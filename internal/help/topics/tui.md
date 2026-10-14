@@ -11,16 +11,18 @@ crm tui --read-only
 
 ## Views
 
-Switch with the number keys, or `[` and `]`.
+Jump with the number keys, cycle with `[` and `]`, or press `v` for the view switcher. The tab bar shows Home, People, Due and Tasks, with the rest under More.
 
 | Key | View | Shows |
 |---|---|---|
-| 1 | People | everyone, searchable |
-| 2 | Due | who you are due to contact (keep-in-touch) |
-| 3 | Birthdays | upcoming birthdays |
+| 1 | Home | what needs attention: who is due, birthdays, tasks, recent notes, sync status |
+| 2 | People | everyone, searchable |
+| 3 | Due | who you are due to contact (keep-in-touch) |
 | 4 | Tasks | open tasks |
-| 5 | Merge | groups of probable duplicates |
-| 6 | Archived | archived people |
+| 5 | Birthdays | upcoming birthdays |
+| 6 | Merge | groups of probable duplicates |
+| 7 | Archived | archived people |
+| 8 | Sync | sync sources and the inbox of unmatched records |
 
 ## Moving
 
@@ -52,6 +54,18 @@ In the detail form: `enter` edits a row, `a` adds a row, `d` deletes the row (as
 - In the compare screen: `tab` picks the other person's value for a row, `s` changes the survivor, `m` merges, `esc` leaves. Dropped people are archived and can be restored.
 - `M` merges the marked people. `#` archives (asks y/n).
 - Archived view: `u` restores. `X` purges after you type the name.
+
+## Notes
+
+In the detail form, on a note row: `enter` edits the text, `t` changes the type, `d` deletes (asks y/n). "Restore last deleted note" is in the palette.
+
+## Sync view
+
+`s` runs a sync for the selected source, `d` does a dry run. In the inbox: `a` accepts (creates a person), `p` attaches to an existing person, `i` ignores.
+
+## Home
+
+`enter` on an item opens that person in People with the detail form focused.
 
 ## Quit
 

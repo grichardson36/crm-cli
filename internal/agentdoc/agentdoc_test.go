@@ -2,6 +2,7 @@ package agentdoc_test
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -41,8 +42,19 @@ func TestAgentsMDNamesTheFirstCommands(t *testing.T) {
 }
 
 func TestNoVendorSpecificFiles(t *testing.T) {
+	root := filepath.Join("..", "..")
 	for _, f := range []string{".claude", ".codex", ".cursorrules", ".mcp.json", "SKILL.md"} {
-		_, err := os.Stat(filepath.Join("..", "..", f))
-		assert.True(t, os.IsNotExist(err), "%s must not ship in the repository root", f)
+		if _, err := os.Stat(filepath.Join(root, f)); os.IsNotExist(err) {
+			continue
+		}
+		// The path exists locally (agents may create scratch dirs such as
+		// .claude/worktrees). Only a tracked file would ship in the repository.
+		cmd := exec.Command("git", "ls-files", "--", f)
+		cmd.Dir = root
+		out, err := cmd.Output()
+		if err != nil {
+			t.Skipf("git unavailable to check whether %s is tracked: %v", f, err)
+		}
+		assert.Empty(t, strings.TrimSpace(string(out)), "%s must not ship in the repository root", f)
 	}
 }

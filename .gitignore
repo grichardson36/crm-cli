@@ -29,3 +29,6 @@ coverage.html
 
 # Go
 vendor/
+
+# Agent scratch directories
+.claude/
