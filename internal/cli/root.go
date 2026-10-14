@@ -60,6 +60,7 @@ func NewRootCmd() *cobra.Command {
 
 	// sync runner and inbox
 	registerSyncCommands(rootCmd)
+	registerDavCommands(rootCmd)
 
 	// agent surface: help topics, manifest, discovery, setup, health, docs
 	help := helpCommand()
