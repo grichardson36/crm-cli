@@ -49,6 +49,7 @@ func NewRootCmd() *cobra.Command {
 	registerContextCommand(rootCmd)
 	registerStatusCommand(rootCmd)
 	registerMCPCommands(rootCmd)
+	registerImportCommand(rootCmd)
 
 	return rootCmd
 }
