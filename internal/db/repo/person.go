@@ -142,7 +142,12 @@ func (r *PersonRepo) FindAll(ctx context.Context, filters model.PersonFilters) (
 		args = append(args, *filters.OrgID)
 	}
 
-	query += " ORDER BY updated_at DESC"
+	// The tag join also has an updated_at column, so qualify it.
+	if filters.Tag != nil {
+		query += " ORDER BY p.updated_at DESC"
+	} else {
+		query += " ORDER BY updated_at DESC"
+	}
 
 	if filters.Limit > 0 {
 		query += " LIMIT ?"
