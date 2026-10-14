@@ -6,8 +6,28 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/jdanielnd/crm-cli/internal/model"
 )
+
+// entityTables maps tagging entity types to the table that holds them.
+var entityTables = map[string]string{
+	"person": "people", "organization": "organizations",
+	"deal": "deals", "interaction": "interactions",
+}
+
+// touchEntity bumps updated_at on a tagged entity. Table names come from entityTables only.
+func (r *TagRepo) touchEntity(ctx context.Context, entityType string, entityID int64) error {
+	table, ok := entityTables[entityType]
+	if !ok {
+		return fmt.Errorf("invalid entity type %q: %w", entityType, model.ErrValidation)
+	}
+	if _, err := r.db.ExecContext(ctx,
+		fmt.Sprintf("UPDATE %s SET updated_at = datetime('now') WHERE id = ?", table), entityID); err != nil {
+		return fmt.Errorf("touch %s %d: %w", entityType, entityID, err)
+	}
+	return nil
+}
 
 // TagRepo handles tag database operations.
 type TagRepo struct {
@@ -49,7 +69,9 @@ func (r *TagRepo) FindOrCreate(ctx context.Context, name string) (*model.Tag, er
 		return nil, fmt.Errorf("find tag: %w", err)
 	}
 
-	result, err := r.db.ExecContext(ctx, "INSERT INTO tags (name) VALUES (?)", name)
+	result, err := r.db.ExecContext(ctx,
+		"INSERT INTO tags (name, uuid, created_at, updated_at) VALUES (?, ?, datetime('now'), datetime('now'))",
+		name, uuid.New().String())
 	if err != nil {
 		return nil, fmt.Errorf("create tag: %w", err)
 	}
@@ -81,11 +103,14 @@ func (r *TagRepo) Apply(ctx context.Context, entityType string, entityID int64, 
 		return err
 	}
 
-	_, err = r.db.ExecContext(ctx,
+	res, err := r.db.ExecContext(ctx,
 		"INSERT OR IGNORE INTO taggings (tag_id, entity_type, entity_id) VALUES (?, ?, ?)",
 		tag.ID, entityType, entityID)
 	if err != nil {
 		return fmt.Errorf("apply tag: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n > 0 {
+		return r.touchEntity(ctx, entityType, entityID)
 	}
 	return nil
 }
@@ -107,7 +132,7 @@ func (r *TagRepo) Remove(ctx context.Context, entityType string, entityID int64,
 	if rows == 0 {
 		return fmt.Errorf("tag %q on %s %d: %w", tagName, entityType, entityID, model.ErrNotFound)
 	}
-	return nil
+	return r.touchEntity(ctx, entityType, entityID)
 }
 
 // GetForEntity returns all tags for an entity.
@@ -156,7 +181,22 @@ func (r *TagRepo) GetEntities(ctx context.Context, tagName string, entityType st
 
 // Delete removes a tag and all its taggings.
 func (r *TagRepo) Delete(ctx context.Context, tagName string) error {
-	result, err := r.db.ExecContext(ctx, "DELETE FROM tags WHERE name = ?", tagName)
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	// Entities that lose the tag changed, so bump their updated_at before the taggings go.
+	for entityType, table := range entityTables {
+		if _, err := tx.ExecContext(ctx,
+			fmt.Sprintf(`UPDATE %s SET updated_at = datetime('now') WHERE id IN (
+				SELECT tg.entity_id FROM taggings tg JOIN tags t ON t.id = tg.tag_id
+				WHERE t.name = ? AND tg.entity_type = ?)`, table), tagName, entityType); err != nil {
+			return fmt.Errorf("touch tagged %s: %w", entityType, err)
+		}
+	}
+	result, err := tx.ExecContext(ctx, "DELETE FROM tags WHERE name = ?", tagName)
 	if err != nil {
 		return fmt.Errorf("delete tag: %w", err)
 	}
@@ -164,5 +204,5 @@ func (r *TagRepo) Delete(ctx context.Context, tagName string) error {
 	if rows == 0 {
 		return fmt.Errorf("tag %q: %w", tagName, model.ErrNotFound)
 	}
-	return nil
+	return tx.Commit()
 }

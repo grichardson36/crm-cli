@@ -68,6 +68,11 @@ func registerStatusCommand(rootCmd *cobra.Command) {
 				return fmt.Errorf("count open tasks: %w", err)
 			}
 
+			deviceID, err := repo.DeviceID(ctx, db)
+			if err != nil {
+				return err
+			}
+
 			f := resolveFormat()
 			if f == format.FormatJSON || f == format.FormatCSV || f == format.FormatTSV {
 				data := []map[string]any{{
@@ -78,6 +83,7 @@ func registerStatusCommand(rootCmd *cobra.Command) {
 					"open_tasks":         openTasks,
 					"overdue_tasks":      overdueCount,
 					"interactions_7days": weekInteractions,
+					"device_id":          deviceID,
 				}}
 				cols := []format.ColumnDef{
 					{Header: "Contacts", Field: "contacts"},
@@ -87,6 +93,7 @@ func registerStatusCommand(rootCmd *cobra.Command) {
 					{Header: "Open Tasks", Field: "open_tasks"},
 					{Header: "Overdue", Field: "overdue_tasks"},
 					{Header: "Interactions (7d)", Field: "interactions_7days"},
+					{Header: "Device ID", Field: "device_id"},
 				}
 				return format.Output(os.Stdout, f, data, cols, flagQuiet)
 			}

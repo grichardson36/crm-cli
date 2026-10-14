@@ -118,13 +118,17 @@ func (r *PersonRepo) FindByID(ctx context.Context, id int64) (*model.Person, err
 
 // FindAll lists people with optional filters.
 func (r *PersonRepo) FindAll(ctx context.Context, filters model.PersonFilters) ([]*model.Person, error) {
-	query := fmt.Sprintf("SELECT %s FROM people WHERE archived = 0", personColumns)
+	archived := 0
+	if filters.Archived {
+		archived = 1
+	}
+	query := fmt.Sprintf("SELECT %s FROM people WHERE archived = %d", personColumns, archived)
 	var args []any
 
 	if filters.Tag != nil {
 		query = fmt.Sprintf(
-			"SELECT p.%s FROM people p JOIN taggings tg ON tg.entity_type = 'person' AND tg.entity_id = p.id JOIN tags t ON t.id = tg.tag_id WHERE p.archived = 0 AND t.name = ?",
-			strings.ReplaceAll(personColumns, ", ", ", p."),
+			"SELECT p.%s FROM people p JOIN taggings tg ON tg.entity_type = 'person' AND tg.entity_id = p.id JOIN tags t ON t.id = tg.tag_id WHERE p.archived = %d AND t.name = ?",
+			strings.ReplaceAll(personColumns, ", ", ", p."), archived,
 		)
 		args = append(args, *filters.Tag)
 	}
@@ -225,12 +229,15 @@ func (r *PersonRepo) Update(ctx context.Context, id int64, input model.UpdatePer
 	}
 	if input.KeepInTouch != nil {
 		if *input.KeepInTouch == "" || *input.KeepInTouch == "unset" {
-			setClauses = append(setClauses, "keep_in_touch = NULL")
+			setClauses = append(setClauses, "keep_in_touch = NULL", "keep_in_touch_set_at = NULL")
 		} else if !model.ValidCadence(*input.KeepInTouch) {
 			return nil, fmt.Errorf("invalid keep-in-touch cadence %q (must be one of: %s): %w", *input.KeepInTouch, strings.Join(model.KeepInTouchCadences, ", "), model.ErrValidation)
 		} else {
-			setClauses = append(setClauses, "keep_in_touch = ?")
-			args = append(args, *input.KeepInTouch)
+			// Restart the first-due clock only when the cadence actually changes.
+			setClauses = append(setClauses,
+				"keep_in_touch_set_at = CASE WHEN keep_in_touch IS ? THEN keep_in_touch_set_at ELSE datetime('now') END",
+				"keep_in_touch = ?")
+			args = append(args, *input.KeepInTouch, *input.KeepInTouch)
 		}
 	}
 	if input.SnoozedUntil != nil {

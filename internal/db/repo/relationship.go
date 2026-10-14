@@ -3,6 +3,7 @@ package repo
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/jdanielnd/crm-cli/internal/model"
@@ -35,6 +36,11 @@ func (r *RelationshipRepo) Create(ctx context.Context, personID, relatedID int64
 	}
 
 	id, _ := result.LastInsertId()
+	for _, pid := range []int64{personID, relatedID} {
+		if err := touchPerson(ctx, r.db, pid); err != nil {
+			return nil, err
+		}
+	}
 	return &model.Relationship{
 		ID:              id,
 		PersonID:        personID,
@@ -70,13 +76,21 @@ func (r *RelationshipRepo) FindForPerson(ctx context.Context, personID int64) ([
 
 // Delete removes a relationship by ID.
 func (r *RelationshipRepo) Delete(ctx context.Context, id int64) error {
-	result, err := r.db.ExecContext(ctx, "DELETE FROM relationships WHERE id = ?", id)
+	var personID, relatedID int64
+	err := r.db.QueryRowContext(ctx, "SELECT person_id, related_person_id FROM relationships WHERE id = ?", id).Scan(&personID, &relatedID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("relationship %d: %w", id, model.ErrNotFound)
+	}
 	if err != nil {
+		return fmt.Errorf("find relationship %d: %w", id, err)
+	}
+	if _, err := r.db.ExecContext(ctx, "DELETE FROM relationships WHERE id = ?", id); err != nil {
 		return fmt.Errorf("delete relationship: %w", err)
 	}
-	rows, _ := result.RowsAffected()
-	if rows == 0 {
-		return fmt.Errorf("relationship %d: %w", id, model.ErrNotFound)
+	for _, pid := range []int64{personID, relatedID} {
+		if err := touchPerson(ctx, r.db, pid); err != nil {
+			return err
+		}
 	}
 	return nil
 }

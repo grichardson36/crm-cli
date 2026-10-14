@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -82,7 +81,10 @@ func registerPersonCommands(rootCmd *cobra.Command) {
 	personCmd.AddCommand(personAddCmd())
 	personCmd.AddCommand(personListCmd())
 	personCmd.AddCommand(personEditCmd())
-	personCmd.AddCommand(personDeleteCmd())
+	personCmd.AddCommand(personArchiveCmd("archive <id>...", "Archive people (reversible, see 'person restore')", "Archived", false))
+	personCmd.AddCommand(personArchiveCmd("delete <id>...", "Deprecated alias of 'person archive'", "Deleted", true))
+	personCmd.AddCommand(personRestoreCmd())
+	personCmd.AddCommand(personPurgeCmd())
 	personCmd.AddCommand(personShowCmd())
 	registerPersonDetailCommands(personCmd)
 	registerRelateCommands(personCmd)
@@ -165,6 +167,7 @@ func personAddCmd() *cobra.Command {
 func personListCmd() *cobra.Command {
 	var tag string
 	var limit int
+	var archived bool
 
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -176,7 +179,7 @@ func personListCmd() *cobra.Command {
 			}
 			defer db.Close()
 
-			filters := model.PersonFilters{Limit: limit}
+			filters := model.PersonFilters{Limit: limit, Archived: archived}
 			if tag != "" {
 				filters.Tag = &tag
 			}
@@ -193,6 +196,7 @@ func personListCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&tag, "tag", "", "filter by tag")
 	cmd.Flags().IntVar(&limit, "limit", 0, "max results")
+	cmd.Flags().BoolVar(&archived, "archived", false, "list archived people instead")
 
 	return cmd
 }
@@ -312,34 +316,6 @@ func personEditCmd() *cobra.Command {
 	cmd.Flags().IntVar(&tier, "tier", 0, "priority tier (0 clears)")
 
 	return cmd
-}
-
-func personDeleteCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "delete <id>",
-		Short: "Delete a person (soft-delete)",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			id, err := strconv.ParseInt(args[0], 10, 64)
-			if err != nil {
-				return model.NewExitError(model.ErrValidation, "invalid person ID: %s", args[0])
-			}
-
-			db, err := openDB()
-			if err != nil {
-				return err
-			}
-			defer db.Close()
-
-			r := repo.NewPersonRepo(db)
-			if err := r.Archive(cmd.Context(), id); err != nil {
-				return err
-			}
-
-			fmt.Fprintf(os.Stderr, "Deleted person #%d\n", id)
-			return nil
-		},
-	}
 }
 
 // parseName splits "Jane Smith" into first and last.

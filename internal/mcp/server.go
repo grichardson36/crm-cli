@@ -138,10 +138,35 @@ func NewServer(db *sql.DB, version string) *server.MCPServer {
 
 	s.AddTool(
 		gomcp.NewTool("crm_person_delete",
-			gomcp.WithDescription("Delete (archive) a person by ID"),
+			gomcp.WithDescription("Deprecated alias of crm_person_archive"),
 			gomcp.WithNumber("id", gomcp.Required(), gomcp.Description("Person ID")),
 		),
 		personDeleteHandler(pr),
+	)
+
+	s.AddTool(
+		gomcp.NewTool("crm_person_archive",
+			gomcp.WithDescription("Archive a person (reversible). Archived people are hidden from search, due, birthdays and dupes"),
+			gomcp.WithNumber("id", gomcp.Required(), gomcp.Description("Person ID")),
+		),
+		personDeleteHandler(pr),
+	)
+
+	s.AddTool(
+		gomcp.NewTool("crm_person_restore",
+			gomcp.WithDescription("Restore an archived person"),
+			gomcp.WithNumber("id", gomcp.Required(), gomcp.Description("Person ID")),
+		),
+		personRestoreHandler(pr),
+	)
+
+	s.AddTool(
+		gomcp.NewTool("crm_person_purge",
+			gomcp.WithDescription("Permanently delete an already archived person and their dependent data. Cannot be undone"),
+			gomcp.WithNumber("id", gomcp.Required(), gomcp.Description("Person ID")),
+			gomcp.WithBoolean("confirm", gomcp.Required(), gomcp.Description("Must be true")),
+		),
+		personPurgeHandler(pr),
 	)
 
 	// Organization tools
@@ -165,8 +190,8 @@ func NewServer(db *sql.DB, version string) *server.MCPServer {
 	// Interaction tools
 	s.AddTool(
 		gomcp.NewTool("crm_interaction_log",
-			gomcp.WithDescription("Log an interaction (call, email, meeting, note, message)"),
-			gomcp.WithString("type", gomcp.Required(), gomcp.Description("Interaction type: call, email, meeting, note, message")),
+			gomcp.WithDescription("Log an interaction of any defined type (see crm_note_types)"),
+			gomcp.WithString("type", gomcp.Required(), gomcp.Description("Interaction type, case-insensitive. Defaults: call, email, meeting, note, message. Call crm_note_types for the full list")),
 			gomcp.WithString("subject", gomcp.Description("Subject/title")),
 			gomcp.WithString("content", gomcp.Description("Content/body")),
 			gomcp.WithString("direction", gomcp.Description("Direction: inbound or outbound")),
@@ -174,6 +199,14 @@ func NewServer(db *sql.DB, version string) *server.MCPServer {
 			gomcp.WithArray("person_ids", gomcp.Description("Array of person IDs to link this interaction to")),
 		),
 		interactionLogHandler(ir),
+	)
+
+	s.AddTool(
+		gomcp.NewTool("crm_note_types",
+			gomcp.WithDescription("List interaction types usable with crm_interaction_log, and whether each counts as contact for keep-in-touch"),
+			gomcp.WithBoolean("include_archived", gomcp.Description("Also list archived types")),
+		),
+		noteTypesHandler(repo.NewNoteTypeRepo(db)),
 	)
 
 	s.AddTool(
@@ -506,7 +539,46 @@ func personDeleteHandler(pr *repo.PersonRepo) server.ToolHandlerFunc {
 		if err != nil {
 			return mcpError(err)
 		}
-		return gomcp.NewToolResultText(fmt.Sprintf("Person #%d deleted", id)), nil
+		return gomcp.NewToolResultText(fmt.Sprintf("Person #%d archived", id)), nil
+	}
+}
+
+func personRestoreHandler(pr *repo.PersonRepo) server.ToolHandlerFunc {
+	return func(ctx context.Context, req gomcp.CallToolRequest) (*gomcp.CallToolResult, error) {
+		id, errResult := requireID(req, "id")
+		if errResult != nil {
+			return errResult, nil
+		}
+		if err := pr.Restore(ctx, id); err != nil {
+			return mcpError(err)
+		}
+		return gomcp.NewToolResultText(fmt.Sprintf("Person #%d restored", id)), nil
+	}
+}
+
+func personPurgeHandler(pr *repo.PersonRepo) server.ToolHandlerFunc {
+	return func(ctx context.Context, req gomcp.CallToolRequest) (*gomcp.CallToolResult, error) {
+		id, errResult := requireID(req, "id")
+		if errResult != nil {
+			return errResult, nil
+		}
+		if !req.GetBool("confirm", false) {
+			return gomcp.NewToolResultError("validation error: purge is permanent, pass confirm: true"), nil
+		}
+		if err := pr.Purge(ctx, id); err != nil {
+			return mcpError(err)
+		}
+		return gomcp.NewToolResultText(fmt.Sprintf("Person #%d permanently deleted", id)), nil
+	}
+}
+
+func noteTypesHandler(nr *repo.NoteTypeRepo) server.ToolHandlerFunc {
+	return func(ctx context.Context, req gomcp.CallToolRequest) (*gomcp.CallToolResult, error) {
+		types, err := nr.List(ctx, req.GetBool("include_archived", false))
+		if err != nil {
+			return mcpError(err)
+		}
+		return jsonResult(types)
 	}
 }
 
