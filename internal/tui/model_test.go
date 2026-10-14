@@ -299,3 +299,10 @@ func TestReadOnlyBlocksWrites(t *testing.T) {
 	press(m, "j", "/")
 	assert.Equal(t, modeSearch, m.mode)
 }
+
+func TestCleanCellStripsEmoji(t *testing.T) {
+	assert.Equal(t, "Jane Smith", cleanCell("Jane ❤️ Smith"))
+	assert.Equal(t, "Ann", cleanCell("Ann 👩‍💻"))
+	assert.Equal(t, "Zoë Müller", cleanCell("Zoë Müller"))
+	assert.Equal(t, "田中 太郎", cleanCell("田中 太郎"))
+}

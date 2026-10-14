@@ -26,6 +26,22 @@ var (
 
 func tabLabel(i int, name string) string { return fmt.Sprintf("%d %s", i+1, name) }
 
+// cleanCell drops emoji and the joiners/selectors that glue them together.
+// Terminals disagree with go-runewidth on how wide these are, which shifts
+// every column to their right, so list cells show only plain text.
+func cleanCell(s string) string {
+	clean := strings.Map(func(r rune) rune {
+		switch {
+		case r == 0x200D, r >= 0xFE00 && r <= 0xFE0F, r == 0x20E3: // ZWJ, variation selectors, keycap
+			return -1
+		case r >= 0x1F000, r >= 0x2600 && r <= 0x27BF, r >= 0x2B00 && r <= 0x2BFF: // emoji, symbols, dingbats, arrows
+			return -1
+		}
+		return r
+	}, s)
+	return strings.Join(strings.Fields(clean), " ")
+}
+
 // fit truncates s to width cells and pads it with spaces.
 func fit(s string, width int) string {
 	if width <= 0 {
@@ -101,11 +117,12 @@ func (m *Model) listView(w, h int) string {
 	}
 	for i := m.offset; i < end; i++ {
 		r := m.rows[i]
-		meta := runewidth.Truncate(r.meta, w/2, "…")
+		title, sub := cleanCell(r.title), cleanCell(r.sub)
+		meta := runewidth.Truncate(cleanCell(r.meta), w/2, "…")
 		metaW := runewidth.StringWidth(meta)
-		left := r.title
-		if r.sub != "" {
-			left += "  " + r.sub
+		left := title
+		if sub != "" {
+			left += "  " + sub
 		}
 		line := fit(left, w-metaW-1) + " " + meta
 		line = fit(line, w)
@@ -113,10 +130,10 @@ func (m *Model) listView(w, h int) string {
 			b.WriteString(selStyle.Render(line))
 		} else {
 			// Dim the subtitle by rendering name and rest separately.
-			name := runewidth.Truncate(r.title, w-metaW-1, "…")
+			name := runewidth.Truncate(title, w-metaW-1, "…")
 			rest := ""
-			if r.sub != "" && runewidth.StringWidth(name) == runewidth.StringWidth(r.title) {
-				rest = fit("  "+r.sub, w-metaW-1-runewidth.StringWidth(name))
+			if sub != "" && runewidth.StringWidth(name) == runewidth.StringWidth(title) {
+				rest = fit("  "+sub, w-metaW-1-runewidth.StringWidth(name))
 			} else {
 				rest = strings.Repeat(" ", max(0, w-metaW-1-runewidth.StringWidth(name)))
 			}
