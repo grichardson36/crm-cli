@@ -360,3 +360,32 @@ func nextOccurrence(today time.Time, month, day int) time.Time {
 		}
 	}
 }
+
+// ListSummaries returns every active person as a lightweight row, ordered by last then first name.
+func (r *PersonRepo) ListSummaries(ctx context.Context) ([]model.PersonSummary, error) {
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT p.id, p.first_name, p.last_name, p.company, p.title, p.email, p.location, p.is_favorite, p.keep_in_touch, p.updated_at,
+		        (SELECT group_concat(t.name, ', ') FROM taggings tg JOIN tags t ON t.id = tg.tag_id
+		          WHERE tg.entity_type = 'person' AND tg.entity_id = p.id),
+		        (SELECT group_concat(e.email, ' ') FROM person_emails e WHERE e.person_id = p.id)
+		 FROM people p WHERE p.archived = 0
+		 ORDER BY lower(COALESCE(p.last_name, p.first_name)), lower(p.first_name)`)
+	if err != nil {
+		return nil, fmt.Errorf("list people: %w", err)
+	}
+	defer rows.Close()
+	var out []model.PersonSummary
+	for rows.Next() {
+		var s model.PersonSummary
+		var first string
+		var last, company, title, email, location, cadence, tags, emails sql.NullString
+		if err := rows.Scan(&s.ID, &first, &last, &company, &title, &email, &location, &s.IsFavorite, &cadence, &s.UpdatedAt, &tags, &emails); err != nil {
+			return nil, fmt.Errorf("scan person summary: %w", err)
+		}
+		s.Name = displayName(first, last)
+		s.Company, s.Title, s.Email, s.Location = company.String, title.String, email.String, location.String
+		s.KeepInTouch, s.Tags, s.AllEmails = cadence.String, tags.String, emails.String
+		out = append(out, s)
+	}
+	return out, rows.Err()
+}

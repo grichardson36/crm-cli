@@ -50,6 +50,7 @@ func NewRootCmd() *cobra.Command {
 	registerStatusCommand(rootCmd)
 	registerMCPCommands(rootCmd)
 	registerReminderCommands(rootCmd)
+	registerTUICommand(rootCmd)
 	registerImportCommand(rootCmd)
 
 	return rootCmd

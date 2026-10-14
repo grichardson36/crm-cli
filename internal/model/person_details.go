@@ -102,3 +102,18 @@ func ParseBirthday(s string) (month, day int, year *int, err error) {
 	}
 	return month, day, year, nil
 }
+
+// PersonSummary is a lightweight row for lists and search-as-you-type.
+type PersonSummary struct {
+	ID          int64
+	Name        string
+	Company     string
+	Title       string
+	Email       string
+	AllEmails   string
+	Location    string
+	Tags        string
+	IsFavorite  bool
+	KeepInTouch string
+	UpdatedAt   string
+}
