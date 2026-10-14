@@ -128,6 +128,9 @@ func (r *PersonRepo) AddEmail(ctx context.Context, id int64, email string, label
 		 ON CONFLICT(person_id, email) DO UPDATE SET label = COALESCE(excluded.label, label)`, id, email, label); err != nil {
 		return fmt.Errorf("add email: %w", err)
 	}
+	if err := touchPerson(ctx, tx, id); err != nil {
+		return err
+	}
 	var hasPrimary int
 	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM person_emails WHERE person_id = ? AND is_primary = 1`, id).Scan(&hasPrimary); err != nil {
 		return err
@@ -192,6 +195,9 @@ func (r *PersonRepo) AddPhone(ctx context.Context, id int64, phone string, label
 		 ON CONFLICT(person_id, phone_number) DO UPDATE SET label = COALESCE(excluded.label, label)`, id, phone, label); err != nil {
 		return fmt.Errorf("add phone: %w", err)
 	}
+	if err := touchPerson(ctx, tx, id); err != nil {
+		return err
+	}
 	var hasPrimary int
 	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM person_phones WHERE person_id = ? AND is_primary = 1`, id).Scan(&hasPrimary); err != nil {
 		return err
@@ -254,6 +260,16 @@ func (r *PersonRepo) SetHandle(ctx context.Context, id int64, kind, value string
 	if err != nil {
 		return fmt.Errorf("set handle: %w", err)
 	}
+	return touchPerson(ctx, r.db, id)
+}
+
+// touchPerson bumps people.updated_at after a change to a row owned by the person.
+func touchPerson(ctx context.Context, q interface {
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
+}, id int64) error {
+	if _, err := q.ExecContext(ctx, `UPDATE people SET updated_at = datetime('now') WHERE id = ?`, id); err != nil {
+		return fmt.Errorf("touch person %d: %w", id, err)
+	}
 	return nil
 }
 
@@ -266,7 +282,7 @@ func (r *PersonRepo) RemoveHandle(ctx context.Context, id int64, kind string) er
 	if n, _ := res.RowsAffected(); n == 0 {
 		return fmt.Errorf("%s handle on person %d: %w", kind, id, model.ErrNotFound)
 	}
-	return nil
+	return touchPerson(ctx, r.db, id)
 }
 
 func displayName(first string, last sql.NullString) string {

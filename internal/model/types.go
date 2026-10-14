@@ -76,6 +76,19 @@ type PersonFilters struct {
 	Tag   *string
 	OrgID *int64
 	Limit int
+	// Archived lists archived people instead of active ones.
+	Archived bool
+}
+
+// NoteType is a user-defined interaction type (call, email, standup, ...).
+type NoteType struct {
+	ID              int64  `json:"id"`
+	UUID            string `json:"uuid"`
+	Name            string `json:"name"`
+	CountsAsContact bool   `json:"counts_as_contact"`
+	Archived        bool   `json:"archived"`
+	CreatedAt       string `json:"created_at"`
+	UpdatedAt       string `json:"updated_at"`
 }
 
 // Organization represents a company or group.
@@ -274,7 +287,7 @@ func ValidEntityType(t string) bool {
 	return false
 }
 
-// Interaction types
+// InteractionTypes lists the seed note types. The note_types table is the source of truth.
 var InteractionTypes = []string{"call", "email", "meeting", "note", "message"}
 
 // ValidInteractionType checks if the given type is valid.

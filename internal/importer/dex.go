@@ -299,14 +299,15 @@ func insertContact(ctx context.Context, tx *sql.Tx, t *table, row []string, rep 
 		updated = created
 	}
 
+	kit := keepInTouch(t.get(row, "frequency_text"), t.get(row, "frequency"))
 	res, err := tx.ExecContext(ctx,
 		`INSERT INTO people (uuid, first_name, last_name, email, phone, title, company, location, notes,
-		   birthday_month, birthday_day, birthday_year, keep_in_touch, last_contacted_at, is_favorite, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		   birthday_month, birthday_day, birthday_year, keep_in_touch, keep_in_touch_set_at, last_contacted_at, is_favorite, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CASE WHEN ? IS NULL THEN NULL ELSE datetime('now') END, ?, ?, ?, ?)`,
 		uuid.NewString(), first, nullable(last), primaryEmail, primaryPhone,
 		nullable(t.get(row, "job_title")), nullable(t.get(row, "company")), nullable(t.get(row, "location")),
 		nullable(t.get(row, "description")), bm, bd, by,
-		keepInTouch(t.get(row, "frequency_text"), t.get(row, "frequency")),
+		kit, kit,
 		nullable(sqliteTime(t.get(row, "last_seen_at"))), fav, created, updated)
 	if err != nil {
 		return 0, err
