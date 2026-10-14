@@ -300,6 +300,8 @@ func NewServer(db *sql.DB, version string) *server.MCPServer {
 		statsHandler(db),
 	)
 
+	registerDedupeTools(s, db)
+
 	return s
 }
 
