@@ -8,6 +8,7 @@ import (
 
 	"github.com/jdanielnd/crm-cli/internal/db"
 	"github.com/jdanielnd/crm-cli/internal/format"
+	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/spf13/cobra"
 )
 
@@ -60,36 +61,83 @@ func NewRootCmd() *cobra.Command {
 	// sync runner and inbox
 	registerSyncCommands(rootCmd)
 
+	// agent surface: help topics, manifest, discovery, setup, health, docs
+	help := helpCommand()
+	rootCmd.SetHelpCommand(help)
+	rootCmd.AddCommand(help)
+	registerSchemaCommand(rootCmd)
+	registerWhereCommand(rootCmd)
+	registerDomainsCommand(rootCmd)
+	registerInitCommand(rootCmd)
+	registerDoctorCommand(rootCmd)
+	registerAgentCommand(rootCmd)
+	registerDocsCommand(rootCmd)
+
+	rootCmd.DisableAutoGenTag = true
+	rootCmd.SetFlagErrorFunc(func(_ *cobra.Command, err error) error {
+		return model.NewExitError(model.ErrUsage, "%s", err.Error())
+	})
+
+	// Must run last: it annotates every command registered above.
+	applyMeta(rootCmd)
+
 	return rootCmd
 }
 
 // openDB resolves the database path and opens it.
 func openDB() (*sql.DB, error) {
-	dbPath := flagDB
-
-	if dbPath == "" {
-		dbPath = os.Getenv("CRM_DB")
+	loc, err := resolveDBLocation()
+	if err != nil {
+		return nil, err
 	}
-
-	if dbPath == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return nil, fmt.Errorf("get home directory: %w", err)
-		}
-		dir := filepath.Join(home, ".crm")
-		if err := os.MkdirAll(dir, 0700); err != nil {
-			return nil, fmt.Errorf("create data directory: %w", err)
-		}
-		dbPath = filepath.Join(dir, "crm.db")
-	}
+	dbPath := loc.Path
 
 	// Ensure parent directory exists
 	dir := filepath.Dir(dbPath)
-	if err := os.MkdirAll(dir, 0700); err != nil {
-		return nil, fmt.Errorf("create directory %s: %w", dir, err)
+	if dbPath != ":memory:" {
+		if err := os.MkdirAll(dir, 0700); err != nil {
+			return nil, fmt.Errorf("create directory %s: %w", dir, err)
+		}
 	}
 
 	return db.Open(dbPath)
+}
+
+// Sources of the active database path, in priority order.
+const (
+	dbSourceFlag    = "flag"
+	dbSourceEnv     = "env"
+	dbSourceDefault = "default"
+)
+
+// dbLocation is the resolved database path and how it was chosen.
+type dbLocation struct {
+	Path   string
+	Source string
+}
+
+// defaultDataDir is the directory that holds the default database and the other domains.
+func defaultDataDir() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("get home directory: %w", err)
+	}
+	return filepath.Join(home, ".crm"), nil
+}
+
+// resolveDBLocation picks the database path: --db, then CRM_DB, then ~/.crm/crm.db.
+func resolveDBLocation() (dbLocation, error) {
+	if flagDB != "" {
+		return dbLocation{Path: flagDB, Source: dbSourceFlag}, nil
+	}
+	if env := os.Getenv("CRM_DB"); env != "" {
+		return dbLocation{Path: env, Source: dbSourceEnv}, nil
+	}
+	dir, err := defaultDataDir()
+	if err != nil {
+		return dbLocation{}, err
+	}
+	return dbLocation{Path: filepath.Join(dir, "crm.db"), Source: dbSourceDefault}, nil
 }
 
 // resolveFormat returns the current output format.

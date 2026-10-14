@@ -10,6 +10,18 @@ A local-first personal CRM that lives in your terminal. Manage contacts, organiz
 
 Single static binary. SQLite database. No cloud. No accounts. Your data stays on your machine.
 
+> This is a fork of [jdanielnd/crm-cli](https://github.com/jdanielnd/crm-cli) (MIT). The original copyright and license notice are kept. See [License](#license).
+
+## Install with your AI agent
+
+Paste this into any agent that can run shell commands. It installs `crm`, creates your database, checks the setup and walks you through the first steps.
+
+```text
+Install and set up the crm program for me. Fetch https://raw.githubusercontent.com/grichardson36/crm-cli/main/INSTALL.md and follow its numbered steps in order. Run each check, show me the result, and ask before you change anything outside the crm data directory. When setup passes `crm doctor`, walk me through the first three things to try.
+```
+
+The steps are in [INSTALL.md](INSTALL.md). Agents learn the program from the program itself: [AGENTS.md](AGENTS.md), `crm help`, `crm schema -f json` and `crm agent`. No vendor-specific file is needed.
+
 ## Features
 
 - **People & Organizations** — contacts with full profiles, linked to companies
@@ -20,26 +32,36 @@ Single static binary. SQLite database. No cloud. No accounts. Your data stays on
 - **Relationships** — person-to-person links (colleague, mentor, referred-by, …)
 - **Full-Text Search** — find anything across all entities instantly
 - **Context Briefing** — one command to get everything about a person before a meeting
-- **AI-Ready** — built-in MCP server for Claude and other AI agents
+- **Keep in Touch** — cadences, a due list, birthdays, duplicate detection and merge, archive and restore
+- **Agent-Ready** — built-in help topics, a JSON command manifest, `--dry-run` on every change, JSON errors, and an optional MCP server
 - **Multiple Output Formats** — table, JSON, CSV, TSV — pipe into anything
 - **Zero Dependencies** — single binary, pure-Go SQLite, runs anywhere
 
 ## Install
 
+The easiest way is the prompt above. By hand:
+
+1. Download the archive for your system from [GitHub Releases](https://github.com/grichardson36/crm-cli/releases): `crm_<os>_<arch>.tar.gz` (`.zip` on Windows), with os `linux`, `darwin` or `windows` and arch `amd64` or `arm64`. Check it against `checksums.txt`.
+2. Put `crm` on your PATH.
+3. Run `crm --version`, then `crm init` and `crm doctor`.
+
+Or build from source with Go 1.24+:
+
 ```bash
-# Homebrew (macOS/Linux)
-brew install jdanielnd/tap/crm
-
-# Go
-go install github.com/jdanielnd/crm-cli/cmd/crm@latest
-
-# Or download a binary from GitHub Releases
-# https://github.com/jdanielnd/crm-cli/releases
+go build -o crm ./cmd/crm
 ```
 
 ## Quick Start
 
 ```bash
+# Create your database and check the setup
+crm init
+crm doctor
+
+# Learn the program from the program
+crm help
+crm help overview
+
 # Add a company
 crm org add "Acme Corp" --domain acme.com
 
@@ -58,6 +80,22 @@ crm status
 
 ## Commands
 
+`crm help` has a guide for each area below, with examples that are tested on every build. `crm <command> --help` shows the flags of one command, and `crm schema -f json` lists them all.
+
+### Setup and discovery
+
+```bash
+crm init                                 # create the data directory and database
+crm init --domain work                   # a separate database: ~/.crm/work.db
+crm where                                # which database is active and how it was chosen
+crm domains                              # every database in ~/.crm
+crm doctor                               # health check with a fix for each problem
+crm help [topic]                         # built-in guides; --search <text> to find a word
+crm schema -f json                       # every command, flag, example and exit code
+crm agent                                # the quick start for AI agents (AGENTS.md)
+crm backup ~/.crm/backups/crm.db         # consistent copy of the database
+```
+
 ### People
 
 ```bash
@@ -66,7 +104,8 @@ crm person list                          # all contacts
 crm person list --tag vip --limit 10     # filtered
 crm person show 1                        # full details
 crm person edit 1 --title "CTO" --company "Acme Corp"
-crm person delete 1                      # soft-delete (recoverable)
+crm person archive 1                     # reversible; crm person restore 1 brings them back
+crm person edit 1 --title CTO --dry-run  # preview any change without writing
 ```
 
 ### Organizations
@@ -122,7 +161,7 @@ crm tag apply deal 1 "q2"
 crm tag show person 1                    # tags on a person
 crm tag remove person 1 "vip"
 crm tag list                             # all tags
-crm tag delete "old-tag"                 # remove tag entirely
+crm tag delete "old-tag" --yes           # remove tag entirely (cannot be undone)
 ```
 
 ### Relationships
@@ -196,9 +235,20 @@ crm task list --overdue -f json | jq -r '.[] | "OVERDUE: \(.title)"'
 
 Exit codes: `0` success, `1` error, `2` usage, `3` not found, `4` conflict, `10` database error.
 
-## AI Integration (MCP Server)
+With `-f json`, errors are printed to stderr as `{"error":{"code":"not_found","message":"...","exit_code":3}}`.
 
-`crm` includes a built-in [MCP](https://modelcontextprotocol.io/) server so AI agents can query and update your CRM over a structured protocol.
+## AI agents
+
+Any agent that can run a shell command can use `crm` through the CLI with `-f json`. It needs no MCP server, skill or vendor-specific file.
+
+- [AGENTS.md](AGENTS.md) is the quick start: where data lives, the first commands to run and the safety rules. `crm agent` prints it.
+- `crm help agents` is the full guide. `crm help --search <text>` finds a word in every guide.
+- `crm schema -f json` lists every command, flag, example, which commands change data, exit codes and MCP tool names.
+- Every command that changes data has `--dry-run`. Commands that cannot be undone need `--yes`.
+
+## Optional: MCP server
+
+`crm` also includes a built-in [MCP](https://modelcontextprotocol.io/) server for agents that prefer a structured protocol. It adds `crm_help` and `crm_schema` tools, and the help topics as resources named `crm://help/<topic>`.
 
 ### Claude Code
 
@@ -206,7 +256,7 @@ Exit codes: `0` success, `1` error, `2` usage, `3` not found, `4` conflict, `10`
 claude mcp add crm -- crm mcp serve
 ```
 
-Then copy [`AGENT.md`](AGENT.md) into your project as `CLAUDE.md` so Claude knows how to use the CRM effectively.
+Then point the agent at [`AGENTS.md`](AGENTS.md) so it knows how to use the CRM effectively.
 
 ### Claude Desktop (macOS)
 
@@ -229,7 +279,7 @@ Then copy [`AGENT.md`](AGENT.md) into your project as `CLAUDE.md` so Claude know
 
 3. Restart Claude Desktop
 
-4. Create a new **Project**, click the project settings, and paste the contents of [`AGENT.md`](AGENT.md) into the project instructions. This teaches Claude when to log interactions, how to maintain contact summaries, tagging conventions, and more.
+4. Create a new **Project**, click the project settings, and paste the contents of [`AGENTS.md`](AGENTS.md) (or the longer workflow notes in [`AGENT.md`](AGENT.md)) into the project instructions. This teaches Claude when to log interactions, how to maintain contact summaries, tagging conventions, and more.
 
 ### Available Tools
 
@@ -253,6 +303,10 @@ Then copy [`AGENT.md`](AGENT.md) into your project as `CLAUDE.md` so Claude know
 | `crm_task_list` | List open tasks |
 | `crm_tag_apply` | Apply a tag |
 | `crm_stats` | CRM summary stats |
+| `crm_help` | Built-in help topics: list, read one, or search |
+| `crm_schema` | Machine-readable manifest of the CLI |
+
+This table lists the main tools. `crm schema -f json` lists every tool name. `AGENT.md` has workflow notes for Claude users.
 
 ### Example AI Workflow
 
@@ -280,28 +334,28 @@ crm --db /path/to/crm.db person list
 export CRM_DB=/path/to/crm.db
 ```
 
-The database and directory are auto-created on first use.
+`crm init` creates the directory and database. They are also created on first use. `crm where` shows the active database and `crm domains` lists every database in `~/.crm`. Keep several databases (domains) to separate, for example, personal and work contacts: `crm init --domain work`, then `crm --db ~/.crm/work.db ...`.
 
-### iCloud Sync (macOS)
+### Do not sync the database folder
 
-Point your database to iCloud Drive for automatic backup across machines:
+Do not put the database in OneDrive, Dropbox or iCloud. Their sync clients copy the file and its write-ahead log at different moments, which can corrupt SQLite. Keep the database local and write backups into the synced folder:
 
 ```bash
-export CRM_DB="$HOME/Library/Mobile Documents/com~apple~CloudDocs/crm/crm.db"
+crm backup "$HOME/Library/Mobile Documents/com~apple~CloudDocs/crm-backups/crm.db"
 ```
 
-SQLite WAL mode handles concurrent reads well, but avoid writing from two machines simultaneously.
+`crm doctor` warns when the database is inside one of these folders.
 
 ## Building from Source
 
 ```bash
-git clone https://github.com/jdanielnd/crm-cli.git
+git clone https://github.com/grichardson36/crm-cli.git
 cd crm-cli
 go build -o crm ./cmd/crm
 go test ./...
 ```
 
-Requires Go 1.23+. No CGO — builds anywhere Go runs.
+Requires Go 1.24+. No CGO — builds anywhere Go runs.
 
 ## Tech Stack
 
@@ -315,4 +369,4 @@ Requires Go 1.23+. No CGO — builds anywhere Go runs.
 
 ## License
 
-MIT
+MIT. This project is a fork of [jdanielnd/crm-cli](https://github.com/jdanielnd/crm-cli), Copyright (c) the original authors, released under the MIT License. The original copyright and license notice stay with all copies of this software.

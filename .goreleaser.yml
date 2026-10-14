@@ -1,5 +1,10 @@
 version: 2
 
+# Release assets, as INSTALL.md expects them:
+#   crm_<os>_<arch>.tar.gz   (crm_windows_<arch>.zip on Windows)   os: linux, darwin, windows   arch: amd64, arm64
+#   checksums.txt            SHA-256 of every archive
+project_name: crm
+
 builds:
   - main: ./cmd/crm
     binary: crm
@@ -12,9 +17,11 @@ builds:
     goarch:
       - amd64
       - arm64
+    # cmd/crm/main.go copies main.version into cli.Version, so the flag must target main.version.
     ldflags:
       - -s -w
-      - -X github.com/jdanielnd/crm-cli/internal/cli.Version={{.Version}}
+      - -X main.version={{.Version}}
+      - -X main.commit={{.ShortCommit}}
 
 archives:
   - formats:
@@ -24,6 +31,10 @@ archives:
       - goos: windows
         formats:
           - zip
+    files:
+      - README.md
+      - AGENTS.md
+      - INSTALL.md
 
 changelog:
   sort: asc
@@ -41,6 +52,8 @@ brews:
       owner: jdanielnd
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    # The tap belongs to the upstream project. Generate the formula but do not push it.
+    skip_upload: true
     name: crm
     directory: Formula
     homepage: "https://github.com/jdanielnd/crm-cli"

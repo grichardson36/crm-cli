@@ -11,6 +11,7 @@ var (
 	ErrValidation = errors.New("validation error")
 	ErrConflict   = errors.New("conflict")
 	ErrDatabase   = errors.New("database error")
+	ErrUsage      = errors.New("usage error")
 )
 
 // ExitError wraps a sentinel with a user-facing message.
@@ -33,7 +34,7 @@ func NewExitError(sentinel error, format string, args ...any) *ExitError {
 // ExitCode maps an error to a CLI exit code.
 func ExitCode(err error) int {
 	switch {
-	case errors.Is(err, ErrValidation):
+	case errors.Is(err, ErrValidation), errors.Is(err, ErrUsage):
 		return 2
 	case errors.Is(err, ErrNotFound):
 		return 3

@@ -2,13 +2,11 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/jdanielnd/crm-cli/internal/cli"
-	"github.com/jdanielnd/crm-cli/internal/model"
 )
 
 var (
@@ -27,8 +25,7 @@ func run() int {
 
 	rootCmd := cli.NewRootCmd()
 	if err := rootCmd.ExecuteContext(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "crm: error: %s\n", err.Error())
-		return model.ExitCode(err)
+		return cli.ReportError(os.Stderr, err, os.Args[1:])
 	}
 	return 0
 }
