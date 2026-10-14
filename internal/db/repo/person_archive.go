@@ -90,6 +90,9 @@ func (r *PersonRepo) Purge(ctx context.Context, id int64) error {
 	if err := tombstone("interactions", soleInteractions, id); err != nil {
 		return err
 	}
+	if err := exec("DELETE FROM external_ids WHERE entity = 'interaction' AND local_id IN (SELECT id FROM interactions WHERE "+soleInteractions+")", id); err != nil {
+		return err
+	}
 	if err := exec("DELETE FROM interactions WHERE "+soleInteractions, id); err != nil {
 		return err
 	}
@@ -114,6 +117,12 @@ func (r *PersonRepo) Purge(ctx context.Context, id int64) error {
 		return err
 	}
 	if err := exec("DELETE FROM custom_fields WHERE entity_type = 'person' AND entity_id = ?", id); err != nil {
+		return err
+	}
+	if err := exec("DELETE FROM external_ids WHERE entity = 'person' AND local_id = ?", id); err != nil {
+		return err
+	}
+	if err := exec("DELETE FROM field_versions WHERE entity = 'person' AND local_id = ?", id); err != nil {
 		return err
 	}
 	// Cascades: person_emails, person_phones, person_handles, task_people,

@@ -268,18 +268,36 @@ func (r *PersonRepo) Update(ctx context.Context, id int64, input model.UpdatePer
 	setClauses = append(setClauses, "updated_at = datetime('now')")
 	args = append(args, id)
 
-	query := fmt.Sprintf("UPDATE people SET %s WHERE id = ? AND archived = 0", strings.Join(setClauses, ", "))
-	result, err := r.db.ExecContext(ctx, query, args...)
+	// One transaction covers the update and its per-field change records.
+	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
+		return nil, fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	selectQuery := fmt.Sprintf("SELECT %s FROM people WHERE id = ? AND archived = 0", personColumns)
+	before, err := scanPerson(tx.QueryRowContext(ctx, selectQuery, id))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("person %d: %w", id, model.ErrNotFound)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("find person %d: %w", id, err)
+	}
+
+	query := fmt.Sprintf("UPDATE people SET %s WHERE id = ? AND archived = 0", strings.Join(setClauses, ", "))
+	if _, err := tx.ExecContext(ctx, query, args...); err != nil {
 		return nil, fmt.Errorf("update person %d: %w", id, err)
 	}
 
-	rows, err := result.RowsAffected()
+	after, err := scanPerson(tx.QueryRowContext(ctx, selectQuery, id))
 	if err != nil {
-		return nil, fmt.Errorf("rows affected: %w", err)
+		return nil, fmt.Errorf("reload person %d: %w", id, err)
 	}
-	if rows == 0 {
-		return nil, fmt.Errorf("person %d: %w", id, model.ErrNotFound)
+	if err := recordPersonFieldChanges(ctx, tx, id, before, after); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("commit transaction: %w", err)
 	}
 
 	if err := r.syncPrimary(ctx, id, input.Email, input.Phone); err != nil {

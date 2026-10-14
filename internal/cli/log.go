@@ -64,6 +64,8 @@ func registerLogCommands(rootCmd *cobra.Command) {
 	logCmd.AddCommand(logAddCmd())
 	logCmd.AddCommand(logTypesCmd())
 	logCmd.AddCommand(logListCmd())
+	logCmd.AddCommand(logEditCmd())
+	logCmd.AddCommand(logRmCmd())
 
 	rootCmd.AddCommand(logCmd)
 }

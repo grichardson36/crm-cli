@@ -7,6 +7,7 @@ import (
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/format"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	crmsync "github.com/jdanielnd/crm-cli/internal/sync"
 	"github.com/spf13/cobra"
 )
 
@@ -73,9 +74,15 @@ func registerStatusCommand(rootCmd *cobra.Command) {
 				return err
 			}
 
+			lastSync, err := crmsync.LastSyncSummary(ctx, db)
+			if err != nil {
+				return err
+			}
+
 			f := resolveFormat()
 			if f == format.FormatJSON || f == format.FormatCSV || f == format.FormatTSV {
 				data := []map[string]any{{
+					"last_sync":          lastSync,
 					"contacts":           personCount,
 					"organizations":      orgCount,
 					"open_deals":         dealCount,
@@ -103,6 +110,10 @@ func registerStatusCommand(rootCmd *cobra.Command) {
 				personCount, orgCount, dealCount, dealValue)
 			fmt.Fprintf(os.Stdout, "%d open tasks | %d overdue | %d interactions this week\n",
 				openTasks, overdueCount, weekInteractions)
+			if lastSync != nil {
+				fmt.Fprintf(os.Stdout, "Last sync: %s %s at %s (%d created, %d updated, %d errors, %d in inbox)\n",
+					lastSync.Source, lastSync.Status, lastSync.FinishedAt, lastSync.Created, lastSync.Updated, lastSync.Errors, lastSync.InboxPending)
+			}
 
 			// Show pipeline if there are deals
 			dr := repo.NewDealRepo(db)
