@@ -115,7 +115,7 @@ func TestMigration004_UpgradeFromV2(t *testing.T) {
 
 	var version int
 	require.NoError(t, d.QueryRow(`PRAGMA user_version`).Scan(&version))
-	assert.Equal(t, 5, version)
+	assert.Equal(t, 6, version)
 }
 
 func TestMigration004_BackfillsKeepInTouchSetAt(t *testing.T) {

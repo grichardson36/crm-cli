@@ -154,6 +154,20 @@ var commandMeta = map[string]cmdMeta{
 	"sync inbox ignore": {mutates: true, examples: []string{`crm sync inbox ignore 1`}},
 	"backup":            {examples: []string{`crm backup ./crm-backup.db`}},
 
+	// phone sync over CardDAV
+	"dav serve": {mutates: true, noDryRun: true, examples: []string{
+		`crm dav serve --password-env CRM_DAV_PASSWORD`,
+		`crm dav serve --password-file ~/.crm/dav-password --user grant --base-url https://contacts.example.com --read-only`}},
+	"dav info": {fields: "base_url,user,address_book,address_book_url,address_book_path,discovery_url,listen,password,steps,notes", examples: []string{
+		`crm dav info -f json`, `crm dav info --base-url https://contacts.example.com --user grant`}},
+	"dav status": {fields: "contacts_exposed,device_created,synced_to_device,last_request_at,last_get_at,last_put_at,conflicts,open_conflicts", examples: []string{
+		`crm dav status -f json`}},
+	"dav conflicts": {fields: davConflictFields, examples: []string{`crm dav conflicts -f json`}},
+	"dav conflicts list": {fields: davConflictFields, examples: []string{
+		`crm dav conflicts list -f json`, `crm dav conflicts list --all -f json`}},
+	"dav conflicts show": {fields: davConflictFields, examples: []string{`crm dav conflicts show 1 -f json`}},
+	"dav conflicts undo": {mutates: true, fields: davConflictFields, examples: []string{`crm dav conflicts undo 1`}},
+
 	// interfaces
 	"mcp serve": {examples: []string{`crm mcp serve`}},
 	"tui":       {mutates: true, noDryRun: true, examples: []string{`crm tui`, `crm tui --read-only`}},
