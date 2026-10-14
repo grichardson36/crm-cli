@@ -13,6 +13,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
+	"github.com/jdanielnd/crm-cli/internal/dedupe"
 	"github.com/jdanielnd/crm-cli/internal/model"
 )
 
@@ -23,10 +24,12 @@ const (
 	viewDue
 	viewBirthdays
 	viewTasks
+	viewMerge
+	viewArchived
 	numViews
 )
 
-var viewNames = [numViews]string{"People", "Due", "Birthdays", "Tasks"}
+var viewNames = [numViews]string{"People", "Due", "Birthdays", "Tasks", "Merge", "Archived"}
 
 type mode int
 
@@ -63,6 +66,8 @@ type Model struct {
 	ir   *repo.InteractionRepo
 	tr   *repo.TaskRepo
 	tagr *repo.TagRepo
+	dr   *repo.DupeRepo
+	ntr  *repo.NoteTypeRepo
 	now  func() time.Time
 
 	// clip copies text to the system clipboard (OSC52 by default). open launches a URL.
@@ -107,6 +112,19 @@ type Model struct {
 	confirm    *confirmState
 	ov         *overlay
 	pendingCmd tea.Cmd
+
+	// Merge view: duplicate groups parallel to rows, the minimum level and the dismissals made
+	// this session (newest last) for undo. cmp is the open compare screen, if any.
+	groups    []dedupe.Group
+	minLevel  dedupe.Level
+	dismissed [][]int64
+	cmp       *compareState
+
+	// Archived view: the archived people by id.
+	arch map[int64]*model.Person
+
+	// noteType is the type used by the next note prompt (remembered between notes).
+	noteType string
 }
 
 // New creates the model and loads data.
@@ -122,6 +140,10 @@ func New(ctx context.Context, db *sql.DB) (*Model, error) {
 		ir:       repo.NewInteractionRepo(db),
 		tr:       repo.NewTaskRepo(db),
 		tagr:     repo.NewTagRepo(db),
+		dr:       repo.NewDupeRepo(db),
+		ntr:      repo.NewNoteTypeRepo(db),
+		minLevel: dedupe.Medium,
+		noteType: "note",
 		now:      time.Now,
 		input:    in,
 		rowInput: ri,
@@ -233,6 +255,29 @@ func (m *Model) rebuild(keep bool) error {
 				r.sub = "repeats " + *t.Recurrence
 			}
 			rows = append(rows, r)
+		}
+	case viewMerge:
+		groups, err := m.dr.Find(m.ctx, m.minLevel)
+		if err != nil {
+			return err
+		}
+		m.groups = groups
+		for _, g := range groups {
+			rows = append(rows, groupRow(g))
+		}
+	case viewArchived:
+		list, err := m.pr.FindAll(m.ctx, model.PersonFilters{Archived: true})
+		if err != nil {
+			return err
+		}
+		m.arch = map[int64]*model.Person{}
+		for _, p := range list {
+			m.arch[p.ID] = p
+			sub := cleanCell(str(p.Company))
+			if sub == "" {
+				sub = cleanCell(str(p.Title))
+			}
+			rows = append(rows, row{personID: p.ID, title: cleanCell(fullName(p)), sub: sub, meta: dateOnly(p.UpdatedAt)})
 		}
 	}
 	m.rows = rows
@@ -518,6 +563,11 @@ func (m *Model) startPrompt(kind, prompt, initial string) {
 	if m.curPerson() == 0 {
 		return
 	}
+	m.startInput(kind, prompt, initial)
+}
+
+// startInput opens the footer input for a prompt that needs no selected person.
+func (m *Model) startInput(kind, prompt, initial string) {
 	m.mode = modePrompt
 	m.promptKind = kind
 	m.input.Prompt = prompt
@@ -536,10 +586,18 @@ func (m *Model) handlePromptKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		kind := m.promptKind
 		m.mode = modeNormal
 		m.input.Blur()
+		m.pendingCmd = nil
 		if value != "" {
 			m.runPrompt(kind, value)
 		}
-		return m, nil
+		cmd := m.pendingCmd
+		m.pendingCmd = nil
+		return m, cmd
+	case "tab", "shift+tab":
+		if m.promptKind == "note" {
+			m.cycleNoteType(msg.String() == "tab")
+			return m, nil
+		}
 	}
 	var cmd tea.Cmd
 	m.input, cmd = m.input.Update(msg)
@@ -551,9 +609,13 @@ func (m *Model) handleConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "y", "Y":
 		m.mode, m.confirm = modeNormal, nil
+		m.pendingCmd = nil
 		if c != nil {
 			c.yes()
 		}
+		cmd := m.pendingCmd
+		m.pendingCmd = nil
+		return m, cmd
 	case "n", "N", "esc":
 		m.mode, m.confirm = modeNormal, nil
 		m.setStatus("cancelled", false)
@@ -590,6 +652,14 @@ func (m *Model) bulk(ids []int64, single, plural string, fn func(id int64) error
 }
 
 func (m *Model) runPrompt(kind, value string) {
+	switch kind {
+	case "notetype-add":
+		m.addNoteType(value)
+		return
+	case "purge":
+		m.purgeCurrent(value)
+		return
+	}
 	ids := m.targets()
 	if len(ids) == 0 {
 		m.setStatus("no person selected", true)
@@ -628,12 +698,13 @@ func (m *Model) runPrompt(kind, value string) {
 			m.setStatus("no person selected", true)
 			return
 		}
-		subject := "Note"
-		if _, err := m.ir.Create(m.ctx, model.CreateInteractionInput{Type: "note", Subject: &subject, Content: &value, PersonIDs: []int64{pid}}); err != nil {
+		typ := m.currentNoteType()
+		if _, err := m.ir.Create(m.ctx, model.CreateInteractionInput{Type: typ, Content: &value, PersonIDs: []int64{pid}}); err != nil {
 			m.setStatus(err.Error(), true)
 			return
 		}
-		m.setStatus("note added", false)
+		m.noteType = typ
+		m.setStatus(typ+" added", false)
 	case "task":
 		if pid == 0 {
 			m.setStatus("no person selected", true)

@@ -282,7 +282,7 @@ func (m *Model) handleHelpKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // helpText is generated from the action registry so it matches the palette.
 func (m *Model) helpText() string {
-	order := []string{"Contact", "Edit pane", "Bulk", "Move", "Views", "App"}
+	order := []string{"Contact", "Edit pane", "Bulk", "Merge", "Compare", "Archive", "Move", "Views", "App"}
 	var b strings.Builder
 	for _, g := range order {
 		b.WriteString(headStyle.Render(g) + "\n")

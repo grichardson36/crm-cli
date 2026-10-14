@@ -20,6 +20,9 @@ func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	if m.mode != modeNormal {
 		return m, nil
 	}
+	if m.cmp != nil {
+		return m.compareMouse(msg)
+	}
 	listW := m.listWidth()
 	inList := msg.X < listW
 	switch msg.Button {
@@ -43,14 +46,11 @@ func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		switch {
 		case msg.Y == 0:
 			// Click on the tab bar.
-			x := 0
-			for i, name := range viewNames {
-				w := len(tabLabel(i, name)) + 2
-				if msg.X >= x && msg.X < x+w {
+			for i, seg := range m.tabLayout() {
+				if msg.X >= seg.x0 && msg.X < seg.x1 {
 					m.switchView(viewKind(i))
 					break
 				}
-				x += w
 			}
 		case msg.Y == footerY:
 			// Tapping the status line opens the palette.
@@ -90,6 +90,39 @@ func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 					return m, m.runAction(a)
 				}
 			}
+		}
+	}
+	return m, nil
+}
+
+// compareMouse handles the mouse on the compare screen: wheel moves, a click picks the clicked
+// person's value for the row, and the footer works as usual.
+func (m *Model) compareMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	switch msg.Button {
+	case tea.MouseButtonWheelUp:
+		m.handleCompareMouse(msg.X, msg.Y, -1)
+	case tea.MouseButtonWheelDown:
+		m.handleCompareMouse(msg.X, msg.Y, 1)
+	case tea.MouseButtonLeft:
+		if msg.Action != tea.MouseActionPress {
+			return m, nil
+		}
+		footerY := 1 + m.bodyHeight()
+		switch {
+		case msg.Y == footerY:
+			if a := m.actionByID("palette"); a != nil {
+				return m, m.runAction(a)
+			}
+		case msg.Y == footerY+1:
+			for _, s := range m.footerSegs() {
+				if msg.X >= s.x0 && msg.X < s.x1 {
+					if a := m.actionByID(s.id); a != nil && a.enabled(m) {
+						return m, m.runAction(a)
+					}
+				}
+			}
+		default:
+			m.handleCompareMouse(msg.X, msg.Y, 0)
 		}
 	}
 	return m, nil

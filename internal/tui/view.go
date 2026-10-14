@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"unicode"
 
@@ -70,6 +71,9 @@ func (m *Model) View() string {
 	if m.help {
 		return m.helpView()
 	}
+	if m.cmp != nil {
+		return m.compareView()
+	}
 	listW := m.listWidth()
 	bodyH := m.bodyHeight()
 	detailW := m.width - listW - 1
@@ -89,18 +93,56 @@ func (m *Model) View() string {
 	return m.tabsView() + "\n" + body + "\n" + m.footerView()
 }
 
-func (m *Model) tabsView() string {
-	var tabs []string
+// tabSeg is one tab in the tab bar with its screen columns [x0, x1).
+type tabSeg struct {
+	label  string
+	x0, x1 int
+}
+
+// tabLayout places the tabs. When the full labels do not fit the width, tabs other than the
+// current one shrink to their number so the bar still fits (keys 1-6 and clicks work as usual).
+func (m *Model) tabLayout() []tabSeg {
+	total := 0
+	for i, name := range viewNames {
+		total += runewidth.StringWidth(tabLabel(i, name)) + 2
+	}
+	compact := total > m.width
+	var segs []tabSeg
+	x := 0
 	for i, name := range viewNames {
 		label := tabLabel(i, name)
+		if compact && viewKind(i) != m.view {
+			label = strconv.Itoa(i + 1)
+		}
+		w := runewidth.StringWidth(label) + 2
+		segs = append(segs, tabSeg{label: label, x0: x, x1: x + w})
+		x += w
+	}
+	return segs
+}
+
+// countText is the right side of the tab bar.
+func (m *Model) countText() string {
+	switch m.view {
+	case viewMerge:
+		return fmt.Sprintf("%d groups, %s+", len(m.rows), m.minLevel)
+	case viewArchived:
+		return fmt.Sprintf("%d archived", len(m.rows))
+	}
+	return fmt.Sprintf("%d shown / %d total", len(m.rows), len(m.people))
+}
+
+func (m *Model) tabsView() string {
+	var tabs []string
+	for i, seg := range m.tabLayout() {
 		if viewKind(i) == m.view {
-			tabs = append(tabs, tabOn.Render(label))
+			tabs = append(tabs, tabOn.Render(seg.label))
 		} else {
-			tabs = append(tabs, tabOff.Render(label))
+			tabs = append(tabs, tabOff.Render(seg.label))
 		}
 	}
-	line := strings.Join(tabs, "")
-	count := dimStyle.Render(fmt.Sprintf("%d shown / %d total", len(m.rows), len(m.people)))
+	line := lipgloss.NewStyle().MaxWidth(m.width).Render(strings.Join(tabs, ""))
+	count := dimStyle.Render(m.countText())
 	gap := m.width - lipgloss.Width(line) - lipgloss.Width(count)
 	if gap < 1 {
 		return line
@@ -119,6 +161,10 @@ func (m *Model) listView(w, h int) string {
 			return dimStyle.Render("No birthdays in the next 90 days.")
 		case m.view == viewTasks:
 			return dimStyle.Render("No open tasks. Press t on a person to add one.")
+		case m.view == viewMerge:
+			return dimStyle.Render("No duplicates at " + m.minLevel.String() + " confidence or above. m lowers the level.")
+		case m.view == viewArchived:
+			return dimStyle.Render("Nothing archived. # archives the selected person.")
 		}
 		return dimStyle.Render("Nothing here yet.")
 	}
@@ -180,7 +226,9 @@ var footShort = map[string]string{
 	"down": "move", "search": "search", "focus-detail": "edit", "mark": "mark", "contacted": "contacted",
 	"tag": "tag", "cadence": "cadence", "tier": "tier", "note": "note", "new": "new", "task": "task",
 	"help": "help", "palette": "menu", "edit": "edit", "add": "add", "delete": "delete", "copy": "copy",
-	"open": "open", "back": "back",
+	"open": "open", "back": "back", "compare": "compare", "dupe-level": "level", "dismiss": "dismiss",
+	"undo-dismiss": "undo", "merge-marked": "merge", "archive": "archive", "restore": "restore", "purge": "purge",
+	"cmp-pick": "pick", "cmp-survivor": "survivor", "cmp-apply": "merge", "cmp-back": "back",
 }
 
 // footerSegs lists the hints for the focused pane, in order, limited to what fits the width.
@@ -270,6 +318,9 @@ func (m *Model) hintsLine() string {
 	case modeConfirm:
 		return dimStyle.Render("y yes  n no")
 	case modeSearch, modePrompt:
+		if m.mode == modePrompt && m.promptKind == "note" {
+			return dimStyle.Render("enter save  tab type  esc cancel")
+		}
 		return dimStyle.Render("enter confirm  esc cancel")
 	}
 	var parts []string

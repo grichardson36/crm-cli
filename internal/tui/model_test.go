@@ -126,7 +126,7 @@ func TestViewFitsTerminal(t *testing.T) {
 	}
 	for _, size := range [][2]int{{100, 30}, {60, 12}, {40, 10}, {120, 50}} {
 		m.Update(tea.WindowSizeMsg{Width: size[0], Height: size[1]})
-		for _, v := range []string{"1", "2", "3", "4"} {
+		for _, v := range []string{"1", "2", "3", "4", "5", "6"} {
 			press(m, v)
 			check(size, "view "+v)
 		}
@@ -209,9 +209,11 @@ func TestViewsDueBirthdaysTasks(t *testing.T) {
 	assert.Contains(t, m.View(), "No open tasks")
 
 	press(m, "]")
+	assert.Equal(t, viewMerge, m.view)
+	press(m, "]", "]")
 	assert.Equal(t, viewPeople, m.view, "] wraps around")
 	press(m, "[")
-	assert.Equal(t, viewTasks, m.view, "[ wraps back")
+	assert.Equal(t, viewArchived, m.view, "[ wraps back")
 }
 
 func TestMarkContactedRemovesFromDue(t *testing.T) {

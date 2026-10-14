@@ -308,6 +308,9 @@ func (m *Model) refreshDetail(force bool) {
 	}
 	r, ok := m.selected()
 	key := fmt.Sprintf("%d/%d", r.personID, r.taskID)
+	if m.view == viewMerge {
+		key += fmt.Sprintf("/%d", m.cursor)
+	}
 	if !ok {
 		key = ""
 	}
@@ -317,7 +320,7 @@ func (m *Model) refreshDetail(force bool) {
 	changed := key != m.detailKey
 	m.detailKey = key
 	m.formPerson = r.personID
-	if ok {
+	if ok && m.view != viewArchived {
 		m.form = m.buildForm(r.personID, r.taskID)
 	} else {
 		m.form, m.formTitle = nil, ""
@@ -338,7 +341,7 @@ func (m *Model) syncDetail() {
 	w := m.detail.Width
 	if len(m.form) == 0 {
 		m.lineRow, m.rowStart, m.rowEnd = nil, nil, nil
-		m.detail.SetContent(dimStyle.Render("Nothing selected."))
+		m.detail.SetContent(m.emptyDetail())
 		return
 	}
 	var lines []string
@@ -530,8 +533,7 @@ func (m *Model) addRow(k rowKind) tea.Cmd {
 	}
 	if k == rkNote {
 		// Notes use the same footer prompt as the n key.
-		m.startPrompt("note", "note: ", "")
-		return m.input.Focus()
+		return m.startNotePrompt()
 	}
 	m.focus = focusDetail
 	// Find the section: the last row of this kind. Replace a placeholder or insert after.
