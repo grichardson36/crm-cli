@@ -57,6 +57,9 @@ func NewRootCmd() *cobra.Command {
 	// dedupe (dupes, person merge)
 	registerDupesCommands(rootCmd)
 
+	// sync runner and inbox
+	registerSyncCommands(rootCmd)
+
 	return rootCmd
 }
 

@@ -334,6 +334,8 @@ func NewServer(db *sql.DB, version string) *server.MCPServer {
 	)
 
 	registerDedupeTools(s, db)
+	registerLogEditTools(s, ir)
+	registerSyncTools(s, db)
 
 	return s
 }

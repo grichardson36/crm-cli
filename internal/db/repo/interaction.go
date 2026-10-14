@@ -93,6 +93,94 @@ func (r *InteractionRepo) Create(ctx context.Context, input model.CreateInteract
 	return r.FindByID(ctx, rowID)
 }
 
+// Update edits an active interaction. The type must be an active note type.
+// Subject, Content and Direction accept "" to clear. FTS follows through the update trigger.
+func (r *InteractionRepo) Update(ctx context.Context, id int64, input model.UpdateInteractionInput) (*model.Interaction, error) {
+	var sets []string
+	var args []any
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if input.Type != nil {
+		typeName, err := resolveActiveType(ctx, tx, *input.Type)
+		if err != nil {
+			return nil, err
+		}
+		sets = append(sets, "type = ?")
+		args = append(args, typeName)
+	}
+	if input.Subject != nil {
+		sets = append(sets, "subject = ?")
+		args = append(args, nullIfEmpty(*input.Subject))
+	}
+	if input.Content != nil {
+		sets = append(sets, "content = ?")
+		args = append(args, nullIfEmpty(*input.Content))
+	}
+	if input.Direction != nil {
+		if *input.Direction != "" && !model.ValidInteractionDirection(*input.Direction) {
+			return nil, fmt.Errorf("invalid direction %q: %w", *input.Direction, model.ErrValidation)
+		}
+		sets = append(sets, "direction = ?")
+		args = append(args, nullIfEmpty(*input.Direction))
+	}
+	if input.OccurredAt != nil {
+		if strings.TrimSpace(*input.OccurredAt) == "" {
+			return nil, fmt.Errorf("occurred_at cannot be empty: %w", model.ErrValidation)
+		}
+		sets = append(sets, "occurred_at = ?")
+		args = append(args, *input.OccurredAt)
+	}
+	if len(sets) == 0 {
+		return r.FindByID(ctx, id)
+	}
+
+	sets = append(sets, "updated_at = datetime('now')")
+	args = append(args, id)
+	res, err := tx.ExecContext(ctx,
+		fmt.Sprintf("UPDATE interactions SET %s WHERE id = ? AND archived = 0", strings.Join(sets, ", ")), args...)
+	if err != nil {
+		return nil, fmt.Errorf("update interaction %d: %w", id, err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return nil, fmt.Errorf("interaction %d: %w", id, model.ErrNotFound)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("commit transaction: %w", err)
+	}
+	return r.FindByID(ctx, id)
+}
+
+// Archive soft-deletes an interaction. It stops counting toward keep-in-touch and drops out of search.
+func (r *InteractionRepo) Archive(ctx context.Context, id int64) error {
+	res, err := r.db.ExecContext(ctx,
+		"UPDATE interactions SET archived = 1, updated_at = datetime('now') WHERE id = ? AND archived = 0", id)
+	if err != nil {
+		return fmt.Errorf("archive interaction %d: %w", id, err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return fmt.Errorf("interaction %d: %w", id, model.ErrNotFound)
+	}
+	return nil
+}
+
+// Restore brings an archived interaction back.
+func (r *InteractionRepo) Restore(ctx context.Context, id int64) error {
+	res, err := r.db.ExecContext(ctx,
+		"UPDATE interactions SET archived = 0, updated_at = datetime('now') WHERE id = ? AND archived = 1", id)
+	if err != nil {
+		return fmt.Errorf("restore interaction %d: %w", id, err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return fmt.Errorf("archived interaction %d: %w", id, model.ErrNotFound)
+	}
+	return nil
+}
+
 // FindByID returns an interaction by ID with its person IDs.
 func (r *InteractionRepo) FindByID(ctx context.Context, id int64) (*model.Interaction, error) {
 	row := r.db.QueryRowContext(ctx,

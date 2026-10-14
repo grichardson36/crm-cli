@@ -109,6 +109,18 @@ func TestImportDex_IdempotentAndDryRun(t *testing.T) {
 	assert.Equal(t, 2, rep.NotesSkipped)
 	require.NoError(t, d.QueryRow(`SELECT COUNT(*) FROM people`).Scan(&n))
 	assert.Equal(t, 3, n)
+
+	// The mapping lives in external_ids (source dex). The custom field stays.
+	require.NoError(t, d.QueryRow(`SELECT COUNT(*) FROM external_ids WHERE source = 'dex' AND entity = 'person'`).Scan(&n))
+	assert.Equal(t, 3, n)
+	require.NoError(t, d.QueryRow(`SELECT COUNT(*) FROM custom_fields WHERE field_name = 'dex_id'`).Scan(&n))
+	assert.Equal(t, 3, n)
+	var local int64
+	require.NoError(t, d.QueryRow(`SELECT e.local_id FROM external_ids e JOIN people p ON p.id = e.local_id AND p.uuid = e.local_uuid
+		WHERE e.external_id = '11111111-1111-1111-1111-111111111111'`).Scan(&local))
+	var first string
+	require.NoError(t, d.QueryRow(`SELECT first_name FROM people WHERE id = ?`, local).Scan(&first))
+	assert.Equal(t, "Jane", first)
 }
 
 func TestImportDex_RejectsOtherCSV(t *testing.T) {

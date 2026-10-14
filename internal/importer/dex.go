@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -13,7 +14,12 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/jdanielnd/crm-cli/internal/db/repo"
+	"github.com/jdanielnd/crm-cli/internal/model"
 )
+
+// DexSource is the external_ids source name for Dex records.
+const DexSource = "dex"
 
 // DexOptions tunes an import.
 type DexOptions struct {
@@ -111,7 +117,8 @@ func readCSV(path string) (*table, error) {
 
 // ImportDex loads a Dex contacts export, and optionally a Dex notes export, in one
 // transaction. With dryRun the transaction is rolled back after counting.
-// Re-running is safe: contacts are matched by their Dex id, notes by "dex:<id>".
+// Re-running is safe: contacts are matched by their Dex id in external_ids (source "dex"),
+// notes by "dex:<id>". The dex_id custom field is still written for display.
 func ImportDex(ctx context.Context, db *sql.DB, contactsPath, notesPath string, opts DexOptions) (*DexReport, error) {
 	contacts, err := readCSV(contactsPath)
 	if err != nil {
@@ -141,25 +148,27 @@ func ImportDex(ctx context.Context, db *sql.DB, contactsPath, notesPath string, 
 		skip[strings.ToLower(strings.TrimSpace(name))] = true
 	}
 	byDexID := map[string]int64{}
+	extIDs := repo.NewExternalIDRepo(tx)
 
 	for _, row := range contacts.rows {
 		dexID := contacts.get(row, "id")
 		if dexID == "" {
 			continue
 		}
-		var existing int64
-		err := tx.QueryRowContext(ctx,
-			`SELECT entity_id FROM custom_fields WHERE entity_type='person' AND field_name='dex_id' AND field_value=?`, dexID).Scan(&existing)
+		known, err := extIDs.Lookup(ctx, DexSource, "person", dexID)
 		if err == nil {
-			byDexID[dexID] = existing
+			byDexID[dexID] = known.LocalID
 			rep.ContactsSkipped++
 			continue
 		}
-		if err != sql.ErrNoRows {
+		if !errors.Is(err, model.ErrNotFound) {
 			return nil, err
 		}
 		pid, err := insertContact(ctx, tx, contacts, row, rep, skip)
 		if err != nil {
+			return nil, fmt.Errorf("contact %s: %w", dexID, err)
+		}
+		if _, err := extIDs.Upsert(ctx, repo.ExternalIDInput{Entity: "person", LocalID: pid, Source: DexSource, ExternalID: dexID}); err != nil {
 			return nil, fmt.Errorf("contact %s: %w", dexID, err)
 		}
 		byDexID[dexID] = pid
