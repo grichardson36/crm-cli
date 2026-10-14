@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -21,6 +22,9 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 	binaryPath = filepath.Join(tmp, "crm")
+	if runtime.GOOS == "windows" {
+		binaryPath += ".exe"
+	}
 
 	// Find project root (where go.mod lives)
 	projectRoot, err := findProjectRoot()
