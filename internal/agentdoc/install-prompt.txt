@@ -1,0 +1,1 @@
+Install and set up the crm program for me. Fetch https://raw.githubusercontent.com/grichardson36/crm-cli/main/INSTALL.md and follow its numbered steps in order. Run each check, show me the result, and ask before you change anything outside the crm data directory. When setup passes `crm doctor`, walk me through the first three things to try.

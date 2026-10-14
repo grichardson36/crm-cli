@@ -17,11 +17,17 @@ import (
 )
 
 // NewServer creates an MCP server with all CRM tools registered.
-func NewServer(db *sql.DB, version string) *server.MCPServer {
+func NewServer(db *sql.DB, version string, opts ...Option) *server.MCPServer {
+	var o options
+	for _, opt := range opts {
+		opt(&o)
+	}
+
 	s := server.NewMCPServer(
 		"crm",
 		version,
 		server.WithToolCapabilities(false),
+		server.WithResourceCapabilities(false, false),
 	)
 
 	pr := repo.NewPersonRepo(db)
@@ -336,6 +342,7 @@ func NewServer(db *sql.DB, version string) *server.MCPServer {
 	registerDedupeTools(s, db)
 	registerLogEditTools(s, ir)
 	registerSyncTools(s, db)
+	registerHelpTools(s, o)
 
 	return s
 }

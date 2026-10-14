@@ -66,7 +66,7 @@ func TestTagDelete(t *testing.T) {
 	crm(t, dbPath, "person", "add", "Jane Smith", "-f", "json")
 	crm(t, dbPath, "tag", "apply", "person", "1", "vip")
 
-	_, stderr, code := crm(t, dbPath, "tag", "delete", "vip")
+	_, stderr, code := crm(t, dbPath, "tag", "delete", "vip", "--yes")
 	assert.Equal(t, 0, code)
 	assert.Contains(t, stderr, "Deleted tag")
 }
