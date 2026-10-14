@@ -1,11 +1,11 @@
-// Package tui is a keyboard-first terminal browser for the CRM. The mouse works too.
+// Package tui is a keyboard-first terminal browser and editor for the CRM. The mouse works too.
 package tui
 
 import (
 	"context"
 	"database/sql"
 	"fmt"
-	"strconv"
+	"os"
 	"strings"
 	"time"
 
@@ -31,9 +31,20 @@ var viewNames = [numViews]string{"People", "Due", "Birthdays", "Tasks"}
 type mode int
 
 const (
-	modeNormal mode = iota
-	modeSearch
-	modePrompt
+	modeNormal  mode = iota
+	modeSearch       // footer input: search
+	modePrompt       // footer input: snooze, note, task, tag
+	modeEdit         // inline input on a detail row
+	modeConfirm      // y/n question in the footer
+	modeOverlay      // command palette or picker
+)
+
+// focus says which pane receives movement keys.
+type focus int
+
+const (
+	focusList focus = iota
+	focusDetail
 )
 
 // row is one line in the list pane.
@@ -54,10 +65,17 @@ type Model struct {
 	tagr *repo.TagRepo
 	now  func() time.Time
 
+	// clip copies text to the system clipboard (OSC52 by default). open launches a URL.
+	clip func(string)
+	open func(string) error
+
 	width, height int
 	view          viewKind
 	mode          mode
+	focus         focus
 	help          bool
+	helpVP        viewport.Model
+	actions       []action
 
 	people      []model.PersonSummary
 	rows        []row
@@ -65,6 +83,7 @@ type Model struct {
 	offset      int
 	query       string
 	sortRecent  bool
+	marked      map[int64]bool
 	detail      viewport.Model
 	detailKey   string
 	input       textinput.Model
@@ -72,21 +91,46 @@ type Model struct {
 	status      string
 	statusIsErr bool
 	readOnly    bool
+
+	// Detail form.
+	form       []formRow
+	formTitle  string
+	formPerson int64
+	fcur       int
+	lineRow    []int // screen line in the detail content -> form row index, -1 for none
+	rowStart   []int
+	rowEnd     []int
+	creating   bool
+	edit       *editState
+	rowInput   textinput.Model
+
+	confirm    *confirmState
+	ov         *overlay
+	pendingCmd tea.Cmd
 }
 
 // New creates the model and loads data.
 func New(ctx context.Context, db *sql.DB) (*Model, error) {
 	in := textinput.New()
 	in.CharLimit = 500
+	ri := textinput.New()
+	ri.CharLimit = 2000
+	ri.Prompt = ""
 	m := &Model{
-		ctx:    ctx,
-		pr:     repo.NewPersonRepo(db),
-		ir:     repo.NewInteractionRepo(db),
-		tr:     repo.NewTaskRepo(db),
-		tagr:   repo.NewTagRepo(db),
-		now:    time.Now,
-		input:  in,
-		detail: viewport.New(0, 0),
+		ctx:      ctx,
+		pr:       repo.NewPersonRepo(db),
+		ir:       repo.NewInteractionRepo(db),
+		tr:       repo.NewTaskRepo(db),
+		tagr:     repo.NewTagRepo(db),
+		now:      time.Now,
+		input:    in,
+		rowInput: ri,
+		detail:   viewport.New(0, 0),
+		helpVP:   viewport.New(0, 0),
+		marked:   map[int64]bool{},
+		actions:  buildActions(),
+		clip:     func(s string) { osc52Copy(os.Stdout, s) },
+		open:     openURL,
 	}
 	if err := m.reload(); err != nil {
 		return nil, err
@@ -112,6 +156,12 @@ func (m *Model) setStatus(msg string, isErr bool) {
 	m.status, m.statusIsErr = msg, isErr
 }
 
+func (m *Model) report(err error) {
+	if err != nil {
+		m.setStatus(err.Error(), true)
+	}
+}
+
 // reload re-reads everything from the database and rebuilds the current view.
 func (m *Model) reload() error {
 	people, err := m.pr.ListSummaries(m.ctx)
@@ -120,6 +170,11 @@ func (m *Model) reload() error {
 	}
 	m.people = people
 	return m.rebuild(true)
+}
+
+// afterWrite refreshes lists and the detail pane after a change.
+func (m *Model) afterWrite() {
+	m.report(m.reload())
 }
 
 // rebuild recomputes rows for the current view. With keep it leaves the cursor on the same item,
@@ -141,7 +196,7 @@ func (m *Model) rebuild(keep bool) error {
 			return err
 		}
 		for _, d := range due {
-			rows = append(rows, row{personID: d.PersonID, title: d.Name, sub: d.KeepInTouch, meta: fmt.Sprintf("%dd overdue", d.DaysOverdue)})
+			rows = append(rows, row{personID: d.PersonID, title: cleanCell(d.Name), sub: d.KeepInTouch, meta: fmt.Sprintf("%dd overdue", d.DaysOverdue)})
 		}
 	case viewBirthdays:
 		list, err := m.pr.Birthdays(m.ctx, 90, m.now())
@@ -157,7 +212,7 @@ func (m *Model) rebuild(keep bool) error {
 			if b.Turning != nil {
 				sub += fmt.Sprintf(" (turns %d)", *b.Turning)
 			}
-			rows = append(rows, row{personID: b.PersonID, title: b.Name, sub: sub, meta: meta})
+			rows = append(rows, row{personID: b.PersonID, title: cleanCell(b.Name), sub: sub, meta: meta})
 		}
 	case viewTasks:
 		tasks, err := m.tr.FindAll(m.ctx, model.TaskFilters{})
@@ -165,7 +220,7 @@ func (m *Model) rebuild(keep bool) error {
 			return err
 		}
 		for _, t := range tasks {
-			r := row{taskID: t.ID, title: t.Title}
+			r := row{taskID: t.ID, title: cleanCell(t.Title)}
 			if len(t.PersonIDs) > 0 {
 				r.personID = t.PersonIDs[0]
 			} else if t.PersonID != nil {
@@ -212,13 +267,13 @@ func (m *Model) peopleRows() []row {
 		if !matches(p, terms) {
 			continue
 		}
-		name := p.Name
+		name := cleanCell(p.Name)
 		if p.IsFavorite {
 			name = "★ " + name
 		}
-		sub := p.Company
+		sub := cleanCell(p.Company)
 		if sub == "" {
-			sub = p.Title
+			sub = cleanCell(p.Title)
 		}
 		rows = append(rows, row{personID: p.ID, title: name, sub: sub, meta: p.KeepInTouch})
 	}
@@ -301,25 +356,51 @@ func (m *Model) selected() (row, bool) {
 	return m.rows[m.cursor], true
 }
 
+// curPerson is the person the actions apply to, or 0.
+func (m *Model) curPerson() int64 {
+	if m.creating {
+		return 0
+	}
+	r, ok := m.selected()
+	if !ok {
+		return 0
+	}
+	return r.personID
+}
+
 func (m *Model) move(delta int) {
 	m.cursor += delta
 	m.clamp()
 	m.refreshDetail(false)
 }
 
-// refreshDetail rebuilds the detail pane when the selection changed (or when forced).
-func (m *Model) refreshDetail(force bool) {
-	r, ok := m.selected()
-	key := fmt.Sprintf("%d/%d", r.personID, r.taskID)
-	if !ok {
-		key = ""
+// markedIDs lists the marked people that are visible in the current list, in list order.
+func (m *Model) markedIDs() []int64 {
+	if len(m.marked) == 0 {
+		return nil
 	}
-	if !force && key == m.detailKey {
-		return
+	var ids []int64
+	seen := map[int64]bool{}
+	for _, r := range m.rows {
+		if r.personID != 0 && m.marked[r.personID] && !seen[r.personID] {
+			seen[r.personID] = true
+			ids = append(ids, r.personID)
+		}
 	}
-	m.detailKey = key
-	m.detail.SetContent(m.detailText(r, ok))
-	m.detail.GotoTop()
+	return ids
+}
+
+// targets are the people a person action applies to: the marked ones in the list, else the current one.
+func (m *Model) targets() []int64 {
+	if m.focus == focusList {
+		if ids := m.markedIDs(); len(ids) > 0 {
+			return ids
+		}
+	}
+	if p := m.curPerson(); p != 0 {
+		return []int64{p}
+	}
+	return nil
 }
 
 // Update implements tea.Model.
@@ -329,70 +410,31 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width, m.height = msg.Width, msg.Height
 		m.detail.Width = m.width - m.listWidth() - 3
 		m.detail.Height = m.bodyHeight()
+		m.helpVP.Width = m.width
+		m.helpVP.Height = max(1, m.height-2)
 		m.clamp()
 		m.refreshDetail(true)
 		return m, nil
 	case tea.MouseMsg:
 		return m.handleMouse(msg)
 	case tea.KeyMsg:
+		if m.mode == modeOverlay {
+			return m.handleOverlayKey(msg)
+		}
 		if m.help {
-			m.help = false
-			return m, nil
+			return m.handleHelpKey(msg)
 		}
 		switch m.mode {
 		case modeSearch:
 			return m.handleSearchKey(msg)
 		case modePrompt:
 			return m.handlePromptKey(msg)
+		case modeEdit:
+			return m.handleEditKey(msg)
+		case modeConfirm:
+			return m.handleConfirmKey(msg)
 		}
 		return m.handleKey(msg)
-	}
-	return m, nil
-}
-
-func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
-	if m.mode != modeNormal || m.help {
-		return m, nil
-	}
-	inList := msg.X < m.listWidth()
-	switch msg.Button {
-	case tea.MouseButtonWheelUp:
-		if inList {
-			m.move(-3)
-		} else {
-			m.detail.LineUp(3)
-		}
-	case tea.MouseButtonWheelDown:
-		if inList {
-			m.move(3)
-		} else {
-			m.detail.LineDown(3)
-		}
-	case tea.MouseButtonLeft:
-		if msg.Action != tea.MouseActionPress {
-			return m, nil
-		}
-		if msg.Y == 0 {
-			// Click on the tab bar.
-			x := 0
-			for i, name := range viewNames {
-				w := len(tabLabel(i, name)) + 2
-				if msg.X >= x && msg.X < x+w {
-					m.switchView(viewKind(i))
-					break
-				}
-				x += w
-			}
-			return m, nil
-		}
-		if inList {
-			idx := m.offset + msg.Y - 1
-			if idx >= 0 && idx < len(m.rows) && msg.Y-1 < m.bodyHeight() {
-				m.cursor = idx
-				m.clamp()
-				m.refreshDetail(false)
-			}
-		}
 	}
 	return m, nil
 }
@@ -403,110 +445,43 @@ func (m *Model) switchView(v viewKind) {
 	}
 	m.view = v
 	m.cursor, m.offset = 0, 0
+	m.marked = map[int64]bool{}
+	m.focus = focusList
 	m.setStatus("", false)
 	if err := m.rebuild(false); err != nil {
 		m.setStatus(err.Error(), true)
 	}
 }
 
+// handleKey dispatches a key in normal mode through the action registry.
 func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	half := m.bodyHeight() / 2
-	switch msg.String() {
-	case "q", "ctrl+c":
-		return m, tea.Quit
-	case "?":
-		m.help = true
-	case "j", "down", "ctrl+n":
-		m.move(1)
-	case "k", "up", "ctrl+p":
-		m.move(-1)
-	case "ctrl+d", "pgdown":
-		m.move(half)
-	case "ctrl+u", "pgup":
-		m.move(-half)
-	case "g", "home":
-		m.cursor = 0
-		m.clamp()
-		m.refreshDetail(false)
-	case "G", "end":
-		m.cursor = len(m.rows) - 1
-		m.clamp()
-		m.refreshDetail(false)
-	case "J":
-		m.detail.LineDown(3)
-	case "K":
-		m.detail.LineUp(3)
-	case "1", "2", "3", "4":
-		n, _ := strconv.Atoi(msg.String())
-		m.switchView(viewKind(n - 1))
-	case "tab":
-		m.switchView((m.view + 1) % numViews)
-	case "shift+tab":
-		m.switchView((m.view + numViews - 1) % numViews)
-	case "/":
-		if m.view != viewPeople {
-			m.switchView(viewPeople)
+	key := msg.String()
+	for i := range m.actions {
+		a := &m.actions[i]
+		if !a.hasKey(key) || !a.enabled(m) {
+			continue
 		}
-		m.mode = modeSearch
-		m.input.Prompt = "/"
-		m.input.SetValue(m.query)
-		m.input.CursorEnd()
-		return m, m.input.Focus()
-	case "esc":
-		if m.query != "" {
-			m.query = ""
-			m.cursor, m.offset = 0, 0
-			m.report(m.rebuild(false))
-		}
-	case "o":
-		if m.view == viewPeople {
-			m.sortRecent = !m.sortRecent
-			m.cursor, m.offset = 0, 0
-			m.report(m.rebuild(false))
-			if m.sortRecent {
-				m.setStatus("sorted by recently updated", false)
-			} else {
-				m.setStatus("sorted by name", false)
-			}
-		}
-	case "r":
-		m.report(m.reload())
-		m.setStatus("reloaded", false)
-	case "c", "f", "x", "s", "n", "t":
-		if m.readOnly {
-			m.setStatus("read-only: this view cannot change data", true)
-			return m, nil
-		}
-		return m.handleWriteKey(msg.String())
+		return m, m.runAction(a)
 	}
 	return m, nil
 }
 
-func (m *Model) handleWriteKey(key string) (tea.Model, tea.Cmd) {
-	switch key {
-	case "c":
-		m.markContacted()
-	case "f":
-		m.toggleFavorite()
-	case "x":
-		m.completeTask()
-	case "s":
-		m.startPrompt("snooze", "snooze days: ", "7")
-		return m, m.input.Focus()
-	case "n":
-		m.startPrompt("note", "note: ", "")
-		return m, m.input.Focus()
-	case "t":
-		m.startPrompt("task", "task (add a due date after a | e.g. call back | 2026-12-01): ", "")
-		return m, m.input.Focus()
+// runAction runs an action, enforcing read-only mode.
+func (m *Model) runAction(a *action) tea.Cmd {
+	if a.write && m.readOnly {
+		m.setStatus("read-only: "+strings.ToLower(a.title)+" is disabled", true)
+		return nil
 	}
-	return m, nil
+	return a.run(m)
 }
 
-func (m *Model) report(err error) {
-	if err != nil {
-		m.setStatus(err.Error(), true)
+func (m *Model) actionByID(id string) *action {
+	for i := range m.actions {
+		if m.actions[i].id == id {
+			return &m.actions[i]
+		}
 	}
+	return nil
 }
 
 func (m *Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -540,7 +515,7 @@ func (m *Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) startPrompt(kind, prompt, initial string) {
-	if _, ok := m.selected(); !ok {
+	if m.curPerson() == 0 {
 		return
 	}
 	m.mode = modePrompt
@@ -571,35 +546,101 @@ func (m *Model) handlePromptKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+func (m *Model) handleConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	c := m.confirm
+	switch msg.String() {
+	case "y", "Y":
+		m.mode, m.confirm = modeNormal, nil
+		if c != nil {
+			c.yes()
+		}
+	case "n", "N", "esc":
+		m.mode, m.confirm = modeNormal, nil
+		m.setStatus("cancelled", false)
+	}
+	return m, nil
+}
+
+// bulk applies fn to every id and reports one status line. Marks clear afterwards.
+func (m *Model) bulk(ids []int64, single, plural string, fn func(id int64) error) {
+	ok, failed := 0, 0
+	var first error
+	for _, id := range ids {
+		if err := fn(id); err != nil {
+			failed++
+			if first == nil {
+				first = err
+			}
+			continue
+		}
+		ok++
+	}
+	if m.focus == focusList {
+		m.marked = map[int64]bool{}
+	}
+	switch {
+	case failed > 0:
+		m.setStatus(fmt.Sprintf("%d done, %d failed: %v", ok, failed, first), true)
+	case ok == 1:
+		m.setStatus(single, false)
+	default:
+		m.setStatus(fmt.Sprintf("%s: %d people", plural, ok), false)
+	}
+	m.afterWrite()
+}
+
 func (m *Model) runPrompt(kind, value string) {
-	r, ok := m.selected()
-	if !ok || r.personID == 0 {
+	ids := m.targets()
+	if len(ids) == 0 {
 		m.setStatus("no person selected", true)
 		return
 	}
+	pid := m.curPerson()
 	switch kind {
 	case "snooze":
-		days, err := strconv.Atoi(value)
-		if err != nil || days < 0 {
+		days, err := parseDays(value)
+		if err != nil {
 			m.setStatus("enter a number of days", true)
 			return
 		}
 		until := m.now().UTC().AddDate(0, 0, days).Format("2006-01-02 15:04:05")
-		if _, err := m.pr.Update(m.ctx, r.personID, model.UpdatePersonInput{SnoozedUntil: &until}); err != nil {
-			m.setStatus(err.Error(), true)
+		m.bulk(ids, fmt.Sprintf("snoozed for %d days", days), "snoozed", func(id int64) error {
+			_, err := m.pr.Update(m.ctx, id, model.UpdatePersonInput{SnoozedUntil: &until})
+			return err
+		})
+		return
+	case "tag":
+		remove := strings.HasPrefix(value, "-")
+		name := strings.TrimLeft(strings.TrimSpace(strings.TrimPrefix(value, "-")), "#")
+		if name == "" {
+			m.setStatus("enter a tag name (prefix with - to remove)", true)
 			return
 		}
-		m.setStatus(fmt.Sprintf("snoozed for %d days", days), false)
+		m.bulk(ids, "tag "+map[bool]string{true: "removed", false: "added"}[remove], "tagged "+name, func(id int64) error {
+			if remove {
+				return m.tagr.Remove(m.ctx, "person", id, name)
+			}
+			return m.tagr.Apply(m.ctx, "person", id, name)
+		})
+		return
 	case "note":
+		if pid == 0 {
+			m.setStatus("no person selected", true)
+			return
+		}
 		subject := "Note"
-		if _, err := m.ir.Create(m.ctx, model.CreateInteractionInput{Type: "note", Subject: &subject, Content: &value, PersonIDs: []int64{r.personID}}); err != nil {
+		if _, err := m.ir.Create(m.ctx, model.CreateInteractionInput{Type: "note", Subject: &subject, Content: &value, PersonIDs: []int64{pid}}); err != nil {
 			m.setStatus(err.Error(), true)
 			return
 		}
 		m.setStatus("note added", false)
 	case "task":
+		if pid == 0 {
+			m.setStatus("no person selected", true)
+			return
+		}
 		title, due, _ := strings.Cut(value, "|")
-		in := model.CreateTaskInput{Title: strings.TrimSpace(title), Priority: "medium", PersonID: &r.personID}
+		in := model.CreateTaskInput{Title: strings.TrimSpace(title), Priority: "medium", PersonID: &pid}
 		if d := strings.TrimSpace(due); d != "" {
 			in.DueAt = &d
 		}
@@ -609,62 +650,5 @@ func (m *Model) runPrompt(kind, value string) {
 		}
 		m.setStatus("task added", false)
 	}
-	m.afterWrite()
-}
-
-// afterWrite refreshes lists and the detail pane after a change.
-func (m *Model) afterWrite() {
-	m.report(m.reload())
-}
-
-func (m *Model) markContacted() {
-	r, ok := m.selected()
-	if !ok || r.personID == 0 {
-		return
-	}
-	when := m.now().UTC().Format("2006-01-02 15:04:05")
-	empty := ""
-	if _, err := m.pr.Update(m.ctx, r.personID, model.UpdatePersonInput{LastContactedAt: &when, SnoozedUntil: &empty}); err != nil {
-		m.setStatus(err.Error(), true)
-		return
-	}
-	m.setStatus("marked as contacted", false)
-	m.afterWrite()
-}
-
-func (m *Model) toggleFavorite() {
-	r, ok := m.selected()
-	if !ok || r.personID == 0 {
-		return
-	}
-	p, err := m.pr.FindByID(m.ctx, r.personID)
-	if err != nil {
-		m.setStatus(err.Error(), true)
-		return
-	}
-	fav := !p.IsFavorite
-	if _, err := m.pr.Update(m.ctx, r.personID, model.UpdatePersonInput{IsFavorite: &fav}); err != nil {
-		m.setStatus(err.Error(), true)
-		return
-	}
-	m.afterWrite()
-}
-
-func (m *Model) completeTask() {
-	r, ok := m.selected()
-	if !ok || r.taskID == 0 {
-		m.setStatus("select a task in the Tasks view (4)", true)
-		return
-	}
-	task, err := m.tr.Complete(m.ctx, r.taskID)
-	if err != nil {
-		m.setStatus(err.Error(), true)
-		return
-	}
-	msg := "task done"
-	if task.NextTaskID != nil {
-		msg += ", next occurrence created"
-	}
-	m.setStatus(msg, false)
 	m.afterWrite()
 }
