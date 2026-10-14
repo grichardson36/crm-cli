@@ -122,6 +122,10 @@ func buildActions() []action {
 			write: true, when: whenPerson, run: func(m *Model) tea.Cmd { m.pickNoteType(); return nil }},
 		{id: "note-types", title: "Manage note types", group: "Contact", desc: "add or archive note types (call, email, meeting, ...)",
 			write: true, run: func(m *Model) tea.Cmd { return m.openNoteTypes() }},
+		{id: "note-retype", title: "Change note type", group: "Edit pane", hint: "t", keys: []string{"t"}, desc: "pick a new type for the note under the cursor (detail pane)",
+			write: true, foot: 16, footIn: inDetail, footIf: whenNoteRow, when: whenNoteRow, run: func(m *Model) tea.Cmd { m.retypeNote(); return nil }},
+		{id: "note-restore", title: "Restore last deleted note", group: "Edit pane", desc: "bring back the note deleted last in this session",
+			write: true, when: whenDeletedNote, run: func(m *Model) tea.Cmd { m.restoreLastNote(); return nil }},
 		{id: "task", title: "Add task", group: "Contact", hint: "t", keys: []string{"t"}, desc: "add a task: title | optional due date",
 			write: true, foot: 50, footIn: inList, when: whenPerson, run: func(m *Model) tea.Cmd {
 				m.startPrompt("task", "task (add a due date after a | e.g. call back | 2026-12-01): ", "")
@@ -147,6 +151,24 @@ func buildActions() []action {
 			write: true, run: func(m *Model) tea.Cmd { m.completeTask(); return nil }},
 		{id: "new", title: "New contact", group: "Contact", hint: "+", keys: []string{"+"}, desc: "create a contact: opens a blank form, saved when you enter a name",
 			write: true, foot: 45, footIn: inList, run: func(m *Model) tea.Cmd { return m.startCreate() }},
+
+		// Home.
+		{id: "home-open", title: "Open", group: "Home", hint: "enter", keys: []string{"enter"}, desc: "open the person (People view, detail pane) or the view the row stands for",
+			foot: 20, footIn: inList, when: whenHomeRow, run: func(m *Model) tea.Cmd { return m.openHomeRow() }},
+
+		// Sync view: sources and inbox.
+		{id: "sync-now", title: "Sync now", group: "Sync", hint: "s", keys: []string{"s"}, desc: "run the selected source in the background (also: Sync now: <source> in the palette)",
+			write: true, foot: 20, footIn: inList, when: whenSource, run: func(m *Model) tea.Cmd { return m.startSync(m.selectedSource(), false) }},
+		{id: "sync-dry", title: "Dry-run sync", group: "Sync", hint: "d", keys: []string{"d"}, desc: "show what the selected source would change, writes nothing (also: Dry-run sync: <source>)",
+			foot: 21, footIn: inList, when: whenSource, run: func(m *Model) tea.Cmd { return m.startSync(m.selectedSource(), true) }},
+		{id: "inbox-accept", title: "Accept inbox record", group: "Sync", hint: "a", keys: []string{"a"}, desc: "create a person from the selected inbox record",
+			write: true, foot: 22, footIn: inList, when: whenInboxRow, run: func(m *Model) tea.Cmd { m.acceptInbox(); return nil }},
+		{id: "inbox-attach", title: "Attach inbox record", group: "Sync", hint: "p", keys: []string{"p"}, desc: "attach the selected inbox record to a person you search for",
+			write: true, foot: 23, footIn: inList, when: whenInboxRow, run: func(m *Model) tea.Cmd { m.attachInbox(); return nil }},
+		{id: "inbox-ignore", title: "Ignore inbox record", group: "Sync", hint: "i", keys: []string{"i"}, desc: "dismiss the selected inbox record",
+			write: true, foot: 24, footIn: inList, when: whenInboxRow, run: func(m *Model) tea.Cmd { m.ignoreInbox(); return nil }},
+		{id: "open-inbox", title: "Open inbox", group: "Sync", desc: "show the Sync view with the cursor on the first pending inbox record",
+			run: func(m *Model) tea.Cmd { m.openInbox(); return nil }},
 
 		// Merge view and manual merge.
 		{id: "find-dupes", title: "Find duplicates", group: "Merge", desc: "show groups of probable duplicate people (Merge view, also 5)",
@@ -216,7 +238,9 @@ func buildActions() []action {
 			run: func(m *Model) tea.Cmd { m.detail.LineUp(3); return nil }},
 
 		// Views and search.
-		viewAction(viewPeople), viewAction(viewDue), viewAction(viewBirthdays), viewAction(viewTasks), viewAction(viewMerge), viewAction(viewArchived),
+		viewAction(viewHome), viewAction(viewPeople), viewAction(viewDue), viewAction(viewTasks), viewAction(viewBirthdays), viewAction(viewMerge), viewAction(viewArchived), viewAction(viewSync),
+		{id: "goto-view", title: "Go to view", group: "Views", hint: "v", keys: []string{"v"}, desc: "list every view with its number key (1-8) and jump to one",
+			foot: 85, footIn: inList, run: func(m *Model) tea.Cmd { return m.openViewSwitcher() }},
 		{id: "next-view", title: "Next view", group: "Views", hint: "]", keys: []string{"]"}, desc: "next view",
 			run: func(m *Model) tea.Cmd { m.switchView((m.view + 1) % numViews); return nil }},
 		{id: "prev-view", title: "Previous view", group: "Views", hint: "[", keys: []string{"["}, desc: "previous view",

@@ -46,9 +46,12 @@ func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		switch {
 		case msg.Y == 0:
 			// Click on the tab bar.
-			for i, seg := range m.tabLayout() {
+			for _, seg := range m.tabLayout() {
 				if msg.X >= seg.x0 && msg.X < seg.x1 {
-					m.switchView(viewKind(i))
+					if seg.more {
+						return m, m.openViewSwitcher()
+					}
+					m.switchView(seg.view)
 					break
 				}
 			}
@@ -67,7 +70,7 @@ func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			}
 		case inList:
 			idx := m.offset + msg.Y - 1
-			if idx >= 0 && idx < len(m.rows) && msg.Y-1 < m.bodyHeight() {
+			if idx >= 0 && idx < len(m.rows) && msg.Y-1 < m.bodyHeight() && !m.rows[idx].skip {
 				m.focus = focusList
 				m.cursor = idx
 				m.clamp()

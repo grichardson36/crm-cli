@@ -539,6 +539,8 @@ func (m *Model) emptyDetail() string {
 	}
 	var b strings.Builder
 	switch m.view {
+	case viewSync:
+		return m.syncItemDetail(r)
 	case viewMerge:
 		if m.cursor >= len(m.groups) {
 			return ""

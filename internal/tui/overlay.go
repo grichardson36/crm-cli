@@ -2,6 +2,7 @@ package tui
 
 import (
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -29,6 +30,7 @@ type overlay struct {
 	cursor   int
 	offset   int
 	palette  bool
+	digits   bool // a number key picks the item with that hint (view switcher)
 	onPick   func(m *Model, it overlayItem)
 	listTop  int // first screen line of the item list
 	pageSize int
@@ -112,8 +114,28 @@ func (m *Model) openPalette() tea.Cmd {
 		}
 		items = append(items, it)
 	}
+	// One entry per registered adapter. A dry run writes nothing, so read-only mode allows it.
+	for _, name := range m.registry.Names() {
+		run := overlayItem{id: "sync-run:" + name, label: "Sync now: " + name, desc: "run the " + name + " source in the background, shows the result line"}
+		dry := overlayItem{id: "sync-dry:" + name, label: "Dry-run sync: " + name, desc: "preview what " + name + " would change, writes nothing"}
+		if m.readOnly {
+			run.disabled = "read-only"
+		}
+		if m.cmp != nil {
+			run.disabled, dry.disabled = "not here", "not here"
+		}
+		items = append(items, run, dry)
+	}
 	o := m.newOverlay("Command palette", items, true)
 	o.onPick = func(m *Model, it overlayItem) {
+		if kind, name, ok := strings.Cut(it.id, ":"); ok && (kind == "sync-run" || kind == "sync-dry") {
+			if it.disabled != "" {
+				m.setStatus(strings.ToLower(it.label)+": "+it.disabled, true)
+				return
+			}
+			m.pendingCmd = m.startSync(name, kind == "sync-dry")
+			return
+		}
 		a := m.actionByID(it.id)
 		if a == nil {
 			return
@@ -125,6 +147,32 @@ func (m *Model) openPalette() tea.Cmd {
 		m.pendingCmd = m.runAction(a)
 	}
 	return m.showOverlay(o)
+}
+
+// openViewSwitcher lists every view with its number key.
+func (m *Model) openViewSwitcher() tea.Cmd {
+	items := make([]overlayItem, 0, numViews)
+	for v := viewKind(0); v < numViews; v++ {
+		it := overlayItem{id: "view-" + strings.ToLower(viewNames[v]), label: viewNames[v], hint: strconv.Itoa(int(v) + 1), value: strconv.Itoa(int(v))}
+		if v == m.view {
+			it.desc = "current view"
+		} else {
+			it.desc = viewBlurbs[v]
+		}
+		items = append(items, it)
+	}
+	m.openPicker("Go to view", items, func(m *Model, it overlayItem) {
+		n, _ := strconv.Atoi(it.value)
+		m.switchView(viewKind(n))
+	})
+	m.ov.digits = true
+	return nil
+}
+
+// viewBlurbs say what each view is for.
+var viewBlurbs = [numViews]string{
+	"what needs attention today", "everyone, search with /", "people to reach out to", "open tasks",
+	"upcoming birthdays", "probable duplicates", "archived people, restore or purge", "sources and the inbox",
 }
 
 // openPicker shows a small list of choices. onPick runs after the overlay closes.
@@ -184,6 +232,14 @@ func (m *Model) handleOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "pgdown":
 		o.move(page, page)
+		return m, nil
+	}
+	if k := msg.String(); o.digits && len(k) == 1 && k[0] >= '1' && k[0] <= '9' {
+		for i, idx := range o.shown {
+			if o.items[idx].hint == k {
+				return m, m.pickOverlay(i)
+			}
+		}
 		return m, nil
 	}
 	var cmd tea.Cmd
@@ -282,7 +338,7 @@ func (m *Model) handleHelpKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // helpText is generated from the action registry so it matches the palette.
 func (m *Model) helpText() string {
-	order := []string{"Contact", "Edit pane", "Bulk", "Merge", "Compare", "Archive", "Move", "Views", "App"}
+	order := []string{"Home", "Contact", "Edit pane", "Bulk", "Sync", "Merge", "Compare", "Archive", "Move", "Views", "App"}
 	var b strings.Builder
 	for _, g := range order {
 		b.WriteString(headStyle.Render(g) + "\n")
@@ -313,6 +369,6 @@ func (m *Model) helpText() string {
 	b.WriteString(headStyle.Render("Mouse") + "\n")
 	b.WriteString(nameStyle.Render(fit("click", 22)) + "select a row, click again on a detail row to edit it\n")
 	b.WriteString(nameStyle.Render(fit("click footer", 22)) + "tap a footer key to run it, tap the status line for the palette\n")
-	b.WriteString(nameStyle.Render(fit("wheel, tabs", 22)) + "scroll, switch view\n")
+	b.WriteString(nameStyle.Render(fit("wheel, tabs", 22)) + "scroll, switch view (the More tab opens the view list)\n")
 	return strings.TrimRight(b.String(), "\n")
 }

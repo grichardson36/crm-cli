@@ -44,6 +44,7 @@ type formRow struct {
 	primary bool
 	empty   bool // placeholder for an empty section
 	head    string
+	typ     string // rkNote: the interaction type
 }
 
 type editState struct {
@@ -269,7 +270,7 @@ func (m *Model) personRows(p *model.Person) []formRow {
 			if it.Subject != nil && *it.Subject != "" {
 				val += ": " + *it.Subject
 			}
-			r := formRow{kind: rkNote, label: date, key: val, value: str(it.Content), id: it.ID}
+			r := formRow{kind: rkNote, label: date, key: val, value: str(it.Content), id: it.ID, typ: it.Type}
 			if i == 0 {
 				r.head = recentHead
 			}
@@ -308,7 +309,7 @@ func (m *Model) refreshDetail(force bool) {
 	}
 	r, ok := m.selected()
 	key := fmt.Sprintf("%d/%d", r.personID, r.taskID)
-	if m.view == viewMerge {
+	if m.view == viewMerge || m.view == viewSync {
 		key += fmt.Sprintf("/%d", m.cursor)
 	}
 	if !ok {
@@ -487,7 +488,7 @@ func (m *Model) startEdit() tea.Cmd {
 	case r.kind == rkInfo:
 		m.setStatus("this row is read-only", true)
 	case r.kind == rkNote:
-		m.setStatus("notes cannot be edited yet (no repo method). Copy with y, add with a", true)
+		return m.beginEdit(m.fcur, false)
 	case r.kind == rkCadence:
 		m.pickCadence([]int64{m.formPerson})
 	case r.kind == rkTier:
@@ -776,6 +777,14 @@ func (m *Model) applyEdit(e *editState, v string) error {
 		m.setStatus("task saved", false)
 		m.finishEdit()
 		m.selectRow(rkTask, title)
+	case rkNote:
+		id := m.form[e.row].id
+		if _, err := m.ir.Update(ctx, id, model.UpdateInteractionInput{Content: &v}); err != nil {
+			return err
+		}
+		m.setStatus("note saved", false)
+		m.finishEdit()
+		m.selectNote(id)
 	default:
 		m.cancelEdit()
 	}
@@ -863,7 +872,7 @@ func (m *Model) askDelete() {
 	case rkTask:
 		what, do = "task "+r.value, func() error { return m.tr.Archive(m.ctx, r.id) }
 	case rkNote:
-		m.setStatus("notes cannot be deleted yet (no repo method)", true)
+		m.askDeleteNote(r)
 		return
 	case rkInfo:
 		m.setStatus("this row is read-only", true)

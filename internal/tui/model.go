@@ -9,27 +9,31 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/dedupe"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	crmsync "github.com/jdanielnd/crm-cli/internal/sync"
 )
 
 type viewKind int
 
 const (
-	viewPeople viewKind = iota
+	viewHome viewKind = iota
+	viewPeople
 	viewDue
-	viewBirthdays
 	viewTasks
+	viewBirthdays
 	viewMerge
 	viewArchived
+	viewSync
 	numViews
 )
 
-var viewNames = [numViews]string{"People", "Due", "Birthdays", "Tasks", "Merge", "Archived"}
+var viewNames = [numViews]string{"Home", "People", "Due", "Tasks", "Birthdays", "Merge", "Archived", "Sync"}
 
 type mode int
 
@@ -57,6 +61,13 @@ type row struct {
 	title    string
 	sub      string
 	meta     string
+
+	// skip rows (section headings, the status line) are drawn but never selected.
+	skip bool
+	// jump is a view number (view+1) that Enter opens for rows that stand for a whole view.
+	jump int
+	// sync carries the Sync view data of the row.
+	sync *syncItem
 }
 
 // Model is the Bubble Tea model.
@@ -68,7 +79,18 @@ type Model struct {
 	tagr *repo.TagRepo
 	dr   *repo.DupeRepo
 	ntr  *repo.NoteTypeRepo
+	db   *sql.DB
 	now  func() time.Time
+
+	// Sync view: the adapters this process can run, the runner and the inbox over the database.
+	registry *crmsync.Registry
+	runner   *crmsync.Runner
+	inbox    *crmsync.Inbox
+	// busy names the background job in flight ("" when idle). spin animates the status bar.
+	busy string
+	spin spinner.Model
+	// deletedNotes is the session stack of deleted note ids for "Restore last deleted note".
+	deletedNotes []int64
 
 	// clip copies text to the system clipboard (OSC52 by default). open launches a URL.
 	clip func(string)
@@ -134,8 +156,15 @@ func New(ctx context.Context, db *sql.DB) (*Model, error) {
 	ri := textinput.New()
 	ri.CharLimit = 2000
 	ri.Prompt = ""
+	registry := crmsync.DefaultRegistry(os.Getenv)
 	m := &Model{
 		ctx:      ctx,
+		db:       db,
+		registry: registry,
+		runner:   crmsync.NewRunner(db, registry),
+		inbox:    crmsync.NewInbox(db),
+		spin:     spinner.New(spinner.WithSpinner(spinner.Dot)),
+		view:     viewHome,
 		pr:       repo.NewPersonRepo(db),
 		ir:       repo.NewInteractionRepo(db),
 		tr:       repo.NewTaskRepo(db),
@@ -210,6 +239,18 @@ func (m *Model) rebuild(keep bool) error {
 
 	var rows []row
 	switch m.view {
+	case viewHome:
+		hr, err := m.homeRows()
+		if err != nil {
+			return err
+		}
+		rows = hr
+	case viewSync:
+		sr, err := m.syncRows()
+		if err != nil {
+			return err
+		}
+		rows = sr
 	case viewPeople:
 		rows = m.peopleRows()
 	case viewDue:
@@ -294,9 +335,35 @@ func (m *Model) rebuild(keep bool) error {
 	} else {
 		m.offset = 0
 	}
+	m.settle()
 	m.clamp()
 	m.refreshDetail(true)
 	return nil
+}
+
+// settle moves the cursor off rows that cannot be selected (headings), forward first.
+func (m *Model) settle() {
+	if m.cursor < 0 {
+		m.cursor = 0
+	}
+	if m.cursor >= len(m.rows) {
+		m.cursor = len(m.rows) - 1
+	}
+	if m.cursor < 0 || !m.rows[m.cursor].skip {
+		return
+	}
+	for i := m.cursor; i < len(m.rows); i++ {
+		if !m.rows[i].skip {
+			m.cursor = i
+			return
+		}
+	}
+	for i := m.cursor; i >= 0; i-- {
+		if !m.rows[i].skip {
+			m.cursor = i
+			return
+		}
+	}
 }
 
 func (m *Model) peopleRows() []row {
@@ -389,6 +456,18 @@ func (m *Model) clamp() {
 	if m.cursor >= m.offset+h {
 		m.offset = m.cursor - h + 1
 	}
+	// Keep the headings above the first selectable row in view.
+	if m.cursor < len(m.rows) && m.cursor < h {
+		onlyHeads := true
+		for i := 0; i < m.cursor; i++ {
+			if !m.rows[i].skip {
+				onlyHeads = false
+			}
+		}
+		if onlyHeads {
+			m.offset = 0
+		}
+	}
 	if m.offset < 0 {
 		m.offset = 0
 	}
@@ -414,7 +493,22 @@ func (m *Model) curPerson() int64 {
 }
 
 func (m *Model) move(delta int) {
-	m.cursor += delta
+	dir := 1
+	if delta < 0 {
+		dir, delta = -1, -delta
+	}
+	cur := m.cursor
+	for n := 0; n < delta; n++ {
+		next := cur + dir
+		for next >= 0 && next < len(m.rows) && m.rows[next].skip {
+			next += dir
+		}
+		if next < 0 || next >= len(m.rows) {
+			break
+		}
+		cur = next
+	}
+	m.cursor = cur
 	m.clamp()
 	m.refreshDetail(false)
 }
@@ -462,6 +556,16 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case tea.MouseMsg:
 		return m.handleMouse(msg)
+	case syncDoneMsg:
+		m.finishSync(msg)
+		return m, nil
+	case spinner.TickMsg:
+		if m.busy == "" {
+			return m, nil
+		}
+		var cmd tea.Cmd
+		m.spin, cmd = m.spin.Update(msg)
+		return m, cmd
 	case tea.KeyMsg:
 		if m.mode == modeOverlay {
 			return m.handleOverlayKey(msg)

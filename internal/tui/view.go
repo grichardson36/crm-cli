@@ -93,29 +93,64 @@ func (m *Model) View() string {
 	return m.tabsView() + "\n" + body + "\n" + m.footerView()
 }
 
-// tabSeg is one tab in the tab bar with its screen columns [x0, x1).
+// tabSeg is one tab in the tab bar with its screen columns [x0, x1). A segment with more set is
+// the "More" entry that opens the view switcher. on marks the highlighted tab.
 type tabSeg struct {
 	label  string
 	x0, x1 int
+	view   viewKind
+	more   bool
+	on     bool
 }
 
-// tabLayout places the tabs. When the full labels do not fit the width, tabs other than the
-// current one shrink to their number so the bar still fits (keys 1-6 and clicks work as usual).
+// mainTabs are the views with their own tab. Every other view is reached through More or v.
+var mainTabs = []viewKind{viewHome, viewPeople, viewDue, viewTasks}
+
+func isMainTab(v viewKind) bool {
+	for _, t := range mainTabs {
+		if t == v {
+			return true
+		}
+	}
+	return false
+}
+
+// tabLayout places the tabs: the main views plus a "v More" entry. When the current view is not
+// a main view, the More entry shows its name. When the full labels do not fit the width, tabs
+// other than the current one shrink to their key so the bar still fits.
 func (m *Model) tabLayout() []tabSeg {
+	type item struct {
+		full, short string
+		seg         tabSeg
+	}
+	var items []item
+	for _, v := range mainTabs {
+		items = append(items, item{full: tabLabel(int(v), viewNames[v]), short: strconv.Itoa(int(v) + 1),
+			seg: tabSeg{view: v, on: v == m.view}})
+	}
+	more := item{full: "v More", short: "v", seg: tabSeg{more: true, view: m.view}}
+	if !isMainTab(m.view) {
+		more.full = "v " + viewNames[m.view]
+		more.seg.on = true
+	}
+	items = append(items, more)
+
 	total := 0
-	for i, name := range viewNames {
-		total += runewidth.StringWidth(tabLabel(i, name)) + 2
+	for _, it := range items {
+		total += runewidth.StringWidth(it.full) + 2
 	}
 	compact := total > m.width
 	var segs []tabSeg
 	x := 0
-	for i, name := range viewNames {
-		label := tabLabel(i, name)
-		if compact && viewKind(i) != m.view {
-			label = strconv.Itoa(i + 1)
+	for _, it := range items {
+		label := it.full
+		if compact && !it.seg.on {
+			label = it.short
 		}
 		w := runewidth.StringWidth(label) + 2
-		segs = append(segs, tabSeg{label: label, x0: x, x1: x + w})
+		seg := it.seg
+		seg.label, seg.x0, seg.x1 = label, x, x+w
+		segs = append(segs, seg)
 		x += w
 	}
 	return segs
@@ -124,18 +159,31 @@ func (m *Model) tabLayout() []tabSeg {
 // countText is the right side of the tab bar.
 func (m *Model) countText() string {
 	switch m.view {
+	case viewHome:
+		return ""
 	case viewMerge:
 		return fmt.Sprintf("%d groups, %s+", len(m.rows), m.minLevel)
 	case viewArchived:
 		return fmt.Sprintf("%d archived", len(m.rows))
+	case viewSync:
+		sources, inbox := 0, 0
+		for _, r := range m.rows {
+			if r.sync != nil && r.sync.source != nil {
+				sources++
+			}
+			if r.sync != nil && r.sync.entry != nil {
+				inbox++
+			}
+		}
+		return fmt.Sprintf("%d sources, %d in inbox", sources, inbox)
 	}
 	return fmt.Sprintf("%d shown / %d total", len(m.rows), len(m.people))
 }
 
 func (m *Model) tabsView() string {
 	var tabs []string
-	for i, seg := range m.tabLayout() {
-		if viewKind(i) == m.view {
+	for _, seg := range m.tabLayout() {
+		if seg.on {
 			tabs = append(tabs, tabOn.Render(seg.label))
 		} else {
 			tabs = append(tabs, tabOff.Render(seg.label))
@@ -165,6 +213,8 @@ func (m *Model) listView(w, h int) string {
 			return dimStyle.Render("No duplicates at " + m.minLevel.String() + " confidence or above. m lowers the level.")
 		case m.view == viewArchived:
 			return dimStyle.Render("Nothing archived. # archives the selected person.")
+		case m.view == viewSync:
+			return dimStyle.Render("No sync sources connected yet.")
 		}
 		return dimStyle.Render("Nothing here yet.")
 	}
@@ -181,6 +231,15 @@ func (m *Model) listView(w, h int) string {
 	for i := m.offset; i < end; i++ {
 		r := m.rows[i]
 		title, sub := cleanCell(r.title), cleanCell(r.sub)
+		if r.skip {
+			meta := runewidth.Truncate(cleanCell(r.meta), w/2, "…")
+			metaW := runewidth.StringWidth(meta)
+			b.WriteString(nameStyle.Render(fit(title, w-metaW-1)) + dimStyle.Render(" "+meta))
+			if i < end-1 {
+				b.WriteString("\n")
+			}
+			continue
+		}
 		if anyMarks {
 			if m.marked[r.personID] && r.personID != 0 {
 				title = "✓ " + title
@@ -228,6 +287,8 @@ var footShort = map[string]string{
 	"help": "help", "palette": "menu", "edit": "edit", "add": "add", "delete": "delete", "copy": "copy",
 	"open": "open", "back": "back", "compare": "compare", "dupe-level": "level", "dismiss": "dismiss",
 	"undo-dismiss": "undo", "merge-marked": "merge", "archive": "archive", "restore": "restore", "purge": "purge",
+	"home-open": "open", "sync-now": "sync", "sync-dry": "dry-run", "inbox-accept": "accept", "inbox-attach": "attach",
+	"inbox-ignore": "ignore", "goto-view": "views", "note-retype": "type",
 	"cmp-pick": "pick", "cmp-survivor": "survivor", "cmp-apply": "merge", "cmp-back": "back",
 }
 
@@ -281,6 +342,8 @@ func (m *Model) footerView() string {
 		status = errStyle.Render(m.confirm.prompt)
 	default:
 		switch {
+		case m.busy != "":
+			status = m.spin.View() + " " + dimStyle.Render(m.busy+"...")
 		case m.status != "" && m.statusIsErr:
 			status = errStyle.Render(m.status)
 		case m.status != "":

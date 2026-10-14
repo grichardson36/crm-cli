@@ -11,6 +11,7 @@ import (
 	"github.com/jdanielnd/crm-cli/internal/db"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	crmsync "github.com/jdanielnd/crm-cli/internal/sync"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -46,7 +47,10 @@ func newTestModel(t *testing.T) (*Model, *repo.PersonRepo) {
 	m.now = func() time.Time { return time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC) }
 	m.clip = func(string) {}
 	m.open = func(string) error { return nil }
+	m.registry = crmsync.NewRegistry() // no adapters unless a test installs the fake
+	m.runner = crmsync.NewRunner(d, m.registry)
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
+	m.switchView(viewPeople) // most tests start on the People list; Home has its own tests
 	return m, pr
 }
 
@@ -108,7 +112,7 @@ func TestInitialRender(t *testing.T) {
 	assert.Equal(t, []string{"Zed Adams", "Bob Baker", "Cara Cole"}, names(m), "sorted by last name")
 
 	out := m.View()
-	assert.Contains(t, out, "1 People")
+	assert.Contains(t, out, "2 People")
 	assert.Contains(t, out, "Zed Adams")
 	assert.Contains(t, out, "zed@acme.com", "detail pane shows the first person")
 	assert.Contains(t, out, "3 shown / 3 total")
@@ -126,11 +130,11 @@ func TestViewFitsTerminal(t *testing.T) {
 	}
 	for _, size := range [][2]int{{100, 30}, {60, 12}, {40, 10}, {120, 50}} {
 		m.Update(tea.WindowSizeMsg{Width: size[0], Height: size[1]})
-		for _, v := range []string{"1", "2", "3", "4", "5", "6"} {
+		for _, v := range []string{"1", "2", "3", "4", "5", "6", "7", "8"} {
 			press(m, v)
 			check(size, "view "+v)
 		}
-		press(m, "1", "tab")
+		press(m, "2", "tab")
 		check(size, "detail focus")
 		press(m, "a")
 		check(size, "inline add")
@@ -195,12 +199,12 @@ func TestSearchAndTagFilter(t *testing.T) {
 func TestViewsDueBirthdaysTasks(t *testing.T) {
 	m, _ := newTestModel(t)
 
-	press(m, "2")
+	press(m, "3")
 	assert.Equal(t, viewDue, m.view)
 	assert.Equal(t, []string{"Bob Baker"}, names(m))
 	assert.Contains(t, m.View(), "overdue")
 
-	press(m, "3")
+	press(m, "5")
 	assert.Equal(t, []string{"Bob Baker"}, names(m))
 	assert.Equal(t, "in 7d", m.rows[0].meta)
 
@@ -209,16 +213,18 @@ func TestViewsDueBirthdaysTasks(t *testing.T) {
 	assert.Contains(t, m.View(), "No open tasks")
 
 	press(m, "]")
-	assert.Equal(t, viewMerge, m.view)
-	press(m, "]", "]")
-	assert.Equal(t, viewPeople, m.view, "] wraps around")
+	assert.Equal(t, viewBirthdays, m.view)
+	press(m, "]", "]", "]")
+	assert.Equal(t, viewSync, m.view)
+	press(m, "]")
+	assert.Equal(t, viewHome, m.view, "] wraps around")
 	press(m, "[")
-	assert.Equal(t, viewArchived, m.view, "[ wraps back")
+	assert.Equal(t, viewSync, m.view, "[ wraps back")
 }
 
 func TestMarkContactedRemovesFromDue(t *testing.T) {
 	m, pr := newTestModel(t)
-	press(m, "2")
+	press(m, "3")
 	require.Len(t, m.rows, 1)
 	press(m, "c")
 	assert.Empty(t, m.rows, "contacted people are no longer due")
@@ -235,13 +241,13 @@ func TestSnoozeFavoriteNoteAndTask(t *testing.T) {
 	ctx := context.Background()
 
 	// Snooze Bob out of the due list for 7 days.
-	press(m, "2", "s")
+	press(m, "3", "s")
 	assert.Equal(t, modePrompt, m.mode)
 	press(m, "enter") // accepts the default of 7
 	assert.Empty(t, m.rows)
 
 	// Favorite Zed, add a note and a task.
-	press(m, "1", "f")
+	press(m, "2", "f")
 	assert.Contains(t, m.rows[0].title, "★")
 	press(m, "n")
 	typeText(m, "met at the conference")
@@ -267,7 +273,7 @@ func TestSnoozeFavoriteNoteAndTask(t *testing.T) {
 	assert.NotNil(t, p.KeepInTouchSnoozedUntil)
 
 	// An empty prompt or esc changes nothing.
-	press(m, "1", "n", "esc")
+	press(m, "2", "n", "esc")
 	assert.Equal(t, modeNormal, m.mode)
 	press(m, "s")
 	typeText(m, "abc")
@@ -289,8 +295,8 @@ func TestMouse(t *testing.T) {
 	m.Update(tea.MouseMsg{X: 3, Y: 3, Button: tea.MouseButtonWheelUp, Action: tea.MouseActionPress})
 	assert.Equal(t, 0, m.cursor)
 
-	// Click the "2 Due" tab.
-	x := len(tabLabel(0, viewNames[0])) + 2 + 2
+	// Click the "3 Due" tab.
+	x := m.tabLayout()[2].x0 + 1
 	m.Update(tea.MouseMsg{X: x, Y: 0, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
 	assert.Equal(t, viewDue, m.view)
 }
@@ -591,7 +597,7 @@ func TestAddPhoneHandleTagTaskNote(t *testing.T) {
 	tasks, _ = m.tr.FindAll(context.Background(), model.TaskFilters{PersonID: ptr64(1)})
 	assert.Empty(t, tasks)
 
-	// Notes: a opens the note prompt, notes cannot be edited or deleted yet.
+	// Notes: a opens the note prompt.
 	goTo(t, m, "note")
 	press(m, "a")
 	assert.Equal(t, modePrompt, m.mode)
@@ -604,9 +610,11 @@ func TestAddPhoneHandleTagTaskNote(t *testing.T) {
 		}
 	}
 	press(m, "enter")
-	assert.True(t, m.statusIsErr)
+	assert.Equal(t, modeEdit, m.mode, "enter edits a note")
+	press(m, "esc")
 	press(m, "d")
-	assert.Equal(t, modeNormal, m.mode)
+	assert.Equal(t, modeConfirm, m.mode, "d asks before deleting a note")
+	press(m, "n")
 	var copied string
 	m.clip = func(s string) { copied = s }
 	press(m, "y")
@@ -689,7 +697,7 @@ func TestCreateContact(t *testing.T) {
 
 func TestCreateContactFromOtherViewAndPalette(t *testing.T) {
 	m, pr := newTestModel(t)
-	press(m, "2", "ctrl+k")
+	press(m, "3", "ctrl+k")
 	typeText(m, "new contact")
 	press(m, "enter")
 	require.Equal(t, modeEdit, m.mode)
@@ -767,7 +775,7 @@ func TestMarksAndBulkActions(t *testing.T) {
 	// Marks clear when the view changes.
 	press(m, " ")
 	assert.Len(t, m.marked, 1)
-	press(m, "2")
+	press(m, "3")
 	assert.Empty(t, m.marked)
 }
 
