@@ -68,6 +68,9 @@ func (m *Model) View() string {
 	if m.mode == modeOverlay && m.ov != nil {
 		return m.overlayView()
 	}
+	if m.tv != nil {
+		return m.textViewRender()
+	}
 	if m.help {
 		return m.helpView()
 	}
@@ -398,7 +401,7 @@ func (m *Model) hintsLine() string {
 
 func (m *Model) helpView() string {
 	title := headStyle.Render("Keys") + dimStyle.Render("   generated from the same action list as the palette (ctrl+k)")
-	foot := dimStyle.Render("j/k scroll  any other key closes")
+	foot := dimStyle.Render("j/k scroll  any other key closes  ctrl+k for every action")
 	cut := lipgloss.NewStyle().MaxWidth(m.width)
 	return cut.Render(title) + "\n" + m.helpVP.View() + "\n" + cut.Render(foot)
 }

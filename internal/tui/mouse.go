@@ -8,6 +8,15 @@ func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	if m.mode == modeOverlay && m.ov != nil {
 		return m.handleOverlayMouse(msg)
 	}
+	if m.tv != nil {
+		switch msg.Button {
+		case tea.MouseButtonWheelUp:
+			m.tv.vp.LineUp(3)
+		case tea.MouseButtonWheelDown:
+			m.tv.vp.LineDown(3)
+		}
+		return m, nil
+	}
 	if m.help {
 		switch msg.Button {
 		case tea.MouseButtonWheelUp:

@@ -290,6 +290,19 @@ func buildActions() []action {
 			foot: 1, footIn: inBoth, run: func(m *Model) tea.Cmd { return m.openPalette() }},
 		{id: "help", inCompare: true, title: "Help", group: "App", hint: "?", keys: []string{"?"}, desc: "show every key",
 			foot: 80, footIn: inBoth, run: func(m *Model) tea.Cmd { m.openHelp(); return nil }},
+		{id: "help-topics", title: "Help: topics", group: "App", desc: "list the built-in help topics, filter and read one (same as crm help)",
+			run: func(m *Model) tea.Cmd { m.openHelpTopics(""); return nil }},
+		{id: "help-search", title: "Help: search", group: "App", desc: "find a word across all help topics (same as crm help --search)",
+			run: func(m *Model) tea.Cmd {
+				m.startInput("help-search", "search help: ", "")
+				return m.input.Focus()
+			}},
+		{id: "doctor", title: "Doctor", group: "App", desc: "check the installation and database, with a fix for each problem (same as crm doctor)",
+			run: func(m *Model) tea.Cmd { m.showDoctor(); return nil }},
+		{id: "where", title: "Where", group: "App", desc: "show the active database: path, domain, schema version, device id, size (same as crm where)",
+			run: func(m *Model) tea.Cmd { m.showWhere(); return nil }},
+		{id: "domains", title: "Domains", group: "App", desc: "list the databases in the data directory (same as crm domains)",
+			run: func(m *Model) tea.Cmd { m.showDomains(); return nil }},
 		{id: "quit", inCompare: true, title: "Quit", group: "App", hint: "q", keys: []string{"q", "ctrl+c"}, desc: "quit",
 			run: func(m *Model) tea.Cmd { return tea.Quit }},
 	}

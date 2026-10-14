@@ -102,6 +102,9 @@ type Model struct {
 	focus         focus
 	help          bool
 	helpVP        viewport.Model
+	tv            *textView // read-only page: help topics, doctor, where, domains
+	env           Env
+	lastFilter    string // filter text of the overlay that was just picked
 	actions       []action
 
 	people      []model.PersonSummary
@@ -190,12 +193,13 @@ func New(ctx context.Context, db *sql.DB) (*Model, error) {
 }
 
 // Run starts the TUI.
-func Run(ctx context.Context, db *sql.DB, readOnly bool) error {
+func Run(ctx context.Context, db *sql.DB, readOnly bool, env Env) error {
 	m, err := New(ctx, db)
 	if err != nil {
 		return err
 	}
 	m.readOnly = readOnly
+	m.env = env
 	_, err = tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion(), tea.WithContext(ctx)).Run()
 	return err
 }
@@ -551,6 +555,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.detail.Height = m.bodyHeight()
 		m.helpVP.Width = m.width
 		m.helpVP.Height = max(1, m.height-2)
+		if m.tv != nil {
+			m.tv.vp.Width, m.tv.vp.Height = m.width, max(1, m.height-2)
+		}
 		m.clamp()
 		m.refreshDetail(true)
 		return m, nil
@@ -569,6 +576,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		if m.mode == modeOverlay {
 			return m.handleOverlayKey(msg)
+		}
+		if m.tv != nil {
+			return m.handleTextKey(msg)
 		}
 		if m.help {
 			return m.handleHelpKey(msg)
@@ -762,6 +772,9 @@ func (m *Model) runPrompt(kind, value string) {
 		return
 	case "purge":
 		m.purgeCurrent(value)
+		return
+	case "help-search":
+		m.openHelpSearch(value)
 		return
 	}
 	ids := m.targets()

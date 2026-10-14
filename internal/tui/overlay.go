@@ -202,6 +202,7 @@ func (m *Model) pickOverlay(i int) tea.Cmd {
 	}
 	it := o.items[o.shown[i]]
 	pick := o.onPick
+	m.lastFilter = o.filter.Value()
 	m.closeOverlay()
 	m.pendingCmd = nil
 	if pick != nil {

@@ -67,6 +67,14 @@ In the detail form, on a note row: `enter` edits the text, `t` changes the type,
 
 `enter` on an item opens that person in People with the detail form focused.
 
+## Help, doctor and where from the palette
+
+These palette actions mirror the CLI commands and work in `--read-only` mode. Each opens a scrollable page: `j` / `k`, `g` / `G`, `esc` goes back.
+
+- "Help: topics" lists the topics with a filter, `enter` opens one. "Help: search" asks for a word and lists the matching lines.
+- "Doctor" runs the checks of `crm doctor` on the open database, with the fix line for each problem.
+- "Where" shows the open database: path, domain, schema version, device id, size. "Domains" lists the databases in the data directory.
+
 ## Quit
 
 `q` or `ctrl+c`.
