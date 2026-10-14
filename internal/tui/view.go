@@ -2,7 +2,9 @@ package tui
 
 import (
 	"fmt"
+	"sort"
 	"strings"
+	"unicode"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/jdanielnd/crm-cli/internal/model"
@@ -17,6 +19,7 @@ var (
 	tabOn     = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FFFFFF")).Background(lipgloss.Color("#5A56E0")).Padding(0, 1)
 	tabOff    = lipgloss.NewStyle().Foreground(dim).Padding(0, 1)
 	selStyle  = lipgloss.NewStyle().Reverse(true)
+	offStyle  = lipgloss.NewStyle().Underline(true)
 	dimStyle  = lipgloss.NewStyle().Foreground(dim)
 	nameStyle = lipgloss.NewStyle().Bold(true).Foreground(accent)
 	headStyle = lipgloss.NewStyle().Bold(true)
@@ -25,6 +28,24 @@ var (
 )
 
 func tabLabel(i int, name string) string { return fmt.Sprintf("%d %s", i+1, name) }
+
+// cleanCell removes emoji and control characters that break column widths in list cells.
+func cleanCell(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		switch {
+		case r >= 0x1F000, r >= 0xFE00 && r <= 0xFE0F, r == 0x200D, r == 0x20E3:
+			continue
+		case r >= 0x2600 && r <= 0x27BF && r != '★':
+			continue
+		case unicode.IsControl(r):
+			b.WriteRune(' ')
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return strings.Join(strings.Fields(b.String()), " ")
+}
 
 // fit truncates s to width cells and pads it with spaces.
 func fit(s string, width int) string {
@@ -43,6 +64,9 @@ func (m *Model) View() string {
 	if m.width == 0 {
 		return "loading..."
 	}
+	if m.mode == modeOverlay && m.ov != nil {
+		return m.overlayView()
+	}
 	if m.help {
 		return m.helpView()
 	}
@@ -54,7 +78,11 @@ func (m *Model) View() string {
 	}
 
 	list := lipgloss.NewStyle().Width(listW).Height(bodyH).MaxHeight(bodyH).Render(m.listView(listW, bodyH))
-	sep := lipgloss.NewStyle().Foreground(dim).Render(strings.TrimRight(strings.Repeat("│\n", bodyH), "\n"))
+	sepStyle := dimStyle
+	if m.focus == focusDetail {
+		sepStyle = nameStyle
+	}
+	sep := sepStyle.Render(strings.TrimRight(strings.Repeat("│\n", bodyH), "\n"))
 	detail := lipgloss.NewStyle().Width(detailW).Height(bodyH).MaxHeight(bodyH).PaddingLeft(1).Render(m.detail.View())
 	body := lipgloss.JoinHorizontal(lipgloss.Top, list, sep, detail)
 
@@ -94,6 +122,11 @@ func (m *Model) listView(w, h int) string {
 		}
 		return dimStyle.Render("Nothing here yet.")
 	}
+	cursorStyle := selStyle
+	if m.focus == focusDetail {
+		cursorStyle = offStyle
+	}
+	anyMarks := len(m.marked) > 0
 	var b strings.Builder
 	end := m.offset + h
 	if end > len(m.rows) {
@@ -101,21 +134,29 @@ func (m *Model) listView(w, h int) string {
 	}
 	for i := m.offset; i < end; i++ {
 		r := m.rows[i]
+		title := r.title
+		if anyMarks {
+			if m.marked[r.personID] && r.personID != 0 {
+				title = "✓ " + title
+			} else {
+				title = "  " + title
+			}
+		}
 		meta := runewidth.Truncate(r.meta, w/2, "…")
 		metaW := runewidth.StringWidth(meta)
-		left := r.title
+		left := title
 		if r.sub != "" {
 			left += "  " + r.sub
 		}
 		line := fit(left, w-metaW-1) + " " + meta
 		line = fit(line, w)
 		if i == m.cursor {
-			b.WriteString(selStyle.Render(line))
+			b.WriteString(cursorStyle.Render(line))
 		} else {
 			// Dim the subtitle by rendering name and rest separately.
-			name := runewidth.Truncate(r.title, w-metaW-1, "…")
+			name := runewidth.Truncate(title, w-metaW-1, "…")
 			rest := ""
-			if r.sub != "" && runewidth.StringWidth(name) == runewidth.StringWidth(r.title) {
+			if r.sub != "" && runewidth.StringWidth(name) == runewidth.StringWidth(title) {
 				rest = fit("  "+r.sub, w-metaW-1-runewidth.StringWidth(name))
 			} else {
 				rest = strings.Repeat(" ", max(0, w-metaW-1-runewidth.StringWidth(name)))
@@ -129,212 +170,123 @@ func (m *Model) listView(w, h int) string {
 	return b.String()
 }
 
+// footSeg is one clickable key hint in the footer.
+type footSeg struct {
+	hint, label, id string
+	x0, x1          int // screen columns [x0, x1)
+}
+
+var footShort = map[string]string{
+	"down": "move", "search": "search", "focus-detail": "edit", "mark": "mark", "contacted": "contacted",
+	"tag": "tag", "cadence": "cadence", "tier": "tier", "note": "note", "new": "new", "task": "task",
+	"help": "help", "palette": "menu", "edit": "edit", "add": "add", "delete": "delete", "copy": "copy",
+	"open": "open", "back": "back",
+}
+
+// footerSegs lists the hints for the focused pane, in order, limited to what fits the width.
+func (m *Model) footerSegs() []footSeg {
+	var acts []*action
+	for i := range m.actions {
+		a := &m.actions[i]
+		if a.foot == 0 || a.footIn&m.focusBit() == 0 || !a.enabled(m) {
+			continue
+		}
+		if a.footIf != nil && !a.footIf(m) {
+			continue
+		}
+		if a.write && m.readOnly {
+			continue
+		}
+		acts = append(acts, a)
+	}
+	sort.SliceStable(acts, func(i, j int) bool { return acts[i].foot < acts[j].foot })
+
+	x := 0
+	if m.readOnly {
+		x = len("READ-ONLY") + 2
+	}
+	var segs []footSeg
+	for _, a := range acts {
+		hint, label := a.hint, footShort[a.id]
+		if a.id == "down" {
+			hint = "j/k"
+		}
+		if a.id == "focus-detail" && m.readOnly {
+			label = "detail"
+		}
+		w := runewidth.StringWidth(hint) + 1 + runewidth.StringWidth(label)
+		if x+w > m.width {
+			break
+		}
+		segs = append(segs, footSeg{hint: hint, label: label, id: a.id, x0: x, x1: x + w})
+		x += w + 2
+	}
+	return segs
+}
+
 func (m *Model) footerView() string {
 	var status string
 	switch m.mode {
 	case modeSearch, modePrompt:
 		status = m.input.View()
+	case modeConfirm:
+		status = errStyle.Render(m.confirm.prompt)
 	default:
 		switch {
 		case m.status != "" && m.statusIsErr:
 			status = errStyle.Render(m.status)
 		case m.status != "":
 			status = okStyle.Render(m.status)
+		case m.mode == modeEdit:
+			status = dimStyle.Render("editing: enter saves, esc cancels")
 		case m.query != "":
 			status = dimStyle.Render("filter: " + m.query + "  (esc clears)")
 		}
 	}
-	hints := "j/k move  / search  1-4 views  c contacted  n note  t task  s snooze  f favorite  x done  ? help  q quit"
+	if n := len(m.markedIDs()); n > 0 && (m.mode == modeNormal) {
+		tag := nameStyle.Render(fmt.Sprintf("%d marked", n))
+		room := m.width - lipgloss.Width(tag) - 1
+		if room > 0 {
+			status = lipgloss.NewStyle().MaxWidth(room).Render(status)
+			pad := room - lipgloss.Width(status)
+			status += strings.Repeat(" ", max(0, pad)) + " " + tag
+		}
+	}
+	statusLine := lipgloss.NewStyle().MaxWidth(m.width).Render(status)
+	if pad := m.width - lipgloss.Width(statusLine); pad > 0 {
+		statusLine += strings.Repeat(" ", pad)
+	}
+	return statusLine + "\n" + m.hintsLine()
+}
+
+func (m *Model) hintsLine() string {
+	switch m.mode {
+	case modeEdit:
+		h := "enter save  esc cancel"
+		if m.edit != nil && m.edit.kind == rkHandle {
+			h += "  tab change kind"
+		}
+		return dimStyle.Render(runewidth.Truncate(h, m.width, "…"))
+	case modeConfirm:
+		return dimStyle.Render("y yes  n no")
+	case modeSearch, modePrompt:
+		return dimStyle.Render("enter confirm  esc cancel")
+	}
+	var parts []string
 	if m.readOnly {
-		hints = "READ-ONLY  j/k move  / search  1-4 views  J/K scroll detail  ? help  q quit"
+		parts = append(parts, errStyle.Render("READ-ONLY"))
 	}
-	if m.mode != modeNormal {
-		hints = "enter confirm  esc cancel"
+	for _, s := range m.footerSegs() {
+		parts = append(parts, nameStyle.Render(s.hint)+" "+dimStyle.Render(s.label))
 	}
-	return fit(status, m.width) + "\n" + dimStyle.Render(runewidth.Truncate(hints, m.width, "…"))
+	return strings.Join(parts, "  ")
 }
 
 func (m *Model) helpView() string {
-	rows := [][2]string{
-		{"j / k, ↑ / ↓", "move"},
-		{"g / G", "top / bottom"},
-		{"ctrl+d / ctrl+u", "half page down / up"},
-		{"J / K", "scroll the detail pane"},
-		{"/", "search people (name, company, email, location, tags). Use #tag to filter by tag"},
-		{"esc", "clear the search"},
-		{"1 2 3 4, tab", "People, Due, Birthdays, Tasks"},
-		{"c", "mark contacted now (resets the keep-in-touch clock)"},
-		{"s", "snooze keep-in-touch for N days"},
-		{"n", "add a note to the selected person"},
-		{"t", "add a task: title | optional due date"},
-		{"f", "toggle favorite"},
-		{"x", "complete the selected task (Tasks view)"},
-		{"o", "toggle sort: name / recently updated"},
-		{"r", "reload from the database"},
-		{"q", "quit"},
-		{"mouse", "click to select, click a tab to switch, wheel to scroll"},
-	}
-	var b strings.Builder
-	b.WriteString(headStyle.Render("Keys") + "\n\n")
-	for _, r := range rows {
-		b.WriteString(nameStyle.Render(fit(r[0], 18)) + r[1] + "\n")
-	}
-	b.WriteString("\n" + dimStyle.Render("press any key to close"))
-	return b.String()
-}
-
-// detailText renders the right-hand pane for the selected row.
-func (m *Model) detailText(r row, ok bool) string {
-	if !ok {
-		return dimStyle.Render("Nothing selected.")
-	}
-	var b strings.Builder
-	if r.taskID != 0 {
-		m.writeTask(&b, r.taskID)
-	}
-	if r.personID != 0 {
-		m.writePerson(&b, r.personID)
-	}
-	return strings.TrimRight(b.String(), "\n")
-}
-
-func (m *Model) writeTask(b *strings.Builder, id int64) {
-	t, err := m.tr.FindByID(m.ctx, id)
-	if err != nil {
-		b.WriteString(errStyle.Render(err.Error()) + "\n")
-		return
-	}
-	b.WriteString(nameStyle.Render(t.Title) + "\n")
-	if t.DueAt != nil {
-		b.WriteString("due " + *t.DueAt + "\n")
-	}
-	if t.Recurrence != nil {
-		b.WriteString("repeats every " + *t.Recurrence + "\n")
-	}
-	b.WriteString("priority " + t.Priority + "\n")
-	if t.Description != nil {
-		b.WriteString(*t.Description + "\n")
-	}
-	b.WriteString("\n")
-}
-
-func (m *Model) writePerson(b *strings.Builder, id int64) {
-	p, err := m.pr.FindByID(m.ctx, id)
-	if err != nil {
-		b.WriteString(errStyle.Render(err.Error()) + "\n")
-		return
-	}
-	if err := m.pr.LoadDetails(m.ctx, p); err != nil {
-		b.WriteString(errStyle.Render(err.Error()) + "\n")
-		return
-	}
-	name := p.FirstName
-	if p.LastName != nil {
-		name += " " + *p.LastName
-	}
-	if p.IsFavorite {
-		name = "★ " + name
-	}
-	b.WriteString(nameStyle.Render(name) + dimStyle.Render(fmt.Sprintf("  #%d", p.ID)) + "\n")
-
-	var line []string
-	if p.Title != nil {
-		line = append(line, *p.Title)
-	}
-	if p.Company != nil {
-		line = append(line, *p.Company)
-	}
-	if len(line) > 0 {
-		b.WriteString(strings.Join(line, " at ") + "\n")
-	}
-	if p.Location != nil {
-		b.WriteString(dimStyle.Render(*p.Location) + "\n")
-	}
-	b.WriteString("\n")
-
-	for _, e := range p.Emails {
-		b.WriteString(label("email") + e.Email + labelSuffix(e.Label, e.IsPrimary) + "\n")
-	}
-	for _, ph := range p.Phones {
-		b.WriteString(label("phone") + ph.PhoneNumber + labelSuffix(ph.Label, ph.IsPrimary) + "\n")
-	}
-	for _, h := range p.Handles {
-		b.WriteString(label(h.Kind) + h.Value + "\n")
-	}
-
-	if bd := formatBirthdayParts(p); bd != "" {
-		b.WriteString(label("birthday") + bd + "\n")
-	}
-	if p.KeepInTouch != nil {
-		line := *p.KeepInTouch
-		if p.LastContactedAt != nil {
-			line += ", last contacted " + *p.LastContactedAt
-		} else {
-			line += ", never contacted"
-		}
-		if p.KeepInTouchSnoozedUntil != nil && *p.KeepInTouchSnoozedUntil > m.now().UTC().Format("2006-01-02 15:04:05") {
-			line += ", snoozed until " + *p.KeepInTouchSnoozedUntil
-		}
-		b.WriteString(label("keep in touch") + line + "\n")
-	} else if p.LastContactedAt != nil {
-		b.WriteString(label("last contacted") + *p.LastContactedAt + "\n")
-	}
-
-	if tags, err := m.tagr.GetForEntity(m.ctx, "person", p.ID); err == nil && len(tags) > 0 {
-		names := make([]string, len(tags))
-		for i, t := range tags {
-			names[i] = t.Name
-		}
-		b.WriteString(label("tags") + strings.Join(names, ", ") + "\n")
-	}
-
-	if p.Notes != nil && *p.Notes != "" {
-		b.WriteString("\n" + headStyle.Render("Notes") + "\n" + *p.Notes + "\n")
-	}
-	if p.Summary != nil && *p.Summary != "" {
-		b.WriteString("\n" + headStyle.Render("Summary") + "\n" + *p.Summary + "\n")
-	}
-
-	if tasks, err := m.tr.FindAll(m.ctx, model.TaskFilters{PersonID: &p.ID}); err == nil && len(tasks) > 0 {
-		b.WriteString("\n" + headStyle.Render("Open tasks") + "\n")
-		for _, t := range tasks {
-			due := ""
-			if t.DueAt != nil {
-				due = dimStyle.Render("  due " + *t.DueAt)
-			}
-			b.WriteString("• " + t.Title + due + "\n")
-		}
-	}
-
-	if ints, err := m.ir.FindAll(m.ctx, model.InteractionFilters{PersonID: &p.ID, Limit: 8}); err == nil && len(ints) > 0 {
-		b.WriteString("\n" + headStyle.Render("Recent") + "\n")
-		for _, i := range ints {
-			head := dimStyle.Render(i.OccurredAt) + "  " + i.Type
-			if i.Subject != nil {
-				head += ": " + *i.Subject
-			}
-			b.WriteString(head + "\n")
-			if i.Content != nil && *i.Content != "" {
-				b.WriteString("  " + truncateLines(*i.Content, 4) + "\n")
-			}
-		}
-	}
-}
-
-func label(s string) string { return dimStyle.Render(fit(s, 14)) }
-
-func labelSuffix(l *string, primary bool) string {
-	var parts []string
-	if l != nil && *l != "" {
-		parts = append(parts, *l)
-	}
-	if primary {
-		parts = append(parts, "primary")
-	}
-	if len(parts) == 0 {
-		return ""
-	}
-	return dimStyle.Render("  (" + strings.Join(parts, ", ") + ")")
+	title := headStyle.Render("Keys") + dimStyle.Render("   generated from the same action list as the palette (ctrl+k)")
+	foot := dimStyle.Render("j/k scroll  any other key closes")
+	cut := lipgloss.NewStyle().MaxWidth(m.width)
+	return cut.Render(title) + "\n" + m.helpVP.View() + "\n" + cut.Render(foot)
 }
 
 func formatBirthdayParts(p *model.Person) string {
@@ -345,12 +297,4 @@ func formatBirthdayParts(p *model.Person) string {
 		return fmt.Sprintf("%04d-%02d-%02d", *p.BirthdayYear, *p.BirthdayMonth, *p.BirthdayDay)
 	}
 	return fmt.Sprintf("%02d-%02d", *p.BirthdayMonth, *p.BirthdayDay)
-}
-
-func truncateLines(s string, n int) string {
-	lines := strings.Split(strings.TrimSpace(s), "\n")
-	if len(lines) > n {
-		lines = append(lines[:n], "…")
-	}
-	return strings.Join(lines, "\n  ")
 }
