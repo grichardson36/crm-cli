@@ -145,6 +145,9 @@ func (m *Model) footerView() string {
 		}
 	}
 	hints := "j/k move  / search  1-4 views  c contacted  n note  t task  s snooze  f favorite  x done  ? help  q quit"
+	if m.readOnly {
+		hints = "READ-ONLY  j/k move  / search  1-4 views  J/K scroll detail  ? help  q quit"
+	}
 	if m.mode != modeNormal {
 		hints = "enter confirm  esc cancel"
 	}

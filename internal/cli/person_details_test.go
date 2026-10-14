@@ -129,3 +129,19 @@ func TestRecurringTaskWithTwoPeople(t *testing.T) {
 	_, _, code = crm(t, db, "task", "add", "bad", "--recurrence", "weekly")
 	assert.Equal(t, 2, code, "recurrence needs a due date")
 }
+
+func TestBackupCommand(t *testing.T) {
+	dir := t.TempDir()
+	db := filepath.Join(dir, "crm.db")
+	crm(t, db, "person", "add", "Jane Smith")
+	dest := filepath.Join(dir, "snapshot.db")
+
+	_, _, code := crm(t, db, "backup", dest)
+	require.Equal(t, 0, code)
+	out, _, code := crm(t, dest, "person", "list", "-f", "json")
+	require.Equal(t, 0, code)
+	assert.Len(t, jsonRows(t, out), 1)
+
+	_, _, code = crm(t, db, "backup", dest)
+	assert.Equal(t, 4, code, "refuses to overwrite")
+}

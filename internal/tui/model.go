@@ -71,6 +71,7 @@ type Model struct {
 	promptKind  string
 	status      string
 	statusIsErr bool
+	readOnly    bool
 }
 
 // New creates the model and loads data.
@@ -94,11 +95,12 @@ func New(ctx context.Context, db *sql.DB) (*Model, error) {
 }
 
 // Run starts the TUI.
-func Run(ctx context.Context, db *sql.DB) error {
+func Run(ctx context.Context, db *sql.DB, readOnly bool) error {
 	m, err := New(ctx, db)
 	if err != nil {
 		return err
 	}
+	m.readOnly = readOnly
 	_, err = tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion(), tea.WithContext(ctx)).Run()
 	return err
 }
@@ -470,6 +472,18 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "r":
 		m.report(m.reload())
 		m.setStatus("reloaded", false)
+	case "c", "f", "x", "s", "n", "t":
+		if m.readOnly {
+			m.setStatus("read-only: this view cannot change data", true)
+			return m, nil
+		}
+		return m.handleWriteKey(msg.String())
+	}
+	return m, nil
+}
+
+func (m *Model) handleWriteKey(key string) (tea.Model, tea.Cmd) {
+	switch key {
 	case "c":
 		m.markContacted()
 	case "f":

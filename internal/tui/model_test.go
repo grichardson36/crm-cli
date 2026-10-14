@@ -281,3 +281,21 @@ func TestSortToggleAndReload(t *testing.T) {
 	press(m, "o")
 	assert.Equal(t, "Zed Adams", names(m)[0])
 }
+
+func TestReadOnlyBlocksWrites(t *testing.T) {
+	m, pr := newTestModel(t)
+	m.readOnly = true
+	for _, k := range []string{"c", "f", "n", "t", "s", "x"} {
+		press(m, k)
+		assert.Equal(t, modeNormal, m.mode, "key %s must not open a prompt", k)
+		assert.True(t, m.statusIsErr, "key %s", k)
+	}
+	assert.Contains(t, m.View(), "READ-ONLY")
+	p, err := pr.FindByID(context.Background(), 1)
+	require.NoError(t, err)
+	assert.False(t, p.IsFavorite)
+	assert.Nil(t, p.LastContactedAt)
+	// Reading still works.
+	press(m, "j", "/")
+	assert.Equal(t, modeSearch, m.mode)
+}
