@@ -17,6 +17,7 @@ func registerImportCommand(rootCmd *cobra.Command) {
 
 	var contacts, notes string
 	var dryRun bool
+	var skipTags []string
 	dex := &cobra.Command{
 		Use:   "dex",
 		Short: "Import a Dex CSV export (contacts, and optionally notes)",
@@ -31,7 +32,7 @@ func registerImportCommand(rootCmd *cobra.Command) {
 			}
 			defer db.Close()
 
-			rep, err := importer.ImportDex(cmd.Context(), db, contacts, notes, dryRun)
+			rep, err := importer.ImportDex(cmd.Context(), db, contacts, notes, importer.DexOptions{DryRun: dryRun, SkipTags: skipTags})
 			if err != nil {
 				return err
 			}
@@ -45,6 +46,7 @@ func registerImportCommand(rootCmd *cobra.Command) {
 	}
 	dex.Flags().StringVar(&contacts, "contacts", "", "path to dex_contacts_*.csv")
 	dex.Flags().StringVar(&notes, "notes", "", "path to dex_notes_*.csv")
+	dex.Flags().StringSliceVar(&skipTags, "skip-tag", nil, "group/tag name to leave out (repeatable)")
 	dex.Flags().BoolVar(&dryRun, "dry-run", false, "count what would be imported without writing")
 
 	importCmd.AddCommand(dex)

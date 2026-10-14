@@ -15,6 +15,12 @@ import (
 	"github.com/google/uuid"
 )
 
+// DexOptions tunes an import.
+type DexOptions struct {
+	DryRun   bool
+	SkipTags []string // group or tag names to leave out (case-insensitive)
+}
+
 // DexReport counts what an import did.
 type DexReport struct {
 	ContactsImported int `json:"contacts_imported"`
@@ -106,7 +112,7 @@ func readCSV(path string) (*table, error) {
 // ImportDex loads a Dex contacts export, and optionally a Dex notes export, in one
 // transaction. With dryRun the transaction is rolled back after counting.
 // Re-running is safe: contacts are matched by their Dex id, notes by "dex:<id>".
-func ImportDex(ctx context.Context, db *sql.DB, contactsPath, notesPath string, dryRun bool) (*DexReport, error) {
+func ImportDex(ctx context.Context, db *sql.DB, contactsPath, notesPath string, opts DexOptions) (*DexReport, error) {
 	contacts, err := readCSV(contactsPath)
 	if err != nil {
 		return nil, err
@@ -130,6 +136,10 @@ func ImportDex(ctx context.Context, db *sql.DB, contactsPath, notesPath string, 
 	defer func() { _ = tx.Rollback() }()
 
 	rep := &DexReport{}
+	skip := map[string]bool{}
+	for _, name := range opts.SkipTags {
+		skip[strings.ToLower(strings.TrimSpace(name))] = true
+	}
 	byDexID := map[string]int64{}
 
 	for _, row := range contacts.rows {
@@ -148,7 +158,7 @@ func ImportDex(ctx context.Context, db *sql.DB, contactsPath, notesPath string, 
 		if err != sql.ErrNoRows {
 			return nil, err
 		}
-		pid, err := insertContact(ctx, tx, contacts, row, rep)
+		pid, err := insertContact(ctx, tx, contacts, row, rep, skip)
 		if err != nil {
 			return nil, fmt.Errorf("contact %s: %w", dexID, err)
 		}
@@ -162,7 +172,7 @@ func ImportDex(ctx context.Context, db *sql.DB, contactsPath, notesPath string, 
 		}
 	}
 
-	if dryRun {
+	if opts.DryRun {
 		return rep, nil
 	}
 	return rep, tx.Commit()
@@ -243,7 +253,7 @@ func keepInTouch(frequencyText, frequency string) any {
 	return nil
 }
 
-func insertContact(ctx context.Context, tx *sql.Tx, t *table, row []string, rep *DexReport) (int64, error) {
+func insertContact(ctx context.Context, tx *sql.Tx, t *table, row []string, rep *DexReport, skip map[string]bool) (int64, error) {
 	emails := splitList(t.get(row, "dex_emails"))
 	if len(emails) == 0 {
 		emails = splitList(t.get(row, "dex_email"))
@@ -333,6 +343,9 @@ func insertContact(ctx context.Context, tx *sql.Tx, t *table, row []string, rep 
 
 	for _, col := range []string{"dex_groups", "dex_tags"} {
 		for _, name := range splitList(t.get(row, col)) {
+			if skip[strings.ToLower(name)] {
+				continue
+			}
 			if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO tags (name) VALUES (?)`, name); err != nil {
 				return 0, err
 			}

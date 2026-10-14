@@ -39,7 +39,7 @@ func TestImportDex(t *testing.T) {
 	defer d.Close()
 	contacts, notes := writeFiles(t)
 
-	rep, err := importer.ImportDex(context.Background(), d, contacts, notes, false)
+	rep, err := importer.ImportDex(context.Background(), d, contacts, notes, importer.DexOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, 3, rep.ContactsImported)
 	assert.Equal(t, 3, rep.Emails, "jane has two, solo has one")
@@ -92,16 +92,16 @@ func TestImportDex_IdempotentAndDryRun(t *testing.T) {
 	defer d.Close()
 	contacts, notes := writeFiles(t)
 
-	rep, err := importer.ImportDex(context.Background(), d, contacts, notes, true)
+	rep, err := importer.ImportDex(context.Background(), d, contacts, notes, importer.DexOptions{DryRun: true})
 	require.NoError(t, err)
 	assert.Equal(t, 3, rep.ContactsImported)
 	var n int
 	require.NoError(t, d.QueryRow(`SELECT COUNT(*) FROM people`).Scan(&n))
 	assert.Equal(t, 0, n, "dry run writes nothing")
 
-	_, err = importer.ImportDex(context.Background(), d, contacts, notes, false)
+	_, err = importer.ImportDex(context.Background(), d, contacts, notes, importer.DexOptions{})
 	require.NoError(t, err)
-	rep, err = importer.ImportDex(context.Background(), d, contacts, notes, false)
+	rep, err = importer.ImportDex(context.Background(), d, contacts, notes, importer.DexOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, 0, rep.ContactsImported)
 	assert.Equal(t, 3, rep.ContactsSkipped)
@@ -117,6 +117,21 @@ func TestImportDex_RejectsOtherCSV(t *testing.T) {
 	defer d.Close()
 	path := filepath.Join(t.TempDir(), "other.csv")
 	require.NoError(t, os.WriteFile(path, []byte("a,b\n1,2\n"), 0o600))
-	_, err = importer.ImportDex(context.Background(), d, path, "", false)
+	_, err = importer.ImportDex(context.Background(), d, path, "", importer.DexOptions{})
 	assert.Error(t, err)
+}
+
+func TestImportDex_SkipTags(t *testing.T) {
+	d, err := db.Open(":memory:")
+	require.NoError(t, err)
+	defer d.Close()
+	contacts, _ := writeFiles(t)
+
+	_, err = importer.ImportDex(context.Background(), d, contacts, "", importer.DexOptions{SkipTags: []string{"linkedin connections"}})
+	require.NoError(t, err)
+	var n int
+	require.NoError(t, d.QueryRow(`SELECT COUNT(*) FROM tags WHERE name = 'LinkedIn Connections'`).Scan(&n))
+	assert.Equal(t, 0, n)
+	require.NoError(t, d.QueryRow(`SELECT COUNT(*) FROM tags WHERE name = 'Acme'`).Scan(&n))
+	assert.Equal(t, 1, n)
 }
