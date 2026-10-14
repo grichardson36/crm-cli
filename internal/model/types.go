@@ -16,6 +16,20 @@ type Person struct {
 	OrgID     *int64  `json:"org_id"`
 	CreatedAt string  `json:"created_at"`
 	UpdatedAt string  `json:"updated_at"`
+
+	BirthdayMonth           *int    `json:"birthday_month"`
+	BirthdayDay             *int    `json:"birthday_day"`
+	BirthdayYear            *int    `json:"birthday_year"`
+	KeepInTouch             *string `json:"keep_in_touch"`
+	KeepInTouchSnoozedUntil *string `json:"keep_in_touch_snoozed_until"`
+	LastContactedAt         *string `json:"last_contacted_at"`
+	IsFavorite              bool    `json:"is_favorite"`
+	PriorityTier            *int    `json:"priority_tier"`
+
+	// Filled only by PersonRepo.LoadDetails.
+	Emails  []PersonEmail  `json:"emails,omitempty"`
+	Phones  []PersonPhone  `json:"phones,omitempty"`
+	Handles []PersonHandle `json:"handles,omitempty"`
 }
 
 // CreatePersonInput holds fields for creating a person.
@@ -44,6 +58,17 @@ type UpdatePersonInput struct {
 	Notes     *string
 	Summary   *string
 	OrgID     *int64
+
+	// Birthday is "YYYY-MM-DD" or "--MM-DD"; an empty string clears it.
+	Birthday *string
+	// KeepInTouch is one of KeepInTouchCadences; an empty string clears it.
+	KeepInTouch *string
+	// SnoozedUntil hides the person from the due list until then; an empty string clears it.
+	SnoozedUntil    *string
+	LastContactedAt *string
+	IsFavorite      *bool
+	// PriorityTier 0 clears the tier.
+	PriorityTier *int
 }
 
 // PersonFilters holds optional filters for listing people.
@@ -175,6 +200,9 @@ type Tag struct {
 
 // Task represents a follow-up or to-do item.
 type Task struct {
+	Recurrence  *string `json:"recurrence"`
+	PersonIDs   []int64 `json:"person_ids,omitempty"`
+	NextTaskID  *int64  `json:"next_task_id,omitempty"`
 	ID          int64   `json:"id"`
 	UUID        string  `json:"uuid"`
 	Title       string  `json:"title"`
@@ -198,6 +226,9 @@ type CreateTaskInput struct {
 	DealID      *int64
 	DueAt       *string
 	Priority    string
+	// PersonIDs links the task to several people. PersonID is added to it.
+	PersonIDs  []int64
+	Recurrence *string
 }
 
 // UpdateTaskInput holds optional fields for updating a task.
@@ -208,6 +239,7 @@ type UpdateTaskInput struct {
 	DealID      *int64
 	DueAt       *string
 	Priority    *string
+	Recurrence  *string
 }
 
 // TaskFilters holds optional filters for listing tasks.

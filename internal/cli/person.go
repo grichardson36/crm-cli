@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/format"
@@ -60,6 +61,7 @@ func personToMap(p *model.Person) map[string]any {
 	if p.OrgID != nil {
 		m["org_id"] = *p.OrgID
 	}
+	addDetailFields(m, p)
 	return m
 }
 
@@ -79,17 +81,19 @@ func registerPersonCommands(rootCmd *cobra.Command) {
 
 	personCmd.AddCommand(personAddCmd())
 	personCmd.AddCommand(personListCmd())
-	personCmd.AddCommand(personShowCmd())
 	personCmd.AddCommand(personEditCmd())
 	personCmd.AddCommand(personDeleteCmd())
+	personCmd.AddCommand(personShowCmd())
+	registerPersonDetailCommands(personCmd)
 	registerRelateCommands(personCmd)
 
 	rootCmd.AddCommand(personCmd)
 }
 
 func personAddCmd() *cobra.Command {
-	var email, phone, title, company, location, notes string
+	var email, phone, title, company, location, notes, birthday, keepInTouch string
 	var orgID int64
+	var favorite bool
 
 	cmd := &cobra.Command{
 		Use:   "add <name>",
@@ -123,6 +127,22 @@ func personAddCmd() *cobra.Command {
 				return err
 			}
 
+			extra := model.UpdatePersonInput{}
+			if birthday != "" {
+				extra.Birthday = &birthday
+			}
+			if keepInTouch != "" {
+				extra.KeepInTouch = &keepInTouch
+			}
+			if favorite {
+				extra.IsFavorite = &favorite
+			}
+			if extra.Birthday != nil || extra.KeepInTouch != nil || extra.IsFavorite != nil {
+				if person, err = r.Update(cmd.Context(), person.ID, extra); err != nil {
+					return err
+				}
+			}
+
 			data := []map[string]any{personToMap(person)}
 			return format.Output(os.Stdout, resolveFormat(), data, personColumns, flagQuiet)
 		},
@@ -135,6 +155,9 @@ func personAddCmd() *cobra.Command {
 	cmd.Flags().StringVar(&location, "location", "", "location")
 	cmd.Flags().StringVar(&notes, "notes", "", "notes")
 	cmd.Flags().Int64Var(&orgID, "org", 0, "organization ID")
+	cmd.Flags().StringVar(&birthday, "birthday", "", "birthday as YYYY-MM-DD, or --MM-DD when the year is unknown")
+	cmd.Flags().StringVar(&keepInTouch, "keep-in-touch", "", "cadence: "+strings.Join(model.KeepInTouchCadences, ", "))
+	cmd.Flags().BoolVar(&favorite, "favorite", false, "mark as favorite")
 
 	return cmd
 }
@@ -180,32 +203,23 @@ func personShowCmd() *cobra.Command {
 		Short: "Show a person's details",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			id, err := strconv.ParseInt(args[0], 10, 64)
-			if err != nil {
-				return model.NewExitError(model.ErrValidation, "invalid person ID: %s", args[0])
-			}
-
-			db, err := openDB()
+			id, err := parsePersonID(args[0])
 			if err != nil {
 				return err
 			}
-			defer db.Close()
-
-			r := repo.NewPersonRepo(db)
-			person, err := r.FindByID(cmd.Context(), id)
-			if err != nil {
-				return err
-			}
-
-			data := []map[string]any{personToMap(person)}
-			return format.Output(os.Stdout, resolveFormat(), data, personColumns, flagQuiet)
+			return withPersonRepo(cmd, func(r *repo.PersonRepo) error {
+				return outputPersonDetail(cmd, r, id)
+			})
 		},
 	}
 }
 
 func personEditCmd() *cobra.Command {
 	var firstName, lastName, email, phone, title, company, location, notes string
+	var birthday, keepInTouch, lastContacted, snoozeUntil string
 	var orgID int64
+	var tier int
+	var favorite bool
 
 	cmd := &cobra.Command{
 		Use:   "edit <id>",
@@ -251,6 +265,24 @@ func personEditCmd() *cobra.Command {
 			if cmd.Flags().Changed("org") {
 				input.OrgID = &orgID
 			}
+			if cmd.Flags().Changed("birthday") {
+				input.Birthday = &birthday
+			}
+			if cmd.Flags().Changed("keep-in-touch") {
+				input.KeepInTouch = &keepInTouch
+			}
+			if cmd.Flags().Changed("last-contacted") {
+				input.LastContactedAt = &lastContacted
+			}
+			if cmd.Flags().Changed("snooze-until") {
+				input.SnoozedUntil = &snoozeUntil
+			}
+			if cmd.Flags().Changed("favorite") {
+				input.IsFavorite = &favorite
+			}
+			if cmd.Flags().Changed("tier") {
+				input.PriorityTier = &tier
+			}
 
 			r := repo.NewPersonRepo(db)
 			person, err := r.Update(cmd.Context(), id, input)
@@ -272,6 +304,12 @@ func personEditCmd() *cobra.Command {
 	cmd.Flags().StringVar(&location, "location", "", "location")
 	cmd.Flags().StringVar(&notes, "notes", "", "notes")
 	cmd.Flags().Int64Var(&orgID, "org", 0, "organization ID")
+	cmd.Flags().StringVar(&birthday, "birthday", "", "birthday as YYYY-MM-DD, or --MM-DD when the year is unknown (empty clears)")
+	cmd.Flags().StringVar(&keepInTouch, "keep-in-touch", "", "cadence: "+strings.Join(model.KeepInTouchCadences, ", ")+" (empty clears)")
+	cmd.Flags().StringVar(&lastContacted, "last-contacted", "", "when you last reached out, as YYYY-MM-DD or YYYY-MM-DD HH:MM:SS")
+	cmd.Flags().StringVar(&snoozeUntil, "snooze-until", "", "hide from the due list until this date (empty clears)")
+	cmd.Flags().BoolVar(&favorite, "favorite", false, "mark as favorite (--favorite=false to unmark)")
+	cmd.Flags().IntVar(&tier, "tier", 0, "priority tier (0 clears)")
 
 	return cmd
 }

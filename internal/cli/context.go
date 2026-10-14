@@ -51,6 +51,9 @@ func registerContextCommand(rootCmd *cobra.Command) {
 			result := map[string]any{}
 
 			// Person profile
+			if err := pr.LoadDetails(ctx, person); err != nil {
+				return err
+			}
 			result["person"] = personToMap(person)
 
 			// Organization

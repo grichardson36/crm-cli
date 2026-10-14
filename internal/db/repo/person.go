@@ -21,7 +21,7 @@ func NewPersonRepo(db *sql.DB) *PersonRepo {
 	return &PersonRepo{db: db}
 }
 
-var personColumns = "id, uuid, first_name, last_name, email, phone, title, company, location, notes, summary, org_id, created_at, updated_at"
+var personColumns = "id, uuid, first_name, last_name, email, phone, title, company, location, notes, summary, org_id, created_at, updated_at, birthday_month, birthday_day, birthday_year, keep_in_touch, keep_in_touch_snoozed_until, last_contacted_at, is_favorite, priority_tier"
 
 func scanPerson(row interface{ Scan(...any) error }) (*model.Person, error) {
 	var p model.Person
@@ -30,6 +30,9 @@ func scanPerson(row interface{ Scan(...any) error }) (*model.Person, error) {
 		&p.Email, &p.Phone, &p.Title, &p.Company,
 		&p.Location, &p.Notes, &p.Summary, &p.OrgID,
 		&p.CreatedAt, &p.UpdatedAt,
+		&p.BirthdayMonth, &p.BirthdayDay, &p.BirthdayYear,
+		&p.KeepInTouch, &p.KeepInTouchSnoozedUntil, &p.LastContactedAt,
+		&p.IsFavorite, &p.PriorityTier,
 	)
 	if err != nil {
 		return nil, err
@@ -60,6 +63,10 @@ func (r *PersonRepo) Create(ctx context.Context, input model.CreatePersonInput) 
 		return nil, fmt.Errorf("last insert id: %w", err)
 	}
 
+	if err := r.syncPrimary(ctx, rowID, input.Email, input.Phone); err != nil {
+		return nil, err
+	}
+
 	return r.FindByID(ctx, rowID)
 }
 
@@ -68,7 +75,8 @@ func (r *PersonRepo) checkDuplicate(ctx context.Context, input model.CreatePerso
 	if input.Email != nil && *input.Email != "" {
 		var count int
 		err := r.db.QueryRowContext(ctx,
-			"SELECT COUNT(*) FROM people WHERE email = ? AND archived = 0", *input.Email).Scan(&count)
+			`SELECT COUNT(*) FROM people p WHERE p.archived = 0
+			 AND (p.email = ? OR p.id IN (SELECT person_id FROM person_emails WHERE email = ?))`, *input.Email, *input.Email).Scan(&count)
 		if err != nil {
 			return fmt.Errorf("check duplicate email: %w", err)
 		}
@@ -203,6 +211,49 @@ func (r *PersonRepo) Update(ctx context.Context, id int64, input model.UpdatePer
 		args = append(args, *input.OrgID)
 	}
 
+	if input.Birthday != nil {
+		if *input.Birthday == "" {
+			setClauses = append(setClauses, "birthday_month = NULL", "birthday_day = NULL", "birthday_year = NULL")
+		} else {
+			m, d, y, err := model.ParseBirthday(*input.Birthday)
+			if err != nil {
+				return nil, err
+			}
+			setClauses = append(setClauses, "birthday_month = ?", "birthday_day = ?", "birthday_year = ?")
+			args = append(args, m, d, y)
+		}
+	}
+	if input.KeepInTouch != nil {
+		if *input.KeepInTouch == "" || *input.KeepInTouch == "unset" {
+			setClauses = append(setClauses, "keep_in_touch = NULL")
+		} else if !model.ValidCadence(*input.KeepInTouch) {
+			return nil, fmt.Errorf("invalid keep-in-touch cadence %q (must be one of: %s): %w", *input.KeepInTouch, strings.Join(model.KeepInTouchCadences, ", "), model.ErrValidation)
+		} else {
+			setClauses = append(setClauses, "keep_in_touch = ?")
+			args = append(args, *input.KeepInTouch)
+		}
+	}
+	if input.SnoozedUntil != nil {
+		setClauses = append(setClauses, "keep_in_touch_snoozed_until = ?")
+		args = append(args, nullIfEmpty(*input.SnoozedUntil))
+	}
+	if input.LastContactedAt != nil {
+		setClauses = append(setClauses, "last_contacted_at = ?")
+		args = append(args, nullIfEmpty(*input.LastContactedAt))
+	}
+	if input.IsFavorite != nil {
+		setClauses = append(setClauses, "is_favorite = ?")
+		args = append(args, *input.IsFavorite)
+	}
+	if input.PriorityTier != nil {
+		setClauses = append(setClauses, "priority_tier = ?")
+		if *input.PriorityTier == 0 {
+			args = append(args, nil)
+		} else {
+			args = append(args, *input.PriorityTier)
+		}
+	}
+
 	if len(setClauses) == 0 {
 		return r.FindByID(ctx, id)
 	}
@@ -222,6 +273,10 @@ func (r *PersonRepo) Update(ctx context.Context, id int64, input model.UpdatePer
 	}
 	if rows == 0 {
 		return nil, fmt.Errorf("person %d: %w", id, model.ErrNotFound)
+	}
+
+	if err := r.syncPrimary(ctx, id, input.Email, input.Phone); err != nil {
+		return nil, err
 	}
 
 	return r.FindByID(ctx, id)
@@ -253,13 +308,16 @@ func (r *PersonRepo) Search(ctx context.Context, query string, limit int) ([]*mo
 	}
 
 	sql := fmt.Sprintf(
-		`SELECT %s FROM people WHERE archived = 0 AND id IN (SELECT rowid FROM people_fts WHERE people_fts MATCH ?) ORDER BY updated_at DESC LIMIT ?`,
+		`SELECT %s FROM people WHERE archived = 0 AND (id IN (SELECT rowid FROM people_fts WHERE people_fts MATCH ?)
+		 OR id IN (SELECT person_id FROM person_emails WHERE email LIKE ?)
+		 OR id IN (SELECT person_id FROM person_phones WHERE phone_number LIKE ?)) ORDER BY updated_at DESC LIMIT ?`,
 		personColumns,
 	)
 
 	// Quote the query to handle special FTS5 characters like @
 	ftsQuery := `"` + strings.ReplaceAll(query, `"`, `""`) + `"` + "*"
-	rows, err := r.db.QueryContext(ctx, sql, ftsQuery, limit)
+	like := "%" + query + "%"
+	rows, err := r.db.QueryContext(ctx, sql, ftsQuery, like, like, limit)
 	if err != nil {
 		return nil, fmt.Errorf("search people: %w", err)
 	}

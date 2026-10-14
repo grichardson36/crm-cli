@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
+	"time"
 
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
@@ -75,8 +77,63 @@ func NewServer(db *sql.DB, version string) *server.MCPServer {
 			gomcp.WithString("location", gomcp.Description("Location")),
 			gomcp.WithString("notes", gomcp.Description("Notes")),
 			gomcp.WithString("summary", gomcp.Description("AI-maintained summary/dossier")),
+			gomcp.WithString("birthday", gomcp.Description("YYYY-MM-DD, or --MM-DD when the year is unknown. Empty string clears it")),
+			gomcp.WithString("keep_in_touch", gomcp.Description("Keep-in-touch cadence: "+strings.Join(model.KeepInTouchCadences, ", ")+". Empty string clears it")),
+			gomcp.WithString("snoozed_until", gomcp.Description("Hide from the due list until this date (YYYY-MM-DD). Empty string clears it")),
+			gomcp.WithString("last_contacted_at", gomcp.Description("When you last reached out (YYYY-MM-DD or YYYY-MM-DD HH:MM:SS, UTC)")),
+			gomcp.WithBoolean("is_favorite", gomcp.Description("Mark as favorite")),
+			gomcp.WithNumber("priority_tier", gomcp.Description("Priority tier number. 0 clears it")),
 		),
 		personUpdateHandler(pr),
+	)
+
+	s.AddTool(
+		gomcp.NewTool("crm_person_add_contact_method",
+			gomcp.WithDescription("Add an email, phone number, or social handle to a person. A person can have several emails and phones. The first one becomes primary"),
+			gomcp.WithNumber("id", gomcp.Required(), gomcp.Description("Person ID")),
+			gomcp.WithString("type", gomcp.Required(), gomcp.Enum("email", "phone", "handle"), gomcp.Description("What to add")),
+			gomcp.WithString("value", gomcp.Required(), gomcp.Description("The email address, phone number, or handle URL/username")),
+			gomcp.WithString("kind", gomcp.Description("For type=handle: "+strings.Join(model.HandleKinds, ", "))),
+			gomcp.WithString("label", gomcp.Description("Optional label for an email or phone, e.g. Work")),
+			gomcp.WithBoolean("primary", gomcp.Description("Make this the primary email or phone")),
+		),
+		contactMethodAddHandler(pr),
+	)
+
+	s.AddTool(
+		gomcp.NewTool("crm_person_remove_contact_method",
+			gomcp.WithDescription("Remove an email, phone number, or social handle from a person"),
+			gomcp.WithNumber("id", gomcp.Required(), gomcp.Description("Person ID")),
+			gomcp.WithString("type", gomcp.Required(), gomcp.Enum("email", "phone", "handle"), gomcp.Description("What to remove")),
+			gomcp.WithString("value", gomcp.Required(), gomcp.Description("The email or phone to remove, or for type=handle the handle kind")),
+		),
+		contactMethodRemoveHandler(pr),
+	)
+
+	s.AddTool(
+		gomcp.NewTool("crm_due",
+			gomcp.WithDescription("List people you are due to reach out to, based on each person's keep-in-touch cadence. Most overdue first"),
+			gomcp.WithNumber("within_days", gomcp.Description("Also include people due in the next N days (default 0)")),
+			gomcp.WithNumber("limit", gomcp.Description("Max results (default 50)")),
+		),
+		dueHandler(pr),
+	)
+
+	s.AddTool(
+		gomcp.NewTool("crm_birthdays",
+			gomcp.WithDescription("List upcoming birthdays, soonest first"),
+			gomcp.WithNumber("days", gomcp.Description("Look ahead this many days (default 30)")),
+		),
+		birthdaysHandler(pr),
+	)
+
+	s.AddTool(
+		gomcp.NewTool("crm_person_mark_contacted",
+			gomcp.WithDescription("Record that you just reached out to a person. Resets their keep-in-touch clock and clears any snooze"),
+			gomcp.WithNumber("id", gomcp.Required(), gomcp.Description("Person ID")),
+			gomcp.WithString("at", gomcp.Description("When (YYYY-MM-DD or YYYY-MM-DD HH:MM:SS, UTC). Default now")),
+		),
+		markContactedHandler(pr),
 	)
 
 	s.AddTool(
@@ -186,8 +243,18 @@ func NewServer(db *sql.DB, version string) *server.MCPServer {
 			gomcp.WithNumber("deal_id", gomcp.Description("Associated deal ID")),
 			gomcp.WithString("due", gomcp.Description("Due date (ISO 8601)")),
 			gomcp.WithString("priority", gomcp.Description("Priority: low, medium, high (default: medium)")),
+			gomcp.WithArray("person_ids", gomcp.Description("Link the task to several people"), gomcp.WithNumberItems()),
+			gomcp.WithString("recurrence", gomcp.Description("Repeat when completed, e.g. \"7 days\", \"1 mon\", weekly. Needs a due date")),
 		),
 		taskCreateHandler(tr),
+	)
+
+	s.AddTool(
+		gomcp.NewTool("crm_task_complete",
+			gomcp.WithDescription("Mark a task done. A recurring task creates its next occurrence and returns next_task_id"),
+			gomcp.WithNumber("id", gomcp.Required(), gomcp.Description("Task ID")),
+		),
+		taskCompleteHandler(tr),
 	)
 
 	s.AddTool(
@@ -336,6 +403,9 @@ func personGetHandler(pr *repo.PersonRepo) server.ToolHandlerFunc {
 		if err != nil {
 			return mcpError(err)
 		}
+		if err := pr.LoadDetails(ctx, person); err != nil {
+			return mcpError(err)
+		}
 		return jsonResult(person)
 	}
 }
@@ -395,6 +465,25 @@ func personUpdateHandler(pr *repo.PersonRepo) server.ToolHandlerFunc {
 		}
 		if s, ok := argString(args, "summary"); ok {
 			input.Summary = &s
+		}
+		if s, ok := argString(args, "birthday"); ok {
+			input.Birthday = &s
+		}
+		if s, ok := argString(args, "keep_in_touch"); ok {
+			input.KeepInTouch = &s
+		}
+		if s, ok := argString(args, "snoozed_until"); ok {
+			input.SnoozedUntil = &s
+		}
+		if s, ok := argString(args, "last_contacted_at"); ok {
+			input.LastContactedAt = &s
+		}
+		if b, ok := args["is_favorite"].(bool); ok {
+			input.IsFavorite = &b
+		}
+		if f, ok := argFloat(args, "priority_tier"); ok {
+			tier := int(f)
+			input.PriorityTier = &tier
 		}
 
 		person, err := pr.Update(ctx, id, input)
@@ -568,6 +657,9 @@ func contextHandler(pr *repo.PersonRepo, or *repo.OrgRepo, ir *repo.InteractionR
 		if err != nil {
 			return mcpError(err)
 		}
+		if err := pr.LoadDetails(ctx, person); err != nil {
+			return mcpError(err)
+		}
 
 		result := map[string]any{"person": person}
 
@@ -703,6 +795,16 @@ func taskCreateHandler(tr *repo.TaskRepo) server.ToolHandlerFunc {
 		if did, ok := argInt64(args, "deal_id"); ok {
 			input.DealID = &did
 		}
+		if raw, ok := args["person_ids"].([]any); ok {
+			for _, v := range raw {
+				if f, ok := v.(float64); ok && f == math.Trunc(f) && f > 0 {
+					input.PersonIDs = append(input.PersonIDs, int64(f))
+				}
+			}
+		}
+		if rec, ok := argString(args, "recurrence"); ok && rec != "" {
+			input.Recurrence = &rec
+		}
 
 		task, err := tr.Create(ctx, input)
 		if err != nil {
@@ -729,6 +831,125 @@ func taskListHandler(tr *repo.TaskRepo) server.ToolHandlerFunc {
 			return mcpError(err)
 		}
 		return jsonResult(tasks)
+	}
+}
+
+func taskCompleteHandler(tr *repo.TaskRepo) server.ToolHandlerFunc {
+	return func(ctx context.Context, req gomcp.CallToolRequest) (*gomcp.CallToolResult, error) {
+		id, errResult := requireID(req, "id")
+		if errResult != nil {
+			return errResult, nil
+		}
+		task, err := tr.Complete(ctx, id)
+		if err != nil {
+			return mcpError(err)
+		}
+		return jsonResult(task)
+	}
+}
+
+// --- Contact method, reminder, and birthday handlers ---
+
+func contactMethodAddHandler(pr *repo.PersonRepo) server.ToolHandlerFunc {
+	return func(ctx context.Context, req gomcp.CallToolRequest) (*gomcp.CallToolResult, error) {
+		id, errResult := requireID(req, "id")
+		if errResult != nil {
+			return errResult, nil
+		}
+		value := req.GetString("value", "")
+		label := strPtr(req.GetString("label", ""))
+		primary := req.GetBool("primary", false)
+
+		var err error
+		switch kind := req.GetString("type", ""); kind {
+		case "email":
+			err = pr.AddEmail(ctx, id, value, label, primary)
+		case "phone":
+			err = pr.AddPhone(ctx, id, value, label, primary)
+		case "handle":
+			err = pr.SetHandle(ctx, id, req.GetString("kind", ""), value)
+		default:
+			return gomcp.NewToolResultError("type must be email, phone, or handle"), nil
+		}
+		if err != nil {
+			return mcpError(err)
+		}
+		return personWithDetails(ctx, pr, id)
+	}
+}
+
+func contactMethodRemoveHandler(pr *repo.PersonRepo) server.ToolHandlerFunc {
+	return func(ctx context.Context, req gomcp.CallToolRequest) (*gomcp.CallToolResult, error) {
+		id, errResult := requireID(req, "id")
+		if errResult != nil {
+			return errResult, nil
+		}
+		value := req.GetString("value", "")
+
+		var err error
+		switch kind := req.GetString("type", ""); kind {
+		case "email":
+			err = pr.RemoveEmail(ctx, id, value)
+		case "phone":
+			err = pr.RemovePhone(ctx, id, value)
+		case "handle":
+			err = pr.RemoveHandle(ctx, id, value)
+		default:
+			return gomcp.NewToolResultError("type must be email, phone, or handle"), nil
+		}
+		if err != nil {
+			return mcpError(err)
+		}
+		return personWithDetails(ctx, pr, id)
+	}
+}
+
+func personWithDetails(ctx context.Context, pr *repo.PersonRepo, id int64) (*gomcp.CallToolResult, error) {
+	person, err := pr.FindByID(ctx, id)
+	if err != nil {
+		return mcpError(err)
+	}
+	if err := pr.LoadDetails(ctx, person); err != nil {
+		return mcpError(err)
+	}
+	return jsonResult(person)
+}
+
+func dueHandler(pr *repo.PersonRepo) server.ToolHandlerFunc {
+	return func(ctx context.Context, req gomcp.CallToolRequest) (*gomcp.CallToolResult, error) {
+		due, err := pr.Due(ctx, req.GetInt("within_days", 0), req.GetInt("limit", 50))
+		if err != nil {
+			return mcpError(err)
+		}
+		return jsonResult(due)
+	}
+}
+
+func birthdaysHandler(pr *repo.PersonRepo) server.ToolHandlerFunc {
+	return func(ctx context.Context, req gomcp.CallToolRequest) (*gomcp.CallToolResult, error) {
+		list, err := pr.Birthdays(ctx, req.GetInt("days", 30), time.Now())
+		if err != nil {
+			return mcpError(err)
+		}
+		return jsonResult(list)
+	}
+}
+
+func markContactedHandler(pr *repo.PersonRepo) server.ToolHandlerFunc {
+	return func(ctx context.Context, req gomcp.CallToolRequest) (*gomcp.CallToolResult, error) {
+		id, errResult := requireID(req, "id")
+		if errResult != nil {
+			return errResult, nil
+		}
+		when := req.GetString("at", "")
+		if when == "" {
+			when = time.Now().UTC().Format("2006-01-02 15:04:05")
+		}
+		empty := ""
+		if _, err := pr.Update(ctx, id, model.UpdatePersonInput{LastContactedAt: &when, SnoozedUntil: &empty}); err != nil {
+			return mcpError(err)
+		}
+		return personWithDetails(ctx, pr, id)
 	}
 }
 

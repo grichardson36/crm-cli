@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jdanielnd/crm-cli/internal/model"
@@ -21,14 +22,45 @@ func NewTaskRepo(db *sql.DB) *TaskRepo {
 	return &TaskRepo{db: db}
 }
 
+const taskColumns = `id, uuid, title, description, person_id, deal_id, due_at, priority,
+	completed, completed_at, archived, created_at, updated_at, recurrence`
+
 func scanTask(row interface{ Scan(...any) error }) (*model.Task, error) {
 	var t model.Task
 	err := row.Scan(
 		&t.ID, &t.UUID, &t.Title, &t.Description, &t.PersonID, &t.DealID,
 		&t.DueAt, &t.Priority, &t.Completed, &t.CompletedAt,
-		&t.Archived, &t.CreatedAt, &t.UpdatedAt,
+		&t.Archived, &t.CreatedAt, &t.UpdatedAt, &t.Recurrence,
 	)
 	return &t, err
+}
+
+// loadPeople fills t.PersonIDs from task_people.
+func (r *TaskRepo) loadPeople(ctx context.Context, t *model.Task) error {
+	rows, err := r.db.QueryContext(ctx, `SELECT person_id FROM task_people WHERE task_id = ? ORDER BY person_id`, t.ID)
+	if err != nil {
+		return fmt.Errorf("load task people: %w", err)
+	}
+	defer rows.Close()
+	t.PersonIDs = nil
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return err
+		}
+		t.PersonIDs = append(t.PersonIDs, id)
+	}
+	return rows.Err()
+}
+
+// linkPeople links a task to people, ignoring ones already linked.
+func (r *TaskRepo) linkPeople(ctx context.Context, taskID int64, ids []int64) error {
+	for _, pid := range ids {
+		if _, err := r.db.ExecContext(ctx, `INSERT OR IGNORE INTO task_people (task_id, person_id) VALUES (?, ?)`, taskID, pid); err != nil {
+			return fmt.Errorf("link person %d to task %d: %w", pid, taskID, err)
+		}
+	}
+	return nil
 }
 
 // Create inserts a new task.
@@ -37,44 +69,59 @@ func (r *TaskRepo) Create(ctx context.Context, input model.CreateTaskInput) (*mo
 		return nil, fmt.Errorf("invalid priority %q: %w", input.Priority, model.ErrValidation)
 	}
 
+	if input.Recurrence != nil {
+		if _, _, _, err := model.ParseRecurrence(*input.Recurrence); err != nil {
+			return nil, err
+		}
+		if input.DueAt == nil {
+			return nil, fmt.Errorf("a recurring task needs a due date: %w", model.ErrValidation)
+		}
+	}
+
 	id := uuid.New().String()
 	result, err := r.db.ExecContext(ctx,
-		`INSERT INTO tasks (uuid, title, description, person_id, deal_id, due_at, priority)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		id, input.Title, input.Description, input.PersonID, input.DealID, input.DueAt, input.Priority)
+		`INSERT INTO tasks (uuid, title, description, person_id, deal_id, due_at, priority, recurrence)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		id, input.Title, input.Description, input.PersonID, input.DealID, input.DueAt, input.Priority, input.Recurrence)
 	if err != nil {
 		return nil, fmt.Errorf("create task: %w", err)
 	}
 
 	taskID, _ := result.LastInsertId()
+	people := input.PersonIDs
+	if input.PersonID != nil {
+		people = append(people, *input.PersonID)
+	}
+	if err := r.linkPeople(ctx, taskID, people); err != nil {
+		return nil, err
+	}
 	return r.FindByID(ctx, taskID)
 }
 
 // FindByID returns a task by ID.
 func (r *TaskRepo) FindByID(ctx context.Context, id int64) (*model.Task, error) {
 	t, err := scanTask(r.db.QueryRowContext(ctx,
-		`SELECT id, uuid, title, description, person_id, deal_id, due_at, priority,
-		        completed, completed_at, archived, created_at, updated_at
-		 FROM tasks WHERE id = ? AND archived = 0`, id))
+		`SELECT `+taskColumns+` FROM tasks WHERE id = ? AND archived = 0`, id))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("task %d: %w", id, model.ErrNotFound)
 		}
 		return nil, fmt.Errorf("find task %d: %w", id, err)
 	}
+	if err := r.loadPeople(ctx, t); err != nil {
+		return nil, err
+	}
 	return t, nil
 }
 
 // FindAll returns tasks with optional filters.
 func (r *TaskRepo) FindAll(ctx context.Context, filters model.TaskFilters) ([]*model.Task, error) {
-	query := `SELECT id, uuid, title, description, person_id, deal_id, due_at, priority,
-	                 completed, completed_at, archived, created_at, updated_at
-	          FROM tasks WHERE archived = 0`
+	query := `SELECT ` + taskColumns + ` FROM tasks WHERE archived = 0`
 	var args []any
 
 	if filters.PersonID != nil {
-		query += " AND person_id = ?"
-		args = append(args, *filters.PersonID)
+		query += " AND (person_id = ? OR id IN (SELECT task_id FROM task_people WHERE person_id = ?))"
+		args = append(args, *filters.PersonID, *filters.PersonID)
 	}
 	if filters.DealID != nil {
 		query += " AND deal_id = ?"
@@ -108,7 +155,16 @@ func (r *TaskRepo) FindAll(ctx context.Context, filters model.TaskFilters) ([]*m
 		}
 		tasks = append(tasks, t)
 	}
-	return tasks, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
+	for _, t := range tasks {
+		if err := r.loadPeople(ctx, t); err != nil {
+			return nil, err
+		}
+	}
+	return tasks, nil
 }
 
 // Complete marks a task as completed.
@@ -132,7 +188,31 @@ func (r *TaskRepo) Complete(ctx context.Context, id int64) (*model.Task, error) 
 		}
 		return nil, fmt.Errorf("task %d: %w", id, model.ErrNotFound)
 	}
-	return r.FindByID(ctx, id)
+	done, err := r.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if done.Recurrence != nil && done.DueAt != nil {
+		nextDue, err := model.NextDue(*done.DueAt, *done.Recurrence, time.Now().UTC())
+		if err != nil {
+			return nil, err
+		}
+		next, err := r.Create(ctx, model.CreateTaskInput{
+			Title:       done.Title,
+			Description: done.Description,
+			PersonID:    done.PersonID,
+			DealID:      done.DealID,
+			DueAt:       &nextDue,
+			Priority:    done.Priority,
+			PersonIDs:   done.PersonIDs,
+			Recurrence:  done.Recurrence,
+		})
+		if err != nil {
+			return nil, err
+		}
+		done.NextTaskID = &next.ID
+	}
+	return done, nil
 }
 
 // Update modifies a task.
@@ -168,6 +248,18 @@ func (r *TaskRepo) Update(ctx context.Context, id int64, input model.UpdateTaskI
 		args = append(args, *input.Priority)
 	}
 
+	if input.Recurrence != nil {
+		if *input.Recurrence == "" {
+			setClauses = append(setClauses, "recurrence = NULL")
+		} else {
+			if _, _, _, err := model.ParseRecurrence(*input.Recurrence); err != nil {
+				return nil, err
+			}
+			setClauses = append(setClauses, "recurrence = ?")
+			args = append(args, *input.Recurrence)
+		}
+	}
+
 	if len(setClauses) == 0 {
 		return r.FindByID(ctx, id)
 	}
@@ -184,6 +276,11 @@ func (r *TaskRepo) Update(ctx context.Context, id int64, input model.UpdateTaskI
 	rows, _ := result.RowsAffected()
 	if rows == 0 {
 		return nil, fmt.Errorf("task %d: %w", id, model.ErrNotFound)
+	}
+	if input.PersonID != nil {
+		if err := r.linkPeople(ctx, id, []int64{*input.PersonID}); err != nil {
+			return nil, err
+		}
 	}
 
 	return r.FindByID(ctx, id)
