@@ -25,6 +25,4 @@ crm birthdays -f json
 
 Fields: `person_id`, `name`, `date`, `days_until`, `turning`. `turning` is absent when the year is unknown. The default window is 30 days.
 
-## Related topics
-
-`keep-in-touch`, `tui` (the Birthdays view, key 3).
+See also: keep-in-touch, tui (Birthdays view, key 5).

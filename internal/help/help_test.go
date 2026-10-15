@@ -1,6 +1,7 @@
 package help_test
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 
@@ -10,8 +11,9 @@ import (
 )
 
 var requiredTopics = []string{
-	"overview", "people", "contact-methods", "keep-in-touch", "birthdays", "tasks", "notes", "tags",
-	"duplicates", "archive", "domains", "import", "sync", "dav", "output", "agents", "tui", "install",
+	"overview", "people", "orgs", "contact-methods", "keep-in-touch", "birthdays", "tasks", "notes", "note-types", "tags",
+	"duplicates", "archive", "domains", "import", "sync", "sync-inbox", "dav", "dav-server", "output", "errors", "agents",
+	"tui", "tui-keys", "install", "backup",
 }
 
 func TestTopicsExistInOrder(t *testing.T) {
@@ -27,6 +29,35 @@ func TestEveryTopicHasTitleSummaryBody(t *testing.T) {
 			assert.NotContains(t, topic.Summary, "\n")
 			assert.Greater(t, len(topic.Body), 200)
 			assert.False(t, strings.Contains(topic.Body, "\r"), "body is normalized to LF")
+		})
+	}
+}
+
+// Minimal-documentation rule (FEATURES K07): a topic fits one screen, answers the basic question
+// first and ends by naming the next topics to read. Overflow belongs in a deeper topic.
+const maxTopicLines = 39
+
+var parenthetical = regexp.MustCompile(`\([^)]*\)`)
+
+func TestTopicsAreShortAndEndWithSeeAlso(t *testing.T) {
+	names := map[string]bool{}
+	for _, n := range help.Names() {
+		names[n] = true
+	}
+	for _, topic := range help.List() {
+		t.Run(topic.Name, func(t *testing.T) {
+			lines := strings.Split(strings.TrimSpace(topic.Body), "\n")
+			assert.LessOrEqual(t, len(lines), maxTopicLines, "move overflow into a deeper topic")
+			last := lines[len(lines)-1]
+			require.True(t, strings.HasPrefix(last, "See also: "), "last line must start with 'See also: ', got %q", last)
+			assert.Equal(t, 1, strings.Count(topic.Body, "See also:"), "one See also line")
+			// Every name in the See also line that looks like a topic must exist.
+			rest := parenthetical.ReplaceAllString(strings.TrimPrefix(last, "See also: "), "")
+			for _, item := range strings.Split(rest, ",") {
+				word := strings.TrimSuffix(strings.Fields(strings.TrimSpace(item))[0], ".")
+				assert.True(t, names[word], "See also names unknown topic %q", word)
+				assert.NotEqual(t, topic.Name, word, "See also names itself")
+			}
 		})
 	}
 }
@@ -66,8 +97,9 @@ func TestExamplesAreCrmCommands(t *testing.T) {
 		}
 	}
 	for _, name := range requiredTopics {
-		if name == "tui" {
-			continue // interactive: its examples cannot run in a test
+		switch name {
+		case "tui", "tui-keys", "dav-server":
+			continue // interactive or long-running: their examples cannot run in a test
 		}
 		assert.Positive(t, topics[name], "topic %s has no runnable example", name)
 	}
