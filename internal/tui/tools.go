@@ -69,8 +69,8 @@ func (m *Model) handleTextKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m *Model) textViewRender() string {
 	cut := lipgloss.NewStyle().MaxWidth(m.width)
-	title := headStyle.Render(m.tv.title)
-	foot := dimStyle.Render("j/k scroll  g/G top/bottom  esc back  ctrl+k for every action")
+	title := m.st.Head.Render(m.tv.title)
+	foot := m.st.Dim.Render("j/k scroll  g/G top/bottom  esc back  ctrl+k for every action")
 	return cut.Render(title) + "\n" + m.tv.vp.View() + "\n" + cut.Render(foot)
 }
 

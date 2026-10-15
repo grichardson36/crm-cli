@@ -75,10 +75,14 @@ These palette actions mirror the CLI commands and work in `--read-only` mode. Ea
 - "Doctor" runs the checks of `crm doctor` on the open database, with the fix line for each problem.
 - "Where" shows the open database: path, domain, schema version, device id, size. "Domains" lists the databases in the data directory.
 
+## Themes
+
+Palette actions `Theme: choose` (live preview, remembered per device) and `Theme: reload` (re-reads `~/.crm/themes/*.toml`). `crm help theme` covers custom themes.
+
 ## Quit
 
 `q` or `ctrl+c`.
 
 ## Related topics
 
-`keep-in-touch`, `duplicates`, `archive`.
+`keep-in-touch`, `duplicates`, `archive`, `theme`.

@@ -11,7 +11,7 @@ import (
 
 var requiredTopics = []string{
 	"overview", "people", "contact-methods", "keep-in-touch", "birthdays", "tasks", "notes", "tags",
-	"duplicates", "archive", "domains", "import", "sync", "dav", "output", "agents", "tui", "install",
+	"duplicates", "archive", "domains", "import", "sync", "dav", "output", "agents", "tui", "theme", "install",
 }
 
 func TestTopicsExistInOrder(t *testing.T) {

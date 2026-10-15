@@ -303,6 +303,10 @@ func buildActions() []action {
 			run: func(m *Model) tea.Cmd { m.showWhere(); return nil }},
 		{id: "domains", title: "Domains", group: "App", desc: "list the databases in the data directory (same as crm domains)",
 			run: func(m *Model) tea.Cmd { m.showDomains(); return nil }},
+		{id: "theme-choose", title: "Theme: choose", group: "App", desc: "pick a color theme, previewed live as you move, remembered on this device (same as crm theme set)",
+			run: func(m *Model) tea.Cmd { m.openThemeChooser(); return nil }},
+		{id: "theme-reload", title: "Theme: reload", group: "App", desc: "re-read ~/.crm/themes/*.toml and apply the current theme again",
+			run: func(m *Model) tea.Cmd { m.reloadTheme(); return nil }},
 		{id: "quit", inCompare: true, title: "Quit", group: "App", hint: "q", keys: []string{"q", "ctrl+c"}, desc: "quit",
 			run: func(m *Model) tea.Cmd { return tea.Quit }},
 	}

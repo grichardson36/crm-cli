@@ -3,8 +3,10 @@ package cli
 import (
 	"path/filepath"
 
+	"github.com/charmbracelet/lipgloss"
 	crmmcp "github.com/jdanielnd/crm-cli/internal/mcp"
 	"github.com/jdanielnd/crm-cli/internal/tui"
+	"github.com/muesli/termenv"
 	"github.com/spf13/cobra"
 )
 
@@ -16,6 +18,9 @@ func registerTUICommand(rootCmd *cobra.Command) {
 		Long:  "A keyboard-first terminal UI (mouse optional). Press ? inside for the key list.",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if flagNoColor {
+				lipgloss.SetColorProfile(termenv.Ascii)
+			}
 			db, err := openDB()
 			if err != nil {
 				return err

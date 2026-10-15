@@ -17,6 +17,7 @@ import (
 	"github.com/jdanielnd/crm-cli/internal/dedupe"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	crmsync "github.com/jdanielnd/crm-cli/internal/sync"
+	"github.com/jdanielnd/crm-cli/internal/theme"
 )
 
 type viewKind int
@@ -150,6 +151,11 @@ type Model struct {
 
 	// noteType is the type used by the next note prompt (remembered between notes).
 	noteType string
+
+	// st holds every style of the active theme. Views draw only with it. See theme.go.
+	st        theme.Styles
+	themeName string // name of the active theme
+	darkBG    bool   // terminal has a dark background (resolves the auto theme)
 }
 
 // New creates the model and loads data.
@@ -185,6 +191,7 @@ func New(ctx context.Context, db *sql.DB) (*Model, error) {
 		actions:  buildActions(),
 		clip:     func(s string) { osc52Copy(os.Stdout, s) },
 		open:     openURL,
+		st:       defaultStyles(),
 	}
 	if err := m.reload(); err != nil {
 		return nil, err
@@ -200,6 +207,7 @@ func Run(ctx context.Context, db *sql.DB, readOnly bool, env Env) error {
 	}
 	m.readOnly = readOnly
 	m.env = env
+	m.applyStartupTheme()
 	_, err = tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion(), tea.WithContext(ctx)).Run()
 	return err
 }
