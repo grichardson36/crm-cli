@@ -98,12 +98,12 @@ func TestCalendarQuickAddEditDelete(t *testing.T) {
 	assert.Equal(t, "nothing changed", m.status)
 
 	// Delete asks first.
-	press(m, "D")
+	press(m, "#")
 	require.Equal(t, modeConfirm, m.mode)
 	press(m, "n")
 	_, err = m.er.FindByID(context.Background(), e.ID)
 	require.NoError(t, err)
-	press(m, "D", "y")
+	press(m, "#", "y")
 	_, err = m.er.FindByID(context.Background(), e.ID)
 	assert.ErrorIs(t, err, model.ErrNotFound)
 	assert.NotContains(t, m.View(), "Lunch with Sam and Pat")
@@ -163,9 +163,9 @@ func TestCalendarModesStepsAndToday(t *testing.T) {
 	assert.Equal(t, calDay, m.cal.mode)
 	assert.Equal(t, "Tue 13 Oct 2026", m.calCountText())
 	assert.Contains(t, rowTexts(m), "09:15 Standup")
-	press(m, "]")
+	press(m, "tab")
 	assert.Equal(t, "Wed 14 Oct 2026", m.calCountText())
-	press(m, "[", "[")
+	press(m, "shift+tab", "shift+tab")
 	assert.Equal(t, "Mon 12 Oct 2026", m.calCountText())
 	press(m, "t")
 	assert.Equal(t, "Tue 13 Oct 2026", m.calCountText())
@@ -186,16 +186,16 @@ func TestCalendarModesStepsAndToday(t *testing.T) {
 	press(m, "h")
 	assert.Equal(t, "2026-10-10", dayKey(m.calSelDate()), "leaving the week loads the one before")
 	assert.Equal(t, "5 Oct - 11 Oct 2026", m.calCountText())
-	press(m, "]")
+	press(m, "tab")
 	assert.Equal(t, "12 Oct - 18 Oct 2026", m.calCountText())
 
 	press(m, "m")
 	assert.Equal(t, calMonth, m.cal.mode)
 	assert.Equal(t, "October 2026", m.calCountText())
 	assert.Contains(t, m.View(), "Wed")
-	press(m, "]")
+	press(m, "tab")
 	assert.Equal(t, "November 2026", m.calCountText())
-	press(m, "[", "[")
+	press(m, "shift+tab", "shift+tab")
 	assert.Equal(t, "September 2026", m.calCountText())
 	press(m, "t")
 	assert.Equal(t, "October 2026", m.calCountText())
@@ -240,15 +240,17 @@ func TestCalendarOverlays(t *testing.T) {
 	assert.Contains(t, joined(), "[ ] send deck", "tasks are on by default")
 	assert.NotContains(t, joined(), "~ Bob Baker", "keep-in-touch is off")
 
-	press(m, "u")
+	toggle(m, "cal-due")
 	assert.Contains(t, joined(), "~ Bob Baker")
-	press(m, "u", "b")
+	toggle(m, "cal-due")
+	toggle(m, "cal-birthdays")
 	assert.NotContains(t, joined(), "* Bob Baker")
 	assert.NotContains(t, joined(), "~ Bob Baker")
-	press(m, "T")
+	toggle(m, "cal-tasks")
 	assert.NotContains(t, joined(), "[ ] send deck")
 	assert.Contains(t, joined(), "Standup", "events are never hidden")
-	press(m, "b", "T")
+	toggle(m, "cal-birthdays")
+	toggle(m, "cal-tasks")
 	assert.Contains(t, joined(), "* Bob Baker")
 	assert.Contains(t, joined(), "[ ] send deck")
 
@@ -268,7 +270,7 @@ func TestCalendarOverlays(t *testing.T) {
 func TestCalendarRepeatScopes(t *testing.T) {
 	m := calModel(t)
 	e := addEvent(t, m, model.CreateEventInput{Title: "Standup", Start: utcT(2026, 10, 12, 14, 15), End: utcT(2026, 10, 12, 14, 30), RRule: "weekdays"})
-	press(m, "d", "]") // Wed 14 Oct
+	press(m, "d", "tab") // Wed 14 Oct
 	require.Equal(t, "Wed 14 Oct 2026", m.calCountText())
 	sel := m.calSelected()
 	require.NotNil(t, sel)
@@ -289,7 +291,7 @@ func TestCalendarRepeatScopes(t *testing.T) {
 	assert.Equal(t, "2026-10-14T16:00:00Z", got[0].Start)
 
 	// Delete this and the following ones.
-	press(m, "]", "D") // Thu 15
+	press(m, "tab", "#") // Thu 15
 	require.Equal(t, modeOverlay, m.mode)
 	press(m, "down", "enter") // This and following
 	require.Equal(t, modeConfirm, m.mode)
@@ -306,7 +308,7 @@ func TestCalendarRepeatScopes(t *testing.T) {
 func TestCalendarAttendeesRemindersTagsStatus(t *testing.T) {
 	m := calModel(t)
 	e := addEvent(t, m, model.CreateEventInput{Title: "Sync", Start: utcT(2026, 10, 14, 15, 0)})
-	press(m, "d", "]")
+	press(m, "d", "tab")
 	require.NotNil(t, m.calEventTarget())
 
 	m.runAction(m.actionByID("cal-attendee-add"))
@@ -372,13 +374,13 @@ func TestCalendarGotoZoneAndErrors(t *testing.T) {
 
 	press(m, "t")
 	addEvent(t, m, model.CreateEventInput{Title: "Call", Start: utcT(2026, 10, 14, 15, 0)})
-	press(m, "d", "]")
+	press(m, "d", "tab")
 	assert.Contains(t, strings.Join(rowTexts(m), "|"), "10:00 Call")
 	m.runAction(m.actionByID("cal-zone"))
 	typeText(m, "Europe/London")
 	press(m, "enter")
 	assert.Equal(t, "Europe/London", tz.Name(m.loc))
-	press(m, "t", "d", "]")
+	press(m, "t", "d", "tab")
 	assert.Contains(t, strings.Join(rowTexts(m), "|"), "16:00 Call")
 	m.runAction(m.actionByID("cal-zone"))
 	typeText(m, "Mars/Base")
@@ -433,13 +435,13 @@ func TestCalendarReadOnlyBlocksWrites(t *testing.T) {
 	m := calModel(t)
 	addEvent(t, m, model.CreateEventInput{Title: "Locked", Start: utcT(2026, 10, 14, 15, 0)})
 	m.readOnly = true
-	press(m, "d", "]")
+	press(m, "d", "tab")
 	press(m, "+")
 	assert.NotEqual(t, modePrompt, m.mode)
 	assert.Contains(t, m.status, "read-only")
 	press(m, "enter")
 	assert.NotEqual(t, modePrompt, m.mode)
-	press(m, "D")
+	press(m, "#")
 	assert.NotEqual(t, modeConfirm, m.mode)
 	// Moving around still works.
 	press(m, "w", "t")
@@ -453,7 +455,7 @@ func TestCalendarActionsAreInThePalette(t *testing.T) {
 		"cal-open", "cal-prev", "cal-next", "cal-today", "cal-agenda", "cal-day", "cal-week", "cal-month", "cal-left", "cal-right",
 		"cal-goto", "cal-birthdays", "cal-due", "cal-tasks", "cal-zone", "cal-add", "cal-delete", "cal-edit", "cal-restore",
 		"cal-attendee-add", "cal-attendee-remove", "cal-attendee-open", "cal-remind", "cal-tag", "cal-status", "cal-busy",
-		"cal-import", "cal-export", "cal-hours", "cal-hours-set", "cal-free", "find-time", "cal-plan", "cal-plan-undo", "view-calendar",
+		"cal-import", "cal-export", "cal-hours", "cal-hours-set", "cal-free", "find-time", "cal-plan", "cal-plan-undo", "cal-invite", "view-calendar",
 	}
 	press(m, "ctrl+k")
 	require.Equal(t, modeOverlay, m.mode)
@@ -521,3 +523,5 @@ func TestCalendarLoadsFastWith5000Events(t *testing.T) {
 	assert.Less(t, per, 100*time.Millisecond, "month view rebuild (budget 50 ms, relaxed for slow CI)")
 	t.Logf("month rebuild with 5000 events: %v", per)
 }
+
+func toggle(m *Model, id string) { m.runAction(m.actionByID(id)) }

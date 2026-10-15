@@ -847,6 +847,10 @@ func (m *Model) bulk(ids []int64, single, plural string, fn func(id int64) error
 }
 
 func (m *Model) runPrompt(kind, value string) {
+	if strings.HasPrefix(kind, "book-") {
+		m.runBookPrompt(kind, value)
+		return
+	}
 	if strings.HasPrefix(kind, "cal-") {
 		m.runCalPrompt(kind, value)
 		return

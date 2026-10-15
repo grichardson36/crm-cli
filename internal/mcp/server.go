@@ -281,7 +281,7 @@ func NewServer(db *sql.DB, version string, opts ...Option) *server.MCPServer {
 			gomcp.WithNumber("person_id", gomcp.Description("Associated person ID")),
 			gomcp.WithNumber("deal_id", gomcp.Description("Associated deal ID")),
 			gomcp.WithString("due", gomcp.Description("Due date (ISO 8601)")),
-			gomcp.WithString("priority", gomcp.Description("Priority: low, medium, high (default: medium)")),
+			gomcp.WithString("priority", gomcp.Description("Priority: low, medium, high, asap (default: medium)")),
 			gomcp.WithArray("person_ids", gomcp.Description("Link the task to several people"), gomcp.WithNumberItems()),
 			gomcp.WithString("recurrence", gomcp.Description("Repeat when completed, e.g. \"7 days\", \"1 mon\", weekly. Needs a due date")),
 			gomcp.WithString("duration", gomcp.Description("How long it takes: 30m, 2h")),
@@ -355,6 +355,8 @@ func NewServer(db *sql.DB, version string, opts ...Option) *server.MCPServer {
 	registerDoTools(s, db)
 	registerEventTools(s, db)
 	registerScheduleTools(s, db, tr)
+	registerBookTools(s, db)
+	registerRemindTools(s, db)
 	registerHelpTools(s, o)
 
 	return s

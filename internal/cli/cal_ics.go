@@ -32,7 +32,7 @@ func calImportCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "import <file.ics | ->",
-		Short: "Import events and tasks from an iCalendar file; a second import updates instead of duplicating",
+		Short: "One-shot import of an iCalendar file as is: a UID already here is updated, any other is added",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var data []byte
@@ -61,9 +61,6 @@ func calImportCmd() *cobra.Command {
 			for _, w := range res.Warnings {
 				fmt.Fprintln(os.Stderr, "crm: warning:", w)
 			}
-			if len(res.UnmatchedAttendees) > 0 {
-				fmt.Fprintf(os.Stderr, "crm: %d attendee address(es) matched nobody and were not created: %v\n", len(res.UnmatchedAttendees), res.UnmatchedAttendees)
-			}
 			if resolveFormat() == format.FormatJSON {
 				return format.Output(os.Stdout, format.FormatJSON, []map[string]any{toMap(res)}, nil, flagQuiet)
 			}
@@ -80,7 +77,7 @@ func calImportCmd() *cobra.Command {
 			return format.Output(os.Stdout, resolveFormat(), rows, icsImportColumns, flagQuiet)
 		},
 	}
-	cmd.Flags().StringVar(&source, "source", icsio.DefaultSource, "name the file's UIDs are remembered under (use a different name per calendar feed)")
+	cmd.Flags().StringVar(&source, "source", icsio.DefaultSource, "label stored with the imported UIDs")
 	cmd.Flags().StringVar(&tzName, "tz", "", "zone for times written without a zone (default: this device)")
 	cmd.Flags().BoolVar(&noTasks, "no-tasks", false, "skip VTODO tasks")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "report what would change and write nothing")

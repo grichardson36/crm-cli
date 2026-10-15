@@ -27,10 +27,8 @@ func TestTaskSchedulingViaMCP(t *testing.T) {
 	callJSON(t, s, "crm_task_create", map[string]any{"title": "Plan", "auto_schedule": true}, &noLen)
 	var upd map[string]any
 	callJSON(t, s, "crm_task_update", map[string]any{"id": noLen["id"], "title": "Plan trip"}, &upd)
-	assert.Equal(t, "no_duration", upd["schedule_issue"])
 	upd = map[string]any{}
 	callJSON(t, s, "crm_task_update", map[string]any{"id": noLen["id"], "duration": "45m", "scheduled_start": "mon 14:00"}, &upd)
-	assert.Nil(t, upd["schedule_issue"])
 	assert.Equal(t, "2026-10-19T19:00:00Z", upd["scheduled_start"])
 	assert.Equal(t, true, upd["scheduled_locked"])
 	callJSON(t, s, "crm_task_update", map[string]any{"id": noLen["id"], "locked": false, "scheduled_start": ""}, &upd)

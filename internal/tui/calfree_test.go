@@ -17,7 +17,7 @@ func TestFindATimePicksASlotAndAddsAnEvent(t *testing.T) {
 	require.NoError(t, err)
 	addEvent(t, m, model.CreateEventInput{Title: "Planning", Start: utcT(2026, 10, 13, 15, 0), End: utcT(2026, 10, 13, 16, 0)})
 
-	press(m, "f")
+	m.runAction(m.actionByID("cal-free"))
 	require.Equal(t, modePrompt, m.mode)
 	assert.Equal(t, "30m | 7", m.input.Value())
 	m.input.SetValue("45m | 2")

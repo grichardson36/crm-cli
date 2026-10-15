@@ -32,6 +32,11 @@ type ExportOptions struct {
 	Source string
 	// EventIDs limits the export to these events (and their overrides). Empty means all.
 	EventIDs []int64
+	// Method makes the file an invitation (REQUEST, CANCEL). Organizer and Invitees are then added
+	// to every event: the file is meant to be mailed, nothing is stored.
+	Method    string
+	Organizer *ics.Person
+	Invitees  []ics.Person
 }
 
 // ExportResult is the file and what went into it.
@@ -157,6 +162,9 @@ func Export(ctx context.Context, db *sql.DB, opt ExportOptions) (*ExportResult, 
 			return nil, err
 		}
 		res.AttendeesWithoutEmail += skipped
+		if opt.Method != "" {
+			invite(ev, opt)
+		}
 		events = append(events, ev)
 		res.Events++
 
@@ -186,8 +194,34 @@ func Export(ctx context.Context, db *sql.DB, opt ExportOptions) (*ExportResult, 
 		todos = tl
 		res.Todos = len(todos)
 	}
-	res.Data = ics.Encode(opt.Name, events, todos)
+	res.Data = ics.EncodeMethod(opt.Name, opt.Method, events, todos)
 	return res, nil
+}
+
+// invite turns an event into an invitation: the organizer is the host and the invitees are
+// asked to reply.
+func invite(ev *ics.Event, opt ExportOptions) {
+	if opt.Organizer != nil {
+		org := *opt.Organizer
+		org.Role = "organizer"
+		ev.Organizer = &org
+	}
+	have := map[string]bool{}
+	for _, a := range ev.Attendees {
+		have[strings.ToLower(a.Email)] = true
+	}
+	for _, p := range opt.Invitees {
+		if p.Email == "" || have[strings.ToLower(p.Email)] {
+			continue
+		}
+		if p.PartStat == "" {
+			p.PartStat = "NEEDS-ACTION"
+		}
+		ev.Attendees = append(ev.Attendees, p)
+	}
+	if opt.Method == "CANCEL" {
+		ev.Status = "CANCELLED"
+	}
 }
 
 func toICSEvent(e *model.Event, uid string, emails map[int64]string) (*ics.Event, int, error) {
@@ -234,6 +268,14 @@ func toICSEvent(e *model.Event, uid string, emails map[int64]string) (*ics.Event
 		p := ics.Person{Email: email, Name: a.Name, Role: a.Role, PartStat: upper(a.RSVP)}
 		ev.Attendees = append(ev.Attendees, p)
 		if a.Role == "organizer" && ev.Organizer == nil {
+			org := p
+			ev.Organizer = &org
+		}
+	}
+	for _, g := range e.Guests {
+		p := ics.Person{Email: g.Email, Name: g.Name, Role: g.Role, PartStat: upper(g.RSVP)}
+		ev.Attendees = append(ev.Attendees, p)
+		if g.Role == "organizer" && ev.Organizer == nil {
 			org := p
 			ev.Organizer = &org
 		}

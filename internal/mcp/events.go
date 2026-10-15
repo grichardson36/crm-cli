@@ -398,7 +398,7 @@ func registerEventTools(s *server.MCPServer, db *sql.DB) {
 
 	s.AddTool(
 		gomcp.NewTool("crm_cal_import_ics",
-			gomcp.WithDescription("Import iCalendar text (events, repeats, exceptions, per-instance changes, tasks). Matched by UID, so importing again updates instead of duplicating. Attendees are matched to people by email and never created; unmatched addresses are listed. Use dry_run to see counts and warnings without writing."),
+			gomcp.WithDescription("Import iCalendar text (events, repeats, exceptions, per-instance changes, tasks). Matched by UID, so importing again updates instead of duplicating. Attendees that match a contact by email are linked, the rest are kept on the event as guests, and no contact is created. One-shot import: for ongoing sync use the CalDAV source. Use dry_run to see counts and warnings without writing."),
 			gomcp.WithString("ics", gomcp.Required(), gomcp.Description("The iCalendar file content")),
 			gomcp.WithString("source", gomcp.Description("Name the UIDs are remembered under (default ics). Use one name per calendar feed")),
 			gomcp.WithString("tz", gomcp.Description("Zone for times written without a zone (default: this device)")),

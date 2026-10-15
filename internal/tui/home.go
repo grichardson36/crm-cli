@@ -7,6 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/remind"
 )
 
 // Home view: what needs attention today. A section only appears when it has content.
@@ -17,6 +18,7 @@ const (
 	homeNoteMax     = 8
 	homeBirthday    = 14 // days ahead
 	homeBirthdayMax = 5
+	homeReminderMax = 4
 )
 
 func whenHomeRow(m *Model) bool {
@@ -95,6 +97,17 @@ func (m *Model) homeRows() ([]row, error) {
 		}
 	}
 	rows = append(rows, row{title: fmt.Sprintf("%d people, %d open tasks, %d overdue", len(m.people), len(tasks), overdueTasks), skip: true})
+
+	if due, err := remind.List(m.ctx, m.db, now, 0, m.loc); err == nil && len(due) > 0 {
+		head("Reminders due", fmt.Sprint(len(due)))
+		for i, d := range due {
+			if i == homeReminderMax {
+				rows = append(rows, row{title: fmt.Sprintf("%d more, palette: Reminders: due now", len(due)-i), jump: int(viewCalendar) + 1})
+				break
+			}
+			rows = append(rows, row{title: cleanCell(d.Title), sub: d.LocalStart, meta: d.StartsIn, jump: int(viewCalendar) + 1})
+		}
+	}
 
 	due, err := m.pr.Due(m.ctx, 0, 1000)
 	if err != nil {

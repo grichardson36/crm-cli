@@ -218,8 +218,10 @@ func TestViewsDueBirthdaysTasks(t *testing.T) {
 	assert.Equal(t, viewSync, m.view)
 	press(m, "]")
 	assert.Equal(t, viewCalendar, m.view)
-	press(m, "1", "[")
-	assert.Equal(t, viewCalendar, m.view, "[ wraps back from Home")
+	press(m, "]")
+	assert.Equal(t, viewHome, m.view, "] wraps around")
+	press(m, "[")
+	assert.Equal(t, viewCalendar, m.view, "[ wraps back")
 }
 
 func TestMarkContactedRemovesFromDue(t *testing.T) {

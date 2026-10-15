@@ -40,8 +40,7 @@ func TestCalPlanProposalWritesNothing(t *testing.T) {
 	assert.Equal(t, "2026-10-15T14:00:00Z", first["blocks"].([]any)[0].(map[string]any)["start"])
 	assert.NotEmpty(t, first["why"])
 	sum := out["summary"].(map[string]any)
-	assert.EqualValues(t, 2, sum["placed"])
-	assert.EqualValues(t, 1, sum["skipped_no_duration"])
+	assert.EqualValues(t, 3, sum["placed"], "a task with no length is planned as 30 minutes")
 
 	for _, row := range calJSON(t, db, "task", "list") {
 		assert.Nil(t, row["scheduled_start"], "a proposal writes nothing")
@@ -56,7 +55,7 @@ func TestCalPlanApplyDryRunUndo(t *testing.T) {
 	preview := planOut(t, db, "--apply", "--dry-run")
 	assert.Equal(t, "apply preview", preview["mode"])
 	diff := preview["diff"].([]any)
-	require.Len(t, diff, 2)
+	require.Len(t, diff, 3)
 	assert.Equal(t, "Write report", diff[0].(map[string]any)["task"])
 	assert.NotEmpty(t, diff[0].(map[string]any)["new_start"])
 	for _, row := range calJSON(t, db, "task", "list") {

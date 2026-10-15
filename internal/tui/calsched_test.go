@@ -65,7 +65,7 @@ func TestAutoScheduleToggle(t *testing.T) {
 	got, err := m.tr.FindByID(context.Background(), task.ID)
 	require.NoError(t, err)
 	assert.True(t, got.AutoSchedule)
-	assert.Contains(t, m.status, "no duration yet")
+	assert.Contains(t, m.status, "planned as 30 min")
 	press(m, "A")
 	got, _ = m.tr.FindByID(context.Background(), task.ID)
 	assert.False(t, got.AutoSchedule)
@@ -89,7 +89,7 @@ func TestScheduledTasksAreBlocksInTheCalendar(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.NoError(t, m.reload())
-	press(m, "d", "]")
+	press(m, "d", "tab")
 	require.Equal(t, "Wed 14 Oct 2026", m.calCountText())
 	var found *row
 	for i := range m.rows {
