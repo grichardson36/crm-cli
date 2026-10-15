@@ -7,7 +7,7 @@ crm tui
 crm tui --read-only
 ```
 
-`--read-only` disables every key that changes data. Press `?` inside for the full key list. The command palette (`ctrl+k`, also `:`) searches and runs every action, so you never have to remember a key.
+`--read-only` disables every key that changes data. Press `?` inside for the full key list. The command bar (`ctrl+k`, also `:`) runs any action, finds people, orgs, deals, tasks and notes, and takes commands (`n Sam called`). Prefixes narrow it: `>` actions, `@` people, `#` tags, `?` help. An empty box lists what you used recently. A name with no match offers to create the person or add a note.
 
 ## Views
 

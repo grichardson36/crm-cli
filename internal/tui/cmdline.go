@@ -112,6 +112,20 @@ func (m *Model) matchesActionTitle(val string) bool {
 	return false
 }
 
+// bareVerb is true for exactly a verb and a space ("snooze "), which always opens the command
+// line even when an action title starts the same way.
+func bareVerb(val string) bool {
+	if !strings.HasSuffix(val, " ") {
+		return false
+	}
+	word := strings.TrimSpace(val)
+	if strings.ContainsAny(word, " \t") {
+		return false
+	}
+	_, ok := quick.VerbOf(word)
+	return ok
+}
+
 // byteCursor is the cursor of the palette input as a byte offset into its value.
 func (o *overlay) byteCursor() int {
 	runes := []rune(o.filter.Value())
@@ -130,7 +144,7 @@ func (m *Model) syncCmd() {
 		return
 	}
 	val := o.filter.Value()
-	if !quick.IsCommand(val) || m.matchesActionTitle(val) {
+	if !quick.IsCommand(val) || (m.matchesActionTitle(val) && !bareVerb(val)) {
 		if o.cmd != nil {
 			o.cmd = nil
 			o.refilter()
@@ -429,7 +443,7 @@ func (m *Model) cmdView() string {
 				lines = append(lines, cut.Render("  "+ch.Describe()))
 			}
 		}
-		lines = append(lines, cut.Render(m.st.Dim.Render("enter apply  esc back  (U undoes it afterwards)")))
+		lines = append(lines, cut.Render(m.st.Dim.Render("enter apply  esc back  (ctrl+z undoes it afterwards)")))
 		return strings.Join(lines, "\n")
 	}
 	if c.msg != "" {

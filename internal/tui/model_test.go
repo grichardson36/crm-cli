@@ -787,7 +787,7 @@ func TestPaletteFilterAndRun(t *testing.T) {
 	require.Equal(t, modeOverlay, m.mode)
 	assert.Len(t, m.ov.items, len(m.actions), "palette lists every action")
 	out := m.View()
-	assert.Contains(t, out, "Command palette")
+	assert.Contains(t, out, "Command bar")
 	assert.Contains(t, out, "Toggle favorite")
 
 	typeText(m, "favor")

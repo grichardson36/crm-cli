@@ -194,6 +194,9 @@ type Model struct {
 	// names is the open list of unsettled names, and the choices remembered in this session.
 	names      *namesPanel
 	nameMemory map[string]int64
+
+	// recent are the bar items picked in this session, newest first.
+	recent []overlayItem
 }
 
 // New creates the model and loads data.

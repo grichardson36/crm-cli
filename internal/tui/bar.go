@@ -1,0 +1,372 @@
+package tui
+
+import (
+	"fmt"
+	"sort"
+	"strings"
+
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/jdanielnd/crm-cli/internal/db/repo"
+	"github.com/jdanielnd/crm-cli/internal/help"
+	"github.com/jdanielnd/crm-cli/internal/model"
+)
+
+// The unified bar (ctrl+k) is one box for three jobs: run an action, find a record, and type a
+// command. Without a prefix it lists matching actions and records in groups. A prefix narrows it:
+// > actions, @ people, # tags, ? help. A verb and a space (n, t, log, set, tag, snooze) switches
+// to the command line. An empty box lists the things used recently.
+
+const (
+	kindAction = ""
+	kindRecent = "recent"
+	kindPerson = "person"
+	kindOrg    = "org"
+	kindDeal   = "deal"
+	kindTask   = "task"
+	kindNote   = "note"
+	kindTag    = "tag"
+	kindHelp   = "help"
+	kindVerb   = "verb"
+	kindCreate = "create"
+)
+
+// barRank orders the groups in the bar.
+var barRank = map[string]int{
+	kindRecent: 0, kindAction: 1, kindVerb: 1, kindPerson: 2, kindOrg: 3, kindDeal: 4, kindTask: 5, kindNote: 6,
+	kindTag: 7, kindHelp: 8, kindCreate: 9,
+}
+
+// barGroup is the label shown at the start of each group.
+var barGroup = map[string]string{
+	kindRecent: "Recent", kindAction: "Actions", kindVerb: "Actions", kindPerson: "People", kindOrg: "Orgs",
+	kindDeal: "Deals", kindTask: "Tasks", kindNote: "Notes", kindTag: "Tags", kindHelp: "Help", kindCreate: "Create",
+}
+
+const (
+	barActionCap = 12 // actions shown while searching for something
+	barHitCap    = 4 // records shown per group
+	barRecentCap = 5
+)
+
+// verbAliases are the typed verbs of the actions that have one, shown as "Add note (n)".
+var verbAliases = map[string]string{"note": "n", "task": "t"}
+
+// barScope splits the box text into a scope prefix and the query.
+func barScope(raw string) (scope byte, q string) {
+	if raw != "" && strings.ContainsRune(">@#?", rune(raw[0])) {
+		return raw[0], strings.TrimSpace(raw[1:])
+	}
+	return 0, strings.TrimSpace(raw)
+}
+
+// refilterBar rebuilds the bar list for the text in the box.
+func (o *overlay) refilterBar() {
+	scope, q := barScope(o.filter.Value())
+	var items []overlayItem
+	if scope == 0 && q == "" && o.recent != nil {
+		items = append(items, o.recent()...)
+	}
+	if scope == 0 || scope == '>' {
+		items = append(items, o.base...)
+	}
+	if o.search != nil && (q != "" || scope == '#' || scope == '?') {
+		items = append(items, o.search(scope, q)...)
+	}
+	if scope == 0 && q != "" {
+		items = append(items, verbItems()...)
+	}
+
+	type scored struct{ idx, rank, score, length int }
+	var list []scored
+	for i, it := range items {
+		score := 0
+		switch it.kind {
+		case kindAction, kindVerb:
+			if q != "" {
+				s, ok := fuzzyScore(q, it.label+" "+it.hint+" "+it.id+" "+it.desc)
+				if !ok {
+					continue
+				}
+				score = s
+			}
+			if it.disabled != "" {
+				score += 1000 // after every enabled action
+			}
+		case kindRecent:
+			score = i
+		default:
+			score = i // the database already ranked these
+		}
+		list = append(list, scored{i, barRank[it.kind], score, len(it.label)})
+	}
+	sort.SliceStable(list, func(a, b int) bool {
+		x, y := list[a], list[b]
+		if x.rank != y.rank {
+			return x.rank < y.rank
+		}
+		if x.score != y.score {
+			return x.score < y.score
+		}
+		return q != "" && x.length < y.length // a shorter label wins ties
+	})
+	o.items = items
+	o.shown = o.shown[:0]
+	actions, hits := 0, map[string]int{}
+	for _, s := range list {
+		it := items[s.idx]
+		if q != "" && scope == 0 {
+			switch it.kind {
+			case kindAction, kindVerb:
+				if it.disabled != "" {
+					// A greyed-out action is listed only when the text really appears in it.
+					if s.score >= 1030 {
+						continue
+					}
+					break
+				}
+				if actions++; actions > barActionCap {
+					continue
+				}
+			case kindPerson, kindOrg, kindDeal, kindTask, kindNote:
+				if hits[it.kind]++; hits[it.kind] > barHitCap {
+					continue
+				}
+			}
+		}
+		o.shown = append(o.shown, s.idx)
+	}
+	if len(o.shown) == 0 && q != "" && scope == 0 {
+		o.items = append(o.items,
+			overlayItem{id: "create-person", kind: kindCreate, label: fmt.Sprintf("Create person %q", q), desc: "add a contact with this name", value: q},
+			overlayItem{id: "create-note", kind: kindCreate, label: fmt.Sprintf("Add note %q", q), desc: "write a note with this text", value: q},
+		)
+		o.shown = append(o.shown, len(o.items)-2, len(o.items)-1)
+	}
+	o.cursor, o.offset = 0, 0
+}
+
+func verbItems() []overlayItem {
+	return []overlayItem{
+		{id: "verb:n", kind: kindVerb, label: "Add note (n)", desc: "n <name> text #tag remind fri", value: "n "},
+		{id: "verb:t", kind: kindVerb, label: "Add task (t)", desc: "t <name> text fri 3pm !high", value: "t "},
+		{id: "verb:set", kind: kindVerb, label: "Set fields (set)", desc: "set <name>: company=Acme title=CTO", value: "set "},
+		{id: "verb:tag", kind: kindVerb, label: "Tag people (tag)", desc: "tag <name> #friend", value: "tag "},
+		{id: "verb:snooze", kind: kindVerb, label: "Snooze (snooze)", desc: "snooze <name> 2w", value: "snooze "},
+	}
+}
+
+// barSearch finds records and tags for the box text. Errors give no hits.
+func (m *Model) barSearch(scope byte, q string) []overlayItem {
+	var out []overlayItem
+	switch scope {
+	case '#':
+		low := strings.ToLower(strings.TrimPrefix(q, "#"))
+		for _, t := range m.quickEnv().Tags {
+			if low == "" || strings.Contains(strings.ToLower(t), low) {
+				out = append(out, overlayItem{id: "tag:" + t, kind: kindTag, label: "#" + t, desc: "people with this tag", value: t})
+			}
+		}
+		return out
+	case '?':
+		type hit struct {
+			it    overlayItem
+			score int
+		}
+		var hits []hit
+		for _, t := range help.List() {
+			if s, ok := fuzzyScore(q, t.Name+" "+t.Summary); ok {
+				hits = append(hits, hit{overlayItem{id: "help:" + t.Name, kind: kindHelp, label: t.Name, desc: t.Summary, value: t.Name}, s})
+			}
+		}
+		sort.SliceStable(hits, func(a, b int) bool { return hits[a].score < hits[b].score })
+		for _, h := range hits {
+			out = append(out, h.it)
+		}
+		return out
+	}
+	terms := strings.Fields(strings.ToLower(q))
+	for _, p := range m.people {
+		if matches(p, terms) {
+			desc := p.Company
+			if desc == "" {
+				desc = p.Title
+			}
+			out = append(out, overlayItem{id: fmt.Sprintf("person:%d", p.ID), kind: kindPerson, label: p.Name, desc: desc, ref: p.ID})
+		}
+	}
+	if scope == '@' {
+		return out
+	}
+	if orgs, err := repo.NewOrgRepo(m.db).Search(m.ctx, q, barHitCap); err == nil {
+		for _, o := range orgs {
+			out = append(out, overlayItem{id: fmt.Sprintf("org:%d", o.ID), kind: kindOrg, label: o.Name, desc: "people at this organization", ref: o.ID, value: o.Name})
+		}
+	}
+	if deals, err := repo.NewDealRepo(m.db).Search(m.ctx, q, barHitCap); err == nil {
+		for _, d := range deals {
+			var pid int64
+			if d.PersonID != nil {
+				pid = *d.PersonID
+			}
+			out = append(out, overlayItem{id: fmt.Sprintf("deal:%d", d.ID), kind: kindDeal, label: d.Title, desc: d.Stage, ref: pid})
+		}
+	}
+	if tasks, err := m.tr.FindAll(m.ctx, model.TaskFilters{}); err == nil {
+		low := strings.ToLower(q)
+		for _, t := range tasks {
+			if !t.Completed && strings.Contains(strings.ToLower(t.Title), low) {
+				out = append(out, overlayItem{id: fmt.Sprintf("task:%d", t.ID), kind: kindTask, label: cleanCell(t.Title), desc: "open task", ref: t.ID})
+			}
+		}
+	}
+	if notes, err := m.ir.Search(m.ctx, q, barHitCap); err == nil {
+		for _, n := range notes {
+			text := ""
+			switch {
+			case n.Subject != nil && *n.Subject != "":
+				text = *n.Subject
+			case n.Content != nil:
+				text = *n.Content
+			}
+			var pid int64
+			if len(n.PersonIDs) > 0 {
+				pid = n.PersonIDs[0]
+			}
+			out = append(out, overlayItem{id: fmt.Sprintf("note:%d", n.ID), kind: kindNote, label: cleanCell(text), desc: n.Type, ref: pid})
+		}
+	}
+	return out
+}
+
+// recentItems are what the bar lists first when the box is empty.
+func (m *Model) recentItems() []overlayItem {
+	out := make([]overlayItem, 0, len(m.recent))
+	for _, it := range m.recent {
+		it.origin, it.kind = it.kind, kindRecent
+		out = append(out, it)
+	}
+	return out
+}
+
+// pushRecent remembers a picked item, newest first, for this session.
+func (m *Model) pushRecent(it overlayItem) {
+	if it.kind == kindRecent {
+		it.kind = it.origin
+	}
+	if it.kind == kindCreate || it.kind == kindVerb || it.disabled != "" {
+		return
+	}
+	list := []overlayItem{it}
+	for _, r := range m.recent {
+		if r.id != it.id {
+			list = append(list, r)
+		}
+	}
+	if len(list) > barRecentCap {
+		list = list[:barRecentCap]
+	}
+	m.recent = list
+}
+
+// pickBar runs a record, tag, help, verb or create item from the bar. handled is false for
+// actions, which the palette runs itself.
+func (m *Model) pickBar(it overlayItem) (handled bool, cmd tea.Cmd) {
+	kind := it.kind
+	if kind == kindRecent {
+		kind = it.origin
+		it.kind = kind
+	}
+	switch kind {
+	case kindPerson:
+		m.selectPerson(it.ref)
+	case kindOrg:
+		m.showPeopleQuery(it.value)
+	case kindTag:
+		m.showPeopleQuery("#" + it.value)
+	case kindDeal, kindNote:
+		if it.ref == 0 {
+			m.setStatus("no person is linked to this "+kind, true)
+		} else {
+			m.selectPerson(it.ref)
+		}
+	case kindTask:
+		m.selectTask(it.ref)
+	case kindHelp:
+		m.showTopic(it.value, nil)
+	case kindVerb:
+		cmd = m.openPalette()
+		m.ov.setLine(it.value, len(it.value))
+		m.syncCmd()
+	case kindCreate:
+		if it.id == "create-note" {
+			line := "n " + it.value
+			cmd = m.openPalette()
+			m.ov.setLine(line, len(line))
+			m.syncCmd()
+		} else {
+			cmd = m.createPersonFromBar(it.value)
+		}
+	default:
+		return false, nil
+	}
+	m.pushRecent(it)
+	return true, cmd
+}
+
+func (m *Model) createPersonFromBar(name string) tea.Cmd {
+	if m.readOnly {
+		return m.showToast("read-only: create person is disabled", true)
+	}
+	m.beginGroup()
+	p, err := m.createNamed(name)
+	m.endGroup("create contact " + name)
+	if err != nil {
+		return m.showToast(err.Error(), true)
+	}
+	m.qix = nil
+	m.afterWrite()
+	m.selectPerson(p.ID)
+	return m.showToast("Created "+fullName(p), false)
+}
+
+// selectPerson shows the People view with the person under the cursor.
+func (m *Model) selectPerson(id int64) {
+	m.query = ""
+	if m.view != viewPeople {
+		m.switchView(viewPeople)
+	} else {
+		m.report(m.rebuild(false))
+	}
+	m.focus = focusList
+	m.cursorOn(func(r row) bool { return r.personID == id })
+}
+
+// selectTask shows the Tasks view with the task under the cursor.
+func (m *Model) selectTask(id int64) {
+	if m.view != viewTasks {
+		m.switchView(viewTasks)
+	}
+	m.cursorOn(func(r row) bool { return r.taskID == id })
+}
+
+// showPeopleQuery shows the People view filtered by text.
+func (m *Model) showPeopleQuery(q string) {
+	if m.view != viewPeople {
+		m.switchView(viewPeople)
+	}
+	m.query = q
+	m.cursor, m.offset = 0, 0
+	m.report(m.rebuild(false))
+}
+
+func (m *Model) cursorOn(match func(row) bool) {
+	for i, r := range m.rows {
+		if !r.skip && match(r) {
+			m.cursor = i
+			m.clamp()
+			m.refreshDetail(true)
+			return
+		}
+	}
+	m.setStatus("not in this list", true)
+}

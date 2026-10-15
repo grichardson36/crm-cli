@@ -19,6 +19,11 @@ type overlayItem struct {
 	desc     string
 	value    string
 	disabled string // reason shown greyed out, empty when usable
+	// kind says what a bar item is (see bar.go): "" is an action. ref is a record id and origin
+	// the kind a recent item had.
+	kind   string
+	ref    int64
+	origin string
 }
 
 // overlay is a filterable list shown instead of the main screen: the command palette or a picker.
@@ -45,6 +50,10 @@ type overlay struct {
 	cycle *cycleState
 	// dismissed are the chips turned back into plain text with alt+d while typing a command.
 	dismissed []string
+	// The bar (palette) lists base plus what search finds and recent returns. See bar.go.
+	base   []overlayItem
+	search func(scope byte, q string) []overlayItem
+	recent func() []overlayItem
 }
 
 const overlayTop = 2 // title line, filter line
@@ -73,6 +82,10 @@ func fuzzyScore(query, text string) (int, bool) {
 }
 
 func (o *overlay) refilter() {
+	if o.palette {
+		o.refilterBar()
+		return
+	}
 	type scored struct{ idx, score, length int }
 	var list []scored
 	q := o.filter.Value()
@@ -112,6 +125,9 @@ func (o *overlay) move(d, page int) {
 func (m *Model) newOverlay(title string, items []overlayItem, palette bool) *overlay {
 	in := newInput("> ")
 	o := &overlay{title: title, items: items, filter: in, palette: palette}
+	if palette {
+		o.base = items
+	}
 	o.refilter()
 	return o
 }
@@ -143,8 +159,21 @@ func (m *Model) openPalette() tea.Cmd {
 		}
 		items = append(items, run, dry)
 	}
-	o := m.newOverlay("Command palette", items, true)
+	for i := range items {
+		if v, ok := verbAliases[items[i].id]; ok {
+			items[i].label += " (" + v + ")"
+		}
+	}
+	o := m.newOverlay("Command bar", items, true)
+	o.search = m.barSearch
+	o.recent = m.recentItems
+	o.refilter()
 	o.onPick = func(m *Model, it overlayItem) {
+		if ok, cmd := m.pickBar(it); ok {
+			m.pendingCmd = cmd
+			return
+		}
+		m.pushRecent(it)
 		if kind, name, ok := strings.Cut(it.id, ":"); ok && (kind == "sync-run" || kind == "sync-dry") {
 			if it.disabled != "" {
 				m.setStatus(strings.ToLower(it.label)+": "+it.disabled, true)
@@ -333,7 +362,11 @@ func (m *Model) overlayView() string {
 		return m.cmdView()
 	}
 	var b strings.Builder
-	b.WriteString(lipgloss.NewStyle().MaxWidth(m.width).Render(m.st.Head.Render(o.title)+m.st.Dim.Render("   enter run  esc close  up/down choose")) + "\n")
+	help := "   enter run  esc close  up/down choose"
+	if o.palette {
+		help = "   enter run  esc close   > actions  @ people  # tags  ? help"
+	}
+	b.WriteString(lipgloss.NewStyle().MaxWidth(m.width).Render(m.st.Head.Render(o.title)+m.st.Dim.Render(help)) + "\n")
 	b.WriteString(o.filter.View() + "\n")
 	page := m.overlayPage()
 	if len(o.shown) == 0 {
@@ -343,7 +376,8 @@ func (m *Model) overlayView() string {
 	end := min(len(o.shown), o.offset+page)
 	hintW, titleW := 8, 24
 	if o.palette {
-		hintW = 8
+		b.WriteString(m.barListView(o, end))
+		return b.String()
 	}
 	for i := o.offset; i < end; i++ {
 		it := o.items[o.shown[i]]
@@ -432,3 +466,42 @@ func (m *Model) helpText() string {
 	b.WriteString(m.st.Name.Render(fit("wheel, tabs", 22)) + "scroll, switch view (the More tab opens the view list)\n")
 	return strings.TrimRight(b.String(), "\n")
 }
+
+// barListView draws the bar list: the group name at the start of each group, the label, the
+// description, and the key on the right.
+func (m *Model) barListView(o *overlay, end int) string {
+	const groupW, keyW = 8, 9
+	var b strings.Builder
+	prev := ""
+	if o.offset > 0 {
+		prev = barGroup[o.items[o.shown[o.offset-1]].kind]
+	}
+	for i := o.offset; i < end; i++ {
+		it := o.items[o.shown[i]]
+		group := barGroup[it.kind]
+		tag := ""
+		if group != prev {
+			tag = group
+		}
+		prev = group
+		desc := it.desc
+		if it.disabled != "" {
+			desc = "(" + it.disabled + ") " + desc
+		}
+		titleW := min(34, max(12, m.width/3))
+		room := max(0, m.width-groupW-titleW-keyW)
+		plainLine := fit(tag, groupW) + fit(it.label, titleW) + fit(desc, room) + runewidth.FillLeft(it.hint, keyW)
+		switch {
+		case i == o.cursor:
+			b.WriteString(m.st.Sel.Render(fit(plainLine, m.width)))
+		case it.disabled != "":
+			b.WriteString(m.st.Dim.Render(fit(plainLine, m.width)))
+		default:
+			b.WriteString(m.st.Head.Render(fit(tag, groupW)) + m.st.Name.Render(fit(it.label, titleW)) + m.st.Dim.Render(fit(desc, room)) + m.st.Dim.Render(runewidth.FillLeft(it.hint, keyW)))
+		}
+		if i < end-1 {
+			b.WriteString("\n")
+		}
+	}
+	return b.String()
+}
