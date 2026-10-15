@@ -541,6 +541,8 @@ func (m *Model) emptyDetail() string {
 	switch m.view {
 	case viewSync:
 		return m.syncItemDetail(r)
+	case viewCalendar:
+		return m.calDetail()
 	case viewMerge:
 		if m.cursor >= len(m.groups) {
 			return ""

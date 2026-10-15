@@ -173,6 +173,7 @@ func (m *Model) openViewSwitcher() tea.Cmd {
 var viewBlurbs = [numViews]string{
 	"what needs attention today", "everyone, search with /", "people to reach out to", "open tasks",
 	"upcoming birthdays", "probable duplicates", "archived people, restore or purge", "sources and the inbox",
+	"events, birthdays and due dates by day",
 }
 
 // openPicker shows a small list of choices. onPick runs after the overlay closes.
@@ -339,7 +340,7 @@ func (m *Model) handleHelpKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // helpText is generated from the action registry so it matches the palette.
 func (m *Model) helpText() string {
-	order := []string{"Home", "Contact", "Edit pane", "Bulk", "Sync", "Merge", "Compare", "Archive", "Move", "Views", "App"}
+	order := []string{"Home", "Contact", "Calendar", "Edit pane", "Bulk", "Sync", "Merge", "Compare", "Archive", "Move", "Views", "App"}
 	var b strings.Builder
 	for _, g := range order {
 		b.WriteString(headStyle.Render(g) + "\n")

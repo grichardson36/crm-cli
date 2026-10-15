@@ -23,6 +23,7 @@ Jump with the number keys, cycle with `[` and `]`, or press `v` for the view swi
 | 6 | Merge | groups of probable duplicates |
 | 7 | Archived | archived people |
 | 8 | Sync | sync sources and the inbox of unmatched records |
+| 9 | Calendar | events, birthdays, keep-in-touch dates and tasks by day |
 
 ## Moving
 
@@ -74,6 +75,14 @@ These palette actions mirror the CLI commands and work in `--read-only` mode. Ea
 - "Help: topics" lists the topics with a filter, `enter` opens one. "Help: search" asks for a word and lists the matching lines.
 - "Doctor" runs the checks of `crm doctor` on the open database, with the fix line for each problem.
 - "Where" shows the open database: path, domain, schema version, device id, size. "Domains" lists the databases in the data directory.
+
+## Calendar
+
+Opens on the Agenda (two weeks by day). `a` agenda, `d` day, `w` week grid, `m` month grid (a narrow terminal shows the agenda instead). `t` today, `[` and `]` step a week (day in Day view, month in Month view), so they do not change view here. In the grids `h` and `l` move a day, in Month `j` and `k` move a week and `enter` opens the day.
+
+- `+` adds an event as one line: `Lunch | fri 12:30 1h | weekly`. The preview shows what will be created. `enter` edits the event under the cursor, `D` deletes it. A repeating event asks first: this, this and following, or all.
+- `b` birthdays, `u` keep-in-touch dates, `T` tasks switch overlays. Enter on one opens the person.
+- The palette adds attendees, reminders, tags, status, busy, go to date, show times in another zone, import and export ICS files, and restore the last deleted event.
 
 ## Quit
 

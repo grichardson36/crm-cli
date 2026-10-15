@@ -56,4 +56,4 @@ crm cal import ./feed.ics --source work-feed
 
 Attendees are matched to people by email. Unknown addresses are listed and never created. Use one `--source` name per feed. Times without a zone are read in this device's zone and kept floating. An event deleted here is not created again by a later import.
 
-See also: `tasks`, `keep-in-touch`, `tui`, `agents`.
+See also: `tasks`, `keep-in-touch`, `tui` (Calendar view, key 9), `agents`.
