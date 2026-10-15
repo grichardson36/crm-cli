@@ -30,4 +30,4 @@ crm sync run caldav
 
 If both sides changed the same event, each field is decided on its own: the side that changed it wins, and when both did, the later change wins. Repeats, exceptions and per-instance changes travel with the event. Tasks are not synced.
 
-See also: `calendar`, `sync`, `tui` (Sync view).
+See also: calendar, sync, tui.

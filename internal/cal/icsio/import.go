@@ -432,7 +432,7 @@ func (im *importer) todo(td *ics.Todo) error {
 			return err
 		}
 	} else if !completed && cur.Completed {
-		if _, err := im.tr.Reopen(im.ctx, id); err != nil {
+		if err := im.tr.Reopen(im.ctx, id); err != nil {
 			return err
 		}
 	}

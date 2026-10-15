@@ -9,6 +9,8 @@ import (
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/format"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/quick"
+	"github.com/jdanielnd/crm-cli/internal/shortsyntax"
 	"github.com/spf13/cobra"
 )
 
@@ -106,12 +108,15 @@ func taskAddCmd() *cobra.Command {
 	var description, due, priority, recurrence string
 	var personIDs []int64
 	var dealID int64
+	var dryRun, noSyntax bool
 	var sf *schedFlags
 
 	cmd := &cobra.Command{
 		Use:   "add <title>",
 		Short: "Add a new task",
-		Args:  cobra.ExactArgs(1),
+		Long: "Add a new task. The title can carry short syntax: @fri 3pm (due), !mon (deadline), ~30m (estimate), ^high (priority), +Name (link a person).\n" +
+			"Flags win over the same value in the title. Use --dry-run to see what was read, --no-syntax to keep the title as typed. See 'crm help short-syntax'.",
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			db, err := openDB()
 			if err != nil {
@@ -123,15 +128,45 @@ func taskAddCmd() *cobra.Command {
 				return model.NewExitError(model.ErrValidation, "invalid priority: %s (must be one of: %s)", priority, strings.Join(model.Priorities, ", "))
 			}
 
+			in, err := parseInline(cmd.Context(), db, args[0], noSyntax, shortsyntax.KindTag, shortsyntax.KindCadence)
+			if err != nil {
+				return err
+			}
+			if in.Res.Title == "" {
+				return model.NewExitError(model.ErrValidation, "the title is empty once the short syntax is removed")
+			}
+			if !noSyntax {
+				probe := shortsyntax.Parse(args[0], shortsyntax.Options{Skip: []shortsyntax.Kind{shortsyntax.KindDue, shortsyntax.KindDeadline,
+					shortsyntax.KindDuration, shortsyntax.KindCadence, shortsyntax.KindPriority, shortsyntax.KindPerson}})
+				if len(probe.Tags) > 0 {
+					fmt.Fprintf(os.Stderr, "crm: tasks cannot carry tags yet: #%s stays in the title\n", strings.Join(probe.Tags, " #"))
+				}
+			}
+			tf := quick.TaskFieldsOf(in.Res)
 			input := model.CreateTaskInput{
-				Title:       args[0],
+				Title:       in.Res.Title,
 				Description: nilIfEmpty(description),
 				Priority:    priority,
 				DueAt:       nilIfEmpty(due),
 			}
-			if len(personIDs) > 0 {
-				input.PersonID = &personIDs[0]
-				input.PersonIDs = personIDs[1:]
+			if !cmd.Flags().Changed("description") {
+				input.Description = nilIfEmpty(tf.Description)
+			}
+			if !cmd.Flags().Changed("due") {
+				input.DueAt = nilIfEmpty(tf.Due)
+			}
+			if !cmd.Flags().Changed("priority") {
+				input.Priority = tf.Priority
+			}
+			ids := personIDs
+			if !cmd.Flags().Changed("person") {
+				if ids, err = in.people(); err != nil {
+					return err
+				}
+			}
+			if len(ids) > 0 {
+				input.PersonID = &ids[0]
+				input.PersonIDs = ids[1:]
 			}
 			if cmd.Flags().Changed("deal") {
 				input.DealID = &dealID
@@ -139,6 +174,16 @@ func taskAddCmd() *cobra.Command {
 			input.Recurrence = nilIfEmpty(recurrence)
 			if input.Schedule, err = sf.build(cmd); err != nil {
 				return err
+			}
+
+			if dryRun {
+				return printInlineDryRun(map[string]any{
+					"dry_run": true, "syntax": in.Res,
+					"task": map[string]any{
+						"title": input.Title, "description": input.Description, "due_at": input.DueAt, "priority": input.Priority,
+						"person_ids": ids, "deal_id": input.DealID, "recurrence": input.Recurrence,
+					},
+				})
 			}
 
 			r := repo.NewTaskRepo(db)
@@ -158,6 +203,9 @@ func taskAddCmd() *cobra.Command {
 	cmd.Flags().Int64SliceVar(&personIDs, "person", nil, "associated person ID (repeatable)")
 	cmd.Flags().Int64Var(&dealID, "deal", 0, "associated deal ID")
 	cmd.Flags().StringVar(&recurrence, "recurrence", "", "repeat after completion, e.g. \"7 days\", \"1 mon\", weekly (needs --due)")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print what was read from the title and what would be created, and write nothing")
+	cmd.Flags().BoolVar(&noSyntax, "no-syntax", false, "keep the title as typed: do not read @, !, ~, ^ or + tokens")
+
 	sf = bindScheduleFlags(cmd)
 	return cmd
 }

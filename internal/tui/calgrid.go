@@ -79,26 +79,26 @@ func (m *Model) calStrip(w int) string {
 	default:
 		s = it.date.Format("Mon 2 Jan") + "  " + it.title + "  " + it.sub
 	}
-	return dimStyle.Render(runewidth.Truncate(s, w, "…"))
+	return m.st.Dim.Render(runewidth.Truncate(s, w, "…"))
 }
 
 func (m *Model) dayStyle(d time.Time, sel, today bool, dimmed bool) lipgloss.Style {
 	switch {
 	case sel:
-		return tabOn
+		return m.st.TabOn
 	case today:
-		return nameStyle
+		return m.st.Name
 	case dimmed:
-		return dimStyle
+		return m.st.Dim
 	}
-	return headStyle
+	return m.st.Head
 }
 
 func (m *Model) calWeekLines(w, h int) []string {
 	colW := m.calColWidth(w)
 	sel, today := m.calSelDate(), m.calToday()
 	selected := m.calSelected()
-	sep := dimStyle.Render("│")
+	sep := m.st.Dim.Render("│")
 	var hdr, rule []string
 	cols := make([][]string, 7)
 	bodyH := max(1, h-3)
@@ -106,7 +106,7 @@ func (m *Model) calWeekLines(w, h int) []string {
 		d := m.cal.from.AddDate(0, 0, i)
 		label := weekdayHeads[i] + " " + fmt.Sprint(d.Day())
 		hdr = append(hdr, m.dayStyle(d, d.Equal(sel), d.Equal(today), false).Render(fit(label, colW)))
-		rule = append(rule, dimStyle.Render(strings.Repeat("─", colW)))
+		rule = append(rule, m.st.Dim.Render(strings.Repeat("─", colW)))
 		x0 := i * (colW + 1)
 		m.cal.cells = append(m.cal.cells, calCell{x0: x0, x1: x0 + colW, y0: 0, y1: h - 1, date: d})
 
@@ -114,21 +114,21 @@ func (m *Model) calWeekLines(w, h int) []string {
 		var cell []string
 		for j, it := range items {
 			if len(cell) == bodyH-1 && len(items)-j > 1 {
-				cell = append(cell, dimStyle.Render(fit(fmt.Sprintf("+%d more", len(items)-j), colW)))
+				cell = append(cell, m.st.Dim.Render(fit(fmt.Sprintf("+%d more", len(items)-j), colW)))
 				break
 			}
 			text := fit(cleanCell(gridText(it)), colW)
 			switch {
 			case it == selected:
-				text = selStyle.Render(text)
+				text = m.st.Sel.Render(text)
 			case it.kind != "event":
-				text = dimStyle.Render(text)
+				text = m.st.Dim.Render(text)
 			}
 			cell = append(cell, text)
 		}
 		cols[i] = cell
 	}
-	lines := []string{strings.Join(hdr, sep), strings.Join(rule, dimStyle.Render("┼"))}
+	lines := []string{strings.Join(hdr, sep), strings.Join(rule, m.st.Dim.Render("┼"))}
 	blank := strings.Repeat(" ", colW)
 	for r := 0; r < bodyH; r++ {
 		parts := make([]string, 7)
@@ -148,12 +148,12 @@ func (m *Model) calWeekLines(w, h int) []string {
 func (m *Model) calMonthLines(w, h int) []string {
 	colW := m.calColWidth(w)
 	sel, today := m.calSelDate(), m.calToday()
-	sep := dimStyle.Render("│")
+	sep := m.st.Dim.Render("│")
 	weeks := int(m.cal.to.Sub(m.cal.from).Hours()/24) / 7
 	cellH := max(1, (h-2)/max(1, weeks))
 	var hdr []string
 	for i := 0; i < 7; i++ {
-		hdr = append(hdr, headStyle.Render(fit(weekdayHeads[i], colW)))
+		hdr = append(hdr, m.st.Head.Render(fit(weekdayHeads[i], colW)))
 	}
 	lines := []string{strings.Join(hdr, sep)}
 	blank := strings.Repeat(" ", colW)
@@ -173,12 +173,12 @@ func (m *Model) calMonthLines(w, h int) []string {
 					break
 				}
 				if len(cell) == cellH-1 && len(items)-j > 1 {
-					cell = append(cell, dimStyle.Render(fit(fmt.Sprintf("+%d more", len(items)-j), colW)))
+					cell = append(cell, m.st.Dim.Render(fit(fmt.Sprintf("+%d more", len(items)-j), colW)))
 					break
 				}
 				text := fit(cleanCell(gridText(it)), colW)
 				if dimmed || it.kind != "event" {
-					text = dimStyle.Render(text)
+					text = m.st.Dim.Render(text)
 				}
 				cell = append(cell, text)
 			}

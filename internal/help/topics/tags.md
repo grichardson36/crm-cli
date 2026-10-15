@@ -34,6 +34,4 @@ crm tag delete vip --dry-run
 crm tag delete vip --yes
 ```
 
-## Related topics
-
-`people`, `duplicates` (merging people combines their tags), `tui` (`T` adds a tag, `-name` removes it; `/#tag` searches by tag).
+See also: people, duplicates (merging people combines their tags), tui-keys (`T` adds a tag, `-name` removes it, `/#tag` searches by tag).

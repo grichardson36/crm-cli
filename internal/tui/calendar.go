@@ -523,19 +523,19 @@ func (m *Model) calCountText() string {
 func (m *Model) calDetail() string {
 	w := max(1, m.detail.Width)
 	line := func(s string) string { return runewidth.Truncate(s, w, "…") }
-	kv := func(k, v string) string { return dimStyle.Render(fit(k, labelWidth)) + line(v) + "\n" }
+	kv := func(k, v string) string { return m.st.Dim.Render(fit(k, labelWidth)) + line(v) + "\n" }
 	it := m.calSelected()
 	if it == nil {
-		return dimStyle.Render("Nothing selected.")
+		return m.st.Dim.Render("Nothing selected.")
 	}
 	var b strings.Builder
 	switch it.kind {
 	case "event":
 		e, err := m.er.FindByID(m.ctx, it.inst.EventID)
 		if err != nil {
-			return errStyle.Render(line(err.Error()))
+			return m.st.Err.Render(line(err.Error()))
 		}
-		b.WriteString(nameStyle.Render(line(cleanCell(e.Title))) + dimStyle.Render(fmt.Sprintf("  #%d", e.ID)) + "\n\n")
+		b.WriteString(m.st.Name.Render(line(cleanCell(e.Title))) + m.st.Dim.Render(fmt.Sprintf("  #%d", e.ID)) + "\n\n")
 		b.WriteString(kv("when", m.calWhen(it.inst)))
 		if e.RRule != nil {
 			b.WriteString(kv("repeats", recur.Describe(*e.RRule)))
@@ -575,12 +575,12 @@ func (m *Model) calDetail() string {
 				b.WriteString(line(cleanCell(l)) + "\n")
 			}
 		}
-		b.WriteString("\n" + dimStyle.Render(line("enter edits, # deletes, palette: attendees, reminders, tags")))
+		b.WriteString("\n" + m.st.Dim.Render(line("enter edits, # deletes, palette: attendees, reminders, tags")))
 	case "empty":
-		b.WriteString(nameStyle.Render(it.date.Format("Monday 2 January")) + "\n\n")
-		b.WriteString(dimStyle.Render(line("Nothing planned. + adds an event.")))
+		b.WriteString(m.st.Name.Render(it.date.Format("Monday 2 January")) + "\n\n")
+		b.WriteString(m.st.Dim.Render(line("Nothing planned. + adds an event.")))
 	default:
-		b.WriteString(nameStyle.Render(line(it.title)) + "\n\n" + dimStyle.Render(line(it.sub)))
+		b.WriteString(m.st.Name.Render(line(it.title)) + "\n\n" + m.st.Dim.Render(line(it.sub)))
 	}
 	return strings.TrimRight(b.String(), "\n")
 }

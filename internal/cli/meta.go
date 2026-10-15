@@ -45,9 +45,10 @@ const (
 // commandMeta is keyed by command path below the root.
 var commandMeta = map[string]cmdMeta{
 	// people
-	"person add": {mutates: true, fields: personFields, examples: []string{
+	"person add": {mutates: true, noDryRun: true, fields: personFields, examples: []string{
 		`crm person add "Jane Smith" --email jane@example.com --company "Acme Corp" -f json`,
-		`crm person add "Bob Jones" --keep-in-touch "1 mon" --birthday 1985-03-14 --dry-run`}},
+		`crm person add "Bob Jones" --keep-in-touch "1 mon" --birthday 1985-03-14 --dry-run`,
+		`crm person add "Sam Lee #friend *3m ^high" --dry-run`}},
 	"person list": {fields: personFields, examples: []string{
 		`crm person list -f json`, `crm person list --tag vip --limit 10 -f json`}},
 	"person show": {fields: personFields, examples: []string{`crm person show 1 -f json`}},
@@ -100,12 +101,18 @@ var commandMeta = map[string]cmdMeta{
 	"deal pipeline": {fields: "stage,count,total_value", examples: []string{`crm deal pipeline -f json`}},
 
 	// tasks
-	"task add": {mutates: true, fields: taskFields, examples: []string{
+	"task add": {mutates: true, noDryRun: true, fields: taskFields, examples: []string{
 		`crm task add "Send proposal" --person 1 --due 2026-11-01 --priority high`,
 		`crm task add "Call back" --person 1 --due 2026-11-01 --recurrence "7 days"`,
+		`crm task add "Call back @fri 3pm ~30m ^high +Jane" --dry-run`,
 		`crm task add "Write report" --duration 2h --deadline 2026-11-06 --auto-schedule`}},
-	"task list": {fields: taskFields, examples: []string{`crm task list -f json`, `crm task list --overdue -f json`}},
-	"task show": {fields: taskFields, examples: []string{`crm task show 1 -f json`}},
+	"do": {mutates: true, noDryRun: true, fields: "input,verb,dry_run,applied,preview,subject,links,changes,warnings,problems,needs_confirm,syntax", examples: []string{
+		`crm do "n Jane called about the deal #deal @fri" --dry-run`,
+		`crm do "t Jane send the contract @mon ^high"`,
+		`crm do "set Jane: company=Acme title=CTO" --dry-run -f json`,
+		`crm do "tag note" --person 1`}},
+	"task list":   {fields: taskFields, examples: []string{`crm task list -f json`, `crm task list --overdue -f json`}},
+	"task show":   {fields: taskFields, examples: []string{`crm task show 1 -f json`}},
 	"task edit": {mutates: true, fields: taskFields, target: "task", targetArgs: "first", examples: []string{`crm task edit 1 --priority low`,
 		`crm task edit 1 --duration 90m --earliest-start 2026-11-02 --hard-deadline`, `crm task edit 1 --scheduled-start "2026-11-03 14:00" --dry-run`}},
 	"task done":   {mutates: true, fields: taskFields, target: "task", targetArgs: "first", examples: []string{`crm task done 1`}},
@@ -156,8 +163,9 @@ var commandMeta = map[string]cmdMeta{
 	"log meeting": {mutates: true, fields: logFields, target: "person", targetArgs: "all", examples: []string{`crm log meeting 1 2 --subject "Product demo" --at "2026-10-20 14:00"`}},
 	"log note":    {mutates: true, fields: logFields, target: "person", targetArgs: "all", examples: []string{`crm log note 1 --subject "Quick check-in" --content "Seemed interested"`}},
 	"log message": {mutates: true, fields: logFields, target: "person", targetArgs: "all", examples: []string{`crm log message 1 --content "Sent the deck on WhatsApp"`}},
-	"log add": {mutates: true, fields: logFields, target: "person", targetArgs: "first", examples: []string{
-		`crm log add --type call 1 "Talked about the offsite"`}},
+	"log add": {mutates: true, noDryRun: true, fields: logFields, target: "person", targetArgs: "first", examples: []string{
+		`crm log add --type call 1 "Talked about the offsite"`,
+		`crm log add --type call 1 "Talked about the offsite #trip @yesterday" --dry-run`}},
 	"log types": {fields: "id,uuid,name,counts_as_contact,archived,created_at,updated_at", examples: []string{
 		`crm log types -f json`, `crm log types --all -f json`}},
 	"log types add": {mutates: true, fields: "id,uuid,name,counts_as_contact,archived", examples: []string{`crm log types add standup --counts-as-contact=false`}},
@@ -226,6 +234,12 @@ var commandMeta = map[string]cmdMeta{
 		`crm domains -f json`, `crm domains --dir ~/.crm -f json`}},
 	"init": {mutates: true, noDryRun: true, fields: "domain,path,created,imported,next_steps", examples: []string{
 		`crm init --domain personal --yes -f json`, `crm init --domain work --path ~/.crm/work.db --dry-run`}},
+	"theme":                {examples: []string{`crm theme list -f json`, `crm theme set nord`}},
+	"theme list":           {fields: themeListFields, examples: []string{`crm theme list -f json`}},
+	"theme set":            {mutates: true, examples: []string{`crm theme set nord`, `crm theme set my-theme --dry-run`}},
+	"theme show":           {fields: themeShowFields, examples: []string{`crm theme show -f json`, `crm theme show gruvbox`}},
+	"theme path":           {fields: "themes_dir,exists,config", examples: []string{`crm theme path`, `crm theme path -f json`}},
+	"theme init":           {mutates: true, fields: "name,path,created", examples: []string{`crm theme init my-theme`, `crm theme init my-theme --dry-run`}},
 	"doctor":               {fields: "ok,checks", examples: []string{`crm doctor -f json`}},
 	"agent":                {examples: []string{`crm agent`}},
 	"agent install-prompt": {examples: []string{`crm agent install-prompt`}},

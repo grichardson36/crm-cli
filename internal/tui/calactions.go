@@ -227,6 +227,10 @@ func (m *Model) calCreate(value string) {
 	if !q.allDay {
 		day = floatDate(q.start, m.loc)
 	}
+	id := e.ID
+	m.record("add event "+truncateLabel(e.Title),
+		func() error { return m.er.Archive(m.ctx, id, model.ScopeAll, "") },
+		func() error { return m.er.Restore(m.ctx, id) })
 	m.afterWriteCal(day, e.ID)
 	m.setStatus("event added", false)
 }
@@ -358,6 +362,9 @@ func (m *Model) calDelete() {
 			}
 			if scope == model.ScopeAll {
 				m.deletedEvents = append(m.deletedEvents, target)
+				m.record("delete event "+truncateLabel(snapshot.Title),
+					func() error { return m.er.Restore(m.ctx, target) },
+					func() error { return m.er.Archive(m.ctx, target, model.ScopeAll, "") })
 			}
 			m.afterWriteCal(m.calSelDate(), 0)
 			m.setStatus("event deleted (palette: Restore last deleted event)", false)

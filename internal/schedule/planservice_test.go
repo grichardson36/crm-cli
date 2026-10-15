@@ -45,7 +45,8 @@ func TestPlanTasksReadsButNeverWrites(t *testing.T) {
 	nl := byTitle(*res)["No length"]
 	assert.Equal(t, "placed", nl.Decision)
 	placed := byTitle(*res)["Write report"]
-	assert.Equal(t, "2026-10-12T14:00:00Z", placed.Blocks[0].Start)
+	assert.Equal(t, "2026-10-12T14:00:00Z", nl.Blocks[0].Start)
+	assert.Equal(t, "2026-10-12T14:45:00Z", placed.Blocks[0].Start, "after the 30 minute task and the buffer")
 	var after string
 	require.NoError(t, d.QueryRow(`SELECT group_concat(updated_at || coalesce(scheduled_start, '-')) FROM tasks`).Scan(&after))
 	assert.Equal(t, before, after, "a proposal writes nothing")
