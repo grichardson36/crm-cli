@@ -150,6 +150,8 @@ type Options struct {
 	KnownTags []string
 	// People are known full names. They let "+Sam Lee" match two words.
 	People []string
+	// Names is People already prepared by NewNameSet. Build it once when the list is long; it wins over People.
+	Names *NameSet
 	// Skip lists token kinds to leave as plain text.
 	Skip []Kind
 }
@@ -211,15 +213,12 @@ func newParser(text string, opts Options) *parser {
 			p.known[Fold(t)] = true
 		}
 	}
-	if len(opts.People) > 0 {
-		p.people = map[string]bool{}
-		for _, n := range opts.People {
-			f := Fold(n)
-			p.people[f] = true
-			if c := len(strings.Fields(f)); c > p.maxNames {
-				p.maxNames = c
-			}
-		}
+	switch {
+	case opts.Names != nil && len(opts.Names.set) > 0:
+		p.people, p.maxNames = opts.Names.set, opts.Names.max
+	case len(opts.People) > 0:
+		ns := NewNameSet(opts.People)
+		p.people, p.maxNames = ns.set, ns.max
 	}
 	p.res = Result{Input: text}
 	p.words = splitWords(text)

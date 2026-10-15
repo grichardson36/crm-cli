@@ -30,6 +30,10 @@ type Env struct {
 	NoSyntax bool
 	// LoadPerson loads a person with details, to show old values. It may be nil.
 	LoadPerson func(id int64) (*model.Person, error)
+	// NoteType is the type of a note line. Empty means "note".
+	NoteType string
+	// DueOverride, when set, is the stored due date of a task line, whatever the text says.
+	DueOverride string
 }
 
 func (e Env) now() time.Time {
@@ -193,6 +197,8 @@ type builder struct {
 	links  []Person
 	loaded *model.Person
 	tagMap map[string]string
+	// soft: a "Name:" that matches nobody is plain text (note, task, log) instead of an error.
+	soft bool
 }
 
 // Parse reads one line and returns what it would do. It writes nothing.
@@ -297,6 +303,9 @@ func (b *builder) leading(text string, off int) (n int, explicit bool) {
 	if explicit && b.env.Index != nil {
 		k := len(cands)
 		matches, _ := b.env.Index.ResolveLoose(nameOf(k))
+		if len(matches) == 0 && b.soft {
+			return 0, false
+		}
 		if len(matches) == 0 {
 			b.problem("not_found", fmt.Sprintf("no person matches %q", nameOf(k)))
 			b.p.Marks = append(b.p.Marks, Mark{Kind: "subject", Start: off + cands[0].start, End: off + cands[k-1].end, Bad: true})
@@ -363,7 +372,7 @@ func (b *builder) subjectFor(text string, off int, allowLead bool) (string, int)
 
 // syntax runs the short syntax parser and records the marks.
 func (b *builder) syntax(text string, off int, skip ...shortsyntax.Kind) shortsyntax.Result {
-	opts := shortsyntax.Options{Now: b.env.now(), Disabled: b.env.NoSyntax, People: b.env.Index.Names(), Skip: skip}
+	opts := shortsyntax.Options{Now: b.env.now(), Disabled: b.env.NoSyntax, Names: b.env.Index.NameSet(), Skip: skip}
 	if b.env.Tags != nil {
 		opts.KnownTags = b.env.Tags
 	}
@@ -493,6 +502,10 @@ func (b *builder) types() []string {
 func (b *builder) capture(verb, rest string, off int) {
 	p := b.p
 	typ := "note"
+	if verb == "note" && b.env.NoteType != "" {
+		typ = b.env.NoteType
+	}
+	b.soft = true
 	if verb == "log" {
 		w, end := firstWord(rest)
 		if w == "" {
@@ -698,6 +711,9 @@ func (b *builder) planTask(title string, res shortsyntax.Result) {
 	}
 	tf := TaskFieldsOf(res)
 	prio, due, description := tf.Priority, tf.Due, tf.Description
+	if b.env.DueOverride != "" {
+		due = b.env.DueOverride
+	}
 	pid := ids(subj, links)
 	parts := []string{}
 	if subj != nil {
@@ -709,10 +725,12 @@ func (b *builder) planTask(title string, res shortsyntax.Result) {
 	} else {
 		parts = append(parts, fmt.Sprintf("task: %q", truncate(title, 60)))
 	}
-	if res.Due != nil {
+	if b.env.DueOverride != "" {
+		parts = append(parts, "due "+b.env.DueOverride)
+	} else if res.Due != nil {
 		parts = append(parts, "due "+formatWhen(*res.Due))
 	}
-	if res.Deadline != nil {
+	if res.Deadline != nil && b.env.DueOverride == "" {
 		if res.Due == nil {
 			parts = append(parts, "due "+formatWhen(*res.Deadline)+" (deadline)")
 		} else {

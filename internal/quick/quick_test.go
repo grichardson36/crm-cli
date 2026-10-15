@@ -653,10 +653,40 @@ func TestApplyWithNothingToDo(t *testing.T) {
 	assert.Equal(t, model.ErrValidation, ErrorFor("ambiguous"))
 }
 
+// A command line is re-read on every keystroke, so it must stay fast on a real address book.
+func TestParseAndCompleteStayFastOnABigList(t *testing.T) {
+	firsts := []string{"Sam", "Bob", "Zoë", "Mark", "Ana", "Li", "Omar", "Priya", "Noah", "Eva"}
+	lasts := []string{"Lee", "Baker", "Müller", "Twain", "Smith", "Ng", "Khan", "Rossi", "Silva", "Novak"}
+	var people []model.PersonSummary
+	for i := 0; i < 5000; i++ {
+		people = append(people, model.PersonSummary{
+			ID: int64(i + 1), Name: firsts[i%10] + " " + lasts[(i/10)%10] + " " + string(rune('A'+i%26)) + string(rune('a'+(i/26)%26)),
+			Tags: "friend, work",
+		})
+	}
+	ix := NewIndex(people)
+	env := Env{Now: testNow, Index: ix, Tags: []string{"friend", "work"}, Context: 0}
+	lines := []string{
+		"n Sam Lee Aa called about the deal #friend @fri 3pm +Bob Baker Ab ~30m",
+		"set Mark Twain Ba: company=Acme title=CTO",
+		"t buy milk +",
+	}
+	start := time.Now()
+	const rounds = 20
+	for i := 0; i < rounds; i++ {
+		for _, l := range lines {
+			Parse(l, env)
+			Complete(l, len(l), env)
+		}
+	}
+	per := time.Since(start) / (rounds * time.Duration(len(lines)))
+	assert.Less(t, per, 25*time.Millisecond, "one keystroke should cost far less than a frame")
+}
+
 func TestChangeDescribe(t *testing.T) {
 	assert.Equal(t, "created task: x", Change{Op: "create", Entity: "task", Label: "x"}.Describe())
 	assert.Equal(t, "Bob company: (empty) -> Acme", Change{Op: "update", Label: "Bob", Field: "company", New: "Acme"}.Describe())
-	assert.Equal(t, "tagged person Bob #vip", Change{Op: "tag", Entity: "person", Label: "Bob", New: "vip"}.Describe())
+	assert.Equal(t, "tagged person Bob with #vip", Change{Op: "tag", Entity: "person", Label: "Bob", New: "vip"}.Describe())
 	assert.Equal(t, "removed #vip from person #3", Change{Op: "untag", Entity: "person", ID: 3, New: "vip"}.Describe())
 }
 
@@ -756,6 +786,9 @@ func TestComplete(t *testing.T) {
 			assert.Equal(t, len(c.line), got.End)
 		})
 	}
+	// A finished word has nothing left to complete.
+	done := "n Bob hi *3m"
+	assert.Empty(t, Complete(done, len(done), env).Candidates)
 	// With a selected person there are no name suggestions.
 	env.Context = f.ids["Bob Baker"]
 	got := Complete("n Bo", 4, env)

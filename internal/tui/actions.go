@@ -286,8 +286,12 @@ func buildActions() []action {
 			}},
 
 		// App.
-		{id: "palette", inCompare: true, title: "Command palette", group: "App", hint: "ctrl+k", keys: []string{"ctrl+k", ":"}, desc: "search and run any action (also :)",
+		{id: "palette", inCompare: true, title: "Command palette", group: "App", hint: "ctrl+k", keys: []string{"ctrl+k", ":"}, desc: "search and run any action (also :). Type a command to use it as a command line: n Sam called #deal @fri",
 			foot: 1, footIn: inBoth, run: func(m *Model) tea.Cmd { return m.openPalette() }},
+		{id: "undo-command", title: "Undo last command", group: "App", hint: "U", keys: []string{"U"}, desc: "undo the last command-bar line or prompt note or task of this session",
+			write: true, when: whenUndo, run: func(m *Model) tea.Cmd { m.undoCommand(); return nil }},
+		{id: "syntax-toggle", title: "Toggle short syntax", group: "App", desc: "turn #tag @date !deadline ~30m *3m +Name ^high on or off in the command bar and the note and task prompts",
+			run: func(m *Model) tea.Cmd { m.toggleSyntax(); return nil }},
 		{id: "help", inCompare: true, title: "Help", group: "App", hint: "?", keys: []string{"?"}, desc: "show every key",
 			foot: 80, footIn: inBoth, run: func(m *Model) tea.Cmd { m.openHelp(); return nil }},
 		{id: "help-topics", title: "Help: topics", group: "App", desc: "list the built-in help topics, filter and read one (same as crm help)",

@@ -29,8 +29,25 @@ var durationPresets = []string{"15m", "30m", "45m", "1h", "2h", "4h"}
 
 const maxCandidates = 12
 
-// Complete suggests completions for the word that ends at cursor (a byte offset into line).
+// Complete suggests completions for the word that ends at cursor (a byte offset into line). A
+// candidate equal to the word already typed is left out, except for verbs.
 func Complete(line string, cursor int, env Env) Completion {
+	c := complete(line, cursor, env)
+	if c.Kind == "verb" || len(c.Candidates) == 0 || c.End > len(line) || c.Start > c.End {
+		return c
+	}
+	word := line[c.Start:c.End]
+	kept := make([]string, 0, len(c.Candidates))
+	for _, cand := range c.Candidates {
+		if cand != word && strings.TrimSpace(cand) != word {
+			kept = append(kept, cand)
+		}
+	}
+	c.Candidates = kept
+	return c
+}
+
+func complete(line string, cursor int, env Env) Completion {
 	if cursor > len(line) {
 		cursor = len(line)
 	}

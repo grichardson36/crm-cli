@@ -758,11 +758,10 @@ func (m *Model) applyEdit(e *editState, v string) error {
 			return fmt.Errorf("task title is empty: %w", model.ErrValidation)
 		}
 		if e.add {
-			in := model.CreateTaskInput{Title: title, Priority: "medium", PersonID: &pid}
-			if due != "" {
-				in.DueAt = &due
-			}
-			if _, err := m.tr.Create(ctx, in); err != nil {
+			// New tasks read short syntax too: Call back @fri ^high ~30m +Name.
+			env := m.quickEnvFor(pid)
+			env.DueOverride = m.normalizeDue(due)
+			if _, err := m.runLine("task "+title, env); err != nil {
 				return err
 			}
 		} else {

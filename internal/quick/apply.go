@@ -224,7 +224,7 @@ func (c Change) Describe() string {
 	case "create":
 		return fmt.Sprintf("created %s: %s", c.Entity, c.Label)
 	case "tag":
-		return fmt.Sprintf("tagged %s %s #%s", c.Entity, labelOrID(c), c.New)
+		return fmt.Sprintf("tagged %s %s with #%s", c.Entity, labelOrID(c), c.New)
 	case "untag":
 		return fmt.Sprintf("removed #%s from %s %s", c.New, c.Entity, labelOrID(c))
 	case "update":
@@ -236,6 +236,9 @@ func (c Change) Describe() string {
 func labelOrID(c Change) string {
 	if c.Label != "" {
 		return c.Label
+	}
+	if c.ID == 0 {
+		return "(new)"
 	}
 	return fmt.Sprintf("#%d", c.ID)
 }

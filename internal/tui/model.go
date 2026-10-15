@@ -16,6 +16,8 @@ import (
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/dedupe"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/quick"
+	"github.com/jdanielnd/crm-cli/internal/shortsyntax"
 	crmsync "github.com/jdanielnd/crm-cli/internal/sync"
 )
 
@@ -150,6 +152,15 @@ type Model struct {
 
 	// noteType is the type used by the next note prompt (remembered between notes).
 	noteType string
+
+	// Command bar: caches for the quick package, the person the palette opened on, the changes of
+	// command lines run this session (newest last) for Undo, and the short syntax switch.
+	qix       *quick.Index
+	qtags     []string
+	qtypes    []string
+	cmdPerson int64
+	undo      [][]quick.Change
+	noSyntax  bool
 }
 
 // New creates the model and loads data.
@@ -224,6 +235,7 @@ func (m *Model) reload() error {
 		return err
 	}
 	m.people = people
+	m.qix, m.qtags, m.qtypes = nil, nil, nil
 	return m.rebuild(true)
 }
 
@@ -408,6 +420,23 @@ func matches(p model.PersonSummary, terms []string) bool {
 				return false
 			}
 			continue
+		}
+		// The short syntax tokens also filter: ^high (priority tier) and *3m (cadence).
+		if strings.HasPrefix(t, "^") {
+			if pr, ok := shortsyntax.ParsePriority(t[1:]); ok {
+				if p.PriorityTier != shortsyntax.TierOf(pr) {
+					return false
+				}
+				continue
+			}
+		}
+		if strings.HasPrefix(t, "*") {
+			if c, ok := shortsyntax.ParseCadence(t[1:]); ok {
+				if p.KeepInTouch != c {
+					return false
+				}
+				continue
+			}
 		}
 		if !strings.Contains(hay, t) && !strings.Contains(tags, t) {
 			return false
@@ -815,28 +844,32 @@ func (m *Model) runPrompt(kind, value string) {
 			m.setStatus("no person selected", true)
 			return
 		}
+		// The note goes through the same reader as the command bar: #tag tags the note, +Name
+		// links people, @date makes a reminder and *3m sets the cadence.
 		typ := m.currentNoteType()
-		if _, err := m.ir.Create(m.ctx, model.CreateInteractionInput{Type: typ, Content: &value, PersonIDs: []int64{pid}}); err != nil {
+		env := m.quickEnvFor(pid)
+		env.NoteType = typ
+		plan, err := m.runLine("note "+value, env)
+		if err != nil {
 			m.setStatus(err.Error(), true)
 			return
 		}
 		m.noteType = typ
-		m.setStatus(typ+" added", false)
+		m.setStatus(typ+" added"+extras(plan), false)
 	case "task":
 		if pid == 0 {
 			m.setStatus("no person selected", true)
 			return
 		}
 		title, due, _ := strings.Cut(value, "|")
-		in := model.CreateTaskInput{Title: strings.TrimSpace(title), Priority: "medium", PersonID: &pid}
-		if d := strings.TrimSpace(due); d != "" {
-			in.DueAt = &d
-		}
-		if _, err := m.tr.Create(m.ctx, in); err != nil {
+		env := m.quickEnvFor(pid)
+		env.DueOverride = m.normalizeDue(due)
+		plan, err := m.runLine("task "+strings.TrimSpace(title), env)
+		if err != nil {
 			m.setStatus(err.Error(), true)
 			return
 		}
-		m.setStatus("task added", false)
+		m.setStatus("task added"+extras(plan), false)
 	}
 	m.afterWrite()
 }

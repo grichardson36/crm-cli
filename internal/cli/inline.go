@@ -28,7 +28,7 @@ func parseInline(ctx context.Context, db *sql.DB, text string, noSyntax bool, sk
 		return nil, err
 	}
 	res := shortsyntax.Parse(text, shortsyntax.Options{
-		Now: now, Disabled: noSyntax, KnownTags: env.Tags, People: env.Index.Names(), Skip: skip,
+		Now: now, Disabled: noSyntax, KnownTags: env.Tags, Names: env.Index.NameSet(), Skip: skip,
 	})
 	return &inlineText{Res: res, Env: env}, nil
 }

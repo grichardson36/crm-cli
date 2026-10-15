@@ -40,6 +40,10 @@ Jump with the number keys, cycle with `[` and `]`, or press `v` for the view swi
 - `f` toggle favorite. `T` add a tag, `-name` removes it. `F` set the cadence. `p` set the priority tier.
 - `+` create a contact.
 
+## Command bar
+
+`ctrl+k` is also a command line. Type a verb and a space, such as `n Sam called about the deal #deal @fri`, and a line shows what will happen. `tab` completes verbs, names, tags, dates and cadences. `enter` runs it. `set Sam: company=Acme title=CTO` shows old and new values and needs a second `enter`. `U` undoes the last one. With a person selected, no name is needed. `#friend ^high` also filter the People search. See `short-syntax`.
+
 ## Edit pane
 
 In the detail form: `enter` edits a row, `a` adds a row, `d` deletes the row (asks y/n), `y` copies the value, `o` opens a link, email or phone on this machine.

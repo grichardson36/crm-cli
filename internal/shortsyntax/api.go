@@ -7,6 +7,28 @@ import (
 	"time"
 )
 
+// NameSet holds known full names, folded, for matching "+Sam Lee". Build it once and reuse it.
+type NameSet struct {
+	set map[string]bool
+	max int
+}
+
+// NewNameSet prepares names for Options.Names.
+func NewNameSet(names []string) *NameSet {
+	ns := &NameSet{set: make(map[string]bool, len(names))}
+	for _, n := range names {
+		f := Fold(n)
+		if f == "" {
+			continue
+		}
+		ns.set[f] = true
+		if c := len(strings.Fields(f)); c > ns.max {
+			ns.max = c
+		}
+	}
+	return ns
+}
+
 // ParseCadence turns a typed cadence into a keep-in-touch value. It accepts the stored values
 // ("3 mons", "1 year", "never") and the short forms used after * ("3m", "6w", "monthly").
 func ParseCadence(s string) (string, bool) {
@@ -75,6 +97,9 @@ func ParseBirthday(s string) (string, bool) {
 	}
 	return "", false
 }
+
+// TierOf maps a priority name to a person tier: 1 top, 2 high, 3 medium, 4 low, 5 none, 0 when unknown.
+func TierOf(priority string) int { return Result{Priority: priority}.Tier() }
 
 // FormatMinutes writes minutes as 45m, 2h or 1h30m.
 func FormatMinutes(n int) string { return formatMinutes(n) }

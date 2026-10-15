@@ -63,6 +63,7 @@ Do not open the `.db` file with `sqlite3` or any other tool, do not copy it whil
 - Log what happened with `crm log` and a clear subject, then set the next step as a task.
 - Keep `summary` on a person short and factual. Append, do not overwrite.
 - Use tags for events and groups. Use `crm dupes` after bulk changes.
+- `crm do "n Sam called about the deal #deal @fri" --dry-run` previews one line of text, then run it without `--dry-run`. A name that matches several people returns the candidates and changes nothing. The MCP tool is `crm_do`. See `crm help short-syntax`.
 - Report to the owner what you changed, using record IDs.
 
 ## Optional: MCP

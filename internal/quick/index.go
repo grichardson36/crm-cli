@@ -27,6 +27,7 @@ type Index struct {
 	byID     map[int64]int
 	names    []string
 	maxWords int
+	nameSet  *shortsyntax.NameSet
 }
 
 // NewIndex builds an Index over the people summaries.
@@ -53,6 +54,7 @@ func NewIndex(people []model.PersonSummary) *Index {
 			ix.byLast[words[len(words)-1]] = append(ix.byLast[words[len(words)-1]], i)
 		}
 	}
+	ix.nameSet = shortsyntax.NewNameSet(ix.names)
 	return ix
 }
 
@@ -147,26 +149,30 @@ func (ix *Index) Suggest(prefix string, limit int) []Person {
 		return nil
 	}
 	f := shortsyntax.Fold(prefix)
-	var idx []int
+	// Names that start with the prefix come first, then names where a later word starts with it.
+	var first, later []int
 	for i, full := range ix.folded {
-		if full == "" {
-			continue
-		}
-		if f == "" || strings.HasPrefix(full, f) || strings.Contains(full, " "+f) {
-			idx = append(idx, i)
+		switch {
+		case full == "":
+		case f == "" || strings.HasPrefix(full, f):
+			first = append(first, i)
+		case strings.Contains(full, " "+f):
+			later = append(later, i)
 		}
 	}
-	out := ix.list(idx)
-	// Names that start with the prefix first.
-	sort.SliceStable(out, func(a, b int) bool {
-		pa := strings.HasPrefix(shortsyntax.Fold(out[a].Name), f)
-		pb := strings.HasPrefix(shortsyntax.Fold(out[b].Name), f)
-		return pa && !pb
-	})
+	out := append(ix.list(first), ix.list(later)...)
 	if limit > 0 && len(out) > limit {
 		out = out[:limit]
 	}
 	return out
+}
+
+// NameSet is the full names prepared for shortsyntax.Options.Names.
+func (ix *Index) NameSet() *shortsyntax.NameSet {
+	if ix == nil {
+		return nil
+	}
+	return ix.nameSet
 }
 
 // HasTag reports whether the person carries the tag (ignoring case).

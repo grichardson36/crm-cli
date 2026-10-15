@@ -34,6 +34,10 @@ type overlay struct {
 	onPick   func(m *Model, it overlayItem)
 	listTop  int // first screen line of the item list
 	pageSize int
+	// cmd is the command-bar state while the palette text is a command line (verb and a space).
+	cmd *cmdState
+	// cycle remembers the last Tab completion, so Tab again moves to the next candidate.
+	cycle *cycleState
 }
 
 const overlayTop = 2 // title line, filter line
@@ -102,6 +106,7 @@ func (m *Model) newOverlay(title string, items []overlayItem, palette bool) *ove
 
 // openPalette lists every registry action. Actions that are blocked or out of context are greyed out.
 func (m *Model) openPalette() tea.Cmd {
+	m.cmdPerson = m.palettePerson()
 	items := make([]overlayItem, 0, len(m.actions))
 	for i := range m.actions {
 		a := &m.actions[i]
@@ -216,6 +221,11 @@ func (m *Model) pickOverlay(i int) tea.Cmd {
 func (m *Model) handleOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	o := m.ov
 	page := m.overlayPage()
+	if o.palette {
+		if mdl, c, ok := m.cmdKey(msg); ok {
+			return mdl, c
+		}
+	}
 	switch msg.String() {
 	case "esc", "ctrl+c":
 		m.closeOverlay()
@@ -249,11 +259,15 @@ func (m *Model) handleOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if o.filter.Value() != before {
 		o.refilter()
 	}
+	m.syncCmd()
 	return m, cmd
 }
 
 func (m *Model) handleOverlayMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	o := m.ov
+	if o.cmd != nil {
+		return m, nil
+	}
 	switch msg.Button {
 	case tea.MouseButtonWheelUp:
 		o.move(-3, m.overlayPage())
@@ -273,6 +287,9 @@ func (m *Model) handleOverlayMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 
 func (m *Model) overlayView() string {
 	o := m.ov
+	if o.cmd != nil {
+		return m.cmdView()
+	}
 	var b strings.Builder
 	b.WriteString(lipgloss.NewStyle().MaxWidth(m.width).Render(headStyle.Render(o.title)+dimStyle.Render("   enter run  esc close  up/down choose")) + "\n")
 	b.WriteString(o.filter.View() + "\n")
