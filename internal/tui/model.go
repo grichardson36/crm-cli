@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/jdanielnd/crm-cli/internal/integrations"
 	"os"
 	"strings"
 	"time"
@@ -168,7 +169,7 @@ func New(ctx context.Context, db *sql.DB) (*Model, error) {
 	ri := textinput.New()
 	ri.CharLimit = 2000
 	ri.Prompt = ""
-	registry := crmsync.DefaultRegistry(os.Getenv)
+	registry := integrations.DefaultRegistry(os.Getenv)
 	m := &Model{
 		ctx:      ctx,
 		db:       db,

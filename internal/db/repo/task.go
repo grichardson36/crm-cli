@@ -201,6 +201,9 @@ func (r *TaskRepo) Complete(ctx context.Context, id int64) (*model.Task, error) 
 	if err != nil {
 		return nil, err
 	}
+	if err := recordFieldChanges(ctx, r.db, "task", id, map[string]string{"completed": "b:false"}, map[string]string{"completed": "b:true"}); err != nil {
+		return nil, err
+	}
 	if done.Recurrence != nil && done.DueAt != nil {
 		nextDue, err := model.NextDue(*done.DueAt, *done.Recurrence, time.Now().UTC())
 		if err != nil {
@@ -282,6 +285,7 @@ func (r *TaskRepo) Update(ctx context.Context, id int64, input model.UpdateTaskI
 		return r.FindByID(ctx, id)
 	}
 
+	before, _ := r.FindByID(ctx, id)
 	setClauses = append(setClauses, "updated_at = datetime('now')")
 	args = append(args, id)
 
@@ -301,7 +305,16 @@ func (r *TaskRepo) Update(ctx context.Context, id int64, input model.UpdateTaskI
 		}
 	}
 
-	return r.FindByID(ctx, id)
+	after, err := r.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if before != nil {
+		if err := recordFieldChanges(ctx, r.db, "task", id, taskFieldValues(before), taskFieldValues(after)); err != nil {
+			return nil, err
+		}
+	}
+	return after, nil
 }
 
 // Archive soft-deletes a task.

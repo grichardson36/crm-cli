@@ -30,6 +30,8 @@ type ExportOptions struct {
 	Name string
 	// Source is the external id source whose UIDs are reused. Default "ics".
 	Source string
+	// EventIDs limits the export to these events (and their overrides). Empty means all.
+	EventIDs []int64
 }
 
 // ExportResult is the file and what went into it.
@@ -69,6 +71,15 @@ func parseStored(allDay bool, s string) (time.Time, error) {
 		return tz.ParseDate(s)
 	}
 	return tz.ParseInstant(s)
+}
+
+func containsID(list []int64, id int64) bool {
+	for _, x := range list {
+		if x == id {
+			return true
+		}
+	}
+	return false
 }
 
 func upper(s string) string { return strings.ToUpper(s) }
@@ -119,6 +130,9 @@ func Export(ctx context.Context, db *sql.DB, opt ExportOptions) (*ExportResult, 
 	var events []*ics.Event
 	for _, e := range rows {
 		if e.RecurrenceParentID != nil {
+			continue
+		}
+		if len(opt.EventIDs) > 0 && !containsID(opt.EventIDs, e.ID) {
 			continue
 		}
 		start, end, err := eventSpan(e)

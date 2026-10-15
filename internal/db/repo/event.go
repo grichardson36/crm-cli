@@ -322,6 +322,7 @@ func insertEvent(ctx context.Context, q DBTX, e *model.Event) (int64, error) {
 }
 
 func writeEvent(ctx context.Context, q DBTX, e *model.Event) error {
+	before, berr := scanEvent(q.QueryRowContext(ctx, `SELECT `+eventColumns+` FROM events WHERE id = ?`, e.ID))
 	res, err := q.ExecContext(ctx,
 		`UPDATE events SET title = ?, notes = ?, location = ?, all_day = ?, start_utc = ?, end_utc = ?, start_date = ?,
 			end_date = ?, tz = ?, rrule = ?, status = ?, busy = ?, floating = ?, updated_at = datetime('now')
@@ -333,6 +334,9 @@ func writeEvent(ctx context.Context, q DBTX, e *model.Event) error {
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
 		return fmt.Errorf("event %d: %w", e.ID, model.ErrNotFound)
+	}
+	if berr == nil {
+		return recordFieldChanges(ctx, q, "event", e.ID, eventFieldValues(before), eventFieldValues(e))
 	}
 	return nil
 }
@@ -1188,6 +1192,7 @@ func (r *EventRepo) Purge(ctx context.Context, id int64) error {
 		{`DELETE FROM external_ids WHERE entity = 'event' AND local_id IN (SELECT id FROM events WHERE ` + where + `)`, []any{id, id}},
 		{`DELETE FROM taggings WHERE entity_type = 'event' AND entity_id IN (SELECT id FROM events WHERE ` + where + `)`, []any{id, id}},
 		{`DELETE FROM events WHERE ` + where, []any{id, id}},
+		{`DELETE FROM field_versions WHERE entity = 'event' AND local_id NOT IN (SELECT id FROM events)`, nil},
 	}
 	for _, s := range steps {
 		if _, err := tx.ExecContext(ctx, s.q, s.args...); err != nil {
