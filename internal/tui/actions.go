@@ -394,7 +394,7 @@ func buildActions() []action {
 			}},
 
 		// App.
-		{id: "palette", inCompare: true, title: "Command palette", group: "App", hint: "ctrl+k", keys: []string{"ctrl+k", ":"}, desc: "search and run any action (also :). Type a command to use it as a command line: n Sam called #deal @fri",
+		{id: "palette", inCompare: true, title: "Command palette", group: "App", hint: "ctrl+k", keys: []string{"ctrl+k", ":"}, desc: "search and run any action (also :). Type a command to use it as a command line: n Sam called #deal remind fri",
 			foot: 1, footIn: inBoth, run: func(m *Model) tea.Cmd { return m.openPalette() }},
 		{id: "undo", title: "Undo", group: "App", hint: "ctrl+z", keys: []string{"ctrl+z"}, desc: "undo the last data change of this session. A toast says what was undone",
 			write: true, run: func(m *Model) tea.Cmd { return m.undoLast() }},
@@ -404,7 +404,7 @@ func buildActions() []action {
 			write: true, run: func(m *Model) tea.Cmd { m.openKeysCustomize(); return nil }},
 		{id: "keys-reset", title: "Keys: reset", group: "App", desc: "put one or all custom keys back to the defaults; same as crm keys reset",
 			write: true, run: func(m *Model) tea.Cmd { m.openKeysReset(); return m.takePending() }},
-		{id: "syntax-toggle", title: "Toggle short syntax", group: "App", desc: "turn #tag @date !deadline ~30m *3m +Name ^high on or off in the command bar and the note and task prompts",
+		{id: "syntax-toggle", title: "Toggle short syntax", group: "App", desc: "turn #tag @Name !high ~30m by fri every 3m on or off in the command bar and the note and task prompts",
 			run: func(m *Model) tea.Cmd { m.toggleSyntax(); return nil }},
 		{id: "help", inCompare: true, title: "Help", group: "App", hint: "?", keys: []string{"?"}, desc: "show every key",
 			foot: 80, footIn: inBoth, run: func(m *Model) tea.Cmd { m.openHelp(); return nil }},

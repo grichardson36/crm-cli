@@ -22,7 +22,7 @@ var datePresets = []string{
 }
 
 // CadencePresets are offered after *.
-var CadencePresets = []string{"1w", "2w", "6w", "1m", "3m", "6m", "1y", "never"}
+var CadencePresets = []string{"day", "weekday", "week", "month", "year", "1w", "2w", "6w", "1m", "3m", "6m", "1y", "mon", "tue", "wed", "thu", "fri"}
 
 var priorityPresets = []string{"top", "high", "medium", "low", "none"}
 var durationPresets = []string{"15m", "30m", "45m", "1h", "2h", "4h"}
@@ -80,31 +80,45 @@ func complete(line string, cursor int, env Env) Completion {
 			c.Kind = "tag"
 			c.Candidates = prefixed("#", matchFold(sortedTags(env.Tags), word[1:]))
 			return c
-		case '@', '!':
-			c.Kind = "date"
-			c.Candidates = prefixed(word[:1], matchFold(datePresets, word[1:]))
-			return c
-		case '*':
-			c.Kind = "cadence"
-			c.Candidates = prefixed("*", matchFold(CadencePresets, word[1:]))
-			return c
-		case '^':
+		case '!':
 			c.Kind = "priority"
-			c.Candidates = prefixed("^", matchFold(priorityPresets, word[1:]))
+			c.Candidates = prefixed("!", matchFold(priorityPresets, word[1:]))
+			if word == "!" {
+				c.Candidates = append(c.Candidates, "!!", "!!!")
+			}
 			return c
 		case '~':
 			c.Kind = "duration"
 			c.Candidates = prefixed("~", matchFold(durationPresets, word[1:]))
 			return c
-		case '+', '&':
+		case '@':
 			c.Kind = "person"
 			for _, p := range env.Index.Suggest(strings.Trim(word[1:], "\""), maxCandidates) {
-				c.Candidates = append(c.Candidates, word[:1]+p.Name)
+				c.Candidates = append(c.Candidates, "@"+p.Name)
 			}
 			return c
 		}
 	}
 
+	// The word before decides what a date, a repeat or a duration can be.
+	switch strings.ToLower(before[len(before)-1]) {
+	case "by", "remind", "on", "at":
+		if verb != "set" && verb != "tag" {
+			c.Kind = "date"
+			c.Candidates = matchFold(datePresets, word)
+			if len(c.Candidates) > 0 {
+				return c
+			}
+		}
+	case "every":
+		c.Kind = "cadence"
+		c.Candidates = matchFold(CadencePresets, word)
+		return c
+	case "for":
+		c.Kind = "duration"
+		c.Candidates = matchFold([]string{"15m", "30m", "45m", "1h", "2h", "4h"}, word)
+		return c
+	}
 	pos := len(before) - 1 // words after the verb
 	// log takes a type first.
 	if verb == "log" {
@@ -155,7 +169,7 @@ func complete(line string, cursor int, env Env) Completion {
 	case "snooze":
 		if pos > 0 || env.Context != 0 {
 			c.Kind = "date"
-			c.Candidates = matchFold([]string{"7", "14", "30", "2w", "@tomorrow", "@next week", "@next month"}, word)
+			c.Candidates = matchFold([]string{"7", "14", "30", "2w", "tomorrow", "next week", "next month"}, word)
 			return c
 		}
 	}

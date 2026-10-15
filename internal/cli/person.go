@@ -101,7 +101,7 @@ func personAddCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add <name>",
 		Short: "Add a new person",
-		Long: "Add a new person. The name can carry short syntax: #friend (tag), *3m (keep in touch cadence), ^high (priority tier).\n" +
+		Long: "Add a new person. The name can carry short syntax: #friend (tag), every 3m (keep in touch cadence), !high (priority tier).\n" +
 			"Flags win over the same value in the name. Use --dry-run to see what was read, --no-syntax to keep the name as typed. See 'crm help short-syntax'.",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -111,7 +111,7 @@ func personAddCmd() *cobra.Command {
 			}
 			defer db.Close()
 
-			in, err := parseInline(cmd.Context(), db, args[0], noSyntax, shortsyntax.KindDue, shortsyntax.KindDeadline, shortsyntax.KindDuration, shortsyntax.KindPerson)
+			in, err := parseInline(cmd.Context(), db, args[0], noSyntax, false, shortsyntax.KindDue, shortsyntax.KindDeadline, shortsyntax.KindDuration, shortsyntax.KindPerson, shortsyntax.KindRecurrence)
 			if err != nil {
 				return err
 			}
@@ -194,7 +194,7 @@ func personAddCmd() *cobra.Command {
 	cmd.Flags().StringVar(&keepInTouch, "keep-in-touch", "", "cadence: "+strings.Join(model.KeepInTouchCadences, ", "))
 	cmd.Flags().BoolVar(&favorite, "favorite", false, "mark as favorite")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print what was read from the name and what would be created, and write nothing")
-	cmd.Flags().BoolVar(&noSyntax, "no-syntax", false, "keep the name as typed: do not read #, * or ^ tokens")
+	cmd.Flags().BoolVar(&noSyntax, "no-syntax", false, "keep the name as typed: do not read #, every or ! tokens")
 
 	return cmd
 }

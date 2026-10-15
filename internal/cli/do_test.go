@@ -37,7 +37,7 @@ func decodeList(t *testing.T, s string) []map[string]any {
 
 func TestDoNoteDryRunWritesNothing(t *testing.T) {
 	path := doDB(t)
-	stdout, _, code := crm(t, path, "do", "n Bob called about the deal #deal @2026-12-25", "--dry-run", "-f", "json")
+	stdout, _, code := crm(t, path, "do", "n Bob called about the deal #deal remind 2026-12-25", "--dry-run", "-f", "json")
 	require.Equal(t, 0, code)
 	out := decodeObject(t, stdout)
 	assert.Equal(t, true, out["dry_run"])
@@ -57,7 +57,7 @@ func TestDoNoteDryRunWritesNothing(t *testing.T) {
 
 func TestDoNoteApplies(t *testing.T) {
 	path := doDB(t)
-	stdout, stderr, code := crm(t, path, "do", "n Bob called about the deal #deal @2026-12-25", "-f", "json")
+	stdout, stderr, code := crm(t, path, "do", "n Bob called about the deal #deal remind 2026-12-25", "-f", "json")
 	require.Equal(t, 0, code, stderr)
 	out := decodeObject(t, stdout)
 	assert.Equal(t, true, out["applied"])
@@ -76,7 +76,7 @@ func TestDoNoteApplies(t *testing.T) {
 
 func TestDoWithPersonFlagNeedsNoName(t *testing.T) {
 	path := doDB(t)
-	_, stderr, code := crm(t, path, "do", "t send the contract ^high", "--person", "1")
+	_, stderr, code := crm(t, path, "do", "t send the contract !high", "--person", "1")
 	require.Equal(t, 0, code, stderr)
 	stdout, _, _ := crm(t, path, "task", "list", "--person", "1", "-f", "json")
 	tasks := decodeList(t, stdout)
@@ -153,13 +153,13 @@ func TestDoTagAndSnooze(t *testing.T) {
 	assert.Len(t, decodeList(t, stdout), 2)
 	_, stderr, code = crm(t, path, "do", "snooze Bob whenever")
 	assert.Equal(t, 2, code, "not a number of days or a date: %s", stderr)
-	_, stderr, code = crm(t, path, "do", "snooze Bob @2026-12-24")
+	_, stderr, code = crm(t, path, "do", "snooze Bob 2026-12-24")
 	require.Equal(t, 0, code, stderr)
 }
 
 func TestTaskAddInlineSyntax(t *testing.T) {
 	path := doDB(t)
-	stdout, stderr, code := crm(t, path, "task", "add", "Call back @2026-12-24 3pm ~30m ^high +Bob", "--dry-run")
+	stdout, stderr, code := crm(t, path, "task", "add", "Call back 2026-12-24 3pm ~30m !high @Bob", "--dry-run")
 	require.Equal(t, 0, code, stderr)
 	out := decodeObject(t, stdout)
 	task := out["task"].(map[string]any)
@@ -167,24 +167,25 @@ func TestTaskAddInlineSyntax(t *testing.T) {
 	assert.Equal(t, "2026-12-24 15:00", task["due_at"])
 	assert.Equal(t, "high", task["priority"])
 	assert.Equal(t, []any{float64(3)}, task["person_ids"])
-	assert.Contains(t, task["description"], "Estimate: 30m")
+	assert.Equal(t, float64(30), task["duration_min"])
 	assert.Equal(t, "Call back", out["syntax"].(map[string]any)["title"])
 
 	stdout, _, _ = crm(t, path, "task", "list", "-f", "json")
 	assert.Len(t, decodeList(t, stdout), 0, "dry run writes nothing")
 
 	// For real.
-	stdout, stderr, code = crm(t, path, "task", "add", "Call back @2026-12-24 3pm ^high +Bob", "-f", "json")
+	stdout, stderr, code = crm(t, path, "task", "add", "Call back 2026-12-24 3pm !high @Bob by 2026-12-30", "-f", "json")
 	require.Equal(t, 0, code, stderr)
 	created := decodeList(t, stdout)[0]
 	assert.Equal(t, "Call back", created["title"])
 	assert.Equal(t, "2026-12-24 15:00", created["due_at"])
 	assert.Equal(t, float64(3), created["person_id"])
+	assert.Equal(t, "2026-12-30", created["deadline_at"])
 }
 
 func TestTaskAddFlagsWinOverInlineSyntax(t *testing.T) {
 	path := doDB(t)
-	stdout, stderr, code := crm(t, path, "task", "add", "Call back @2026-12-24 ^high +Bob", "--due", "2027-01-05", "--priority", "low", "--person", "1", "-f", "json")
+	stdout, stderr, code := crm(t, path, "task", "add", "Call back 2026-12-24 !high @Bob", "--due", "2027-01-05", "--priority", "low", "--person", "1", "-f", "json")
 	require.Equal(t, 0, code, stderr)
 	created := decodeList(t, stdout)[0]
 	assert.Equal(t, "2027-01-05", created["due_at"])
@@ -195,9 +196,9 @@ func TestTaskAddFlagsWinOverInlineSyntax(t *testing.T) {
 
 func TestTaskAddNoSyntaxAndWarnings(t *testing.T) {
 	path := doDB(t)
-	stdout, _, code := crm(t, path, "task", "add", "Call back @fri #work", "--no-syntax", "-f", "json")
+	stdout, _, code := crm(t, path, "task", "add", "Call back fri #work @Bob", "--no-syntax", "-f", "json")
 	require.Equal(t, 0, code)
-	assert.Equal(t, "Call back @fri #work", decodeList(t, stdout)[0]["title"])
+	assert.Equal(t, "Call back fri #work @Bob", decodeList(t, stdout)[0]["title"])
 
 	stdout, stderr, code := crm(t, path, "task", "add", "Fix sink #home #house", "-f", "json")
 	require.Equal(t, 0, code, stderr)
@@ -206,25 +207,25 @@ func TestTaskAddNoSyntaxAndWarnings(t *testing.T) {
 	assert.Equal(t, []any{"home", "house"}, created["tags"])
 	assert.Empty(t, stderr)
 
-	_, _, code = crm(t, path, "task", "add", "Ping +Sam", "-f", "json")
-	assert.Equal(t, 2, code, "ambiguous +Sam")
-	_, _, code = crm(t, path, "task", "add", "Ping +Nobody", "-f", "json")
+	_, _, code = crm(t, path, "task", "add", "Ping @Sam", "-f", "json")
+	assert.Equal(t, 2, code, "ambiguous @Sam")
+	_, _, code = crm(t, path, "task", "add", "Ping @Nobody", "-f", "json")
 	assert.Equal(t, 3, code)
-	_, _, code = crm(t, path, "task", "add", "@fri", "-f", "json")
+	_, _, code = crm(t, path, "task", "add", "fri", "-f", "json")
 	assert.Equal(t, 2, code, "empty title")
 }
 
 func TestTaskAddTomorrowFollowsTheClock(t *testing.T) {
 	path := doDB(t)
 	want := time.Now().AddDate(0, 0, 1).Format("2006-01-02")
-	stdout, _, code := crm(t, path, "task", "add", "Water plants @tomorrow", "-f", "json")
+	stdout, _, code := crm(t, path, "task", "add", "Water plants tomorrow", "-f", "json")
 	require.Equal(t, 0, code)
 	assert.Equal(t, want, decodeList(t, stdout)[0]["due_at"])
 }
 
 func TestLogAddInlineSyntax(t *testing.T) {
 	path := doDB(t)
-	stdout, stderr, code := crm(t, path, "log", "add", "--type", "call", "3", "Talked about the offsite #trip @2026-10-01 14:30 +Sam_Lee *3m", "--dry-run")
+	stdout, stderr, code := crm(t, path, "log", "add", "--type", "call", "3", "Talked about the offsite #trip 2026-10-01 14:30 @Sam_Lee every 3m", "--dry-run")
 	require.Equal(t, 0, code, stderr)
 	out := decodeObject(t, stdout)
 	inter := out["interaction"].(map[string]any)
@@ -234,7 +235,7 @@ func TestLogAddInlineSyntax(t *testing.T) {
 	assert.Equal(t, []any{"trip"}, inter["tags"])
 	assert.Equal(t, "3 mons", inter["person_cadence"])
 
-	stdout, stderr, code = crm(t, path, "log", "add", "--type", "call", "3", "Talked about the offsite #trip @2026-10-01 14:30 +Sam_Lee *3m", "-f", "json")
+	stdout, stderr, code = crm(t, path, "log", "add", "--type", "call", "3", "Talked about the offsite #trip 2026-10-01 14:30 @Sam_Lee every 3m", "-f", "json")
 	require.Equal(t, 0, code, stderr)
 	logged := decodeList(t, stdout)[0]
 	assert.Equal(t, "2026-10-01 14:30:00", logged["occurred_at"])
@@ -246,18 +247,18 @@ func TestLogAddInlineSyntax(t *testing.T) {
 	assert.Equal(t, "3 mons", shown["keep_in_touch"])
 
 	// --at wins over @date, and --content is never parsed.
-	stdout, _, code = crm(t, path, "log", "add", "--type", "note", "3", "hello @2026-10-02", "--at", "2026-11-11 10:00:00", "-f", "json")
+	stdout, _, code = crm(t, path, "log", "add", "--type", "note", "3", "hello 2026-10-02", "--at", "2026-11-11 10:00:00", "-f", "json")
 	require.Equal(t, 0, code)
 	assert.Equal(t, "2026-11-11 10:00:00", decodeList(t, stdout)[0]["occurred_at"])
 	assert.Equal(t, "hello", decodeList(t, stdout)[0]["content"])
-	stdout, _, code = crm(t, path, "log", "add", "--type", "note", "3", "--content", "keep #this @fri", "-f", "json")
+	stdout, _, code = crm(t, path, "log", "add", "--type", "note", "3", "--content", "keep #this fri", "-f", "json")
 	require.Equal(t, 0, code)
-	assert.Equal(t, "keep #this @fri", decodeList(t, stdout)[0]["content"])
+	assert.Equal(t, "keep #this fri", decodeList(t, stdout)[0]["content"])
 }
 
 func TestPersonAddInlineSyntax(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "crm.db")
-	stdout, stderr, code := crm(t, path, "person", "add", "Dana Dunn #friend #golf *6m ^top", "--dry-run")
+	stdout, stderr, code := crm(t, path, "person", "add", "Dana Dunn #friend #golf every 6m !top", "--dry-run")
 	require.Equal(t, 0, code, stderr)
 	p := decodeObject(t, stdout)["person"].(map[string]any)
 	assert.Equal(t, "Dana Dunn", p["name"])
@@ -267,7 +268,7 @@ func TestPersonAddInlineSyntax(t *testing.T) {
 	stdout, _, _ = crm(t, path, "person", "list", "-f", "json")
 	assert.Len(t, decodeList(t, stdout), 0, "dry run writes nothing")
 
-	stdout, stderr, code = crm(t, path, "person", "add", "Dana Dunn #friend #golf *6m ^top", "-f", "json")
+	stdout, stderr, code = crm(t, path, "person", "add", "Dana Dunn #friend #golf every 6m !top", "-f", "json")
 	require.Equal(t, 0, code, stderr)
 	created := decodeList(t, stdout)[0]
 	assert.Equal(t, "Dana Dunn", created["name"])
@@ -277,7 +278,7 @@ func TestPersonAddInlineSyntax(t *testing.T) {
 	assert.Len(t, decodeList(t, stdout), 2)
 
 	// A flag wins over the token.
-	stdout, _, code = crm(t, path, "person", "add", "Eve Ng *6m", "--keep-in-touch", "1 year", "-f", "json")
+	stdout, _, code = crm(t, path, "person", "add", "Eve Ng every 6m", "--keep-in-touch", "1 year", "-f", "json")
 	require.Equal(t, 0, code)
 	assert.Equal(t, "1 year", decodeList(t, stdout)[0]["keep_in_touch"])
 

@@ -45,7 +45,7 @@ func logAddCmd() *cobra.Command {
 		Use:   "add --type <type> <person_id> [text...]",
 		Short: "Log an interaction of any defined type",
 		Long: "Log an interaction of any active type from 'crm log types'. Text after the person ID becomes the content.\n" +
-			"The text can carry short syntax: #tag (tags the interaction), @yesterday or @fri 3pm (when it happened), +Name (more people), *3m (keep in touch cadence of the person).\n" +
+			"The text can carry short syntax: #tag (tags the interaction), yesterday or fri 3pm (when it happened), @Name (more people), every 3m (keep in touch cadence of the person).\n" +
 			"Flags win over the same value in the text. Use --dry-run to see what was read, --no-syntax to keep the text as typed. See 'crm help short-syntax'.",
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -75,7 +75,7 @@ func logAddCmd() *cobra.Command {
 
 			var in *inlineText
 			if text != "" && !(content != "" && text == content) {
-				if in, err = parseInline(cmd.Context(), db, text, noSyntax, shortsyntax.KindDeadline, shortsyntax.KindDuration, shortsyntax.KindPriority); err != nil {
+				if in, err = parseInline(cmd.Context(), db, text, noSyntax, true, shortsyntax.KindDeadline, shortsyntax.KindDuration, shortsyntax.KindPriority, shortsyntax.KindRecurrence); err != nil {
 					return err
 				}
 				text = in.Res.Title
@@ -144,7 +144,7 @@ func logAddCmd() *cobra.Command {
 	cmd.Flags().StringVar(&direction, "direction", "", "direction: inbound or outbound")
 	cmd.Flags().StringVar(&at, "at", "", "when the interaction occurred (ISO 8601)")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print what was read from the text and what would be created, and write nothing")
-	cmd.Flags().BoolVar(&noSyntax, "no-syntax", false, "keep the text as typed: do not read #, @, + or * tokens")
+	cmd.Flags().BoolVar(&noSyntax, "no-syntax", false, "keep the text as typed: do not read #, @ or date words")
 	return cmd
 }
 

@@ -34,6 +34,8 @@ type Env struct {
 	NoteType string
 	// DueOverride, when set, is the stored due date of a task line, whatever the text says.
 	DueOverride string
+	// Dismissed lists token texts the user turned back into plain text.
+	Dismissed []string
 }
 
 func (e Env) now() time.Time {
@@ -188,7 +190,7 @@ func skipSpace(s string, i int) int {
 	return i
 }
 
-func isSigilByte(c byte) bool { return strings.IndexByte("#@!~*+&^", c) >= 0 }
+func isSigilByte(c byte) bool { return strings.IndexByte("#@!~", c) >= 0 }
 
 type builder struct {
 	env    Env
@@ -371,8 +373,8 @@ func (b *builder) subjectFor(text string, off int, allowLead bool) (string, int)
 }
 
 // syntax runs the short syntax parser and records the marks.
-func (b *builder) syntax(text string, off int, skip ...shortsyntax.Kind) shortsyntax.Result {
-	opts := shortsyntax.Options{Now: b.env.now(), Disabled: b.env.NoSyntax, Names: b.env.Index.NameSet(), Skip: skip}
+func (b *builder) syntax(text string, off int, dates bool, skip ...shortsyntax.Kind) shortsyntax.Result {
+	opts := shortsyntax.Options{Now: b.env.now(), Disabled: b.env.NoSyntax, Dates: dates, Names: b.env.Index.NameSet(), Skip: skip, Dismiss: b.env.Dismissed}
 	if b.env.Tags != nil {
 		opts.KnownTags = b.env.Tags
 	}
@@ -409,7 +411,7 @@ func (b *builder) resolveLinks(res shortsyntax.Result) {
 	}
 	for i, m := range b.p.Marks {
 		if m.Kind == "person" {
-			name := strings.Trim(strings.TrimLeft(b.p.Input[m.Start:m.End], "+&"), "\"")
+			name := strings.Trim(strings.TrimLeft(b.p.Input[m.Start:m.End], "@"), "\"")
 			if bad[shortsyntax.Fold(strings.ReplaceAll(name, "_", " "))] {
 				b.p.Marks[i].Bad = true
 			}
@@ -531,11 +533,11 @@ func (b *builder) capture(verb, rest string, off int) {
 	if strings.TrimSpace(rest) == "" {
 		switch verb {
 		case "task":
-			p.Preview = "task [name] text @due !deadline ~30m ^high +Name, e.g. t Sam call back @fri"
+			p.Preview = "task [name] text fri 3pm by mon ~30m !high every 2 weeks @Name, e.g. t Sam call back fri"
 		case "log":
-			p.Preview = "log " + typ + " [name] text, e.g. log " + typ + " Sam talked about the offsite @yesterday"
+			p.Preview = "log " + typ + " [name] text, e.g. log " + typ + " Sam talked about the offsite yesterday"
 		default:
-			p.Preview = "note [name] text #tag @remind *3m +Name, e.g. n Sam called about the deal #deal @fri"
+			p.Preview = "note [name] text #tag remind fri every 3m @Name, e.g. n Sam called about the deal #deal remind fri"
 		}
 		return
 	}
@@ -545,11 +547,14 @@ func (b *builder) capture(verb, rest string, off int) {
 	var res shortsyntax.Result
 	switch verb {
 	case "task":
-		res = b.syntax(text, off, shortsyntax.KindCadence)
+		// Tasks read plain-word dates. A repeat is a task repeat, not a keep-in-touch cadence.
+		res = b.syntax(text, off, true, shortsyntax.KindCadence)
 	case "log":
-		res = b.syntax(text, off, shortsyntax.KindDeadline, shortsyntax.KindDuration, shortsyntax.KindPriority)
+		// For a log the date is when it happened. A repeat only counts when it is a cadence.
+		res = b.syntax(text, off, true, shortsyntax.KindDeadline, shortsyntax.KindDuration, shortsyntax.KindPriority, shortsyntax.KindRecurrence)
 	default:
-		res = b.syntax(text, off, shortsyntax.KindDeadline, shortsyntax.KindDuration, shortsyntax.KindPriority)
+		// Notes do not read bare words as dates. remind fri makes the reminder.
+		res = b.syntax(text, off, false, shortsyntax.KindDeadline, shortsyntax.KindDuration, shortsyntax.KindPriority, shortsyntax.KindRecurrence)
 	}
 	b.resolveLinks(res)
 	if b.subj == nil && len(b.links) > 0 && len(p.Problems) == 0 {
@@ -703,10 +708,18 @@ func (b *builder) planTask(title string, res shortsyntax.Result) {
 		subj, links = &links[0], links[1:]
 		p.Subject, p.Links = subj, links
 	}
-	tf := TaskFieldsOf(res)
+	tf := TaskFieldsOf(res, b.env.now().Location())
 	prio, due, description := tf.Priority, tf.Due, tf.Description
 	if b.env.DueOverride != "" {
 		due = b.env.DueOverride
+	}
+	if res.Recurrence != "" && tf.Recurrence != "" && due == "" {
+		b.problem("invalid", fmt.Sprintf("%q needs a date to start from: add one, such as fri", res.Recurrence))
+		b.previewProblems()
+		return
+	}
+	if res.Recurrence != "" && tf.Recurrence == "" {
+		b.warn("%q is not an interval, so it is kept in the description", res.Recurrence)
 	}
 	pid := ids(subj, links)
 	parts := []string{}
@@ -724,12 +737,11 @@ func (b *builder) planTask(title string, res shortsyntax.Result) {
 	} else if res.Due != nil {
 		parts = append(parts, "due "+formatWhen(*res.Due))
 	}
-	if res.Deadline != nil && b.env.DueOverride == "" {
-		if res.Due == nil {
-			parts = append(parts, "due "+formatWhen(*res.Deadline)+" (deadline)")
-		} else {
-			parts = append(parts, "deadline "+formatWhen(*res.Deadline))
-		}
+	if res.Deadline != nil {
+		parts = append(parts, "deadline "+formatWhen(*res.Deadline))
+	}
+	if res.Recurrence != "" {
+		parts = append(parts, "repeats "+strings.TrimPrefix(res.Recurrence, "every "))
 	}
 	if res.Priority != "" {
 		parts = append(parts, res.TaskPriority()+" priority")
@@ -741,9 +753,13 @@ func (b *builder) planTask(title string, res shortsyntax.Result) {
 	p.ops = append(p.ops, op{
 		preview: []Change{ch},
 		run: func(ctx context.Context, r Repos, st *runState) ([]Change, error) {
-			in := model.CreateTaskInput{Title: title, Priority: prio}
+			in := model.CreateTaskInput{Title: title, Priority: prio, Schedule: tf.Schedule}
 			if due != "" {
 				in.DueAt = &due
+			}
+			if tf.Recurrence != "" {
+				rec := tf.Recurrence
+				in.Recurrence = &rec
 			}
 			if description != "" {
 				in.Description = &description
@@ -818,16 +834,16 @@ func splitAssignments(text string) (prefix string, as []assignment) {
 	return strings.TrimSpace(prefix), as
 }
 
-// set plans "set [Name:] key=value ... *3m ^high #tag".
+// set plans "set [Name:] key=value ... every 3m !high #tag".
 func (b *builder) set(rest string, off int) {
 	p := b.p
 	if strings.TrimSpace(rest) == "" {
-		p.Preview = "set [name:] company=Acme title=CTO birthday=Mar 4 *3m ^high #tag"
+		p.Preview = "set [name:] company=Acme title=CTO birthday=Mar 4 every 3m !high #tag"
 		return
 	}
 	text, off, noLead := b.escapeLead(rest, off)
 	text, off = b.subjectFor(text, off, !noLead)
-	res := b.syntax(text, off, shortsyntax.KindDue, shortsyntax.KindDeadline, shortsyntax.KindDuration, shortsyntax.KindPerson)
+	res := b.syntax(text, off, false, shortsyntax.KindDue, shortsyntax.KindDeadline, shortsyntax.KindDuration, shortsyntax.KindPerson, shortsyntax.KindRecurrence)
 	clean := res.Title
 	prefix, as := splitAssignments(clean)
 	if b.subj == nil && prefix != "" {
@@ -1110,11 +1126,11 @@ func (b *builder) tag(rest string, off int) {
 
 var daysRe = regexp.MustCompile(`^\d{1,4}$`)
 
-// snooze plans "snooze [Name] 7", "snooze Sam 2w" or "snooze Sam @fri".
+// snooze plans "snooze [Name] 7", "snooze Sam 2w" or "snooze Sam fri".
 func (b *builder) snooze(rest string, off int) {
 	p := b.p
 	if strings.TrimSpace(rest) == "" {
-		p.Preview = "snooze [name] 7  (days, or 2w, or @fri)"
+		p.Preview = "snooze [name] 7  (days, or 2w, or fri)"
 		return
 	}
 	text, off, noLead := b.escapeLead(rest, off)
@@ -1129,7 +1145,7 @@ func (b *builder) snooze(rest string, off int) {
 	}
 	arg := strings.TrimSpace(text)
 	if arg == "" {
-		p.Preview = "snooze " + b.subj.Name + " 7  (days, or 2w, or @fri)"
+		p.Preview = "snooze " + b.subj.Name + " 7  (days, or 2w, or fri)"
 		return
 	}
 	now := b.env.now()
@@ -1141,12 +1157,11 @@ func (b *builder) snooze(rest string, off int) {
 		human = fmt.Sprintf("%d days", n)
 		b.mark("due", off, off+len(arg))
 	} else {
-		expr := arg
-		if !strings.HasPrefix(expr, "@") {
-			expr = "@" + expr
-		}
-		res := shortsyntax.Parse(expr, shortsyntax.Options{Now: now, Skip: []shortsyntax.Kind{
-			shortsyntax.KindTag, shortsyntax.KindDeadline, shortsyntax.KindDuration, shortsyntax.KindCadence, shortsyntax.KindPriority, shortsyntax.KindPerson}})
+		// "by <date>" takes every date form, so 2w and next week work as well as fri.
+		sres := shortsyntax.Parse("by "+arg, shortsyntax.Options{Now: now, Skip: []shortsyntax.Kind{
+			shortsyntax.KindTag, shortsyntax.KindDuration, shortsyntax.KindCadence, shortsyntax.KindPriority, shortsyntax.KindPerson, shortsyntax.KindRecurrence}})
+		res := sres
+		res.Due = sres.Deadline
 		if res.Due == nil || res.Title != "" {
 			b.problem("invalid", fmt.Sprintf("cannot read %q as a number of days or a date", arg))
 			b.p.Marks = append(b.p.Marks, Mark{Kind: "due", Start: off, End: off + len(arg), Bad: true})

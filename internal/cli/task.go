@@ -124,7 +124,7 @@ func taskAddCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add <title>",
 		Short: "Add a new task",
-		Long: "Add a new task. The title can carry short syntax: #tag (tag), @fri 3pm (due), !mon (deadline), ~30m (estimate), ^high (priority), +Name (link a person).\n" +
+		Long: "Add a new task. The title can carry short syntax: #tag, fri 3pm (due), by mon (deadline), ~30m or for 30m (duration), !high or !!! (priority), every 2 weeks (repeat), @Name (link a person).\n" +
 			"Flags win over the same value in the title. Use --dry-run to see what was read, --no-syntax to keep the title as typed. See 'crm help short-syntax'.",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -138,14 +138,14 @@ func taskAddCmd() *cobra.Command {
 				return model.NewExitError(model.ErrValidation, "invalid priority: %s (must be one of: %s)", priority, strings.Join(model.Priorities, ", "))
 			}
 
-			in, err := parseInline(cmd.Context(), db, args[0], noSyntax, shortsyntax.KindCadence)
+			in, err := parseInline(cmd.Context(), db, args[0], noSyntax, true, shortsyntax.KindCadence)
 			if err != nil {
 				return err
 			}
 			if in.Res.Title == "" {
 				return model.NewExitError(model.ErrValidation, "the title is empty once the short syntax is removed")
 			}
-			tf := quick.TaskFieldsOf(in.Res)
+			tf := quick.TaskFieldsOf(in.Res, clockNow().Location())
 			input := model.CreateTaskInput{
 				Tags:        append(append([]string(nil), tagFlags...), in.Res.Tags...),
 				Title:       in.Res.Title,
@@ -176,8 +176,21 @@ func taskAddCmd() *cobra.Command {
 				input.DealID = &dealID
 			}
 			input.Recurrence = nilIfEmpty(recurrence)
+			if !cmd.Flags().Changed("recurrence") {
+				input.Recurrence = nilIfEmpty(tf.Recurrence)
+			}
 			if input.Schedule, err = sf.build(cmd); err != nil {
 				return err
+			}
+			// ~30m and by fri fill the duration and the deadline unless a flag already did.
+			if input.Schedule.DurationMin == nil {
+				input.Schedule.DurationMin = tf.Schedule.DurationMin
+			}
+			if input.Schedule.DeadlineAt == nil {
+				input.Schedule.DeadlineAt = tf.Schedule.DeadlineAt
+			}
+			if in.Res.Recurrence != "" && tf.Recurrence == "" && !cmd.Flags().Changed("recurrence") {
+				fmt.Fprintf(os.Stderr, "crm: %q is not an interval, so it is kept in the description\n", in.Res.Recurrence)
 			}
 
 			if dryRun {
@@ -186,6 +199,7 @@ func taskAddCmd() *cobra.Command {
 					"task": map[string]any{
 						"title": input.Title, "description": input.Description, "due_at": input.DueAt, "priority": input.Priority,
 						"person_ids": ids, "deal_id": input.DealID, "recurrence": input.Recurrence, "tags": input.Tags,
+						"duration_min": input.Schedule.DurationMin, "deadline_at": input.Schedule.DeadlineAt,
 					},
 				})
 			}
@@ -209,7 +223,7 @@ func taskAddCmd() *cobra.Command {
 	cmd.Flags().StringVar(&recurrence, "recurrence", "", "repeat after completion, e.g. \"7 days\", \"1 mon\", weekly (needs --due)")
 	cmd.Flags().StringSliceVar(&tagFlags, "tag", nil, "tag the task (repeatable); #tag in the title does the same")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print what was read from the title and what would be created, and write nothing")
-	cmd.Flags().BoolVar(&noSyntax, "no-syntax", false, "keep the title as typed: do not read @, !, ~, ^ or + tokens")
+	cmd.Flags().BoolVar(&noSyntax, "no-syntax", false, "keep the title as typed: do not read #, @, !, ~ or date words")
 
 	sf = bindScheduleFlags(cmd)
 	return cmd

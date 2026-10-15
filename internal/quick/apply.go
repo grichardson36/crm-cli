@@ -5,9 +5,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/jdanielnd/crm-cli/internal/cal/tz"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/jdanielnd/crm-cli/internal/shortsyntax"
@@ -15,38 +17,130 @@ import (
 
 func formatMinutes(n int) string { return shortsyntax.FormatMinutes(n) }
 
-// TaskFields are the task columns a parse result sets. Tasks have no deadline or estimate column
-// yet, so a deadline becomes the due date when there is no @date, and otherwise (like the
-// estimate) goes into the description.
+// TaskFields are the task columns a parse result sets.
 type TaskFields struct {
-	Due         string
-	Priority    string
+	Due      string
+	Priority string
+	// Description holds text that has no column: a repeat such as "every fri" that tasks cannot
+	// store as an interval.
 	Description string
+	// Recurrence is the stored repeat ("2 weeks"), when the phrase is an interval.
+	Recurrence string
+	// Schedule carries the duration (~30m, for 30m) and the deadline (by fri).
+	Schedule model.TaskSchedule
 }
 
-// TaskFieldsOf maps a parse result to task columns. Priority defaults to medium.
-func TaskFieldsOf(res shortsyntax.Result) TaskFields {
+// TaskFieldsOf maps a parse result to task columns. Priority defaults to medium. loc is the zone
+// of the clock, used for the instant of a deadline that has a time.
+func TaskFieldsOf(res shortsyntax.Result, loc *time.Location) TaskFields {
 	tf := TaskFields{Priority: res.TaskPriority()}
 	if tf.Priority == "" {
 		tf.Priority = "medium"
 	}
-	var desc []string
-	switch {
-	case res.Due != nil:
+	if res.Due != nil {
 		tf.Due = res.Due.String()
-		if res.Deadline != nil {
-			desc = append(desc, "Deadline: "+res.Deadline.String())
-		}
-	case res.Deadline != nil:
-		tf.Due = res.Deadline.String()
 	}
 	if res.DurationMin > 0 {
-		desc = append(desc, "Estimate: "+formatMinutes(res.DurationMin))
+		n := res.DurationMin
+		tf.Schedule.DurationMin = &n
 	}
-	tf.Description = strings.Join(desc, "\n")
+	if res.Deadline != nil {
+		d := DeadlineText(*res.Deadline, loc)
+		tf.Schedule.DeadlineAt = &d
+	}
+	if res.Recurrence != "" {
+		if rec, ok := RecurrenceOf(res.Recurrence); ok {
+			tf.Recurrence = rec
+		} else {
+			tf.Description = "Repeats: " + res.Recurrence
+		}
+	}
 	return tf
 }
 
+// DeadlineText is the stored deadline of a task: the date for an all-day deadline, otherwise the
+// instant in UTC.
+func DeadlineText(w shortsyntax.When, loc *time.Location) string {
+	if w.Time == "" || w.Date == "" {
+		return w.Date
+	}
+	if loc == nil {
+		loc = time.Local
+	}
+	t, err := time.ParseInLocation("2006-01-02 15:04", w.Date+" "+w.Time, loc)
+	if err != nil {
+		return w.Date
+	}
+	return tz.FormatInstant(t)
+}
+
+// RecurrenceOf turns "every 2 weeks" or "every month" into a task repeat such as "2 weeks" or
+// "monthly". Repeats on named days (every fri) are not intervals and return false.
+func RecurrenceOf(raw string) (string, bool) {
+	words := strings.Fields(strings.ToLower(strings.TrimPrefix(strings.ToLower(raw), "every")))
+	if len(words) == 0 {
+		return "", false
+	}
+	if words[0] == "other" && len(words) == 2 {
+		words = []string{"2", words[1]}
+	}
+	unit := func(s string) (string, bool) {
+		switch strings.TrimSuffix(s, "s") {
+		case "day", "d":
+			return "days", true
+		case "week", "w":
+			return "weeks", true
+		case "month", "mo", "m":
+			return "mon", true
+		case "year", "y":
+			return "year", true
+		}
+		return "", false
+	}
+	var n int
+	var u string
+	switch len(words) {
+	case 1:
+		if v, ok := unit(words[0]); ok {
+			return map[string]string{"days": "daily", "weeks": "weekly", "mon": "monthly", "year": "yearly"}[v], true
+		}
+		// 2w, 3m
+		w := words[0]
+		k := 0
+		for k < len(w) && w[k] >= '0' && w[k] <= '9' {
+			k++
+		}
+		if k == 0 || k == len(w) {
+			return "", false
+		}
+		n, _ = strconv.Atoi(w[:k])
+		var ok bool
+		if u, ok = unit(w[k:]); !ok {
+			return "", false
+		}
+	case 2:
+		var err error
+		if n, err = strconv.Atoi(words[0]); err != nil {
+			return "", false
+		}
+		var ok bool
+		if u, ok = unit(words[1]); !ok {
+			return "", false
+		}
+	default:
+		return "", false
+	}
+	if n < 1 {
+		return "", false
+	}
+	if u == "year" && n > 1 {
+		u = "years"
+	}
+	if u == "mon" && n > 1 {
+		u = "mons"
+	}
+	return fmt.Sprintf("%d %s", n, u), true
+}
 // OccurredAt is the stored time of a logged interaction for an @date: the date with its time, or noon.
 func OccurredAt(w shortsyntax.When) string { return occurredAt(w) }
 

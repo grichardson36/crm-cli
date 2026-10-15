@@ -764,7 +764,7 @@ func (m *Model) applyEdit(e *editState, v string) error {
 			return fmt.Errorf("task title is empty: %w", model.ErrValidation)
 		}
 		if e.add {
-			// New tasks read short syntax too: Call back @fri ^high ~30m +Name.
+			// New tasks read short syntax too: Call back fri !high ~30m @Name.
 			env := m.quickEnvFor(pid)
 			env.DueOverride = m.normalizeDue(due)
 			if _, err := m.runLine("task "+title, env); err != nil {

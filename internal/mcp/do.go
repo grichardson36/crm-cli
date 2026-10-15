@@ -17,9 +17,9 @@ func registerDoTools(s *server.MCPServer, db *sql.DB) {
 	s.AddTool(
 		gomcp.NewTool("crm_do",
 			gomcp.WithDescription("Run one line of text. Verbs: n/note, t/task, log <type>, set, tag, snooze. "+
-				"Examples: \"n Sam called about the deal #deal @fri\", \"t Sam send contract @mon ^high\", "+
+				"Examples: \"n Sam called about the deal #deal remind fri\", \"t Sam send contract by mon !high\", "+
 				"\"set Sam: company=Acme title=CTO\", \"tag Sam vip -old\", \"snooze Sam 2w\". "+
-				"A name after the verb picks the person, or pass person_id. Short syntax: #tag @date !deadline ~30m *3m +Name ^high. "+
+				"A name after the verb picks the person, or pass person_id. Short syntax: #tag @Name !high ~30m by fri every 2 weeks remind fri, and plain dates (fri 3pm) in tasks and logs. "+
 				"Use dry_run to see what would happen first. A name that matches no one or several people returns problems with candidates and changes nothing."),
 			gomcp.WithString("text", gomcp.Required(), gomcp.Description("The line, starting with a verb")),
 			gomcp.WithNumber("person_id", gomcp.Description("The person the line is about, so it needs no name")),

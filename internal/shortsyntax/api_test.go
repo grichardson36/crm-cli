@@ -111,14 +111,14 @@ func TestParseDuration(t *testing.T) {
 
 func TestNameSetMatchesLikePeople(t *testing.T) {
 	ns := NewNameSet([]string{"Sam Lee", "José García", "", "Bob"})
-	r := Parse("call +Jose Garcia now", Options{Now: testNow, Names: ns})
+	r := Parse("call @Jose Garcia now", Options{Now: testNow, Names: ns})
 	assert.Equal(t, []string{"Jose Garcia"}, r.People)
 	assert.Equal(t, "call now", r.Title)
 	// The prepared set is reusable and wins over People.
-	r = Parse("call +Sam Lee", Options{Now: testNow, Names: ns, People: []string{"Other Person"}})
+	r = Parse("call @Sam Lee", Options{Now: testNow, Names: ns, People: []string{"Other Person"}})
 	assert.Equal(t, []string{"Sam Lee"}, r.People)
 	// An empty set does nothing.
-	r = Parse("call +Sam Lee", Options{Now: testNow, Names: NewNameSet(nil)})
+	r = Parse("call @Sam Lee", Options{Now: testNow, Names: NewNameSet(nil)})
 	assert.Equal(t, []string{"Sam"}, r.People)
 	assert.Equal(t, "call Lee", r.Title)
 }

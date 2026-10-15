@@ -48,7 +48,7 @@ var commandMeta = map[string]cmdMeta{
 	"person add": {mutates: true, noDryRun: true, fields: personFields, examples: []string{
 		`crm person add "Jane Smith" --email jane@example.com --company "Acme Corp" -f json`,
 		`crm person add "Bob Jones" --keep-in-touch "1 mon" --birthday 1985-03-14 --dry-run`,
-		`crm person add "Sam Lee #friend *3m ^high" --dry-run`}},
+		`crm person add "Sam Lee #friend every 3m !high" --dry-run`}},
 	"person list": {fields: personFields, examples: []string{
 		`crm person list -f json`, `crm person list --tag vip --limit 10 -f json`}},
 	"person show": {fields: personFields, examples: []string{`crm person show 1 -f json`}},
@@ -104,11 +104,11 @@ var commandMeta = map[string]cmdMeta{
 	"task add": {mutates: true, noDryRun: true, fields: taskFields, examples: []string{
 		`crm task add "Send proposal" --person 1 --due 2026-11-01 --priority high`,
 		`crm task add "Call back" --person 1 --due 2026-11-01 --recurrence "7 days"`,
-		`crm task add "Call back #work @fri 3pm ~30m ^high +Jane" --dry-run`,
+		`crm task add "Call back #work fri 3pm for 30m !high @Jane" --dry-run`,
 		`crm task add "Write report" --duration 2h --deadline 2026-11-06 --auto-schedule`}},
 	"do": {mutates: true, noDryRun: true, fields: "input,verb,dry_run,applied,preview,subject,links,changes,warnings,problems,needs_confirm,syntax", examples: []string{
-		`crm do "n Jane called about the deal #deal @fri" --dry-run`,
-		`crm do "t Jane send the contract @mon ^high"`,
+		`crm do "n Jane called about the deal #deal remind fri" --dry-run`,
+		`crm do "t Jane send the contract by mon !high"`,
 		`crm do "set Jane: company=Acme title=CTO" --dry-run -f json`,
 		`crm do "tag note" --person 1`}},
 	"task list":   {fields: taskFields, examples: []string{`crm task list -f json`, `crm task list --overdue -f json`, `crm task list --tag work -f json`}},
@@ -167,7 +167,7 @@ var commandMeta = map[string]cmdMeta{
 	"log message": {mutates: true, fields: logFields, target: "person", targetArgs: "all", examples: []string{`crm log message 1 --content "Sent the deck on WhatsApp"`}},
 	"log add": {mutates: true, noDryRun: true, fields: logFields, target: "person", targetArgs: "first", examples: []string{
 		`crm log add --type call 1 "Talked about the offsite"`,
-		`crm log add --type call 1 "Talked about the offsite #trip @yesterday" --dry-run`}},
+		`crm log add --type call 1 "Talked about the offsite #trip yesterday" --dry-run`}},
 	"log types": {fields: "id,uuid,name,counts_as_contact,archived,created_at,updated_at", examples: []string{
 		`crm log types -f json`, `crm log types --all -f json`}},
 	"log types add": {mutates: true, fields: "id,uuid,name,counts_as_contact,archived", examples: []string{`crm log types add standup --counts-as-contact=false`}},

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -102,15 +103,17 @@ func datePartial(d dateVal) partial {
 	return partial{hasDate: true, y: d.y, m: d.m, d: d.d}
 }
 
-// parseWhen reads a date, a time, or a date with a time out of lower-case words.
-func parseWhen(w []string, now time.Time) (partial, bool) {
+// parseWhen reads a date, a time, or a date with a time out of lower-case words. strict is for
+// plain words in a sentence: it leaves out the forms that are common in ordinary text (now, 1/2,
+// a bare 2w, the short names tod and tom).
+func parseWhen(w []string, now time.Time, strict bool) (partial, bool) {
 	if len(w) == 0 {
 		return partial{}, false
 	}
-	if p, ok := parseRelativeTime(w, now); ok {
+	if p, ok := parseRelativeTime(w, now, strict); ok {
 		return p, true
 	}
-	if d, ok := matchDate(w, now); ok {
+	if d, ok := matchDate(w, now, strict); ok {
 		return datePartial(d), true
 	}
 	if c, ok := matchClock(w); ok {
@@ -121,7 +124,7 @@ func parseWhen(w []string, now time.Time) (partial, bool) {
 		if b[0] == "at" && len(b) > 1 {
 			b = b[1:]
 		}
-		if d, ok := matchDate(a, now); ok {
+		if d, ok := matchDate(a, now, strict); ok {
 			if c, ok := matchClock(b); ok {
 				p := datePartial(d)
 				p.hasTime, p.hh, p.mm = true, c.h, c.m
@@ -129,7 +132,7 @@ func parseWhen(w []string, now time.Time) (partial, bool) {
 			}
 		}
 		if c, ok := matchClock(a); ok {
-			if d, ok := matchDate(b, now); ok {
+			if d, ok := matchDate(b, now, strict); ok {
 				p := datePartial(d)
 				p.hasTime, p.hh, p.mm = true, c.h, c.m
 				return p, true
@@ -140,11 +143,17 @@ func parseWhen(w []string, now time.Time) (partial, bool) {
 }
 
 // parseRelativeTime reads now, +2h, in 2h, in 30 min, in 2 hours.
-func parseRelativeTime(w []string, now time.Time) (partial, bool) {
+func parseRelativeTime(w []string, now time.Time, strict bool) (partial, bool) {
 	var d time.Duration
 	switch {
 	case len(w) == 1 && w[0] == "now":
+		if strict {
+			return partial{}, false
+		}
 	case len(w) == 1:
+		if strict && !strings.HasPrefix(w[0], "+") {
+			return partial{}, false
+		}
 		m := relTimeRe.FindStringSubmatch(w[0])
 		if m == nil {
 			return partial{}, false
@@ -183,12 +192,12 @@ func relDuration(n int, unit string) time.Duration {
 	return time.Duration(n) * time.Minute
 }
 
-func matchDate(w []string, now time.Time) (dateVal, bool) {
+func matchDate(w []string, now time.Time, strict bool) (dateVal, bool) {
 	loc := now.Location()
 	today := dateOf(now)
 	switch len(w) {
 	case 1:
-		return matchDate1(w[0], now)
+		return matchDate1(w[0], now, strict)
 	case 2:
 		a, b := w[0], w[1]
 		switch a {
@@ -287,9 +296,12 @@ func offsetDate(today dateVal, n int, unit byte, loc *time.Location) dateVal {
 	return dateVal{}
 }
 
-func matchDate1(s string, now time.Time) (dateVal, bool) {
+func matchDate1(s string, now time.Time, strict bool) (dateVal, bool) {
 	loc := now.Location()
 	today := dateOf(now)
+	if strict && (s == "tod" || s == "tom" || s == "tomorow") {
+		return dateVal{}, false
+	}
 	switch s {
 	case "today", "tod":
 		return today, true
@@ -319,7 +331,7 @@ func matchDate1(s string, now time.Time) (dateVal, bool) {
 		dv := dateVal{y, mo, d}
 		return dv, dv.valid()
 	}
-	if m := mdRe.FindStringSubmatch(s); m != nil {
+	if m := mdRe.FindStringSubmatch(s); m != nil && !strict {
 		mo, _ := strconv.Atoi(m[1])
 		d, _ := strconv.Atoi(m[2])
 		if mo < 1 || mo > 12 || d < 1 || d > 31 {
@@ -328,7 +340,7 @@ func matchDate1(s string, now time.Time) (dateVal, bool) {
 		dv := yearlessDate(mo, d, today)
 		return dv, dv.y != 0
 	}
-	if m := offsetRe.FindStringSubmatch(s); m != nil {
+	if m := offsetRe.FindStringSubmatch(s); m != nil && (!strict || strings.HasPrefix(s, "+")) {
 		n, _ := strconv.Atoi(m[1])
 		if n == 0 {
 			return dateVal{}, false

@@ -138,6 +138,7 @@ func (m *Model) syncCmd() {
 		return
 	}
 	env := m.quickEnv()
+	env.Dismissed = o.dismissed
 	plan := quick.Parse(val, env)
 	comp := quick.Complete(val, o.byteCursor(), env)
 	if o.cmd == nil {
@@ -200,6 +201,8 @@ func (m *Model) cmdKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	case "shift+tab":
 		m.cmdTab(-1)
 		return m, nil, true
+	case "alt+d":
+		return m, m.dismissChip(), true
 	case "up", "ctrl+p":
 		c.sel = max(0, c.sel-1)
 		return m, nil, true
@@ -282,7 +285,7 @@ func (m *Model) cmdRun() tea.Cmd {
 func (m *Model) toggleSyntax() {
 	m.noSyntax = !m.noSyntax
 	if m.noSyntax {
-		m.setStatus("short syntax off: #, @, !, ~, *, + and ^ stay plain text", false)
+		m.setStatus("short syntax off: #, @, !, ~, by, remind, every and dates stay plain text", false)
 	} else {
 		m.setStatus("short syntax on", false)
 	}
@@ -335,9 +338,10 @@ func (m *Model) normalizeDue(raw string) string {
 	if raw == "" || m.noSyntax {
 		return raw
 	}
-	res := shortsyntax.Parse("@"+raw, shortsyntax.Options{Now: m.now()})
-	if res.Due != nil && res.Title == "" {
-		return res.Due.String()
+	// "by <date>" takes every date form, so the text after the pipe may be fri, 2w or 2026-12-01.
+	res := shortsyntax.Parse("by "+raw, shortsyntax.Options{Now: m.now()})
+	if res.Deadline != nil && res.Title == "" {
+		return res.Deadline.String()
 	}
 	return raw
 }
@@ -448,7 +452,7 @@ func (m *Model) cmdView() string {
 		rest = append(rest, cut.Render(m.st.Dim.Render("  note: "+w)))
 	}
 	if len(rest) == 0 {
-		rest = append(rest, cut.Render(m.st.Dim.Render("  verbs: n note, t task, log, set, tag, snooze   tokens: #tag @date !deadline ~30m *3m +Name ^high")))
+		rest = append(rest, cut.Render(m.st.Dim.Render("  verbs: n note, t task, log, set, tag, snooze   tokens: #tag @Name !high ~30m by fri remind fri every 3m")))
 	}
 	if len(rest) > room {
 		rest = rest[:room]
@@ -463,3 +467,33 @@ func orNone(s string) string {
 	}
 	return s
 }
+
+// dismissChip turns the highlighted chip under (or just before) the cursor back into plain text.
+// Parsing then leaves that text alone, so a word like "sat" in a sentence is not a date.
+func (m *Model) dismissChip() tea.Cmd {
+	o := m.ov
+	val := o.filter.Value()
+	cur := o.byteCursor()
+	best := -1
+	for i, mk := range o.cmd.plan.Marks {
+		switch mk.Kind {
+		case "verb", "subject", "field", "escape":
+			continue
+		}
+		if mk.Start <= cur && cur <= mk.End {
+			best = i
+			break
+		}
+		if mk.End <= cur {
+			best = i
+		}
+	}
+	if best < 0 {
+		return m.showToast("No chip to turn back into text here", true)
+	}
+	mk := o.cmd.plan.Marks[best]
+	text := val[mk.Start:mk.End]
+	o.dismissed = append(o.dismissed, text)
+	m.syncCmd()
+	return m.showToast("Kept as plain text: "+text, false)
+}

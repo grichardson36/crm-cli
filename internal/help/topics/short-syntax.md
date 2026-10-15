@@ -1,38 +1,38 @@
 # Short syntax
 
-Type meaning inline: tags, dates, people and more inside the text. The CLI, the TUI command bar and agents read it the same way.
+Type meaning inline. A symbol marks a named thing, plain English marks time. The CLI, the TUI command bar and agents read it the same way.
 
 ## Tokens
 
-A token starts a word and counts only when it parses, so `jane@example.com`, `+1 555 0100` and `#42` stay plain text. A backslash keeps a token as text: `\#42`.
+A token counts only when it parses, so `jane@example.com`, `#42` and `every time` stay text. A backslash (`\#42`) or "double quotes" keep text as typed.
 
-| Token | Sets | Examples |
-|---|---|---|
-| `#tag` | tag, unknown tags are created | `#deal` |
-| `@date` | due date or time | `@fri`, `@tomorrow 3pm`, `@next week`, `@+2w`, `@mar 4`, `@15:00` |
-| `!date` | deadline | `!mon`, `!2026-12-31` |
-| `~30m` | duration | `~30m`, `~1h30m` |
-| `*3m` | keep-in-touch cadence | `*1w *2w *6w *1m *3m *6m *1y *never` |
-| `+Name` | link a person | `+Sam`, `+Sam_Lee` |
-| `^high` | priority | `^top ^high ^medium ^low` |
+| You type | Sets |
+|---|---|
+| `#deal` | tag, unknown tags are created |
+| `@Sam`, `@Sam_Lee` | link a person (several matches or none: you choose) |
+| `fri 3pm`, `tomorrow`, `next week`, `in 2 weeks`, `mar 4` | due date or time (tasks, logs, events) |
+| `by fri` | deadline |
+| `remind fri` | reminder date in a note, where bare dates are not read |
+| `~30m`, `for 2 hours` | duration |
+| `!high`, `!!!` (`!!` is medium) | priority |
+| `every 3m`, `every 2 weeks`, `every fri` | repeat. A cadence crm knows (1w 2w 6w 1m 3m 6m 1y) also sets keep in touch |
+| `at Cafe Rio` | place (events) |
+
+A time with no date means today, or tomorrow when it has passed. `sat` or `mon` alone is a day only with a helper (`on sat`, `sat 3pm`).
 
 ## Where it works
 
 ```sh crm-example
-crm do "n Jane called about the deal #deal @fri" --dry-run
+crm do "n Jane called about the deal #deal remind fri" --dry-run
+crm do "t Jane send the contract fri 3pm by mon !high"
 crm do "set Jane: company=Acme title=CTO"
-crm task add "Call back @fri 3pm ~30m +Jane" --dry-run
-crm log add --type call 1 "Talked about the offsite #trip @yesterday" --dry-run
+crm task add "Call back fri 3pm for 30m @Jane" --dry-run
+crm person add "Sam Lee #friend every 3m" --dry-run
+crm log add --type call 1 "Talked about the offsite #trip yesterday" --dry-run
 ```
 
-`crm do` verbs: `n`/`note`, `t`/`task`, `log <type>`, `set`, `tag`, `snooze`. A name after the verb picks the person. `--person ID` names them instead. A name that matches nobody or several people is an error that lists the candidates.
+`crm do` verbs: `n`, `t`, `log <type>`, `set`, `tag`, `snooze`. A name after the verb picks the person, or use `--person ID`. Flags win over tokens. `--dry-run` shows what was read, `--no-syntax` turns it off.
 
-In `n`, `#tag` tags the note, `+Name` links more people, `@date` creates a reminder and `*3m` sets the cadence. In `log`, `@date` is when it happened.
+In the TUI, `ctrl+k` then `n Sam called #deal remind fri` previews the note. `tab` completes, `enter` runs, `alt+d` turns the chip at the cursor back into text, `ctrl+z` undoes.
 
-Flags win over tokens. `--dry-run` shows what was read. `--no-syntax` turns it off. Tasks cannot carry tags yet, so `#tag` stays in a task title.
-
-## In the TUI
-
-`ctrl+k` opens the command bar. Type `n Sam called #deal @fri` and a preview line shows what will happen. `tab` completes verbs, names, tags, dates and cadences. `enter` runs it. A `set` with two or more fields shows old and new values and waits for another `enter`. `ctrl+z` undoes and `ctrl+y` redoes (session only). With a person selected no name is needed. The note and task prompts (`n`, `t`) read the same tokens. In the People search, `#friend ^high *3m` filter the list. The palette action "Toggle short syntax" turns all of it off.
-
-See also: tasks, notes, tags, tui, agents.
+See also: tasks, notes, tags, tui, keys, agents.

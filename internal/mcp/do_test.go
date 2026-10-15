@@ -20,7 +20,7 @@ func TestDoToolNoteDryRunThenApply(t *testing.T) {
 	callJSON(t, s, "crm_person_create", map[string]any{"first_name": "Sam", "last_name": "Ng"}, &sam2)
 
 	var out map[string]any
-	callJSON(t, s, "crm_do", map[string]any{"text": "n Bob called about the deal #deal @2026-12-25", "dry_run": true}, &out)
+	callJSON(t, s, "crm_do", map[string]any{"text": "n Bob called about the deal #deal remind 2026-12-25", "dry_run": true}, &out)
 	assert.Equal(t, true, out["dry_run"])
 	assert.Equal(t, false, out["applied"])
 	assert.Equal(t, "Bob Baker", out["subject"].(map[string]any)["name"])
@@ -29,7 +29,7 @@ func TestDoToolNoteDryRunThenApply(t *testing.T) {
 	callJSON(t, s, "crm_interaction_list", map[string]any{}, &list)
 	assert.Empty(t, list, "dry run writes nothing")
 
-	callJSON(t, s, "crm_do", map[string]any{"text": "n Bob called about the deal #deal @2026-12-25"}, &out)
+	callJSON(t, s, "crm_do", map[string]any{"text": "n Bob called about the deal #deal remind 2026-12-25"}, &out)
 	assert.Equal(t, true, out["applied"])
 	callJSON(t, s, "crm_interaction_list", map[string]any{}, &list)
 	require.Len(t, list, 1)
@@ -75,20 +75,20 @@ func TestDoToolErrors(t *testing.T) {
 
 	// A task needs no person, and no_syntax keeps tokens as text.
 	var out map[string]any
-	callJSON(t, s, "crm_do", map[string]any{"text": "t buy milk @2026-12-25 ^high"}, &out)
+	callJSON(t, s, "crm_do", map[string]any{"text": "t buy milk 2026-12-25 !high"}, &out)
 	assert.Equal(t, true, out["applied"])
 	var tasks []map[string]any
 	callJSON(t, s, "crm_task_list", map[string]any{}, &tasks)
 	require.Len(t, tasks, 1)
 	assert.Equal(t, "buy milk", tasks[0]["title"])
 	assert.Equal(t, "high", tasks[0]["priority"])
-	callJSON(t, s, "crm_do", map[string]any{"text": "t keep @fri literal", "no_syntax": true}, &out)
+	callJSON(t, s, "crm_do", map[string]any{"text": "t keep fri literal", "no_syntax": true}, &out)
 	callJSON(t, s, "crm_task_list", map[string]any{}, &tasks)
 	titles := []string{}
 	for _, tk := range tasks {
 		titles = append(titles, tk["title"].(string))
 	}
-	assert.Contains(t, titles, "keep @fri literal")
+	assert.Contains(t, titles, "keep fri literal")
 }
 
 func TestTaskTagsThroughMCP(t *testing.T) {

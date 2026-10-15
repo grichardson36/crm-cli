@@ -1,23 +1,26 @@
-// Package shortsyntax parses inline short syntax out of free text: tags, dates, durations,
-// cadences, people, priorities and two phrases. It is a pure function of the text, the options
-// and a clock the caller injects, so the CLI, the MCP server, the TUI and agents read the same
-// text the same way.
+// Package shortsyntax parses inline short syntax out of free text: tags, people, dates,
+// deadlines, durations, priorities, repeats and places. It is a pure function of the text, the
+// options and a clock the caller injects, so the CLI, the MCP server, the TUI and agents read the
+// same text the same way.
 //
-// Tokens (each starts a word, or follows an opening bracket or quote):
+// The syntax follows what quick-add boxes in other tools do: a symbol for a named thing, plain
+// English for time.
 //
-//	#tag          tag. Must start with a letter. Unknown tags are flagged "new" when KnownTags is set.
-//	@date @time   due date or time: @fri, @tomorrow 3pm, @next week, @+2w, @in 3 days, @15:00, @mar 4
-//	!date !time   deadline, same grammar as @
-//	~30m          duration: ~30m, ~1h, ~1.5h, ~1h30m
-//	*3m           keep-in-touch cadence: *1w *2w *1m *6w *3m *6m *1y *never *monthly
-//	+Name &Name   link a person: +Sam, +Sam_Lee, +"Sam Lee" (a known full name also matches +Sam Lee)
-//	^high         priority: ^top ^high ^medium ^low ^none (^1 to ^5)
-//	at <place>    location phrase (only when Options.Phrases is set)
-//	every ...     recurrence phrase kept as raw text (only when Options.Phrases is set)
-//	\#            a backslash before a sigil keeps the text literal
+//	#tag            tag. Must start with a letter. Unknown tags are flagged "new" when KnownTags is set.
+//	@Name           link a person: @Sam, @Sam_Lee, @"Sam Lee" (a known full name also matches @Sam Lee)
+//	!high !!  !!!   priority: !top !high !medium !low !none, !! is medium and !!! is high
+//	~30m  for 30m   duration: 30m, 1h, 1.5h, 1h30m
+//	by fri          deadline: any date below after the word by
+//	remind fri 3pm  due date or time, also inside notes (where bare dates are not read)
+//	fri 3pm         due date or time as plain words (only when Options.Dates is set):
+//	                today, tomorrow, fri, next week, in 2 weeks, mar 4, 2026-11-01, 3pm, 15:00, noon
+//	every 3m        repeat. every day, every fri, every 2 weeks stay as raw text. A cadence that
+//	                crm knows (every 1w, 2w, 6w, 1m, 3m, 6m, 1y) also sets the keep-in-touch cadence
+//	at Place        location (only when Options.Phrases is set)
+//	\#              a backslash before a sigil keeps the text literal. Text in "double quotes" is not read.
 //
-// A token counts as syntax only when it parses validly. "a@b.com", "+1 555 0100", "#42" and
-// "~5 items" are plain text. Whatever is recognized is removed from the title.
+// A token counts as syntax only when it parses validly. "a@b.com", "#42", "~5 items" and
+// "every time" are plain text. Whatever is recognized is removed from the title.
 package shortsyntax
 
 import (
@@ -86,13 +89,14 @@ type Result struct {
 	Due         *When    `json:"due,omitempty"`
 	Deadline    *When    `json:"deadline,omitempty"`
 	DurationMin int      `json:"duration_min,omitempty"`
-	// Cadence is a keep-in-touch cadence from model.KeepInTouchCadences.
+	// Cadence is a keep-in-touch cadence from model.KeepInTouchCadences, read from "every 3m".
 	Cadence string `json:"cadence,omitempty"`
-	// People are the names after + or &, as typed (underscores become spaces).
+	// People are the names after @, as typed (underscores become spaces).
 	People []string `json:"people,omitempty"`
 	// Priority is top, high, medium, low or none.
-	Priority   string `json:"priority,omitempty"`
-	Location   string `json:"location,omitempty"`
+	Priority string `json:"priority,omitempty"`
+	Location string `json:"location,omitempty"`
+	// Recurrence is the raw "every ..." phrase, lower case: "every fri", "every 2 weeks".
 	Recurrence string `json:"recurrence,omitempty"`
 	Spans      []Span `json:"spans,omitempty"`
 }
@@ -137,23 +141,28 @@ func (r Result) TaskPriority() string {
 	return ""
 }
 
-// Options control a parse. The zero value parses everything except the two phrases.
+// Options control a parse. The zero value reads tags, people, priorities, durations, "by", "remind",
+// "for" and "every". Plain-word dates and "at <place>" are opt-in.
 type Options struct {
 	// Now is the clock for relative dates. The zero value means time.Now().
 	Now time.Time
 	// Disabled turns the syntax off: the title is the input and nothing is recognized.
 	Disabled bool
-	// Phrases enables "at <place>" and "every ...". Ordinary sentences contain those words, so the
-	// default is off. Calendar commands turn it on.
+	// Dates reads dates and times written as plain words (fri, tomorrow 3pm, next week). Ordinary
+	// sentences contain such words, so notes leave this off and use "remind fri" instead.
+	Dates bool
+	// Phrases enables "at <place>".
 	Phrases bool
 	// KnownTags, when not nil, flags tags outside the list as new. Matching ignores case.
 	KnownTags []string
-	// People are known full names. They let "+Sam Lee" match two words.
+	// People are known full names. They let "@Sam Lee" match two words.
 	People []string
 	// Names is People already prepared by NewNameSet. Build it once when the list is long; it wins over People.
 	Names *NameSet
 	// Skip lists token kinds to leave as plain text.
 	Skip []Kind
+	// Dismiss lists token texts the user turned back into plain text (matched ignoring case).
+	Dismiss []string
 }
 
 // Parse reads the short syntax in text.
@@ -162,9 +171,40 @@ func Parse(text string, opts Options) Result {
 	if opts.Disabled || text == "" {
 		return res
 	}
-	p := newParser(text, opts)
-	p.run()
-	return p.finish()
+	var skipAt []rng
+	for round := 0; round < 4; round++ {
+		p := newParser(text, opts)
+		p.skipAt = skipAt
+		p.run()
+		res = p.finish()
+		if len(opts.Dismiss) == 0 {
+			return res
+		}
+		dismissed := map[string]bool{}
+		for _, d := range opts.Dismiss {
+			dismissed[strings.ToLower(strings.TrimSpace(d))] = true
+		}
+		again := false
+		for _, sp := range res.Spans {
+			if sp.Kind == KindEscape || !dismissed[strings.ToLower(sp.Text)] {
+				continue
+			}
+			seen := false
+			for _, r := range skipAt {
+				if r.a == sp.Start {
+					seen = true
+				}
+			}
+			if !seen {
+				skipAt = append(skipAt, rng{sp.Start, sp.End})
+				again = true
+			}
+		}
+		if !again {
+			return res
+		}
+	}
+	return res
 }
 
 type rng struct{ a, b int }
@@ -175,11 +215,13 @@ type word struct {
 }
 
 type parser struct {
-	text  string
-	words []word
-	opts  Options
-	now   time.Time
-	skip  map[Kind]bool
+	text   string
+	words  []word
+	quoted []bool
+	opts   Options
+	now    time.Time
+	skip   map[Kind]bool
+	skipAt []rng
 
 	known    map[string]bool
 	flagNew  bool
@@ -222,7 +264,37 @@ func newParser(text string, opts Options) *parser {
 	}
 	p.res = Result{Input: text}
 	p.words = splitWords(text)
+	p.quoted = markQuoted(p.words)
 	return p
+}
+
+// markQuoted flags the words inside "double quotes". They are plain text. An opening quote with
+// no closing quote does not count. A quote right after @ belongs to a name: @"Sam Lee".
+func markQuoted(ws []word) []bool {
+	q := make([]bool, len(ws))
+	open := -1
+	for i, w := range ws {
+		t := w.text
+		if open < 0 {
+			j := leadLen(t)
+			if j < len(t) && t[j] == '"' {
+				rest := t[j+1:]
+				if strings.Contains(rest, `"`) {
+					q[i] = true // "one word"
+				} else {
+					open = i
+				}
+			}
+			continue
+		}
+		if strings.Contains(t, `"`) {
+			for k := open; k <= i; k++ {
+				q[k] = true
+			}
+			open = -1
+		}
+	}
+	return q
 }
 
 func splitWords(s string) []word {
@@ -256,24 +328,32 @@ func (p *parser) run() {
 	}
 }
 
-// leadLen is the number of bytes of opening brackets and quotes at the start of a word.
+// leadLen is the number of bytes of opening brackets and single quotes at the start of a word.
 func leadLen(s string) int {
 	n := 0
-	for n < len(s) && strings.IndexByte("([{\"'", s[n]) >= 0 {
+	for n < len(s) && strings.IndexByte("([{'", s[n]) >= 0 {
 		n++
 	}
 	return n
 }
 
-func isSigil(c byte) bool { return strings.IndexByte("#@!~*+&^", c) >= 0 }
+func isSigil(c byte) bool { return strings.IndexByte("#@!~", c) >= 0 }
 
 // token tries to read a token at word i and returns how many words it used (0 for none).
 func (p *parser) token(i int) int {
+	if p.quoted[i] {
+		return 0
+	}
 	w := p.words[i]
 	lead := leadLen(w.text)
 	s := w.text[lead:]
 	if s == "" {
 		return 0
+	}
+	for _, r := range p.skipAt {
+		if at := w.start + lead; at >= r.a && at < r.b {
+			return 0
+		}
 	}
 	if s[0] == '\\' && len(s) > 1 && isSigil(s[1]) {
 		at := w.start + lead
@@ -285,24 +365,163 @@ func (p *parser) token(i int) int {
 	case '#':
 		return p.tag(i, lead)
 	case '@':
-		return p.when(i, lead, KindDue)
+		return p.person(i, lead)
 	case '!':
-		return p.when(i, lead, KindDeadline)
+		return p.priority(i, lead)
 	case '~':
 		return p.duration(i, lead)
-	case '*':
-		return p.cadence(i, lead)
-	case '^':
-		return p.priority(i, lead)
-	case '+', '&':
-		return p.person(i, lead)
 	}
-	if p.opts.Phrases {
-		switch strings.ToLower(s) {
-		case "at":
-			return p.location(i)
+	return p.keyword(i, lead)
+}
+
+// keyword reads the English tokens: by, remind, for, every, at, on and plain dates.
+func (p *parser) keyword(i, lead int) int {
+	w := p.words[i]
+	s := w.text[lead:]
+	core, tail := trimTrail(s)
+	low := strings.ToLower(core)
+	if tail == 0 {
+		switch low {
+		case "by":
+			return p.dateWord(i, lead, i+1, KindDeadline)
+		case "remind":
+			j := i + 1
+			if j < len(p.words) && strings.EqualFold(p.words[j].text, "me") {
+				j++
+			}
+			return p.dateWord(i, lead, j, KindDue)
+		case "for":
+			return p.forDuration(i, lead)
 		case "every":
 			return p.recurrence(i)
+		case "at", "on":
+			if p.opts.Dates {
+				if n := p.dateWord(i, lead, i+1, KindDue, true); n > 0 {
+					return n
+				}
+			}
+			if low == "at" && p.opts.Phrases {
+				return p.location(i)
+			}
+			return 0
+		}
+	}
+	if p.opts.Dates && p.plainDateOK(i, core, low) {
+		return p.dateWord(i, lead, i, KindDue, true)
+	}
+	return 0
+}
+
+// dayAbbrev are short day names that are also names or words. As plain dates they must be typed in
+// lower case, unless they start the text.
+var dayAbbrev = map[string]bool{"mon": true, "tue": true, "tues": true, "wed": true, "weds": true,
+	"thu": true, "thur": true, "thurs": true, "fri": true, "sat": true, "sun": true}
+
+// ambiguousDay are day names that are also ordinary words (I sat down, the sun, Mon Mothma). They
+// count as a date only when a date word comes with them: on sat, next sun, sat 3pm, or when the
+// whole text is that one word.
+var ambiguousDay = map[string]bool{"sat": true, "sun": true, "mon": true, "wed": true}
+
+func (p *parser) plainDateOK(i int, orig, low string) bool {
+	if p.skip[KindDue] {
+		return false
+	}
+	if dayAbbrev[low] && i > 0 && orig != low {
+		return false
+	}
+	if ambiguousDay[low] && len(p.words) > 1 {
+		if _, n, _, ok := p.dateAt(i, true); !ok || n < 2 {
+			return false
+		}
+	}
+	return true
+}
+
+// dateWord reads a date expression that starts at word j, for the token that starts at word i. The
+// token's span runs from word i to the end of the expression. strict is set for plain words,
+// which accept fewer forms than the ones after by or remind.
+func (p *parser) dateWord(i, lead, j int, kind Kind, strictArg ...bool) int {
+	if p.skip[kind] || j >= len(p.words) {
+		return 0
+	}
+	strict := len(strictArg) > 0 && strictArg[0]
+	slot := &p.due
+	if kind == KindDeadline {
+		slot = &p.deadline
+	}
+	part, n, end, ok := p.dateAt(j, strict)
+	if !ok {
+		return 0
+	}
+	merged, ok := mergePartial(*slot, part)
+	if !ok {
+		return 0
+	}
+	*slot = &merged
+	p.add(kind, p.words[i].start+lead, end, "")
+	return (j - i) + n
+}
+
+// dateAt finds the longest date or time expression that starts at word j (five words at most).
+// It returns the value, the number of words, and the byte offset where it ends.
+func (p *parser) dateAt(j int, strict bool) (partial, int, int, bool) {
+	avail := min(5, len(p.words)-j)
+	for n := avail; n >= 1; n-- {
+		words := make([]string, n)
+		quotedAny := false
+		for k := 0; k < n; k++ {
+			if p.quoted[j+k] {
+				quotedAny = true
+			}
+			t := p.words[j+k].text
+			if k == 0 {
+				t = t[leadLen(t):]
+			}
+			if k < n-1 {
+				t = strings.TrimSuffix(t, ",")
+			}
+			words[k] = t
+		}
+		if quotedAny {
+			continue
+		}
+		last, tail := trimTrail(words[n-1])
+		if last == "" {
+			continue
+		}
+		words[n-1] = last
+		for k := range words {
+			words[k] = strings.ToLower(words[k])
+		}
+		part, ok := parseWhen(words, p.now, strict)
+		if !ok {
+			continue
+		}
+		return part, n, p.words[j+n-1].end - tail, true
+	}
+	return partial{}, 0, 0, false
+}
+
+// forDuration reads "for 30m", "for 1h30m", "for 2 hours" and "for 45 min".
+func (p *parser) forDuration(i, lead int) int {
+	if p.skip[KindDuration] || p.res.DurationMin != 0 || i+1 >= len(p.words) || p.quoted[i+1] {
+		return 0
+	}
+	first, tail1 := trimTrail(p.words[i+1].text)
+	if first == "" || first[0] < '0' || first[0] > '9' {
+		return 0
+	}
+	if min, ok := parseDuration(strings.ToLower(first)); ok {
+		p.res.DurationMin = min
+		p.add(KindDuration, p.words[i].start+lead, p.words[i+1].end-tail1, formatMinutes(min))
+		return 2
+	}
+	if tail1 == 0 && i+2 < len(p.words) && !p.quoted[i+2] {
+		second, tail2 := trimTrail(p.words[i+2].text)
+		if min, ok := parseDuration(strings.ToLower(first + second)); ok {
+			p.res.DurationMin = min
+			p.add(KindDuration, p.words[i].start+lead, p.words[i+2].end-tail2, formatMinutes(min))
+			return 3
 		}
 	}
 	return 0
@@ -382,83 +601,35 @@ func (p *parser) duration(i, lead int) int {
 	return 1
 }
 
-func (p *parser) cadence(i, lead int) int {
-	if p.skip[KindCadence] || p.res.Cadence != "" {
-		return 0
-	}
-	w := p.words[i]
-	core, tail := trimTrail(w.text[lead+1:])
-	c, ok := parseCadence(strings.ToLower(core))
-	if !ok {
-		return 0
-	}
-	p.res.Cadence = c
-	p.add(KindCadence, w.start+lead, w.end-tail, c)
-	return 1
-}
-
+// priority reads !high, !top, !medium, !low, !none, !1 to !5, and the bare marks !! (medium) and !!! (high).
 func (p *parser) priority(i, lead int) int {
 	if p.skip[KindPriority] || p.res.Priority != "" {
 		return 0
 	}
 	w := p.words[i]
-	core, tail := trimTrail(w.text[lead+1:])
-	pr, ok := parsePriority(strings.ToLower(core))
-	if !ok {
-		return 0
+	s := w.text[lead:]
+	var pr string
+	end := w.end
+	if strings.Trim(s, "!") == "" {
+		switch len(s) {
+		case 2:
+			pr = "medium"
+		case 3:
+			pr = "high"
+		default:
+			return 0
+		}
+	} else {
+		core, tail := trimTrail(s[1:])
+		v, ok := parsePriority(strings.ToLower(core))
+		if !ok {
+			return 0
+		}
+		pr, end = v, w.end-tail
 	}
 	p.res.Priority = pr
-	p.add(KindPriority, w.start+lead, w.end-tail, pr)
+	p.add(KindPriority, w.start+lead, end, pr)
 	return 1
-}
-
-// when reads @ and ! tokens. The expression may run over several words, so it tries the longest
-// run of words first and falls back to shorter ones.
-func (p *parser) when(i, lead int, kind Kind) int {
-	if p.skip[kind] {
-		return 0
-	}
-	slot := &p.due
-	if kind == KindDeadline {
-		slot = &p.deadline
-	}
-	const maxWords = 5
-	avail := min(maxWords, len(p.words)-i)
-	for n := avail; n >= 1; n-- {
-		words := make([]string, n)
-		for k := 0; k < n; k++ {
-			t := p.words[i+k].text
-			if k == 0 {
-				t = t[lead+1:]
-			}
-			if k < n-1 {
-				t = strings.TrimSuffix(t, ",")
-			}
-			words[k] = t
-		}
-		last, tail := trimTrail(words[n-1])
-		if last == "" {
-			continue
-		}
-		words[n-1] = last
-		for k := range words {
-			words[k] = strings.ToLower(words[k])
-		}
-		part, ok := parseWhen(words, p.now)
-		if !ok {
-			continue
-		}
-		merged, ok := mergePartial(*slot, part)
-		if !ok {
-			continue
-		}
-		*slot = &merged
-		start := p.words[i].start + lead
-		end := p.words[i+n-1].end - tail
-		p.add(kind, start, end, "")
-		return n
-	}
-	return 0
 }
 
 func (p *parser) person(i, lead int) int {
@@ -489,9 +660,6 @@ func (p *parser) person(i, lead int) int {
 		p.addPerson(start, end, name)
 		return n
 	}
-	if s[0] == '&' && strings.HasSuffix(rest, ";") {
-		return 0
-	}
 	core, tail := trimTrail(rest)
 	if core == "" || len(core) > 64 || !validNameToken(core) {
 		return 0
@@ -500,7 +668,7 @@ func (p *parser) person(i, lead int) int {
 	end := w.end - tail
 	used := 1
 	if p.people != nil && tail == 0 {
-		// Try a longer known full name: +Sam Lee.
+		// Try a longer known full name: @Sam Lee.
 		maxK := min(p.maxNames, len(p.words)-i)
 		for k := maxK; k >= 2; k-- {
 			parts := []string{name}
@@ -509,7 +677,7 @@ func (p *parser) person(i, lead int) int {
 			for m := 1; m < k; m++ {
 				nw := p.words[i+m]
 				c, t := trimTrail(nw.text)
-				if c == "" || !validNameToken(c) || (m < k-1 && t != 0) {
+				if c == "" || p.quoted[i+m] || !validNameToken(c) || (m < k-1 && t != 0) {
 					ok = false
 					break
 				}
@@ -568,7 +736,7 @@ func (p *parser) location(i int) int {
 	n := 1
 	end := p.words[i].end
 	for k := i + 1; k < len(p.words) && len(parts) < 5; k++ {
-		if p.isTokenAt(k) {
+		if p.quoted[k] || p.isTokenAt(k) {
 			break
 		}
 		w := p.words[k]
@@ -577,7 +745,7 @@ func (p *parser) location(i int) int {
 			break
 		}
 		if len(parts) == 0 {
-			if _, ok := parseWhen([]string{strings.ToLower(core)}, p.now); ok {
+			if _, ok := parseWhen([]string{strings.ToLower(core)}, p.now, false); ok {
 				return 0
 			}
 			if r, _ := utf8.DecodeRuneInString(core); !unicode.IsLetter(r) && !unicode.IsDigit(r) {
@@ -600,16 +768,11 @@ func (p *parser) location(i int) int {
 	return n
 }
 
-// isTokenAt reports whether word k starts a token. It parses on a scratch copy so nothing is recorded.
+// isTokenAt reports whether word k starts another token. It parses on a scratch copy so nothing is recorded.
 func (p *parser) isTokenAt(k int) bool {
-	w := p.words[k]
-	lead := leadLen(w.text)
-	s := w.text[lead:]
-	if s == "" || !isSigil(s[0]) {
-		return false
-	}
 	scratch := newParser(p.text, p.opts)
-	scratch.words = p.words
+	scratch.words, scratch.quoted = p.words, p.quoted
+	scratch.opts.Phrases = false // "at" inside a place is part of the place
 	return scratch.token(k) > 0
 }
 
@@ -622,9 +785,10 @@ var recurrenceWords = map[string]bool{
 	"sat": true, "saturday": true, "sun": true, "sunday": true,
 }
 
-// recurrence keeps "every ..." as raw text: every day, every weekday, every 2 weeks, every mon and wed.
+// recurrence reads "every ...": every day, every weekday, every 2 weeks, every mon and wed, every 3m.
+// The text is kept raw. When it names a keep-in-touch cadence (every 3m, every week) that is set too.
 func (p *parser) recurrence(i int) int {
-	if p.skip[KindRecurrence] || p.res.Recurrence != "" {
+	if p.res.Recurrence != "" || p.res.Cadence != "" {
 		return 0
 	}
 	parts := []string{"every"}
@@ -632,6 +796,9 @@ func (p *parser) recurrence(i int) int {
 	end := p.words[i].end
 	substantive := false
 	for k := i + 1; k < len(p.words) && n < 8; k++ {
+		if p.quoted[k] {
+			break
+		}
 		w := p.words[k]
 		core, tail := trimTrail(strings.ToLower(w.text))
 		if core == "" {
@@ -656,9 +823,44 @@ func (p *parser) recurrence(i int) int {
 		return 0
 	}
 	raw := strings.Join(parts, " ")
-	p.res.Recurrence = raw
-	p.add(KindRecurrence, p.words[i].start, end, raw)
+	cad := cadenceOfEvery(parts[1:])
+	start := p.words[i].start
+	switch {
+	case !p.skip[KindRecurrence]:
+		p.res.Recurrence = raw
+		if cad != "" && !p.skip[KindCadence] {
+			p.res.Cadence = cad
+		}
+		p.add(KindRecurrence, start, end, raw)
+	case cad != "" && !p.skip[KindCadence]:
+		p.res.Cadence = cad
+		p.add(KindCadence, start, end, cad)
+	default:
+		return 0
+	}
 	return n
+}
+
+// cadenceOfEvery maps the words after "every" to a keep-in-touch cadence, or "".
+func cadenceOfEvery(words []string) string {
+	joined := strings.Join(words, "")
+	switch joined {
+	case "day", "days", "weekday", "weekdays", "weekend", "weekends":
+		return ""
+	case "week":
+		joined = "1week"
+	case "month":
+		joined = "1month"
+	case "year":
+		joined = "1year"
+	case "otherweek":
+		joined = "2weeks"
+	}
+	c, ok := parseCadence(joined)
+	if !ok {
+		return ""
+	}
+	return c
 }
 
 func allDigits(s string) bool {
@@ -692,7 +894,6 @@ func (p *parser) finish() Result {
 			p.spans[i].Value = res.Deadline.String()
 		}
 	}
-	// The value of each when span is the final merged value, so a split "@fri @3pm" shows the same on both.
 	sort.SliceStable(p.spans, func(a, b int) bool { return p.spans[a].Start < p.spans[b].Start })
 	res.Spans = p.spans
 	res.Title = p.title()
@@ -736,7 +937,7 @@ func (p *parser) title() string {
 		b.WriteString(p.text[pos:])
 	}
 	out := strings.TrimSpace(b.String())
-	for _, empty := range []string{"()", "[]", "{}", `""`} {
+	for _, empty := range []string{"()", "[]", "{}"} {
 		out = strings.TrimSpace(strings.ReplaceAll(out, empty, ""))
 	}
 	return out

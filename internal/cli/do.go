@@ -27,7 +27,7 @@ func doCmd() *cobra.Command {
 		Short: "Run one line of text: note, task, log, set, tag or snooze",
 		Long: "Run one line of text, the same line the TUI command bar (ctrl+k) takes.\n" +
 			"Verbs: n or note, t or task, log <type>, set, tag, snooze. A name after the verb picks the person, or use --person.\n" +
-			"Short syntax inside the text: #tag @fri 3pm !deadline ~30m *3m +Name ^high. See 'crm help short-syntax'.\n" +
+			"Short syntax inside the text: #tag @Name !high ~30m for 30m by fri every 2 weeks remind fri, and in tasks and logs plain dates such as fri 3pm. See 'crm help short-syntax'.\n" +
 			"A name that matches several people, or none, is an error that lists the candidates.",
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

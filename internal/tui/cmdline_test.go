@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// In the tests the clock is Tuesday 2026-10-13 12:00 UTC, so @fri is Fri 16 Oct.
+// In the tests the clock is Tuesday 2026-10-13 12:00 UTC, so fri is Fri 16 Oct.
 
 func openBar(m *Model, line string) {
 	press(m, "ctrl+k")
@@ -29,7 +29,7 @@ func allNotes(t *testing.T, m *Model) []*model.Interaction {
 
 func TestCommandBarShowsALivePreviewAndRunsANote(t *testing.T) {
 	m, pr := newTestModel(t)
-	openBar(m, "n called about the deal #deal @fri")
+	openBar(m, "n called about the deal #deal remind fri")
 	require.Equal(t, modeOverlay, m.mode)
 	require.NotNil(t, m.ov.cmd, "a verb and a space switch the palette to a command line")
 	require.True(t, m.ov.cmd.plan.Ready())
@@ -39,7 +39,7 @@ func TestCommandBarShowsALivePreviewAndRunsANote(t *testing.T) {
 	assert.Contains(t, out, `note on Zed Adams: "called about the deal"`)
 	assert.Contains(t, out, "tag #deal (new)")
 	assert.Contains(t, out, "remind Fri 16 Oct")
-	assert.Contains(t, out, "n called about the deal #deal @fri", "the typed line is echoed")
+	assert.Contains(t, out, "n called about the deal #deal remind fri", "the typed line is echoed")
 
 	press(m, "enter")
 	assert.Equal(t, modeNormal, m.mode)
@@ -60,7 +60,7 @@ func TestCommandBarShowsALivePreviewAndRunsANote(t *testing.T) {
 
 func TestCommandBarMarksChips(t *testing.T) {
 	m, _ := newTestModel(t)
-	openBar(m, "n hello #friend #brandnew @fri")
+	openBar(m, "n hello #friend #brandnew remind fri")
 	marks := m.ov.cmd.plan.Marks
 	var kinds []string
 	for _, mk := range marks {
@@ -158,26 +158,26 @@ func TestCommandBarTabCompletesVerbsNamesTagsDatesAndCadences(t *testing.T) {
 
 	// Date presets cycle with repeated tab.
 	press(m, "ctrl+u")
-	typeText(m, "n Bob hi @t")
-	assert.Equal(t, []string{"@today", "@tomorrow", "@tue", "@thu"}, m.ov.cmd.comp.Candidates)
+	typeText(m, "n Bob hi by t")
+	assert.Equal(t, []string{"today", "tomorrow", "tue", "thu"}, m.ov.cmd.comp.Candidates)
 	press(m, "tab")
-	assert.Equal(t, "n Bob hi @today", m.ov.filter.Value())
+	assert.Equal(t, "n Bob hi by today", m.ov.filter.Value())
 	press(m, "tab")
-	assert.Equal(t, "n Bob hi @tomorrow", m.ov.filter.Value())
+	assert.Equal(t, "n Bob hi by tomorrow", m.ov.filter.Value())
 	press(m, "shift+tab")
-	assert.Equal(t, "n Bob hi @today", m.ov.filter.Value())
+	assert.Equal(t, "n Bob hi by today", m.ov.filter.Value())
 
 	// Cadence.
 	press(m, "ctrl+u")
-	typeText(m, "n Bob hi *3")
+	typeText(m, "n Bob hi every 3")
 	press(m, "tab")
-	assert.Equal(t, "n Bob hi *3m", m.ov.filter.Value())
+	assert.Equal(t, "n Bob hi every 3m", m.ov.filter.Value())
 
 	// Up and down choose which candidate tab inserts.
 	press(m, "ctrl+u")
-	typeText(m, "t Bob hi ^")
+	typeText(m, "t Bob hi !")
 	press(m, "down", "tab")
-	assert.Equal(t, "t Bob hi ^high", m.ov.filter.Value())
+	assert.Equal(t, "t Bob hi !high", m.ov.filter.Value())
 
 	// The plan follows the completed text.
 	require.NotNil(t, m.ov.cmd)
@@ -232,7 +232,7 @@ func TestCommandBarMultiFieldSetShowsOldAndNewAndNeedsConfirm(t *testing.T) {
 
 func TestCommandBarUndoAndRedo(t *testing.T) {
 	m, pr := newTestModel(t)
-	openBar(m, "n called #deal @fri")
+	openBar(m, "n called #deal remind fri")
 	press(m, "enter")
 	require.Len(t, allNotes(t, m), 1)
 	assert.Contains(t, plain(m.View()), "Done: note on Zed Adams", "a toast confirms the command")
@@ -450,14 +450,14 @@ func TestCommandBarReadOnlyOnlyLooks(t *testing.T) {
 
 func TestCommandBarLogTaskTagAndSnooze(t *testing.T) {
 	m, pr := newTestModel(t)
-	openBar(m, "log meeting kickoff @yesterday")
+	openBar(m, "log meeting kickoff yesterday")
 	press(m, "enter")
 	its := allNotes(t, m)
 	require.Len(t, its, 1)
 	assert.Equal(t, "meeting", its[0].Type)
 	assert.Equal(t, "2026-10-12 12:00:00", its[0].OccurredAt)
 
-	openBar(m, "t send deck @fri 3pm ^high")
+	openBar(m, "t send deck fri 3pm !high")
 	assert.Contains(t, plain(m.View()), `task for Zed Adams: "send deck"`)
 	press(m, "enter")
 	tasks, _ := m.tr.FindAll(context.Background(), model.TaskFilters{})
@@ -493,7 +493,7 @@ func TestCommandBarFitsTheTerminal(t *testing.T) {
 	for _, size := range [][2]int{{100, 30}, {60, 12}, {40, 10}, {120, 50}} {
 		m.Update(tea.WindowSizeMsg{Width: size[0], Height: size[1]})
 		for _, line := range []string{
-			"n a rather long note with many words that goes on and on and on and on #deal @fri 3pm *3m ^high ~30m",
+			"n a rather long note with many words that goes on and on and on and on #deal remind fri 3pm every 3m !high ~30m",
 			"set company=Zorg title=CTO birthday=Mar 4",
 			"n Ba",
 			"n ",
@@ -526,13 +526,13 @@ func TestCommandBarMouseIsIgnoredInCommandMode(t *testing.T) {
 func TestNotePromptAppliesTokens(t *testing.T) {
 	m, pr := newTestModel(t)
 	press(m, "2", "n")
-	typeText(m, "met at the conference #vip +Cara_Cole @fri *3m")
+	typeText(m, "met at the conference #vip @Cara_Cole remind fri every 3m")
 	press(m, "enter")
 	assert.Equal(t, "note added, #vip, reminder 2026-10-16, cadence 3 mons", m.status)
 	its := allNotes(t, m)
 	require.Len(t, its, 1)
 	assert.Equal(t, "met at the conference", *its[0].Content)
-	assert.Len(t, its[0].PersonIDs, 2, "+Name links a second person")
+	assert.Len(t, its[0].PersonIDs, 2, "@Name links a second person")
 	tags, _ := m.tagr.GetForEntity(context.Background(), "interaction", its[0].ID)
 	require.Len(t, tags, 1)
 	assert.Equal(t, "vip", tags[0].Name)
@@ -550,7 +550,7 @@ func TestNotePromptAppliesTokens(t *testing.T) {
 
 	// An unknown +Name is an error and writes nothing.
 	press(m, "n")
-	typeText(m, "hello +Nobody")
+	typeText(m, "hello @Nobody")
 	press(m, "enter")
 	assert.True(t, m.statusIsErr)
 	assert.Len(t, allNotes(t, m), 2)
@@ -559,7 +559,7 @@ func TestNotePromptAppliesTokens(t *testing.T) {
 func TestNotePromptKeepsTheChosenType(t *testing.T) {
 	m, _ := newTestModel(t)
 	press(m, "2", "n", "tab")
-	typeText(m, "call went well @fri")
+	typeText(m, "call went well remind fri")
 	press(m, "enter")
 	assert.Contains(t, m.status, "added")
 	its := allNotes(t, m)
@@ -572,7 +572,7 @@ func TestNotePromptKeepsTheChosenType(t *testing.T) {
 func TestTaskPromptAppliesTokensAndKeepsThePipe(t *testing.T) {
 	m, _ := newTestModel(t)
 	press(m, "t")
-	typeText(m, "send deck @fri ^high ~30m")
+	typeText(m, "send deck fri !high ~30m")
 	press(m, "enter")
 	assert.Equal(t, "task added", m.status)
 	tasks, _ := m.tr.FindAll(context.Background(), model.TaskFilters{})
@@ -583,7 +583,7 @@ func TestTaskPromptAppliesTokensAndKeepsThePipe(t *testing.T) {
 
 	// The old "title | due" form still wins over a token, and a natural date works after the pipe.
 	press(m, "t")
-	typeText(m, "second @mon | fri")
+	typeText(m, "second tue | fri")
 	press(m, "enter")
 	tasks, _ = m.tr.FindAll(context.Background(), model.TaskFilters{})
 	require.Len(t, tasks, 2)
@@ -606,11 +606,11 @@ func TestShortSyntaxToggle(t *testing.T) {
 	assert.Contains(t, m.status, "short syntax off")
 
 	press(m, "n")
-	typeText(m, "keep #this @fri")
+	typeText(m, "keep #this remind fri")
 	press(m, "enter")
 	its := allNotes(t, m)
 	require.Len(t, its, 1)
-	assert.Equal(t, "keep #this @fri", *its[0].Content)
+	assert.Equal(t, "keep #this remind fri", *its[0].Content)
 
 	openBar(m, "n and #this too")
 	assert.Contains(t, plain(m.View()), `"and #this too"`)
@@ -631,25 +631,25 @@ func TestPeopleSearchUnderstandsPriorityAndCadenceTokens(t *testing.T) {
 	require.NoError(t, m.reload())
 
 	press(m, "/")
-	typeText(m, "^high")
+	typeText(m, "!high")
 	assert.Equal(t, []string{"Cara Cole"}, names(m))
 	press(m, "ctrl+u")
-	typeText(m, "^low")
+	typeText(m, "!low")
 	assert.Empty(t, names(m))
 	press(m, "ctrl+u")
-	typeText(m, "*1w")
+	typeText(m, "every 1w")
 	assert.Equal(t, []string{"Bob Baker"}, names(m), "Bob is on 7 days")
 	press(m, "ctrl+u")
-	typeText(m, "#friend *1w")
+	typeText(m, "#friend every 1w")
 	assert.Equal(t, []string{"Bob Baker"}, names(m))
 	press(m, "ctrl+u")
-	typeText(m, "#friend ^high")
+	typeText(m, "#friend !high")
 	assert.Empty(t, names(m))
 	press(m, "ctrl+u")
-	typeText(m, "^top cole")
+	typeText(m, "!top cole")
 	assert.Empty(t, names(m))
 	press(m, "ctrl+u")
-	typeText(m, "^high cole")
+	typeText(m, "!high cole")
 	assert.Equal(t, []string{"Cara Cole"}, names(m))
 }
 
@@ -727,4 +727,34 @@ func TestTasksCarryTagsInTheTui(t *testing.T) {
 	tasks, _ = m.tr.FindAll(context.Background(), model.TaskFilters{Tag: &home})
 	require.Len(t, tasks, 1)
 	assert.Equal(t, "call plumber", tasks[0].Title)
+}
+func TestCommandBarDismissTurnsAChipBackIntoText(t *testing.T) {
+	m, _ := newTestModel(t)
+	openBar(m, "t see the doc fri #work")
+	require.Contains(t, m.View(), "due Fri 16 Oct")
+	// The cursor is after #work: alt+d turns that last chip back into text.
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}, Alt: true})
+	assert.Contains(t, m.toast.text, "Kept as plain text: #work")
+	assert.NotContains(t, m.View(), "tag #work")
+	assert.Contains(t, m.View(), "due Fri 16 Oct", "other chips stay")
+	// Move the cursor onto fri and dismiss it too.
+	press(m, "left", "left", "left", "left", "left", "left", "left")
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}, Alt: true})
+	assert.NotContains(t, m.ov.cmd.plan.Preview, "due")
+	assert.Contains(t, m.ov.cmd.plan.Preview, `"see the doc fri #work"`)
+	press(m, "enter")
+	tasks, _ := m.tr.FindAll(context.Background(), model.TaskFilters{})
+	require.Len(t, tasks, 1)
+	assert.Equal(t, "see the doc fri #work", tasks[0].Title)
+	assert.Nil(t, tasks[0].DueAt)
+}
+
+func TestNotesDoNotReadBareDatesInTheBar(t *testing.T) {
+	m, _ := newTestModel(t)
+	openBar(m, "n said fri is fine")
+	assert.Contains(t, m.View(), `"said fri is fine"`)
+	assert.NotContains(t, m.ov.cmd.plan.Preview, "remind")
+	press(m, "ctrl+u")
+	typeText(m, "n said fri is fine remind next week")
+	assert.Contains(t, m.View(), "remind Mon 19 Oct")
 }

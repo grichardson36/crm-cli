@@ -200,13 +200,13 @@ Shows contact/org counts, open deals with total value, task counts, overdue item
 
 ### Quick input (short syntax)
 
-Type meaning inline. `#tag`, `@fri 3pm`, `!deadline`, `~30m`, `*3m` (keep in touch), `+Name`, `^high`. The same text works in the CLI, the TUI command bar (`ctrl+k`) and for agents.
+Type meaning inline. `#tag`, `@Name`, plain dates (`fri 3pm`), `by fri`, `~30m`, `!high`, `every 3m`. The same text works in the CLI, the TUI command bar (`ctrl+k`) and for agents.
 
 ```bash
-crm do "n Sam called about the deal #deal @fri"   # note, tag and a reminder in one line
+crm do "n Sam called about the deal #deal remind fri"   # note, tag and a reminder in one line
 crm do "set Sam: company=Acme title=CTO" --dry-run
-crm task add "Send proposal @mon 3pm ^high +Sam"
-crm person add "Sam Lee #friend *3m"
+crm task add "Send proposal mon 3pm by wed !high @Sam"
+crm person add "Sam Lee #friend every 3m"
 ```
 
 See `crm help short-syntax`.

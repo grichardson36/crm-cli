@@ -466,15 +466,16 @@ func matches(p model.PersonSummary, terms []string) bool {
 	}
 	hay := strings.ToLower(strings.Join([]string{p.Name, p.Company, p.Title, p.Email, p.AllEmails, p.Location}, " "))
 	tags := strings.ToLower(p.Tags)
-	for _, t := range terms {
+	for i := 0; i < len(terms); i++ {
+		t := terms[i]
 		if strings.HasPrefix(t, "#") {
 			if len(t) > 1 && !strings.Contains(tags, t[1:]) {
 				return false
 			}
 			continue
 		}
-		// The short syntax tokens also filter: ^high (priority tier) and *3m (cadence).
-		if strings.HasPrefix(t, "^") {
+		// The short syntax tokens also filter: !high (priority tier) and every 3m (cadence).
+		if strings.HasPrefix(t, "!") && len(t) > 1 {
 			if pr, ok := shortsyntax.ParsePriority(t[1:]); ok {
 				if p.PriorityTier != shortsyntax.TierOf(pr) {
 					return false
@@ -482,11 +483,12 @@ func matches(p model.PersonSummary, terms []string) bool {
 				continue
 			}
 		}
-		if strings.HasPrefix(t, "*") {
-			if c, ok := shortsyntax.ParseCadence(t[1:]); ok {
+		if t == "every" && i+1 < len(terms) {
+			if c, ok := shortsyntax.ParseCadence(terms[i+1]); ok {
 				if p.KeepInTouch != c {
 					return false
 				}
+				i++
 				continue
 			}
 		}
@@ -925,7 +927,7 @@ func (m *Model) runPrompt(kind, value string) {
 			return
 		}
 		// The note goes through the same reader as the command bar: #tag tags the note, +Name
-		// links people, @date makes a reminder and *3m sets the cadence.
+		// links people, remind fri makes a reminder and every 3m sets the cadence.
 		typ := m.currentNoteType()
 		env := m.quickEnvFor(pid)
 		env.NoteType = typ

@@ -125,7 +125,7 @@ func TestNotACommandHasNoVerb(t *testing.T) {
 func TestNoteWithSelectedPerson(t *testing.T) {
 	f := newFixture(t)
 	env := f.env("Bob Baker")
-	p := Parse("n called about the deal #deal @fri", env)
+	p := Parse("n called about the deal #deal remind fri", env)
 	require.Empty(t, p.Problems)
 	require.True(t, p.Ready())
 	assert.Equal(t, "note", p.Verb)
@@ -225,7 +225,7 @@ func TestSelectedPersonBeatsLeadingName(t *testing.T) {
 func TestPlusLinks(t *testing.T) {
 	f := newFixture(t)
 	env := f.env("Bob Baker")
-	p := Parse("n lunch with +Sam_Lee", env)
+	p := Parse("n lunch with @Sam_Lee", env)
 	require.Empty(t, p.Problems)
 	assert.Equal(t, "Bob Baker", p.Subject.Name)
 	require.Len(t, p.Links, 1)
@@ -239,22 +239,22 @@ func TestPlusLinks(t *testing.T) {
 	assert.Len(t, res.Changes, 1)
 
 	// Without a selected person the first link is the subject.
-	p = Parse("n coffee +Bob +Zoe", f.env(""))
+	p = Parse("n coffee @Bob @Zoe", f.env(""))
 	require.Empty(t, p.Problems, p.Preview)
 	assert.Equal(t, "Bob Baker", p.Subject.Name)
 	assert.Equal(t, "Zoë Müller", p.Links[0].Name)
 
 	// Unknown and ambiguous links are problems and are marked bad.
-	p = Parse("n coffee +Nobody", env)
+	p = Parse("n coffee @Nobody", env)
 	assert.Equal(t, []string{"not_found"}, problemCodes(p))
 	assert.True(t, p.Marks[len(p.Marks)-1].Bad)
-	p = Parse("n coffee +Sam", env)
+	p = Parse("n coffee @Sam", env)
 	assert.Equal(t, []string{"ambiguous"}, problemCodes(p))
 }
 
 func TestNoteCadence(t *testing.T) {
 	f := newFixture(t)
-	p := Parse("n Bob great chat *3m", f.env(""))
+	p := Parse("n Bob great chat every 3m", f.env(""))
 	require.Empty(t, p.Problems)
 	assert.Contains(t, p.Preview, "keep in touch 3 mons")
 	_, err := Apply(context.Background(), f.repos, p)
@@ -262,7 +262,7 @@ func TestNoteCadence(t *testing.T) {
 	assert.Equal(t, "3 mons", *f.person("Bob Baker").KeepInTouch)
 
 	// Setting the same cadence again is a warning, not a change.
-	p = Parse("n Bob again *3m", f.env(""))
+	p = Parse("n Bob again every 3m", f.env(""))
 	assert.NotEmpty(t, p.Warnings)
 	assert.Len(t, p.Changes, 1)
 }
@@ -281,16 +281,16 @@ func TestNoSyntaxLeavesTokensInTheText(t *testing.T) {
 	f := newFixture(t)
 	env := f.env("Bob Baker")
 	env.NoSyntax = true
-	p := Parse("n called #deal @fri", env)
+	p := Parse("n called #deal remind fri", env)
 	require.Empty(t, p.Problems)
-	assert.Contains(t, p.Preview, `"called #deal @fri"`)
+	assert.Contains(t, p.Preview, `"called #deal remind fri"`)
 	assert.Len(t, p.Changes, 1)
 }
 
 func TestTask(t *testing.T) {
 	f := newFixture(t)
 	env := f.env("")
-	p := Parse("t Bob call back @fri 3pm ^high ~30m !mon", env)
+	p := Parse("t Bob call back fri 3pm !high ~30m by mon", env)
 	require.Empty(t, p.Problems, p.Preview)
 	assert.Equal(t, "task", p.Verb)
 	assert.Contains(t, p.Preview, `task for Bob Baker: "call back"`)
@@ -306,24 +306,31 @@ func TestTask(t *testing.T) {
 	assert.Equal(t, "2026-10-16 15:00", *task.DueAt)
 	assert.Equal(t, "high", task.Priority)
 	assert.Equal(t, f.ids["Bob Baker"], *task.PersonID)
-	assert.Equal(t, "Deadline: 2026-10-19\nEstimate: 30m", *task.Description)
+	assert.Nil(t, task.Description)
+	require.NotNil(t, task.DurationMin)
+	assert.Equal(t, 30, *task.DurationMin)
+	require.NotNil(t, task.DeadlineAt)
+	assert.Equal(t, "2026-10-19", *task.DeadlineAt)
+	assert.Contains(t, p.Preview, "deadline Mon 19 Oct")
 }
 
-func TestTaskDeadlineOnlyBecomesDue(t *testing.T) {
+func TestTaskDeadlineIsItsOwnColumn(t *testing.T) {
 	f := newFixture(t)
-	p := Parse("t Bob send deck !fri", f.env(""))
+	p := Parse("t Bob send deck by fri 5pm", f.env(""))
 	require.Empty(t, p.Problems)
-	assert.Contains(t, p.Preview, "(deadline)")
+	assert.Contains(t, p.Preview, "deadline Fri 16 Oct 17:00")
 	res, err := Apply(context.Background(), f.repos, p)
 	require.NoError(t, err)
 	task, _ := f.repos.Tasks.FindByID(context.Background(), res.Changes[0].ID)
-	assert.Equal(t, "2026-10-16", *task.DueAt)
+	assert.Nil(t, task.DueAt, "a deadline does not set the soft due date")
+	require.NotNil(t, task.DeadlineAt)
+	assert.Equal(t, "2026-10-16T17:00:00Z", *task.DeadlineAt, "the clock is UTC in tests")
 	assert.Nil(t, task.Description)
 }
 
 func TestTaskWithoutPersonIsAllowed(t *testing.T) {
 	f := newFixture(t)
-	p := Parse("t buy milk @tomorrow", f.env(""))
+	p := Parse("t buy milk tomorrow", f.env(""))
 	require.Empty(t, p.Problems)
 	assert.Nil(t, p.Subject)
 	assert.Contains(t, p.Preview, `task: "buy milk"`)
@@ -364,7 +371,7 @@ func TestTaskTagsAreApplied(t *testing.T) {
 
 func TestTaskManyPeople(t *testing.T) {
 	f := newFixture(t)
-	p := Parse("t plan offsite +Bob +Zoe", f.env(""))
+	p := Parse("t plan offsite @Bob @Zoe", f.env(""))
 	require.Empty(t, p.Problems)
 	res, err := Apply(context.Background(), f.repos, p)
 	require.NoError(t, err)
@@ -376,7 +383,7 @@ func TestLog(t *testing.T) {
 	f := newFixture(t)
 	env := f.env("")
 	env.NoteTypes = []string{"call", "meeting", "note"}
-	p := Parse("log call Bob talked about the offsite @yesterday #trip", env)
+	p := Parse("log call Bob talked about the offsite yesterday #trip", env)
 	require.Empty(t, p.Problems, p.Preview)
 	assert.Contains(t, p.Preview, `call on Bob Baker: "talked about the offsite"`)
 	assert.Contains(t, p.Preview, "Wed 14 Oct")
@@ -396,7 +403,7 @@ func TestLog(t *testing.T) {
 	assert.Contains(t, p.Preview, "log <type>")
 
 	// With a time.
-	p = Parse("log meeting Bob kickoff @tue 9:30", env)
+	p = Parse("log meeting Bob kickoff tue 9:30", env)
 	require.Empty(t, p.Problems)
 	res, err = Apply(context.Background(), f.repos, p)
 	require.NoError(t, err)
@@ -536,7 +543,7 @@ func TestSetErrors(t *testing.T) {
 
 func TestSetWithTokens(t *testing.T) {
 	f := newFixture(t)
-	p := Parse("set Bob: *6m ^top #vip #friend", f.env(""))
+	p := Parse("set Bob: every 6m !top #vip #friend", f.env(""))
 	require.Empty(t, p.Problems, p.Preview)
 	// friend is already on Bob, so only vip is added.
 	fields := []string{}
@@ -609,7 +616,7 @@ func TestSnooze(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "2026-10-22 12:00:00", *f.person("Bob Baker").KeepInTouchSnoozedUntil)
 
-	p = Parse("snooze Bob @fri", env)
+	p = Parse("snooze Bob fri", env)
 	require.Empty(t, p.Problems)
 	assert.Equal(t, "2026-10-16 00:00:00", p.Changes[0].New)
 	assert.Equal(t, "2026-10-22 12:00:00", p.Changes[0].Old)
@@ -635,7 +642,7 @@ func TestSnooze(t *testing.T) {
 
 func TestApplyUndoRoundTripForANote(t *testing.T) {
 	f := newFixture(t)
-	p := Parse("n Bob great call #deal @mon *1m", f.env(""))
+	p := Parse("n Bob great call #deal remind mon every 1m", f.env(""))
 	require.Empty(t, p.Problems)
 	res, err := Apply(context.Background(), f.repos, p)
 	require.NoError(t, err)
@@ -685,9 +692,9 @@ func TestParseAndCompleteStayFastOnABigList(t *testing.T) {
 	ix := NewIndex(people)
 	env := Env{Now: testNow, Index: ix, Tags: []string{"friend", "work"}, Context: 0}
 	lines := []string{
-		"n Sam Lee Aa called about the deal #friend @fri 3pm +Bob Baker Ab ~30m",
+		"n Sam Lee Aa called about the deal #friend remind fri 3pm @Bob Baker Ab",
 		"set Mark Twain Ba: company=Acme title=CTO",
-		"t buy milk +",
+		"t buy milk @",
 	}
 	start := time.Now()
 	const rounds = 20
@@ -704,7 +711,7 @@ func TestParseAndCompleteStayFastOnABigList(t *testing.T) {
 func TestRedoAfterUndoAndGuards(t *testing.T) {
 	f := newFixture(t)
 	ctx := context.Background()
-	p := Parse("n Bob great call #deal @mon *1m", f.env(""))
+	p := Parse("n Bob great call #deal remind mon every 1m", f.env(""))
 	res, err := Apply(ctx, f.repos, p)
 	require.NoError(t, err)
 	assert.Equal(t, "add note on Bob Baker, tag #deal (+2 more)", Summarize(res.Changes))
@@ -754,7 +761,7 @@ func TestChangeDescribe(t *testing.T) {
 
 func TestMarksCoverTheInput(t *testing.T) {
 	f := newFixture(t)
-	line := "  n Bob called #deal @fri 3pm ~1h"
+	line := "  n Bob called #deal remind fri 3pm ~1h"
 	p := Parse(line, f.env(""))
 	require.Empty(t, p.Problems)
 	for _, m := range p.Marks {
@@ -764,7 +771,7 @@ func TestMarksCoverTheInput(t *testing.T) {
 	for _, m := range p.Marks {
 		texts = append(texts, line[m.Start:m.End])
 	}
-	assert.Equal(t, []string{"n", "Bob", "#deal", "@fri 3pm"}, texts)
+	assert.Equal(t, []string{"n", "Bob", "#deal", "remind fri 3pm"}, texts)
 }
 
 func TestMarksForSetKeys(t *testing.T) {
@@ -820,14 +827,14 @@ func TestComplete(t *testing.T) {
 		{"n", "verb", []string{"n ", "note "}},
 		{"n Bob called #fr", "tag", []string{"#friend"}},
 		{"n Bob called #", "tag", []string{"#friend"}},
-		{"n Bob called @fr", "date", []string{"@fri"}},
-		{"n Bob called @tom", "date", []string{"@tomorrow"}},
-		{"n Bob called @next", "date", []string{"@next week", "@next month"}},
-		{"n Bob called !s", "date", []string{"!sat", "!sun"}},
-		{"n Bob called *3", "cadence", []string{"*3m"}},
-		{"n Bob called ^h", "priority", []string{"^high"}},
+		{"n Bob called remind fr", "date", []string{"fri"}},
+		{"n Bob called by tom", "date", []string{"tomorrow"}},
+		{"n Bob called by next", "date", []string{"next week", "next month"}},
+		{"n Bob called on s", "date", []string{"sat", "sun"}},
+		{"n Bob called every 3", "cadence", []string{"3m"}},
+		{"n Bob called !h", "priority", []string{"!high"}},
 		{"n Bob called ~3", "duration", []string{"~30m"}},
-		{"n Bob called +sa", "person", []string{"+Sam Lee", "+Sam Ng"}},
+		{"n Bob called @sa", "person", []string{"@Sam Lee", "@Sam Ng"}},
 		{"n Bo", "person", []string{"Bob Baker "}},
 		{"n sam", "person", []string{"Sam Lee ", "Sam Ng "}},
 		{"set Zo", "person", []string{"Zoë Müller: "}},
@@ -849,7 +856,7 @@ func TestComplete(t *testing.T) {
 		})
 	}
 	// A finished word has nothing left to complete.
-	done := "n Bob hi *3m"
+	done := "n Bob hi every 3m"
 	assert.Empty(t, Complete(done, len(done), env).Candidates)
 	// With a selected person there are no name suggestions.
 	env.Context = f.ids["Bob Baker"]
@@ -866,3 +873,84 @@ func TestComplete(t *testing.T) {
 	got = Complete("n", -4, env)
 	assert.Equal(t, 0, got.End)
 }
+
+func TestRecurrenceOf(t *testing.T) {
+	for in, want := range map[string]string{
+		"every day": "daily", "every week": "weekly", "every month": "monthly", "every year": "yearly",
+		"every 2 weeks": "2 weeks", "every 2w": "2 weeks", "every 3m": "3 mons", "every 1m": "1 mon", "every 1y": "1 year",
+		"every 5d": "5 days", "every 3 days": "3 days", "every other week": "2 weeks", "every 2 months": "2 mons", "every 2 years": "2 years",
+	} {
+		got, ok := RecurrenceOf(in)
+		assert.True(t, ok, in)
+		assert.Equal(t, want, got, in)
+	}
+	for _, in := range []string{"every", "every fri", "every mon and wed", "every weekday", "every 0 days", "every 3", "every 1 2 3", "every 5 fortnights"} {
+		_, ok := RecurrenceOf(in)
+		assert.False(t, ok, in)
+	}
+}
+
+func TestTaskRepeatDurationAndDeadline(t *testing.T) {
+	f := newFixture(t)
+	p := Parse("t Bob check in fri every 2 weeks for 45m by next mon !!!", f.env(""))
+	require.Empty(t, p.Problems, p.Preview)
+	assert.Contains(t, p.Preview, "repeats 2 weeks")
+	assert.Contains(t, p.Preview, "45m")
+	assert.Contains(t, p.Preview, "high priority")
+	res, err := Apply(context.Background(), f.repos, p)
+	require.NoError(t, err)
+	task, err := f.repos.Tasks.FindByID(context.Background(), res.Changes[0].ID)
+	require.NoError(t, err)
+	assert.Equal(t, "check in", task.Title)
+	assert.Equal(t, "2 weeks", *task.Recurrence)
+	assert.Equal(t, 45, *task.DurationMin)
+	assert.Equal(t, "2026-10-19", *task.DeadlineAt)
+	assert.Equal(t, "2026-10-16", *task.DueAt)
+	assert.Equal(t, "high", task.Priority)
+
+	// A repeat needs a date to start from.
+	p = Parse("t Bob check in every 2 weeks", f.env(""))
+	assert.Equal(t, []string{"invalid"}, problemCodes(p))
+	assert.Contains(t, p.Preview, "needs a date")
+
+	// A repeat on named days has no interval column: it stays in the description, with a note.
+	p = Parse("t Bob gym every mon and wed", f.env(""))
+	require.Empty(t, p.Problems, p.Preview)
+	require.Len(t, p.Warnings, 1)
+	res, err = Apply(context.Background(), f.repos, p)
+	require.NoError(t, err)
+	task, _ = f.repos.Tasks.FindByID(context.Background(), res.Changes[0].ID)
+	assert.Equal(t, "Repeats: every mon and wed", *task.Description)
+	assert.Nil(t, task.Recurrence)
+}
+
+func TestNotesDoNotReadBareDatesButRemindWorks(t *testing.T) {
+	f := newFixture(t)
+	p := Parse("n Bob said he is out fri and back tomorrow", f.env(""))
+	require.Empty(t, p.Problems)
+	assert.Contains(t, p.Preview, `"said he is out fri and back tomorrow"`)
+	assert.Len(t, p.Changes, 1, "no reminder")
+	p = Parse("n Bob said he is out fri. remind next week", f.env(""))
+	assert.Contains(t, p.Preview, "remind Mon 19 Oct")
+	// A deadline, a duration and a priority are not for notes.
+	p = Parse("n Bob finish by fri ~30m !high", f.env(""))
+	assert.Contains(t, p.Preview, `"finish by fri ~30m !high"`)
+}
+
+func TestDismissedTokensStayText(t *testing.T) {
+	f := newFixture(t)
+	env := f.env("Bob Baker")
+	env.Dismissed = []string{"fri"}
+	p := Parse("t call fri #work", env)
+	assert.Contains(t, p.Preview, `"call fri"`)
+	assert.NotContains(t, p.Preview, "due")
+	assert.Contains(t, p.Preview, "tag #work")
+}
+
+func TestQuotedTextIsNotRead(t *testing.T) {
+	f := newFixture(t)
+	p := Parse(`t Bob read "fri #x @Bob" notes`, f.env(""))
+	require.Empty(t, p.Problems)
+	assert.Contains(t, p.Preview, `"read \"fri #x @Bob\" notes"`)
+	assert.Empty(t, p.Syntax.Tags)
+}

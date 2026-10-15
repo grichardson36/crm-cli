@@ -21,19 +21,20 @@ type inlineText struct {
 }
 
 // parseInline reads the short syntax in text. With noSyntax the text is left as it is.
-func parseInline(ctx context.Context, db *sql.DB, text string, noSyntax bool, skip ...shortsyntax.Kind) (*inlineText, error) {
+// dates turns on plain-word dates (fri, tomorrow 3pm), which tasks and logs read and names do not.
+func parseInline(ctx context.Context, db *sql.DB, text string, noSyntax, dates bool, skip ...shortsyntax.Kind) (*inlineText, error) {
 	now := time.Now()
 	env, err := quick.LoadEnv(ctx, db, now, 0)
 	if err != nil {
 		return nil, err
 	}
 	res := shortsyntax.Parse(text, shortsyntax.Options{
-		Now: now, Disabled: noSyntax, KnownTags: env.Tags, Names: env.Index.NameSet(), Skip: skip,
+		Now: now, Disabled: noSyntax, Dates: dates, KnownTags: env.Tags, Names: env.Index.NameSet(), Skip: skip,
 	})
 	return &inlineText{Res: res, Env: env}, nil
 }
 
-// people resolves the +Name tokens to person IDs. A name with no match is a not-found error and a
+// people resolves the @Name tokens to person IDs. A name with no match is a not-found error and a
 // name with several matches is a validation error that lists them.
 func (in *inlineText) people() ([]int64, error) {
 	var ids []int64
@@ -42,13 +43,13 @@ func (in *inlineText) people() ([]int64, error) {
 		matches, _ := in.Env.Index.ResolveLoose(name)
 		switch {
 		case len(matches) == 0:
-			return nil, model.NewExitError(model.ErrNotFound, "no person matches +%s", name)
+			return nil, model.NewExitError(model.ErrNotFound, "no person matches @%s", name)
 		case len(matches) > 1:
 			var parts []string
 			for _, m := range matches {
 				parts = append(parts, fmt.Sprintf("%s #%d", m.Name, m.ID))
 			}
-			return nil, model.NewExitError(model.ErrValidation, "%d people match +%s: %s (use the ID with --person)", len(matches), name, strings.Join(parts, ", "))
+			return nil, model.NewExitError(model.ErrValidation, "%d people match @%s: %s (use the ID with --person)", len(matches), name, strings.Join(parts, ", "))
 		}
 		if !seen[matches[0].ID] {
 			seen[matches[0].ID] = true

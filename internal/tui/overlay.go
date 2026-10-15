@@ -43,6 +43,8 @@ type overlay struct {
 	cmd *cmdState
 	// cycle remembers the last Tab completion, so Tab again moves to the next candidate.
 	cycle *cycleState
+	// dismissed are the chips turned back into plain text with alt+d while typing a command.
+	dismissed []string
 }
 
 const overlayTop = 2 // title line, filter line
