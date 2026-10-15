@@ -8,7 +8,7 @@ Every key in the terminal UI, grouped by task. The palette (`ctrl+k`) runs any o
 - `tab` or `l`: move into the detail form. `esc`, `h` or `tab`: back to the list.
 - `J` / `K`: scroll the detail pane.
 - `/` search by name, company, email, location and tags. `#tag` filters by tag. `esc` clears.
-- `o` toggles sort between name and recently updated. `r` reloads.
+- `o` toggles sort between name and recently updated. `r` reloads. `ctrl+z` undoes any data change, `ctrl+y` redoes it. Rebind keys: see `keys`.
 
 ## Contact keys
 
@@ -35,4 +35,4 @@ In the detail form: `enter` edits a row, `a` adds a row, `d` deletes the row (as
 - Sync view: `s` runs a sync for the selected source, `d` does a dry run. In the inbox: `a` accepts (creates a person), `p` attaches to an existing person, `i` ignores.
 - Home: `enter` on an item opens that person in People with the detail form focused.
 
-See also: tui, duplicates, archive, notes, sync.
+See also: tui, keys, duplicates, archive, notes, sync.

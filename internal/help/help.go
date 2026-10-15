@@ -16,7 +16,7 @@ var topicsFS embed.FS
 var order = []string{
 	"overview", "people", "orgs", "contact-methods", "keep-in-touch", "birthdays", "tasks", "notes", "note-types", "short-syntax", "tags",
 	"duplicates", "archive", "domains", "import", "sync", "sync-inbox", "dav", "dav-server", "calendar", "calendar-ics", "calendar-plan", "caldav", "output", "errors", "agents",
-	"tui", "tui-keys", "theme", "install", "backup",
+	"tui", "tui-keys", "keys", "theme", "install", "backup",
 }
 
 // Topic is one help page.

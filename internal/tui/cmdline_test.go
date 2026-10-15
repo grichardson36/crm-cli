@@ -256,14 +256,14 @@ func TestCommandBarUndoAndRedo(t *testing.T) {
 	press(m, "ctrl+z")
 	assert.Contains(t, plain(m.View()), "Nothing to undo")
 
-	press(m, "ctrl+r")
+	press(m, "ctrl+y")
 	assert.Contains(t, plain(m.View()), "Redone: add note on Zed Adams")
 	assert.Len(t, allNotes(t, m), 1)
 	tasks, _ = m.tr.FindAll(context.Background(), model.TaskFilters{})
 	assert.Len(t, tasks, 1)
 	press(m, "ctrl+y")
 	assert.Equal(t, "Zorg", *personByID(t, pr, 1).Company, "ctrl+y is redo too")
-	press(m, "ctrl+r")
+	press(m, "ctrl+y")
 	assert.Contains(t, plain(m.View()), "Nothing to redo")
 
 	// A new change clears what could be redone.
@@ -271,7 +271,7 @@ func TestCommandBarUndoAndRedo(t *testing.T) {
 	openBar(m, "set title=CTO")
 	press(m, "enter")
 	assert.Empty(t, m.redoStack)
-	press(m, "ctrl+r")
+	press(m, "ctrl+y")
 	assert.Contains(t, plain(m.View()), "Nothing to redo")
 }
 
@@ -306,7 +306,7 @@ func TestUndoCoversEditsTagsBulkAndFavorites(t *testing.T) {
 	press(m, "ctrl+z")
 	assert.False(t, personByID(t, pr, 1).IsFavorite)
 	assert.Contains(t, m.toast.text, "Undone: set favorite on Zed Adams")
-	press(m, "ctrl+r")
+	press(m, "ctrl+y")
 	assert.True(t, personByID(t, pr, 1).IsFavorite)
 
 	// Tag from the prompt, undo removes it.
@@ -357,7 +357,7 @@ func TestUndoNoteDeleteAndTaskComplete(t *testing.T) {
 	assert.Empty(t, allNotes(t, m))
 	tasks, _ := m.tr.FindAll(context.Background(), model.TaskFilters{})
 	assert.Empty(t, tasks)
-	press(m, "ctrl+r", "ctrl+r")
+	press(m, "ctrl+y", "ctrl+y")
 	assert.Len(t, allNotes(t, m), 1)
 	tasks, _ = m.tr.FindAll(context.Background(), model.TaskFilters{})
 	assert.Len(t, tasks, 1)

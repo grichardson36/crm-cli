@@ -12,7 +12,7 @@ import (
 )
 
 // Undo and redo for this session, like an office program: every data change made in the TUI is
-// an entry on a stack. ctrl+z undoes the newest, ctrl+r (or ctrl+y) redoes it, and a new change
+// an entry on a stack. ctrl+z undoes the newest, ctrl+y redoes it, and a new change
 // clears what could be redone. The stack lives in memory only.
 //
 // Writes go through the h* methods below. They call the repository, then record how to reverse
@@ -152,7 +152,7 @@ func (m *Model) undoLast() tea.Cmd {
 		return m.showToast("Could not undo "+e.label+": "+err.Error(), true)
 	}
 	m.redoStack = append(m.redoStack, e)
-	return m.showToast("Undone: "+e.label+" · ctrl+r redo", false)
+	return m.showToast("Undone: "+e.label+" · ctrl+y redo", false)
 }
 
 // redoLast repeats the entry that was undone last.

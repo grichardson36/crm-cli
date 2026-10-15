@@ -236,6 +236,11 @@ var commandMeta = map[string]cmdMeta{
 		`crm domains -f json`, `crm domains --dir ~/.crm -f json`}},
 	"init": {mutates: true, noDryRun: true, fields: "domain,path,created,imported,next_steps", examples: []string{
 		`crm init --domain personal --yes -f json`, `crm init --domain work --path ~/.crm/work.db --dry-run`}},
+	"keys":                 {examples: []string{`crm keys list -f json`, `crm keys set undo ctrl+z`}},
+	"keys list":            {fields: keysListFields, examples: []string{`crm keys list -f json`, `crm keys list --custom`, `crm keys list --group Contact`}},
+	"keys set":             {mutates: true, noDryRun: true, fields: "id,title,default,keys,saved,dry_run,config", examples: []string{`crm keys set undo ctrl+z`, `crm keys set favorite f "*" --dry-run`}},
+	"keys reset":           {mutates: true, noDryRun: true, fields: "id,title,default,keys,saved,dry_run,config", examples: []string{`crm keys reset undo`, `crm keys reset --all --dry-run`}},
+	"keys path":            {fields: "config,exists", examples: []string{`crm keys path`, `crm keys path -f json`}},
 	"theme":                {examples: []string{`crm theme list -f json`, `crm theme set nord`}},
 	"theme list":           {fields: themeListFields, examples: []string{`crm theme list -f json`}},
 	"theme set":            {mutates: true, examples: []string{`crm theme set nord`, `crm theme set my-theme --dry-run`}},

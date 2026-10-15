@@ -33,6 +33,6 @@ Flags win over tokens. `--dry-run` shows what was read. `--no-syntax` turns it o
 
 ## In the TUI
 
-`ctrl+k` opens the command bar. Type `n Sam called #deal @fri` and a preview line shows what will happen. `tab` completes verbs, names, tags, dates and cadences. `enter` runs it. A `set` with two or more fields shows old and new values and waits for another `enter`. `ctrl+z` undoes and `ctrl+r` redoes (session only). With a person selected no name is needed. The note and task prompts (`n`, `t`) read the same tokens. In the People search, `#friend ^high *3m` filter the list. The palette action "Toggle short syntax" turns all of it off.
+`ctrl+k` opens the command bar. Type `n Sam called #deal @fri` and a preview line shows what will happen. `tab` completes verbs, names, tags, dates and cadences. `enter` runs it. A `set` with two or more fields shows old and new values and waits for another `enter`. `ctrl+z` undoes and `ctrl+y` redoes (session only). With a person selected no name is needed. The note and task prompts (`n`, `t`) read the same tokens. In the People search, `#friend ^high *3m` filter the list. The palette action "Toggle short syntax" turns all of it off.
 
 See also: tasks, notes, tags, tui, agents.

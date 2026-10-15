@@ -335,6 +335,8 @@ func (m *Model) footerView() string {
 		status = m.input.View()
 	case modeConfirm:
 		status = m.st.Err.Render(m.confirm.prompt)
+	case modeCapture:
+		status = m.st.Name.Render("press the new key for " + m.captureTitle() + "  (esc cancels)")
 	default:
 		switch {
 		case m.busy != "":
@@ -375,6 +377,8 @@ func (m *Model) hintsLine() string {
 		return m.st.Dim.Render(runewidth.Truncate(h, m.width, "…"))
 	case modeConfirm:
 		return m.st.Dim.Render("y yes  n no")
+	case modeCapture:
+		return m.st.Dim.Render("any key binds, esc cancel")
 	case modeSearch, modePrompt:
 		if m.mode == modePrompt && m.promptKind == "note" {
 			return m.st.Dim.Render("enter save  tab type  esc cancel")

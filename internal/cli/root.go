@@ -72,6 +72,7 @@ func NewRootCmd() *cobra.Command {
 	registerWhereCommand(rootCmd)
 	registerDomainsCommand(rootCmd)
 	registerThemeCommands(rootCmd)
+	registerKeysCommands(rootCmd)
 	registerInitCommand(rootCmd)
 	registerDoctorCommand(rootCmd)
 	registerAgentCommand(rootCmd)

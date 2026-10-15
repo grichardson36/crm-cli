@@ -17,6 +17,7 @@ import (
 	"github.com/jdanielnd/crm-cli/internal/cal/tz"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/dedupe"
+	"github.com/jdanielnd/crm-cli/internal/keys"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/jdanielnd/crm-cli/internal/quick"
 	"github.com/jdanielnd/crm-cli/internal/shortsyntax"
@@ -50,6 +51,7 @@ const (
 	modeEdit         // inline input on a detail row
 	modeConfirm      // y/n question in the footer
 	modeOverlay      // command palette or picker
+	modeCapture      // waiting for the key to bind to an action
 )
 
 // focus says which pane receives movement keys.
@@ -181,6 +183,12 @@ type Model struct {
 	toast     *toast
 	toastSeq  int
 	noSyntax  bool
+
+	// Key bindings changed by the user (config.toml [keys]), the problems found while loading
+	// them, and the action being rebound while the next key press is captured.
+	keyOverrides keys.Overrides
+	keyProblems  []string
+	capture      *captureState
 }
 
 // New creates the model and loads data.
@@ -236,6 +244,7 @@ func Run(ctx context.Context, db *sql.DB, readOnly bool, env Env) error {
 	m.readOnly = readOnly
 	m.env = env
 	m.applyStartupTheme()
+	m.applyStartupKeys()
 	_, err = tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion(), tea.WithContext(ctx)).Run()
 	return err
 }
@@ -656,6 +665,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		if m.mode == modeOverlay {
 			return m.handleOverlayKey(msg)
+		}
+		if m.mode == modeCapture {
+			return m.handleCaptureKey(msg)
 		}
 		if m.tv != nil {
 			return m.handleTextKey(msg)
