@@ -424,3 +424,27 @@ func Split(spec Spec, at time.Time) (oldRule, newRule string, err error) {
 	}
 	return joinKV(oldParts), joinKV(newParts), nil
 }
+
+// ICSRule returns the rule the way RFC 5545 wants it written: UNTIL as a UTC time for a timed
+// event (section 3.3.10, because DTSTART carries a zone) and as a date for an all-day event.
+func ICSRule(spec Spec) (string, error) {
+	parts, err := parseKV(spec.RRule)
+	if err != nil {
+		return "", err
+	}
+	for i, p := range parts {
+		if p.k != "UNTIL" {
+			continue
+		}
+		w, err := untilWall(p.v, spec)
+		if err != nil {
+			return "", err
+		}
+		if spec.AllDay {
+			parts[i].v = w.Format("20060102")
+		} else {
+			parts[i].v = tz.Instant(w, spec.loc()).UTC().Format("20060102T150405Z")
+		}
+	}
+	return joinKV(parts), nil
+}

@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/jdanielnd/crm-cli/internal/cal/icsio"
 	"github.com/jdanielnd/crm-cli/internal/cal/input"
 	"github.com/jdanielnd/crm-cli/internal/cal/recur"
 	"github.com/jdanielnd/crm-cli/internal/cal/tz"
@@ -392,6 +393,61 @@ func registerEventTools(s *server.MCPServer, db *sql.DB) {
 				return mcpError(err)
 			}
 			return jsonResult(viewOf(e))
+		},
+	)
+
+	s.AddTool(
+		gomcp.NewTool("crm_cal_import_ics",
+			gomcp.WithDescription("Import iCalendar text (events, repeats, exceptions, per-instance changes, tasks). Matched by UID, so importing again updates instead of duplicating. Attendees are matched to people by email and never created; unmatched addresses are listed. Use dry_run to see counts and warnings without writing."),
+			gomcp.WithString("ics", gomcp.Required(), gomcp.Description("The iCalendar file content")),
+			gomcp.WithString("source", gomcp.Description("Name the UIDs are remembered under (default ics). Use one name per calendar feed")),
+			gomcp.WithString("tz", gomcp.Description("Zone for times written without a zone (default: this device)")),
+			gomcp.WithBoolean("include_tasks", gomcp.Description("Import VTODO tasks (default true)")),
+			gomcp.WithBoolean("dry_run", gomcp.Description("Report what would change, write nothing")),
+		),
+		func(ctx context.Context, req gomcp.CallToolRequest) (*gomcp.CallToolResult, error) {
+			text := req.GetString("ics", "")
+			if text == "" {
+				return gomcp.NewToolResultError("validation error: ics is required"), nil
+			}
+			loc, err := tz.Load(req.GetString("tz", ""))
+			if err != nil {
+				return validationError(err)
+			}
+			res, err := icsio.Import(ctx, db, []byte(text), icsio.ImportOptions{
+				Source: req.GetString("source", ""), DryRun: req.GetBool("dry_run", false), Loc: loc,
+				SkipTasks: !req.GetBool("include_tasks", true),
+			})
+			if err != nil {
+				return mcpError(err)
+			}
+			return jsonResult(res)
+		},
+	)
+
+	s.AddTool(
+		gomcp.NewTool("crm_cal_export_ics",
+			gomcp.WithDescription("Export the calendar as iCalendar text. Events keep the UID they were imported with. Attendees without an email address are left out."),
+			gomcp.WithString("from", gomcp.Description("Only events from this date (a date or phrase)")),
+			gomcp.WithString("to", gomcp.Description("Only events before this date")),
+			gomcp.WithBoolean("include_tasks", gomcp.Description("Include tasks as VTODO")),
+			gomcp.WithString("name", gomcp.Description("Calendar name (default crm)")),
+		),
+		func(ctx context.Context, req gomcp.CallToolRequest) (*gomcp.CallToolResult, error) {
+			opt := icsio.ExportOptions{Tasks: req.GetBool("include_tasks", false), Name: req.GetString("name", "crm")}
+			from, to := req.GetString("from", ""), req.GetString("to", "")
+			if from != "" || to != "" {
+				f, t, err := input.Window(from, to, 365, tz.Device(), calNow())
+				if err != nil {
+					return validationError(err)
+				}
+				opt.From, opt.To = f, t
+			}
+			res, err := icsio.Export(ctx, db, opt)
+			if err != nil {
+				return mcpError(err)
+			}
+			return gomcp.NewToolResultText(string(res.Data)), nil
 		},
 	)
 }

@@ -130,6 +130,11 @@ var commandMeta = map[string]cmdMeta{
 		`crm cal attendee add 1 2`, `crm cal attendee add 1 2 --rsvp accepted --dry-run`}},
 	"cal attendee rm": {mutates: true, target: "event", targetArgs: "first", examples: []string{`crm cal attendee rm 1 2`}},
 
+	"cal import": {mutates: true, noDryRun: true, fields: "source,dry_run,calendar,events,overrides,todos,ignored,unmatched_attendees,warnings", examples: []string{
+		`crm cal import ./feed.ics --dry-run`, `crm cal import ./feed.ics --source work-feed --no-tasks`}},
+	"cal export": {fields: "events,overrides,todos,attendees_without_email,file,bytes", examples: []string{
+		`crm cal export --out ./crm.ics`, `crm cal export --from 2026-01-01 --to 2027-01-01 --tasks`}},
+
 	// interactions
 	"log call":    {mutates: true, fields: logFields, target: "person", targetArgs: "all", examples: []string{`crm log call 1 --subject "Intro call" --content "Agreed on Q4 timeline"`}},
 	"log email":   {mutates: true, fields: logFields, target: "person", targetArgs: "all", examples: []string{`crm log email 1 --subject "Follow-up" --direction outbound`}},

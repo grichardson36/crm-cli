@@ -405,3 +405,33 @@ func TestSplit(t *testing.T) {
 		assert.Equal(t, "FREQ=WEEKLY;UNTIL=20261025", oldRule)
 	})
 }
+
+func TestICSRule(t *testing.T) {
+	loc := chicago(t)
+	timed := Spec{Start: utc(2026, 1, 5, 15, 0), End: utc(2026, 1, 5, 16, 0), TZ: loc}
+	allDay := Spec{Start: utc(2026, 1, 5, 0, 0), End: utc(2026, 1, 6, 0, 0), AllDay: true}
+	tests := []struct {
+		name string
+		spec Spec
+		rule string
+		want string
+	}{
+		{"no until", timed, "FREQ=WEEKLY;BYDAY=MO", "FREQ=WEEKLY;BYDAY=MO"},
+		{"a date until becomes the end of that local day in UTC", timed, "FREQ=WEEKLY;UNTIL=20261231", "FREQ=WEEKLY;UNTIL=20270101T055959Z"},
+		{"a UTC until stays", timed, "FREQ=WEEKLY;UNTIL=20260119T150000Z", "FREQ=WEEKLY;UNTIL=20260119T150000Z"},
+		{"a floating until is read as local", timed, "FREQ=WEEKLY;UNTIL=20260119T090000", "FREQ=WEEKLY;UNTIL=20260119T150000Z"},
+		{"all-day until is a date", allDay, "FREQ=WEEKLY;UNTIL=20261231", "FREQ=WEEKLY;UNTIL=20261231"},
+		{"all-day UTC until becomes a date", allDay, "FREQ=WEEKLY;UNTIL=20261231T000000Z", "FREQ=WEEKLY;UNTIL=20261231"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			spec := tt.spec
+			spec.RRule = tt.rule
+			got, err := ICSRule(spec)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+	_, err := ICSRule(Spec{RRule: "nonsense"})
+	assert.Error(t, err)
+}
