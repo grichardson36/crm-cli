@@ -41,7 +41,7 @@ Examples of recurrence: `7 days`, `1 mon`, `weekly`.
 
 ## Scheduling fields
 
-For the calendar and the planner. `--due` stays the soft date. A task without `--duration` is never placed, `task list` shows `no_duration` for auto-scheduled ones.
+For the calendar and the planner. `--due` stays the soft date. A task without `--duration` is planned as 30 minutes. Priority is `asap`, `high`, `medium` or `low`.
 
 ```sh crm-example
 crm task edit 1 --duration 2h --earliest-start 2026-11-02 --deadline 2026-11-06 --hard-deadline

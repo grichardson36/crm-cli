@@ -238,6 +238,14 @@ func toICSEvent(e *model.Event, uid string, emails map[int64]string) (*ics.Event
 			ev.Organizer = &org
 		}
 	}
+	for _, g := range e.Guests {
+		p := ics.Person{Email: g.Email, Name: g.Name, Role: g.Role, PartStat: upper(g.RSVP)}
+		ev.Attendees = append(ev.Attendees, p)
+		if g.Role == "organizer" && ev.Organizer == nil {
+			org := p
+			ev.Organizer = &org
+		}
+	}
 	for _, rm := range e.Reminders {
 		ev.Alarms = append(ev.Alarms, ics.Alarm{MinutesBefore: rm.MinutesBefore, Action: upper(rm.Method)})
 	}

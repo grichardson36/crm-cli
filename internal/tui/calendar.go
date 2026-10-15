@@ -575,7 +575,7 @@ func (m *Model) calDetail() string {
 				b.WriteString(line(cleanCell(l)) + "\n")
 			}
 		}
-		b.WriteString("\n" + dimStyle.Render(line("enter edits, D deletes, palette: attendees, reminders, tags")))
+		b.WriteString("\n" + dimStyle.Render(line("enter edits, # deletes, palette: attendees, reminders, tags")))
 	case "empty":
 		b.WriteString(nameStyle.Render(it.date.Format("Monday 2 January")) + "\n\n")
 		b.WriteString(dimStyle.Render(line("Nothing planned. + adds an event.")))

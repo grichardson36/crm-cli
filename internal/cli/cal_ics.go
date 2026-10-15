@@ -61,9 +61,6 @@ func calImportCmd() *cobra.Command {
 			for _, w := range res.Warnings {
 				fmt.Fprintln(os.Stderr, "crm: warning:", w)
 			}
-			if len(res.UnmatchedAttendees) > 0 {
-				fmt.Fprintf(os.Stderr, "crm: %d attendee address(es) matched nobody and were not created: %v\n", len(res.UnmatchedAttendees), res.UnmatchedAttendees)
-			}
 			if resolveFormat() == format.FormatJSON {
 				return format.Output(os.Stdout, format.FormatJSON, []map[string]any{toMap(res)}, nil, flagQuiet)
 			}

@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -46,7 +45,6 @@ func TestTaskSchedulingFieldsRoundTrip(t *testing.T) {
 	assert.Nil(t, plain.DurationMin)
 	assert.False(t, plain.AutoSchedule)
 	assert.Equal(t, "work", plain.ScheduleName)
-	assert.Empty(t, repo.ScheduleIssue(plain))
 }
 
 func TestTaskPlacingByHandLocksAndClearing(t *testing.T) {
@@ -108,20 +106,4 @@ func TestTaskSchedulingValidation(t *testing.T) {
 			assert.ErrorIs(t, err, model.ErrValidation)
 		})
 	}
-}
-
-func TestTasksWithoutDurationAreReported(t *testing.T) {
-	tr := setupTaskTestDB(t)
-	ctx := context.Background()
-	auto, err := tr.Create(ctx, model.CreateTaskInput{Title: "auto", Priority: "medium", Schedule: model.TaskSchedule{AutoSchedule: boolPtr(true)}})
-	require.NoError(t, err)
-	assert.Equal(t, "no_duration", repo.ScheduleIssue(auto))
-
-	withLen, err := tr.Update(ctx, auto.ID, model.UpdateTaskInput{Schedule: model.TaskSchedule{DurationMin: intp(45)}})
-	require.NoError(t, err)
-	assert.Empty(t, repo.ScheduleIssue(withLen))
-
-	manual, err := tr.Create(ctx, model.CreateTaskInput{Title: "manual", Priority: "medium"})
-	require.NoError(t, err)
-	assert.Empty(t, repo.ScheduleIssue(manual), "tasks the planner does not touch are fine without a length")
 }

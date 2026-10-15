@@ -78,13 +78,12 @@ These palette actions mirror the CLI commands and work in `--read-only` mode. Ea
 
 ## Calendar
 
-Opens on the Agenda (two weeks by day). `a` agenda, `d` day, `w` week grid, `m` month grid (a narrow terminal shows the agenda instead). `t` today, `[` and `]` step a week (day in Day view, month in Month view), so they do not change view here. In the grids `h` and `l` move a day, in Month `j` and `k` move a week and `enter` opens the day.
+Opens on the Agenda (two weeks by day). `a` agenda, `d` day, `w` week grid, `m` month grid (a narrow terminal shows the agenda instead). `t` is today. `tab` and `shift+tab` step the period: a week in Agenda and Week, a day in Day, a month in Month. `[` and `]` still switch views, as everywhere. In the grids `h` and `l` move a day, in Month `j` and `k` move a week and `enter` opens the day.
 
-- `+` adds an event as one line: `Lunch | fri 12:30 1h | weekly`. The preview shows what will be created. `enter` edits the event under the cursor, `D` deletes it. A repeating event asks first: this, this and following, or all.
-- `b` birthdays, `u` keep-in-touch dates, `T` tasks switch overlays. Enter on one opens the person.
-- `P` plans auto-scheduled tasks: accept, reject or lock rows, then apply. "Undo last plan" is in the palette.
-- `f` finds a time: a length and a number of days, then pick a free slot to add an event. "Find a time" is also in the palette of every view.
-- The palette adds attendees, reminders, tags, status, busy, go to date, show times in another zone, import and export ICS files, and restore the last deleted event.
+- `+` adds an event as one line: `Lunch | fri 12:30 1h | weekly`. `enter` edits the event under the cursor, `#` deletes it. A repeating event asks first: this, this and following, or all.
+- Birthdays, keep-in-touch dates and tasks show on their days. The palette switches each on or off. `enter` on one opens the person.
+- The palette also has find a time, plan tasks (`P`), attendees, reminders, tags, status, busy, go to date, show times in another zone, working hours, import and export ICS files, and restore the last deleted event.
+- Tasks: `S` edits duration | start | deadline, `A` toggles auto-schedule.
 
 ## Quit
 

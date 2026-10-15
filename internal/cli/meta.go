@@ -145,7 +145,7 @@ var commandMeta = map[string]cmdMeta{
 		`crm cal hours override 2026-12-24 09:00-12:00`, `crm cal hours override 2026-12-25 off`, `crm cal hours override 2026-12-25 --remove`}},
 	"cal hours config": {mutates: true, fields: "default_rule,buffer_min,step_min,horizon_days", examples: []string{
 		`crm cal hours config`, `crm cal hours config --buffer 15 --step 30 --horizon 21`}},
-	"cal import": {mutates: true, noDryRun: true, fields: "source,dry_run,calendar,events,overrides,todos,ignored,unmatched_attendees,warnings", examples: []string{
+	"cal import": {mutates: true, noDryRun: true, fields: "source,dry_run,calendar,events,overrides,todos,ignored,warnings", examples: []string{
 		`crm cal import ./feed.ics --dry-run`, `crm cal import ./feed.ics --source work-feed --no-tasks`}},
 	"cal export": {fields: "events,overrides,todos,attendees_without_email,file,bytes", examples: []string{
 		`crm cal export --out ./crm.ics`, `crm cal export --from 2026-01-01 --to 2027-01-01 --tasks`}},

@@ -1,6 +1,7 @@
 package icsio_test
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"strings"
@@ -147,7 +148,6 @@ func TestRoundTripIsLossless(t *testing.T) {
 	assert.Equal(t, icsio.Counts{Created: 6}, res.Events)
 	assert.Equal(t, icsio.Counts{Created: 1}, res.Overrides)
 	assert.Equal(t, icsio.Counts{Created: 2}, res.Todos)
-	assert.Empty(t, res.UnmatchedAttendees)
 	assert.Empty(t, res.Warnings)
 
 	second := exportAll(t, b)
@@ -304,61 +304,6 @@ func TestDryRunOnAnEmptyDatabase(t *testing.T) {
 	assert.Equal(t, 0, n)
 }
 
-func TestDeletedLocallyIsNotRecreated(t *testing.T) {
-	a := openDB(t)
-	seed(t, a)
-	data := exportAll(t, a).Data
-	b := openDB(t)
-	imp(t, b, data, icsio.ImportOptions{})
-
-	var id int64
-	require.NoError(t, b.QueryRow(`SELECT id FROM events WHERE title = 'Call'`).Scan(&id))
-	require.NoError(t, repo.NewEventRepo(b).Archive(ctx, id, "", ""))
-	res := imp(t, b, data, icsio.ImportOptions{})
-	assert.Equal(t, 1, res.Events.Skipped)
-	assert.Contains(t, strings.Join(res.Warnings, " "), "deleted here")
-	var n int
-	require.NoError(t, b.QueryRow(`SELECT COUNT(*) FROM events WHERE title = 'Call'`).Scan(&n))
-	assert.Equal(t, 1, n)
-}
-
-func TestUnmatchedAttendeesAreReportedNotCreated(t *testing.T) {
-	a := openDB(t)
-	seed(t, a)
-	data := exportAll(t, a).Data
-	b := openDB(t)
-	res := imp(t, b, data, icsio.ImportOptions{})
-	assert.Equal(t, []string{"jane@example.com (Jane)"}, res.UnmatchedAttendees)
-	var people, attendees int
-	require.NoError(t, b.QueryRow(`SELECT COUNT(*) FROM people`).Scan(&people))
-	require.NoError(t, b.QueryRow(`SELECT COUNT(*) FROM event_people`).Scan(&attendees))
-	assert.Equal(t, 0, people, "nobody is created")
-	assert.Equal(t, 0, attendees)
-}
-
-func TestAmbiguousAttendeeIsSkipped(t *testing.T) {
-	b := openDB(t)
-	addPerson(t, b, "A", "dup@example.com")
-	pr := repo.NewPersonRepo(b)
-	p2, err := pr.Create(ctx, model.CreatePersonInput{FirstName: "B"})
-	require.NoError(t, err)
-	require.NoError(t, pr.AddEmail(ctx, p2.ID, "dup@example.com", nil, false))
-	data := "BEGIN:VCALENDAR\nBEGIN:VEVENT\nUID:a\nSUMMARY:x\nDTSTART:20261016T173000Z\nATTENDEE:mailto:dup@example.com\nEND:VEVENT\nEND:VCALENDAR\n"
-	res := imp(t, b, []byte(data), icsio.ImportOptions{})
-	assert.Contains(t, strings.Join(res.Warnings, " "), "matches 2 people")
-	assert.Equal(t, 1, res.Events.Created)
-}
-
-func TestSourcesAreSeparate(t *testing.T) {
-	data := []byte("BEGIN:VCALENDAR\nBEGIN:VEVENT\nUID:same@x\nSUMMARY:x\nDTSTART:20261016T173000Z\nEND:VEVENT\nEND:VCALENDAR\n")
-	b := openDB(t)
-	imp(t, b, data, icsio.ImportOptions{Source: "feed-a"})
-	res := imp(t, b, data, icsio.ImportOptions{Source: "feed-b"})
-	assert.Equal(t, 1, res.Events.Created, "another source does not claim the UID")
-	res = imp(t, b, data, icsio.ImportOptions{Source: "feed-a"})
-	assert.Equal(t, 1, res.Events.Unchanged)
-}
-
 func TestImportEdgeCases(t *testing.T) {
 	b := openDB(t)
 	data := `BEGIN:VCALENDAR
@@ -450,7 +395,7 @@ func TestImportedSeriesKeepsLocalTimeAcrossDST(t *testing.T) {
 	assert.Equal(t, []string{"2026-03-02T15:00:00Z", "2026-03-09T14:00:00Z", "2026-03-16T14:00:00Z", "2026-03-23T14:00:00Z"}, got)
 }
 
-func TestImportTaskStateRules(t *testing.T) {
+func TestImportTaskStateFollowsTheFile(t *testing.T) {
 	b := openDB(t)
 	open := "BEGIN:VCALENDAR\nBEGIN:VTODO\nUID:t\nSUMMARY:Draft\nSTATUS:NEEDS-ACTION\nEND:VTODO\nEND:VCALENDAR\n"
 	done := "BEGIN:VCALENDAR\nBEGIN:VTODO\nUID:t\nSUMMARY:Draft\nSTATUS:COMPLETED\nEND:VTODO\nEND:VCALENDAR\n"
@@ -461,10 +406,11 @@ func TestImportTaskStateRules(t *testing.T) {
 	require.NoError(t, b.QueryRow(`SELECT completed FROM tasks`).Scan(&completed))
 	assert.Equal(t, 1, completed)
 
-	// Done here stays done even if the file still says open.
+	// The file wins: open in the file reopens the task.
 	res = imp(t, b, []byte(open), icsio.ImportOptions{})
-	assert.Equal(t, 1, res.Todos.Unchanged)
-	assert.Contains(t, strings.Join(res.Warnings, " "), "left done")
+	assert.Equal(t, 1, res.Todos.Updated)
+	require.NoError(t, b.QueryRow(`SELECT completed FROM tasks`).Scan(&completed))
+	assert.Equal(t, 0, completed)
 
 	res = imp(t, b, []byte(open), icsio.ImportOptions{SkipTasks: true})
 	assert.Equal(t, icsio.Counts{}, res.Todos)
@@ -514,4 +460,34 @@ func TestExportIncludesVTimezoneForEachZone(t *testing.T) {
 	for _, e := range cal.Events {
 		assert.Equal(t, "2026-06-01T14:00:00Z", tz.FormatInstant(e.Start), e.TZ)
 	}
+}
+
+func TestImportIsPlainUIDMatching(t *testing.T) {
+	data := []byte("BEGIN:VCALENDAR\nBEGIN:VEVENT\nUID:a@x\nSUMMARY:One\nDTSTART:20261016T173000Z\nATTENDEE;CN=Jane:mailto:Jane@Example.com\nEND:VEVENT\nEND:VCALENDAR\n")
+	b := openDB(t)
+	res := imp(t, b, data, icsio.ImportOptions{Source: "file-a"})
+	assert.Equal(t, 1, res.Events.Created)
+	var people, linked, guests int
+	require.NoError(t, b.QueryRow(`SELECT COUNT(*) FROM people`).Scan(&people))
+	require.NoError(t, b.QueryRow(`SELECT COUNT(*) FROM event_people`).Scan(&linked))
+	require.NoError(t, b.QueryRow(`SELECT COUNT(*) FROM event_guests WHERE email = 'jane@example.com' AND name = 'Jane'`).Scan(&guests))
+	assert.Equal(t, []int{0, 0, 1}, []int{people, linked, guests}, "unknown attendee is recorded on the event, nobody is created")
+	assert.Empty(t, res.Warnings)
+
+	// Same UID from another file updates the same event.
+	res = imp(t, b, bytes.ReplaceAll(data, []byte("One"), []byte("Two")), icsio.ImportOptions{Source: "file-b"})
+	assert.Equal(t, 1, res.Events.Updated)
+
+	// Deleted locally: the file brings it back.
+	var id int64
+	require.NoError(t, b.QueryRow(`SELECT id FROM events`).Scan(&id))
+	require.NoError(t, repo.NewEventRepo(b).Archive(ctx, id, "", ""))
+	res = imp(t, b, data, icsio.ImportOptions{})
+	assert.Equal(t, 1, res.Events.Created)
+
+	// A known contact is linked instead.
+	addPerson(t, b, "Jane", "jane@example.com")
+	imp(t, b, bytes.ReplaceAll(data, []byte("One"), []byte("Three")), icsio.ImportOptions{})
+	require.NoError(t, b.QueryRow(`SELECT COUNT(*) FROM event_people`).Scan(&linked))
+	assert.Equal(t, 1, linked)
 }

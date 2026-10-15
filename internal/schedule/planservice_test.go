@@ -41,8 +41,9 @@ func TestPlanTasksReadsButNeverWrites(t *testing.T) {
 	require.NoError(t, d.QueryRow(`SELECT group_concat(updated_at || coalesce(scheduled_start, '-')) FROM tasks`).Scan(&before))
 	res := plan(t, d)
 	require.Len(t, res.Decisions, 2, "the manual task is not planned")
-	assert.Equal(t, 1, res.Summary.Placed)
-	assert.Equal(t, 1, res.Summary.Skipped)
+	assert.Equal(t, 2, res.Summary.Placed, "no length means 30 minutes")
+	nl := byTitle(*res)["No length"]
+	assert.Equal(t, "placed", nl.Decision)
 	placed := byTitle(*res)["Write report"]
 	assert.Equal(t, "2026-10-12T14:00:00Z", placed.Blocks[0].Start)
 	var after string

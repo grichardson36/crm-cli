@@ -103,11 +103,3 @@ func scheduleColumns(s model.TaskSchedule) (cols []string, vals []any, err error
 	}
 	return cols, vals, nil
 }
-
-// ScheduleIssue says why an auto-scheduled task cannot be placed, or "".
-func ScheduleIssue(t *model.Task) string {
-	if t.AutoSchedule && !t.Completed && (t.DurationMin == nil || *t.DurationMin <= 0) {
-		return "no_duration"
-	}
-	return ""
-}

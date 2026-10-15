@@ -154,6 +154,21 @@ func (r *EventRepo) loadChildren(ctx context.Context, e *model.Event) error {
 	}
 	rows.Close()
 
+	rows, err = q.QueryContext(ctx, `SELECT email, name, role, rsvp FROM event_guests WHERE event_id = ? ORDER BY CASE role WHEN 'organizer' THEN 0 ELSE 1 END, email`, e.ID)
+	if err != nil {
+		return fmt.Errorf("load guests: %w", err)
+	}
+	e.Guests = nil
+	for rows.Next() {
+		var g model.EventGuest
+		if err := rows.Scan(&g.Email, &g.Name, &g.Role, &g.RSVP); err != nil {
+			rows.Close()
+			return err
+		}
+		e.Guests = append(e.Guests, g)
+	}
+	rows.Close()
+
 	rows, err = q.QueryContext(ctx, `SELECT minutes_before, method FROM event_reminders WHERE event_id = ? ORDER BY minutes_before DESC, method`, e.ID)
 	if err != nil {
 		return fmt.Errorf("load reminders: %w", err)
@@ -387,6 +402,35 @@ func (r *EventRepo) writeChildren(ctx context.Context, q DBTX, id int64, exdates
 	return nil
 }
 
+// writeGuests stores attendees who are not contacts.
+func writeGuests(ctx context.Context, q DBTX, id int64, guests []model.EventGuest) error {
+	for _, g := range guests {
+		g.Email = strings.ToLower(strings.TrimSpace(g.Email))
+		if g.Email == "" {
+			continue
+		}
+		if g.Role == "" {
+			g.Role = "attendee"
+		}
+		if g.RSVP == "" {
+			g.RSVP = "needs-action"
+		}
+		if err := model.ValidateEventRole(g.Role); err != nil {
+			return err
+		}
+		if err := model.ValidateEventRSVP(g.RSVP); err != nil {
+			return err
+		}
+		if _, err := q.ExecContext(ctx,
+			`INSERT INTO event_guests (event_id, email, name, role, rsvp) VALUES (?, ?, ?, ?, ?)
+			 ON CONFLICT(event_id, email) DO UPDATE SET name = excluded.name, role = excluded.role, rsvp = excluded.rsvp`,
+			id, g.Email, g.Name, g.Role, g.RSVP); err != nil {
+			return fmt.Errorf("add guest: %w", err)
+		}
+	}
+	return nil
+}
+
 // Create inserts a new event with its attendees, reminders and tags.
 func (r *EventRepo) Create(ctx context.Context, in model.CreateEventInput) (*model.Event, error) {
 	e, err := newEventFromInput(in)
@@ -407,6 +451,9 @@ func (r *EventRepo) Create(ctx context.Context, in model.CreateEventInput) (*mod
 		return nil, err
 	}
 	if err := r.writeChildren(ctx, tx, id, in.Exdates, e.AllDay, in.Attendees, reminders); err != nil {
+		return nil, err
+	}
+	if err := writeGuests(ctx, tx, id, in.Guests); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -861,6 +908,9 @@ func (r *EventRepo) copyChildren(ctx context.Context, tx DBTX, from, to int64, w
 	}
 	if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO event_reminders (event_id, minutes_before, method) SELECT ?, minutes_before, method FROM event_reminders WHERE event_id = ?`, to, from); err != nil {
 		return fmt.Errorf("copy reminders: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO event_guests (event_id, email, name, role, rsvp) SELECT ?, email, name, role, rsvp FROM event_guests WHERE event_id = ?`, to, from); err != nil {
+		return fmt.Errorf("copy guests: %w", err)
 	}
 	if withTags {
 		if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO taggings (tag_id, entity_type, entity_id) SELECT tag_id, 'event', ? FROM taggings WHERE entity_type = 'event' AND entity_id = ?`, to, from); err != nil {

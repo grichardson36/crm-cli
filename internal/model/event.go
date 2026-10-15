@@ -99,6 +99,7 @@ type Event struct {
 
 	Exdates   []string        `json:"exdates,omitempty"`
 	Attendees []EventAttendee `json:"attendees,omitempty"`
+	Guests    []EventGuest    `json:"guests,omitempty"`
 	Reminders []EventReminder `json:"reminders,omitempty"`
 	Tags      []string        `json:"tags,omitempty"`
 
@@ -113,6 +114,15 @@ type EventAttendee struct {
 	Name     string `json:"name,omitempty"`
 	Role     string `json:"role"`
 	RSVP     string `json:"rsvp"`
+}
+
+// EventGuest is an attendee who is not a contact: the address and name the invitation carried.
+// No contact is created from it.
+type EventGuest struct {
+	Email string `json:"email"`
+	Name  string `json:"name,omitempty"`
+	Role  string `json:"role"`
+	RSVP  string `json:"rsvp"`
 }
 
 // EventReminder asks for a notice some minutes before the start. Delivery is outside the program.
@@ -164,6 +174,7 @@ type CreateEventInput struct {
 	Floating bool
 
 	Attendees []EventAttendee
+	Guests    []EventGuest
 	Reminders []EventReminder
 	Tags      []string
 }

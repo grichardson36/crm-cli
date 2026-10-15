@@ -84,9 +84,8 @@ func TestCalImportFromStdinAndErrors(t *testing.T) {
 	require.NoError(t, os.WriteFile(good, []byte("BEGIN:VCALENDAR\nBEGIN:VEVENT\nUID:a@x\nSUMMARY:From a file\nDTSTART;TZID=Europe/London:20261016T093000\nATTENDEE:mailto:nobody@example.com\nX-ODD:1\nEND:VEVENT\nEND:VCALENDAR\n"), 0o600))
 	stdout, stderr, code := calCrm(t, db, "cal", "import", good, "-f", "json", "--source", "feed")
 	require.Equal(t, 0, code, stderr)
-	assert.Contains(t, stderr, "nobody@example.com")
 	assert.Contains(t, stderr, "X-ODD")
-	assert.Contains(t, stdout, `"unmatched_attendees"`)
+	assert.NotContains(t, stdout, "unmatched")
 
 	ev := calJSON(t, db, "cal", "show", "1")
 	assert.Equal(t, "Europe/London", ev[0]["tz"])

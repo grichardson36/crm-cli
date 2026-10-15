@@ -144,6 +144,21 @@ func sameAttendees(a, b []model.EventAttendee) bool {
 	return true
 }
 
+func guestKeys(list []model.EventGuest) []string {
+	out := make([]string, len(list))
+	for i, g := range list {
+		role, rsvp := g.Role, g.RSVP
+		if role == "" {
+			role = "attendee"
+		}
+		if rsvp == "" {
+			rsvp = "needs-action"
+		}
+		out[i] = strings.ToLower(strings.TrimSpace(g.Email)) + "|" + g.Name + "|" + role + "|" + rsvp
+	}
+	return out
+}
+
 func cleanTags(tags []string) []string {
 	seen := map[string]bool{}
 	var out []string
@@ -225,7 +240,7 @@ func (r *EventRepo) Upsert(ctx context.Context, existingID int64, in model.Creat
 	for i, x := range in.Exdates {
 		wantEx[i] = anchorString(want.AllDay, x)
 	}
-	if sameEventFields(cur, want) && sameStrings(cur.Exdates, wantEx) && sameAttendees(cur.Attendees, in.Attendees) &&
+	if sameEventFields(cur, want) && sameStrings(cur.Exdates, wantEx) && sameAttendees(cur.Attendees, in.Attendees) && sameStrings(guestKeys(cur.Guests), guestKeys(in.Guests)) &&
 		sameStrings(reminderStrings(cur.Reminders), reminderStrings(reminders)) && sameStrings(cur.Tags, cleanTags(in.Tags)) {
 		return cur, OutcomeUnchanged, nil
 	}
@@ -243,12 +258,15 @@ func (r *EventRepo) Upsert(ctx context.Context, existingID int64, in model.Creat
 	if err := writeEvent(ctx, tx, want); err != nil {
 		return nil, "", err
 	}
-	for _, q := range []string{`DELETE FROM event_exdates WHERE event_id = ?`, `DELETE FROM event_people WHERE event_id = ?`, `DELETE FROM event_reminders WHERE event_id = ?`} {
+	for _, q := range []string{`DELETE FROM event_exdates WHERE event_id = ?`, `DELETE FROM event_people WHERE event_id = ?`, `DELETE FROM event_guests WHERE event_id = ?`, `DELETE FROM event_reminders WHERE event_id = ?`} {
 		if _, err := tx.ExecContext(ctx, q, cur.ID); err != nil {
 			return nil, "", fmt.Errorf("replace children: %w", err)
 		}
 	}
 	if err := r.writeChildren(ctx, tx, cur.ID, in.Exdates, want.AllDay, in.Attendees, reminders); err != nil {
+		return nil, "", err
+	}
+	if err := writeGuests(ctx, tx, cur.ID, in.Guests); err != nil {
 		return nil, "", err
 	}
 	if err := tx.Commit(); err != nil {

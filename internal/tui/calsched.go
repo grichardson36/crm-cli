@@ -139,8 +139,8 @@ func (m *Model) toggleAutoSchedule() {
 	switch {
 	case !on:
 		m.setStatus("auto-schedule off", false)
-	case repo.ScheduleIssue(&model.Task{AutoSchedule: true, DurationMin: t.DurationMin}) != "":
-		m.setStatus("auto-schedule on, but the task has no duration yet (S sets one)", false)
+	case t.DurationMin == nil:
+		m.setStatus("auto-schedule on, planned as 30 min (S sets a duration)", false)
 	default:
 		m.setStatus("auto-schedule on", false)
 	}

@@ -103,7 +103,7 @@ func TestSplitTaskShowsAsBlocksInTheCalendar(t *testing.T) {
 	_, err := repo.NewPlanRepo(m.db).Apply(context.Background(), []repo.PlanEntry{{TaskID: a.ID, Start: &chunks[0].Start, Blocks: chunks}}, "test")
 	require.NoError(t, err)
 	require.NoError(t, m.reload())
-	press(m, "d", "]")
+	press(m, "d", "tab")
 	s := rowsText(m.rows)
 	assert.Contains(t, s, "09:00 [ ] Write report")
 	assert.Contains(t, s, "14:00 [ ] Write report")

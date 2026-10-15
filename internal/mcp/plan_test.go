@@ -28,7 +28,7 @@ func TestPlanViaMCP(t *testing.T) {
 	first := tasks[0].(map[string]any)
 	assert.Equal(t, "placed", first["decision"])
 	assert.Equal(t, "2026-10-15T14:00:00Z", first["blocks"].([]any)[0].(map[string]any)["start"])
-	assert.EqualValues(t, 1, plan["summary"].(map[string]any)["skipped_no_duration"])
+	assert.EqualValues(t, 2, plan["summary"].(map[string]any)["placed"])
 
 	var list []map[string]any
 	callJSON(t, s, "crm_task_list", map[string]any{}, &list)
@@ -44,10 +44,10 @@ func TestPlanViaMCP(t *testing.T) {
 	for _, tk := range list {
 		if tk["scheduled_start"] != nil {
 			placed++
-			assert.Equal(t, true, tk["scheduled_locked"])
+			assert.Equal(t, tk["id"] == task["id"], tk["scheduled_locked"], "only the pinned row is locked")
 		}
 	}
-	assert.Equal(t, 1, placed)
+	assert.Equal(t, 2, placed)
 
 	text, isErr := call(t, s, "crm_cal_plan", map[string]any{"apply": true})
 	assert.True(t, isErr, text)

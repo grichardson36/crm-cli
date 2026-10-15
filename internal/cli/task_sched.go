@@ -23,7 +23,7 @@ func bindScheduleFlags(cmd *cobra.Command) *schedFlags {
 	fl.StringVar(&f.deadline, "deadline", "", "the scheduler plans against this date or time (empty clears; --due stays the soft target)")
 	fl.BoolVar(&f.hard, "hard-deadline", false, "the deadline may use hours outside working hours")
 	fl.StringVar(&f.minChunk, "min-chunk", "", "smallest block the task may be split into, e.g. 30m (empty clears)")
-	fl.BoolVar(&f.auto, "auto-schedule", false, "let the planner place this task (it needs a duration)")
+	fl.BoolVar(&f.auto, "auto-schedule", false, "let the planner place this task (30 min unless --duration is set)")
 	fl.StringVar(&f.scheduleName, "schedule-name", "", "working hours rule the task is placed in (default work)")
 	fl.StringVar(&f.scheduledStart, "scheduled-start", "", "place the task at this time by hand; it is locked (empty unplaces)")
 	fl.BoolVar(&f.lock, "lock", false, "keep the planner away from the placed time (--lock=false unlocks)")

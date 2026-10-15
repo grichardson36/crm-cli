@@ -45,9 +45,8 @@ type ImportResult struct {
 	Todos     Counts `json:"todos"`
 	// Ignored counts components that are not events or tasks, by name.
 	Ignored map[string]int `json:"ignored,omitempty"`
-	// UnmatchedAttendees lists addresses that matched nobody. They are not created.
-	UnmatchedAttendees []string `json:"unmatched_attendees,omitempty"`
-	Warnings           []string `json:"warnings,omitempty"`
+	// Warnings name components that were left out because they cannot be placed (no UID, no start).
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 func (c *Counts) add(outcome string) {
@@ -70,7 +69,6 @@ type importer struct {
 	ext   *repo.ExternalIDRepo
 	res   *ImportResult
 	cache map[string]int64 // email -> person id, 0 when none or ambiguous
-	seen  map[string]bool
 }
 
 func (im *importer) warn(format string, a ...any) {
@@ -92,7 +90,7 @@ func Import(ctx context.Context, db *sql.DB, data []byte, opt ImportOptions) (*I
 	im := &importer{
 		ctx: ctx, db: db, opt: opt, er: repo.NewEventRepo(db), tr: repo.NewTaskRepo(db), ext: repo.NewExternalIDRepo(db),
 		res:   &ImportResult{Source: opt.Source, DryRun: opt.DryRun, Calendar: cal.Name, Ignored: cal.Skipped},
-		cache: map[string]int64{}, seen: map[string]bool{},
+		cache: map[string]int64{},
 	}
 	if len(cal.Skipped) == 0 {
 		im.res.Ignored = nil
@@ -128,36 +126,42 @@ func Import(ctx context.Context, db *sql.DB, data []byte, opt ImportOptions) (*I
 	return im.res, nil
 }
 
-// lookup finds the local row for a UID: the external id mapping first, then a row whose own uuid
-// is the UID (a file exported from this database).
-func (im *importer) lookup(entity, uid string) (id int64, deletedLocally bool, err error) {
+// lookup finds the local row for a UID: a mapping from this source, a mapping from any other
+// source (the same UID arrives the same way whichever file or feed brought it), or a row whose own
+// uuid is the UID (a file exported from this database). A deleted row counts as no match, so the
+// import inserts the UID again. 0 means no match.
+func (im *importer) lookup(entity, uid string) (int64, error) {
+	var id int64
 	l, err := im.ext.Lookup(im.ctx, im.opt.Source, entity, uid)
+	if errors.Is(err, model.ErrNotFound) {
+		l, err = im.ext.LookupAny(im.ctx, entity, uid)
+	}
 	switch {
 	case err == nil:
-		exists, archived, serr := repo.EntityState(im.ctx, im.db, entity, l.LocalID)
-		if serr != nil {
-			return 0, false, serr
-		}
-		if exists && archived {
-			return l.LocalID, true, nil
-		}
-		if exists {
-			return l.LocalID, false, nil
-		}
+		id = l.LocalID
 	case !errors.Is(err, model.ErrNotFound):
-		return 0, false, err
+		return 0, err
 	}
-	switch entity {
-	case "event":
-		if e, err := im.er.FindByUUID(im.ctx, uid); err == nil {
-			return e.ID, false, nil
-		}
-	case "task":
-		if t, err := im.tr.FindByUUID(im.ctx, uid); err == nil {
-			return t.ID, false, nil
+	if id == 0 {
+		switch entity {
+		case "event":
+			if e, err := im.er.FindByUUID(im.ctx, uid); err == nil {
+				id = e.ID
+			}
+		case "task":
+			if t, err := im.tr.FindByUUID(im.ctx, uid); err == nil {
+				id = t.ID
+			}
 		}
 	}
-	return 0, false, nil
+	if id == 0 {
+		return 0, nil
+	}
+	exists, archived, err := repo.EntityState(im.ctx, im.db, entity, id)
+	if err != nil || !exists || archived {
+		return 0, err
+	}
+	return id, nil
 }
 
 func (im *importer) link(entity, uid string, localID int64) error {
@@ -190,7 +194,8 @@ func rsvpOf(s string) string {
 	return "needs-action"
 }
 
-// person matches an address to one live person. Unknown addresses are reported, never created.
+// person matches an address to the one contact that has it. No match, or more than one, gives 0
+// and the address is kept on the event as a guest. No contact is created.
 func (im *importer) person(p ics.Person) int64 {
 	if p.Email == "" {
 		return 0
@@ -198,24 +203,9 @@ func (im *importer) person(p ics.Person) int64 {
 	if id, ok := im.cache[p.Email]; ok {
 		return id
 	}
-	ids, err := im.er.MatchPersonByEmail(im.ctx, p.Email)
 	var id int64
-	switch {
-	case err != nil:
-		im.warn("attendee %s: %v", p.Email, err)
-	case len(ids) == 1:
+	if ids, err := im.er.MatchPersonByEmail(im.ctx, p.Email); err == nil && len(ids) == 1 {
 		id = ids[0]
-	case len(ids) > 1:
-		im.warn("attendee %s matches %d people, skipped", p.Email, len(ids))
-	default:
-		label := p.Email
-		if p.Name != "" {
-			label = fmt.Sprintf("%s (%s)", p.Email, p.Name)
-		}
-		if !im.seen[p.Email] {
-			im.seen[p.Email] = true
-			im.res.UnmatchedAttendees = append(im.res.UnmatchedAttendees, label)
-		}
 	}
 	im.cache[p.Email] = id
 	return id
@@ -254,12 +244,24 @@ func (im *importer) input(ev *ics.Event) model.CreateEventInput {
 	var order []int64
 	add := func(p ics.Person, organizer bool) {
 		id := im.person(p)
-		if id == 0 {
-			return
-		}
 		role := "attendee"
 		if organizer || p.Role == "organizer" {
 			role = "organizer"
+		}
+		if id == 0 {
+			if p.Email == "" {
+				return
+			}
+			for i := range in.Guests {
+				if in.Guests[i].Email == p.Email {
+					if role == "organizer" {
+						in.Guests[i].Role = role
+					}
+					return
+				}
+			}
+			in.Guests = append(in.Guests, model.EventGuest{Email: p.Email, Name: p.Name, Role: role, RSVP: rsvpOf(p.PartStat)})
+			return
 		}
 		if cur, ok := byPerson[id]; ok {
 			if role == "organizer" {
@@ -291,14 +293,9 @@ func (im *importer) input(ev *ics.Event) model.CreateEventInput {
 }
 
 func (im *importer) event(ev *ics.Event, ids map[string]int64, dryNew map[string]bool) error {
-	id, deleted, err := im.lookup("event", ev.UID)
+	id, err := im.lookup("event", ev.UID)
 	if err != nil {
 		return err
-	}
-	if deleted {
-		im.res.Events.Skipped++
-		im.warn("event %q was deleted here, not created again", ev.UID)
-		return nil
 	}
 	in := im.input(ev)
 	got, outcome, err := im.er.Upsert(im.ctx, id, in, im.opt.DryRun)
@@ -332,11 +329,11 @@ func (im *importer) override(ev *ics.Event, ids map[string]int64, dryNew map[str
 			return nil
 		}
 		// The series may have been imported earlier.
-		id, deleted, err := im.lookup("event", ev.UID)
+		id, err := im.lookup("event", ev.UID)
 		if err != nil {
 			return err
 		}
-		if id == 0 || deleted {
+		if id == 0 {
 			im.res.Overrides.Skipped++
 			im.warn("override of %q has no series in the file or the database, skipped", ev.UID)
 			return nil
@@ -373,14 +370,9 @@ func priorityOf(p int) string {
 }
 
 func (im *importer) todo(td *ics.Todo) error {
-	id, deleted, err := im.lookup("task", td.UID)
+	id, err := im.lookup("task", td.UID)
 	if err != nil {
 		return err
-	}
-	if deleted {
-		im.res.Todos.Skipped++
-		im.warn("task %q was deleted here, not created again", td.UID)
-		return nil
 	}
 	if td.RRule != "" {
 		im.warn("task %q: the repeat rule is not kept, tasks repeat by their own recurrence", td.UID)
@@ -422,10 +414,7 @@ func (im *importer) todo(td *ics.Todo) error {
 		return err
 	}
 	changed := cur.Title != td.Summary || cur.Priority != prio || (desc != nil && (cur.Description == nil || *cur.Description != *desc)) ||
-		(due != nil && (cur.DueAt == nil || *cur.DueAt != *due)) || (completed && !cur.Completed)
-	if cur.Completed && !completed {
-		im.warn("task %q is done here but open in the file, left done", td.UID)
-	}
+		(due != nil && (cur.DueAt == nil || *cur.DueAt != *due)) || completed != cur.Completed
 	if !changed {
 		im.res.Todos.add(repo.OutcomeUnchanged)
 		return im.link("task", td.UID, id)
@@ -440,6 +429,10 @@ func (im *importer) todo(td *ics.Todo) error {
 	}
 	if completed && !cur.Completed {
 		if _, err := im.tr.Complete(im.ctx, id); err != nil {
+			return err
+		}
+	} else if !completed && cur.Completed {
+		if _, err := im.tr.Reopen(im.ctx, id); err != nil {
 			return err
 		}
 	}

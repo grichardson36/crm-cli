@@ -42,7 +42,7 @@ crm search "intro" --type event
 
 ## ICS files
 
-Events and tasks (`--tasks`, as VTODO) go in and out as iCalendar. Imports match by UID, so a second import updates instead of duplicating, and an export imported elsewhere keeps every UID.
+Events and tasks (`--tasks`, as VTODO) go in and out as iCalendar. An import is one-shot and takes the file as it is: a UID already here is updated, any other is added. Nothing is skipped or protected. To stay in sync use the CalDAV source (`caldav`).
 
 ```sh crm-example
 crm cal export --tasks
@@ -54,7 +54,7 @@ crm cal import ./feed.ics --dry-run
 crm cal import ./feed.ics --source work-feed
 ```
 
-Attendees are matched to people by email. Unknown addresses are listed and never created. Use one `--source` name per feed. Times without a zone are read in this device's zone and kept floating. An event deleted here is not created again by a later import.
+Attendees with a contact's email link to the contact. Other addresses are kept on the event as guests, no contact is created. Times without a zone are read in this device's zone and kept floating.
 
 ## Working hours
 
@@ -71,7 +71,7 @@ crm cal hours show --expand today
 
 ## Plan tasks
 
-`crm cal plan` proposes times for tasks with `--auto-schedule` and a duration. It never writes. Order: hard deadlines, then least slack, priority, deadline, creation. Each task takes the earliest free time inside its working hours, clear of events, locked tasks and buffers. Every row says why. `--min-chunk` lets a task split into blocks.
+`crm cal plan` proposes times for tasks with `--auto-schedule`. A task with no `--duration` is planned as 30 minutes. It never writes. Order: ASAP priority first, then hard deadlines, least slack, priority (high, medium, low), deadline, creation. Each task takes the earliest free time inside its working hours, clear of events, locked tasks and buffers. Every row says why. `--min-chunk` lets a task split into blocks.
 
 ```sh crm-example
 crm task edit 1 --duration 2h --deadline 2026-11-06 --auto-schedule

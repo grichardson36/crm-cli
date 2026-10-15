@@ -530,12 +530,10 @@ func TestNumberAndBracketKeysCoverEveryView(t *testing.T) {
 	}
 	assert.Equal(t, viewCalendar, m.view)
 	press(m, "]")
-	assert.Equal(t, viewCalendar, m.view, "] steps the calendar period instead of changing view")
-	press(m, "1", "[")
-	assert.Equal(t, viewCalendar, m.view, "[ wraps back from Home")
-	press(m, "8", "]")
-	assert.Equal(t, viewCalendar, m.view)
-	press(m, "7", "]")
+	assert.Equal(t, viewHome, m.view, "] wraps around, also from the Calendar")
+	press(m, "[")
+	assert.Equal(t, viewCalendar, m.view, "[ wraps back")
+	press(m, "[")
 	assert.Equal(t, viewSync, m.view)
 }
 
