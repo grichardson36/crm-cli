@@ -47,6 +47,7 @@ func NewRootCmd() *cobra.Command {
 	registerDealCommands(rootCmd)
 	registerTaskCommands(rootCmd)
 	registerDoCommand(rootCmd)
+	registerCalCommands(rootCmd)
 	registerSearchCommand(rootCmd)
 	registerContextCommand(rootCmd)
 	registerStatusCommand(rootCmd)

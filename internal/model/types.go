@@ -229,6 +229,32 @@ type Task struct {
 	Archived    bool    `json:"-"`
 	CreatedAt   string  `json:"created_at"`
 	UpdatedAt   string  `json:"updated_at"`
+
+	// Scheduling fields. DueAt stays the soft target; DeadlineAt is the date the scheduler plans against.
+	DurationMin     *int    `json:"duration_min"`
+	EarliestStart   *string `json:"earliest_start"`
+	DeadlineAt      *string `json:"deadline_at"`
+	DeadlineHard    bool    `json:"deadline_hard"`
+	MinChunkMin     *int    `json:"min_chunk_min"`
+	AutoSchedule    bool    `json:"auto_schedule"`
+	ScheduledStart  *string `json:"scheduled_start"`
+	ScheduledLocked bool    `json:"scheduled_locked"`
+	ScheduleName    string  `json:"schedule_name"`
+}
+
+// TaskSchedule holds the optional scheduling fields of a task for create and update. Nil means
+// unchanged. For numbers and text, 0 and the empty string clear the value.
+type TaskSchedule struct {
+	DurationMin    *int
+	EarliestStart  *string
+	DeadlineAt     *string
+	DeadlineHard   *bool
+	MinChunkMin    *int
+	AutoSchedule   *bool
+	ScheduledStart *string // setting a time by hand also locks it, unless ScheduledLocked says otherwise
+	// ScheduledLocked keeps the scheduler away from the placed time.
+	ScheduledLocked *bool
+	ScheduleName    *string
 }
 
 // CreateTaskInput holds fields for creating a task.
@@ -242,6 +268,7 @@ type CreateTaskInput struct {
 	// PersonIDs links the task to several people. PersonID is added to it.
 	PersonIDs  []int64
 	Recurrence *string
+	Schedule   TaskSchedule
 }
 
 // UpdateTaskInput holds optional fields for updating a task.
@@ -253,6 +280,7 @@ type UpdateTaskInput struct {
 	DueAt       *string
 	Priority    *string
 	Recurrence  *string
+	Schedule    TaskSchedule
 }
 
 // TaskFilters holds optional filters for listing tasks.
@@ -275,7 +303,7 @@ type Relationship struct {
 }
 
 // Valid entity types for tagging.
-var EntityTypes = []string{"person", "organization", "deal", "interaction"}
+var EntityTypes = []string{"person", "organization", "deal", "interaction", "event"}
 
 // ValidEntityType checks if the given type is valid.
 func ValidEntityType(t string) bool {

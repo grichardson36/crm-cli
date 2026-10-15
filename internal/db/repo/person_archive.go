@@ -122,6 +122,9 @@ func (r *PersonRepo) Purge(ctx context.Context, id int64) error {
 	if err := exec("DELETE FROM external_ids WHERE entity = 'person' AND local_id = ?", id); err != nil {
 		return err
 	}
+	if err := exec("DELETE FROM field_versions WHERE entity = 'task' AND local_id NOT IN (SELECT id FROM tasks)"); err != nil {
+		return err
+	}
 	if err := exec("DELETE FROM field_versions WHERE entity = 'person' AND local_id = ?", id); err != nil {
 		return err
 	}

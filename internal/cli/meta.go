@@ -33,10 +33,13 @@ const (
 	personFields = "id,uuid,first_name,last_name,name,email,phone,title,company,location,notes,summary,org_id,birthday,keep_in_touch,last_contacted_at,is_favorite,priority_tier,emails,phones,handles,created_at,updated_at"
 	orgFields    = "id,uuid,name,domain,industry,notes,summary,created_at,updated_at"
 	dealFields   = "id,uuid,title,stage,value,person_id,org_id,notes,closed_at,created_at,updated_at"
-	taskFields   = "id,uuid,title,priority,completed,description,person_id,person_ids,deal_id,due_at,recurrence,completed_at,created_at,updated_at"
+	taskFields   = "id,uuid,title,priority,completed,description,person_id,person_ids,deal_id,due_at,recurrence,completed_at,created_at,updated_at,duration_min,earliest_start,deadline_at,deadline_hard,min_chunk_min,auto_schedule,scheduled_start,scheduled_locked,schedule_name,schedule_issue"
 	logFields    = "id,uuid,type,subject,content,direction,occurred_at,person_ids,created_at,updated_at"
 	tagFields    = "id,name"
-	syncFields   = "source,status,created,updated,skipped,inbox,errors,dry_run,note,run_id,since,next_cursor"
+	eventFields  = "id,uuid,title,notes,location,all_day,start,end,start_utc,end_utc,start_date,end_date,tz,rrule,repeat,status,busy,source,exdates,attendees,reminders,tags,local_start,local_end,display_tz,created_at,updated_at"
+	// instanceFields are the fields of one occurrence in cal list.
+	instanceFields = "id,event_id,uuid,series_id,title,location,status,busy,all_day,start,end,start_date,end_date,tz,recurring,occurrence,attendees,date,time,local_start,local_end,display_tz"
+	syncFields     = "source,status,created,updated,skipped,inbox,errors,dry_run,note,run_id,since,next_cursor"
 )
 
 // commandMeta is keyed by command path below the root.
@@ -101,7 +104,8 @@ var commandMeta = map[string]cmdMeta{
 	"task add": {mutates: true, noDryRun: true, fields: taskFields, examples: []string{
 		`crm task add "Send proposal" --person 1 --due 2026-11-01 --priority high`,
 		`crm task add "Call back" --person 1 --due 2026-11-01 --recurrence "7 days"`,
-		`crm task add "Call back @fri 3pm ~30m ^high +Jane" --dry-run`}},
+		`crm task add "Call back @fri 3pm ~30m ^high +Jane" --dry-run`,
+		`crm task add "Write report" --duration 2h --deadline 2026-11-06 --auto-schedule`}},
 	"do": {mutates: true, noDryRun: true, fields: "input,verb,dry_run,applied,preview,subject,links,changes,warnings,problems,needs_confirm,syntax", examples: []string{
 		`crm do "n Jane called about the deal #deal @fri" --dry-run`,
 		`crm do "t Jane send the contract @mon ^high"`,
@@ -109,9 +113,49 @@ var commandMeta = map[string]cmdMeta{
 		`crm do "tag note" --person 1`}},
 	"task list":   {fields: taskFields, examples: []string{`crm task list -f json`, `crm task list --overdue -f json`}},
 	"task show":   {fields: taskFields, examples: []string{`crm task show 1 -f json`}},
-	"task edit":   {mutates: true, fields: taskFields, target: "task", targetArgs: "first", examples: []string{`crm task edit 1 --priority low`}},
+	"task edit": {mutates: true, fields: taskFields, target: "task", targetArgs: "first", examples: []string{`crm task edit 1 --priority low`,
+		`crm task edit 1 --duration 90m --earliest-start 2026-11-02 --hard-deadline`, `crm task edit 1 --scheduled-start "2026-11-03 14:00" --dry-run`}},
 	"task done":   {mutates: true, fields: taskFields, target: "task", targetArgs: "first", examples: []string{`crm task done 1`}},
 	"task delete": {mutates: true, target: "task", targetArgs: "first", examples: []string{`crm task delete 1`}},
+
+	// calendar
+	"cal add": {mutates: true, noDryRun: true, fields: eventFields, examples: []string{
+		`crm cal add "Lunch with Sam" --start "fri 12:30" --duration 1h --location "Cafe Rio" --person 1`,
+		`crm cal add "Standup" --start "2026-10-19 09:15" --duration 15m --repeat weekdays --tz America/Chicago --dry-run`}},
+	"cal list": {fields: instanceFields, examples: []string{
+		`crm cal list -f json`, `crm cal list --from 2026-10-19 --days 14 --tz America/Chicago -f json`, `crm cal list --person 1 --tag work -f json`}},
+	"cal show": {fields: eventFields, examples: []string{`crm cal show 1 -f json`}},
+	"cal edit": {mutates: true, noDryRun: true, fields: eventFields, examples: []string{
+		`crm cal edit 1 --location "Room 4"`,
+		`crm cal edit 1 --scope this --at 2026-10-26T14:00:00Z --start "2026-10-27 10:00" --dry-run`,
+		`crm cal edit 1 --scope following --at 2026-11-02T15:00:00Z --title "Standup v2"`}},
+	"cal rm": {mutates: true, target: "event", targetArgs: "first", examples: []string{
+		`crm cal rm 1`, `crm cal rm 1 --scope this --at 2026-10-26T14:00:00Z --dry-run`}},
+	"cal restore": {mutates: true, target: "event", targetArgs: "first", examples: []string{`crm cal restore 1`}},
+	"cal purge": {mutates: true, destructive: true, target: "event", targetArgs: "first", examples: []string{
+		`crm cal purge 1 --dry-run`, `crm cal purge 1 --yes`}},
+	"cal attendee": {examples: []string{`crm cal attendee add 1 2 --role organizer`}},
+	"cal attendee add": {mutates: true, fields: eventFields, target: "event", targetArgs: "first", examples: []string{
+		`crm cal attendee add 1 2`, `crm cal attendee add 1 2 --rsvp accepted --dry-run`}},
+	"cal attendee rm": {mutates: true, target: "event", targetArgs: "first", examples: []string{`crm cal attendee rm 1 2`}},
+
+	"cal free": {fields: "start,end,local_start,local_end,display_tz,date,time", examples: []string{
+		`crm cal free --len 45m --within 7d -f json`, `crm cal free --len 30m --from "mon" --notice 4h --buffer 15 --limit 5`}},
+	"cal plan": {mutates: true, noDryRun: true, fields: "mode,applied,dry_run,now,horizon_end,summary,tasks,diff,journal_id,id,note,undone", examples: []string{
+		`crm cal plan -f json`, `crm cal plan --apply --dry-run -f json`, `crm cal plan --apply --reject 3 --lock 5`, `crm cal plan --undo`, `crm cal plan --history`}},
+	"cal hours": {examples: []string{`crm cal hours show`}},
+	"cal hours show": {fields: "name,uuid,tz,weekly,overrides,default,config,start,end,local_start,local_end,date,hours", examples: []string{
+		`crm cal hours show -f json`, `crm cal hours show --expand today -f json`}},
+	"cal hours set": {mutates: true, fields: "name,uuid,tz,weekly,overrides,default,config", examples: []string{
+		`crm cal hours set mon-fri 09:00-17:00`, `crm cal hours set sat off`, `crm cal hours set mon,wed 08:00-12:00,13:00-16:00 --tz America/Chicago --dry-run`}},
+	"cal hours override": {mutates: true, fields: "name,uuid,tz,weekly,overrides,default,config", examples: []string{
+		`crm cal hours override 2026-12-24 09:00-12:00`, `crm cal hours override 2026-12-25 off`, `crm cal hours override 2026-12-25 --remove`}},
+	"cal hours config": {mutates: true, fields: "default_rule,buffer_min,step_min,horizon_days", examples: []string{
+		`crm cal hours config`, `crm cal hours config --buffer 15 --step 30 --horizon 21`}},
+	"cal import": {mutates: true, noDryRun: true, fields: "source,dry_run,calendar,events,overrides,todos,ignored,unmatched_attendees,warnings", examples: []string{
+		`crm cal import ./feed.ics --dry-run`, `crm cal import ./feed.ics --source work-feed --no-tasks`}},
+	"cal export": {fields: "events,overrides,todos,attendees_without_email,file,bytes", examples: []string{
+		`crm cal export --out ./crm.ics`, `crm cal export --from 2026-01-01 --to 2027-01-01 --tasks`}},
 
 	// interactions
 	"log call":    {mutates: true, fields: logFields, target: "person", targetArgs: "all", examples: []string{`crm log call 1 --subject "Intro call" --content "Agreed on Q4 timeline"`}},

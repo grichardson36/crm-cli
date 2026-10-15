@@ -35,6 +35,7 @@ var externalEntityTables = map[string]string{
 	"deal":         "deals",
 	"interaction":  "interactions",
 	"task":         "tasks",
+	"event":        "events",
 }
 
 const externalIDColumns = "id, uuid, entity, local_id, local_uuid, source, external_id, etag, last_seen_at, created_at, updated_at"

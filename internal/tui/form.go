@@ -307,9 +307,10 @@ func (m *Model) refreshDetail(force bool) {
 	if m.creating {
 		return
 	}
+	m.calTrack()
 	r, ok := m.selected()
 	key := fmt.Sprintf("%d/%d", r.personID, r.taskID)
-	if m.view == viewMerge || m.view == viewSync {
+	if m.view == viewMerge || m.view == viewSync || m.view == viewCalendar {
 		key += fmt.Sprintf("/%d", m.cursor)
 	}
 	if !ok {

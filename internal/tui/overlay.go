@@ -71,7 +71,7 @@ func fuzzyScore(query, text string) (int, bool) {
 }
 
 func (o *overlay) refilter() {
-	type scored struct{ idx, score int }
+	type scored struct{ idx, score, length int }
 	var list []scored
 	q := o.filter.Value()
 	for i, it := range o.items {
@@ -82,9 +82,14 @@ func (o *overlay) refilter() {
 		if it.disabled != "" {
 			s += 1000
 		}
-		list = append(list, scored{i, s})
+		list = append(list, scored{i, s, len(it.label)})
 	}
-	sort.SliceStable(list, func(a, b int) bool { return list[a].score < list[b].score })
+	sort.SliceStable(list, func(a, b int) bool {
+		if list[a].score != list[b].score {
+			return list[a].score < list[b].score
+		}
+		return q != "" && list[a].length < list[b].length // an exact short title beats a longer one that starts the same
+	})
 	o.shown = o.shown[:0]
 	for _, s := range list {
 		o.shown = append(o.shown, s.idx)
@@ -183,6 +188,7 @@ func (m *Model) openViewSwitcher() tea.Cmd {
 var viewBlurbs = [numViews]string{
 	"what needs attention today", "everyone, search with /", "people to reach out to", "open tasks",
 	"upcoming birthdays", "probable duplicates", "archived people, restore or purge", "sources and the inbox",
+	"events, birthdays and due dates by day",
 }
 
 // openPicker shows a small list of choices. onPick runs after the overlay closes.
@@ -390,7 +396,7 @@ func (m *Model) handleHelpKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // helpText is generated from the action registry so it matches the palette.
 func (m *Model) helpText() string {
-	order := []string{"Home", "Contact", "Edit pane", "Bulk", "Sync", "Merge", "Compare", "Archive", "Move", "Views", "App"}
+	order := []string{"Home", "Contact", "Calendar", "Edit pane", "Bulk", "Sync", "Merge", "Compare", "Archive", "Move", "Views", "App"}
 	var b strings.Builder
 	for _, g := range order {
 		b.WriteString(m.st.Head.Render(g) + "\n")

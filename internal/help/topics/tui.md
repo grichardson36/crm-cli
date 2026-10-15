@@ -23,6 +23,7 @@ Jump with the number keys, cycle with `[` and `]`, or press `v` for the view swi
 | 6 | Merge | groups of probable duplicates |
 | 7 | Archived | archived people |
 | 8 | Sync | sync sources and the inbox of unmatched records |
+| 9 | Calendar | events, birthdays, keep-in-touch dates and tasks by day |
 
 ## Palette actions that mirror CLI commands
 
@@ -35,4 +36,4 @@ These work in `--read-only` mode. Each opens a scrollable page (`j` / `k`, `g` /
 
 All keys, editing, merge, archive, notes, sync and Home are in `crm help tui-keys`.
 
-See also: short-syntax, tui-keys, theme, keep-in-touch, duplicates, archive.
+See also: calendar, short-syntax, tui-keys, theme, keep-in-touch, duplicates, archive.

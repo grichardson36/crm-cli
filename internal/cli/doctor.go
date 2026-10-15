@@ -3,13 +3,13 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/jdanielnd/crm-cli/internal/integrations"
 	"os"
 	"path/filepath"
 
 	crmdoctor "github.com/jdanielnd/crm-cli/internal/doctor"
 	"github.com/jdanielnd/crm-cli/internal/format"
 	crmmcp "github.com/jdanielnd/crm-cli/internal/mcp"
-	crmsync "github.com/jdanielnd/crm-cli/internal/sync"
 	"github.com/spf13/cobra"
 )
 
@@ -35,7 +35,7 @@ func registerDoctorCommand(rootCmd *cobra.Command) {
 				DBPath:      path,
 				Version:     Version,
 				MCPTools:    len(crmmcp.ToolNames()),
-				SyncSources: crmsync.DefaultRegistry(os.Getenv).Names(),
+				SyncSources: integrations.DefaultRegistry(os.Getenv).Names(),
 			})
 			if err := printDoctor(rep); err != nil {
 				return err

@@ -36,4 +36,4 @@ crm task add "Weekly review" --due 2026-11-01 --recurrence weekly
 crm task done 1 --dry-run
 ```
 
-See also: short-syntax, keep-in-touch, agents, tui.
+See also: calendar, short-syntax, keep-in-touch, agents, tui.
