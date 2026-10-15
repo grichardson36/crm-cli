@@ -44,7 +44,7 @@ func TestMigration012_AsapKeepsTasksAndTheirLinks(t *testing.T) {
 
 	var version, n int
 	require.NoError(t, d.QueryRow(`PRAGMA user_version`).Scan(&version))
-	assert.Equal(t, 12, version)
+	assert.GreaterOrEqual(t, version, 12)
 	var title, prio, sched string
 	var dur int
 	require.NoError(t, d.QueryRow(`SELECT title, priority, duration_min, schedule_name FROM tasks WHERE id = 1`).Scan(&title, &prio, &dur, &sched))

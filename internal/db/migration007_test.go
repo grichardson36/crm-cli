@@ -39,7 +39,7 @@ func TestMigration007_UpgradeFromV6KeepsTaggings(t *testing.T) {
 
 	var version, n int
 	require.NoError(t, d.QueryRow(`PRAGMA user_version`).Scan(&version))
-	assert.Equal(t, 12, version)
+	assert.Equal(t, 13, version)
 	require.NoError(t, d.QueryRow(`SELECT COUNT(*) FROM taggings WHERE entity_type = 'person'`).Scan(&n))
 	assert.Equal(t, 2, n, "existing taggings survive the rebuild")
 

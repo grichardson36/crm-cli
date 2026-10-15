@@ -330,7 +330,7 @@ func registerScheduleTools(s *server.MCPServer, db *sql.DB, tr *repo.TaskRepo) {
 
 	s.AddTool(
 		gomcp.NewTool("crm_cal_plan",
-			gomcp.WithDescription("Plan auto-scheduled tasks into free working time. The default is a proposal that writes nothing: per task the decision (placed, late, unfit), blocks, eta, slack and why. With apply true it writes only scheduled_start and split blocks (never locked tasks or events) and returns a journal_id; crm_cal_plan_undo reverses it. Tasks without a duration are skipped."),
+			gomcp.WithDescription("Plan auto-scheduled tasks into free working time. The default is a proposal that writes nothing: per task the decision (placed, late, unfit), blocks, eta, slack and why. With apply true it writes only scheduled_start and split blocks (never locked tasks or events) and returns a journal_id; crm_cal_plan_undo reverses it. A task with no duration is planned as 30 minutes."),
 			gomcp.WithBoolean("apply", gomcp.Description("Write the proposal. Default false")),
 			gomcp.WithArray("only", gomcp.Description("Plan only these task IDs"), gomcp.WithNumberItems()),
 			gomcp.WithArray("reject", gomcp.Description("With apply: leave these task IDs as they are"), gomcp.WithNumberItems()),

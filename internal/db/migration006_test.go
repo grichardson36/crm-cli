@@ -15,7 +15,7 @@ func TestMigration006_DavTables(t *testing.T) {
 
 	var version int
 	require.NoError(t, d.QueryRow(`PRAGMA user_version`).Scan(&version))
-	assert.Equal(t, 12, version)
+	assert.Equal(t, 13, version)
 
 	_, err = d.Exec(`INSERT INTO people (uuid, first_name) VALUES ('p1', 'Jane')`)
 	require.NoError(t, err)

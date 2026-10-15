@@ -205,6 +205,8 @@ func (m *Model) runCalPrompt(kind, value string) {
 		m.calSetHours(value)
 	case "cal-free":
 		m.calFreeRun(value)
+	case "cal-invite":
+		m.calInviteRun(value)
 	}
 }
 

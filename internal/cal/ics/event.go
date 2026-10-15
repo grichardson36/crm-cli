@@ -440,11 +440,19 @@ func firstNonEmpty(a, b string) string {
 // Encode writes the calendar as iCalendar text. Each zone used gets a VTIMEZONE with explicit
 // observances for the years the events cover, so consumers need no tz database.
 func Encode(name string, events []*Event, todos []*Todo) []byte {
+	return EncodeMethod(name, "", events, todos)
+}
+
+// EncodeMethod is Encode with an iTIP METHOD (REQUEST, CANCEL, ...) for invitations.
+func EncodeMethod(name, method string, events []*Event, todos []*Todo) []byte {
 	var w writer
 	w.begin("VCALENDAR")
 	w.line("VERSION", nil, "2.0")
 	w.line("PRODID", nil, "-//crm-cli//calendar//EN")
 	w.line("CALSCALE", nil, "GREGORIAN")
+	if method != "" {
+		w.line("METHOD", nil, method)
+	}
 	if name != "" {
 		w.text("X-WR-CALNAME", nil, name)
 	}
