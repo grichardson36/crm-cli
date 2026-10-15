@@ -39,8 +39,12 @@ func (m *Model) View() string {
 	lines := strings.Split(out, "\n")
 	at := len(lines) - 1
 	// On the main screen keep the key hints and replace the status line above them.
-	if at > 0 && m.mode != modeOverlay && m.tv == nil && !m.help && m.cmp == nil {
+	if at > 0 && m.mode != modeOverlay && m.mode != modeNames && m.tv == nil && !m.help && m.cmp == nil {
 		at--
+	}
+	if len(lines) < m.height && at == len(lines)-1 {
+		lines = append(lines, "") // a short screen: add a line instead of covering one
+		at = len(lines) - 1
 	}
 	lines[at] = m.toastLine()
 	return strings.Join(lines, "\n")

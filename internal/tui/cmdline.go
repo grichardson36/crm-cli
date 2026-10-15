@@ -254,6 +254,8 @@ func (m *Model) cmdEnter() tea.Cmd {
 	switch {
 	case m.readOnly:
 		c.msg = "read-only: this line would change data"
+	case needsNames(p):
+		return m.askNamesFromBar()
 	case len(p.Problems) > 0:
 		c.msg = p.Problems[0].Message
 	case !p.Ready():
@@ -496,4 +498,27 @@ func (m *Model) dismissChip() tea.Cmd {
 	o.dismissed = append(o.dismissed, text)
 	m.syncCmd()
 	return m.showToast("Kept as plain text: "+text, false)
+}
+// askNamesFromBar lists the unsettled names of the command line. After the choices the line runs
+// as usual (a multi-field set still asks to confirm).
+func (m *Model) askNamesFromBar() tea.Cmd {
+	o := m.ov
+	c := o.cmd
+	line := o.filter.Value()
+	dismissed := o.dismissed
+	reparse := func(ch map[string]quick.NameChoice) *quick.Plan {
+		env := m.quickEnv()
+		env.Dismissed, env.Choices = dismissed, ch
+		return quick.Parse(line, env)
+	}
+	m.openNames(c.plan, func() { m.mode = modeOverlay }, reparse, func(p *quick.Plan) tea.Cmd {
+		m.mode = modeOverlay
+		c.plan = p
+		if p.NeedsConfirm {
+			c.confirming = true
+			return nil
+		}
+		return m.cmdRun()
+	})
+	return nil
 }

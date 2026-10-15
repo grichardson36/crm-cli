@@ -27,11 +27,12 @@ crm do "n Jane called about the deal #deal remind fri" --dry-run
 crm do "t Jane send the contract fri 3pm by mon !high"
 crm do "set Jane: company=Acme title=CTO"
 crm task add "Call back fri 3pm for 30m @Jane" --dry-run
-crm person add "Sam Lee #friend every 3m" --dry-run
 crm log add --type call 1 "Talked about the offsite #trip yesterday" --dry-run
 ```
 
 `crm do` verbs: `n`, `t`, `log <type>`, `set`, `tag`, `snooze`. A name after the verb picks the person, or use `--person ID`. Flags win over tokens. `--dry-run` shows what was read, `--no-syntax` turns it off.
+
+A name that matches nobody or several people is never guessed. The TUI lists them all on one screen before saving: `1`-`9` pick a person, `c` creates a contact, `x` keeps the text. Nothing is created by default. `crm do` exits 2 or 3 with the candidates in JSON, or take `--keep-unresolved` / `--link-new`.
 
 In the TUI, `ctrl+k` then `n Sam called #deal remind fri` previews the note. `tab` completes, `enter` runs, `alt+d` turns the chip at the cursor back into text, `ctrl+z` undoes.
 

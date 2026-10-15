@@ -52,6 +52,7 @@ const (
 	modeConfirm      // y/n question in the footer
 	modeOverlay      // command palette or picker
 	modeCapture      // waiting for the key to bind to an action
+	modeNames        // list of names to settle before a line is saved
 )
 
 // focus says which pane receives movement keys.
@@ -189,6 +190,10 @@ type Model struct {
 	keyOverrides keys.Overrides
 	keyProblems  []string
 	capture      *captureState
+
+	// names is the open list of unsettled names, and the choices remembered in this session.
+	names      *namesPanel
+	nameMemory map[string]int64
 }
 
 // New creates the model and loads data.
@@ -224,6 +229,7 @@ func New(ctx context.Context, db *sql.DB) (*Model, error) {
 		detail:   viewport.New(0, 0),
 		helpVP:   viewport.New(0, 0),
 		marked:   map[int64]bool{},
+		nameMemory: map[string]int64{},
 		actions:  buildActions(),
 		clip:     func(s string) { osc52Copy(os.Stdout, s) },
 		open:     openURL,
@@ -671,6 +677,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.mode == modeCapture {
 			return m.handleCaptureKey(msg)
 		}
+		if m.mode == modeNames {
+			return m.handleNamesKey(msg)
+		}
 		if m.tv != nil {
 			return m.handleTextKey(msg)
 		}
@@ -931,14 +940,17 @@ func (m *Model) runPrompt(kind, value string) {
 		typ := m.currentNoteType()
 		env := m.quickEnvFor(pid)
 		env.NoteType = typ
-		plan, err := m.runLine("note "+value, env)
+		_, err := m.runLineAsk("note "+value, env,
+			func() { m.startInput("note", typ+": ", value); _ = m.input.Focus() },
+			func(plan *quick.Plan) tea.Cmd {
+				m.noteType = typ
+				m.setStatus(typ+" added"+extras(plan), false)
+				return m.showToast(typ+" added"+extras(plan), false)
+			})
 		if err != nil {
 			m.setStatus(err.Error(), true)
 			return
 		}
-		m.noteType = typ
-		m.setStatus(typ+" added"+extras(plan), false)
-		m.pendingCmd = m.showToast(typ+" added"+extras(plan), false)
 	case "task":
 		if pid == 0 {
 			m.setStatus("no person selected", true)
@@ -947,13 +959,16 @@ func (m *Model) runPrompt(kind, value string) {
 		title, due, _ := strings.Cut(value, "|")
 		env := m.quickEnvFor(pid)
 		env.DueOverride = m.normalizeDue(due)
-		plan, err := m.runLine("task "+strings.TrimSpace(title), env)
+		_, err := m.runLineAsk("task "+strings.TrimSpace(title), env,
+			func() { m.startInput("task", "task (add a due date after a | e.g. call back | 2026-12-01): ", value); _ = m.input.Focus() },
+			func(plan *quick.Plan) tea.Cmd {
+				m.setStatus("task added"+extras(plan), false)
+				return m.showToast("task added"+extras(plan), false)
+			})
 		if err != nil {
 			m.setStatus(err.Error(), true)
 			return
 		}
-		m.setStatus("task added"+extras(plan), false)
-		m.pendingCmd = m.showToast("task added"+extras(plan), false)
 	}
 	m.afterWrite()
 }

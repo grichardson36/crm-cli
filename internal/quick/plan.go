@@ -36,6 +36,8 @@ type Env struct {
 	DueOverride string
 	// Dismissed lists token texts the user turned back into plain text.
 	Dismissed []string
+	// Choices answer the names a plan asked about (Plan.Names), by NameRef.Key.
+	Choices map[string]NameChoice
 }
 
 func (e Env) now() time.Time {
@@ -43,6 +45,32 @@ func (e Env) now() time.Time {
 		return time.Now()
 	}
 	return e.Now
+}
+
+// NameRef is a name in the line that is not settled: it matched nobody, several people, or only
+// the start of one name. The caller shows these in one list and replans with Env.Choices.
+type NameRef struct {
+	// Text is the name as typed. Token is the exact text in the line, such as @Sam_Lee.
+	Text  string `json:"text"`
+	Token string `json:"token"`
+	// Key identifies the name in Env.Choices: the lower-case token for @names, lead:<name> for a
+	// name at the start of the line.
+	Key string `json:"key"`
+	// Kind is link (an @name) or lead (a name that starts the line).
+	Kind       string   `json:"kind"`
+	Candidates []Person `json:"candidates,omitempty"`
+	// Default is the candidate to preselect: 0 when there is exactly one, else -1 (keep as text).
+	Default int `json:"default"`
+	Start   int `json:"start"`
+	End     int `json:"end"`
+}
+
+// NameChoice settles one NameRef. Action is link (connect to PersonID), text (keep the words as
+// text) or create (the caller makes the person, then answers with link).
+type NameChoice struct {
+	Action   string `json:"action"`
+	PersonID int64  `json:"person_id,omitempty"`
+	Name     string `json:"name,omitempty"`
 }
 
 // Mark is one highlighted range of the input, as byte offsets (End is exclusive).
@@ -84,6 +112,8 @@ type Plan struct {
 	Links    []Person            `json:"links,omitempty"`
 	Syntax   *shortsyntax.Result `json:"syntax,omitempty"`
 	Problems []Problem           `json:"problems,omitempty"`
+	// Names are the names that need a choice before the line can run.
+	Names    []NameRef           `json:"names,omitempty"`
 	Warnings []string            `json:"warnings,omitempty"`
 	Changes  []Change            `json:"changes"`
 	// Preview is one line that says what will happen.
@@ -302,14 +332,35 @@ func (b *builder) leading(text string, off int) (n int, explicit bool) {
 		b.consumeName(off+cands[0].start, off+w.end, nameOf(k), matches)
 		n = end
 	}
+	// A choice made in the names list settles a leading name: link it or keep the words as text.
+	settled := func(k int) (done, skip bool) {
+		ch, ok := b.env.Choices["lead:"+shortsyntax.Fold(nameOf(k))]
+		if !ok {
+			return false, false
+		}
+		if ch.Action == "link" {
+			b.subj = &Person{ID: ch.PersonID, Name: ch.Name}
+			b.p.Marks = append(b.p.Marks, Mark{Kind: "subject", Start: off + cands[0].start, End: off + cands[k-1].end})
+			n = skipSpace(text, cands[k-1].end)
+			return true, false
+		}
+		return false, true
+	}
 	if explicit && b.env.Index != nil {
 		k := len(cands)
+		if done, skip := settled(k); done {
+			return n, true
+		} else if skip {
+			return 0, false
+		}
 		matches, _ := b.env.Index.ResolveLoose(nameOf(k))
 		if len(matches) == 0 && b.soft {
 			return 0, false
 		}
 		if len(matches) == 0 {
 			b.problem("not_found", fmt.Sprintf("no person matches %q", nameOf(k)))
+			b.p.Names = append(b.p.Names, NameRef{Text: nameOf(k), Token: text[cands[0].start:cands[k-1].end], Key: "lead:" + shortsyntax.Fold(nameOf(k)),
+				Kind: "lead", Default: -1, Start: off + cands[0].start, End: off + cands[k-1].end})
 			b.p.Marks = append(b.p.Marks, Mark{Kind: "subject", Start: off + cands[0].start, End: off + cands[k-1].end, Bad: true})
 			return skipSpace(text, cands[k-1].end), true
 		}
@@ -322,6 +373,11 @@ func (b *builder) leading(text string, off int) (n int, explicit bool) {
 	for k := len(cands); k >= 1; k-- {
 		matches, exact := b.env.Index.Resolve(nameOf(k))
 		if len(matches) == 0 || (k >= 2 && !exact) {
+			continue
+		}
+		if done, skip := settled(k); done {
+			return n, false
+		} else if skip {
 			continue
 		}
 		use(k, matches)
@@ -337,6 +393,8 @@ func (b *builder) consumeName(start, end int, name string, matches []Person) {
 		return
 	}
 	b.problem("ambiguous", fmt.Sprintf("%d people match %q", len(matches), name), matches...)
+	b.p.Names = append(b.p.Names, NameRef{Text: name, Token: b.p.Input[start:end], Key: "lead:" + shortsyntax.Fold(name),
+		Kind: "lead", Candidates: matches, Default: -1, Start: start, End: end})
 	b.p.Marks = append(b.p.Marks, Mark{Kind: "subject", Start: start, End: end, Bad: true})
 }
 
@@ -374,7 +432,13 @@ func (b *builder) subjectFor(text string, off int, allowLead bool) (string, int)
 
 // syntax runs the short syntax parser and records the marks.
 func (b *builder) syntax(text string, off int, dates bool, skip ...shortsyntax.Kind) shortsyntax.Result {
-	opts := shortsyntax.Options{Now: b.env.now(), Disabled: b.env.NoSyntax, Dates: dates, Names: b.env.Index.NameSet(), Skip: skip, Dismiss: b.env.Dismissed}
+	dismiss := append([]string(nil), b.env.Dismissed...)
+	for key, ch := range b.env.Choices {
+		if ch.Action == "text" && strings.HasPrefix(key, "@") {
+			dismiss = append(dismiss, key)
+		}
+	}
+	opts := shortsyntax.Options{Now: b.env.now(), Disabled: b.env.NoSyntax, Dates: dates, Names: b.env.Index.NameSet(), Skip: skip, Dismiss: dismiss}
 	if b.env.Tags != nil {
 		opts.KnownTags = b.env.Tags
 	}
@@ -387,23 +451,55 @@ func (b *builder) syntax(text string, off int, dates bool, skip ...shortsyntax.K
 	return res
 }
 
-// resolveLinks turns +Name tokens into people and flags the marks of names that do not resolve.
+// resolveLinks turns @Name tokens into people. A name that is settled (it matches exactly one
+// person by full name, first name or last name) links at once. The rest become NameRefs for the
+// caller to ask about, and block the plan until they are answered.
 func (b *builder) resolveLinks(res shortsyntax.Result) {
+	tokens := map[string]shortsyntax.Span{}
+	for _, sp := range res.Spans {
+		if sp.Kind == shortsyntax.KindPerson {
+			if _, ok := tokens[shortsyntax.Fold(sp.Value)]; !ok {
+				tokens[shortsyntax.Fold(sp.Value)] = sp
+			}
+		}
+	}
 	bad := map[string]bool{}
 	for _, name := range res.People {
-		matches, _ := b.env.Index.ResolveLoose(name)
-		switch {
-		case len(matches) == 1:
-			if b.subj != nil && b.subj.ID == matches[0].ID {
-				continue
+		sp := tokens[shortsyntax.Fold(name)]
+		key := strings.ToLower(sp.Text)
+		if ch, ok := b.env.Choices[key]; ok && ch.Action == "link" {
+			b.addLink(Person{ID: ch.PersonID, Name: ch.Name})
+			continue
+		}
+		matches, _ := b.env.Index.Resolve(name)
+		if len(matches) == 1 {
+			b.addLink(matches[0])
+			continue
+		}
+		weak := false
+		if len(matches) == 0 {
+			matches, _ = b.env.Index.ResolveLoose(name)
+			weak = len(matches) > 0
+		}
+		ref := NameRef{Text: name, Token: sp.Text, Key: key, Kind: "link", Candidates: matches, Default: -1}
+		if len(matches) == 1 {
+			ref.Default = 0
+		}
+		for _, m := range b.p.Marks {
+			if m.Kind == "person" && b.p.Input[m.Start:m.End] == sp.Text {
+				ref.Start, ref.End = m.Start, m.End
+				break
 			}
-			b.links = append(b.links, matches[0])
+		}
+		b.p.Names = append(b.p.Names, ref)
+		bad[shortsyntax.Fold(name)] = true
+		switch {
+		case weak:
+			b.problem("unconfirmed", fmt.Sprintf("@%s is only the start of a name: confirm %s", name, matches[0].Name), matches...)
 		case len(matches) == 0:
-			bad[shortsyntax.Fold(name)] = true
-			b.problem("not_found", fmt.Sprintf("no person matches +%s", name))
+			b.problem("not_found", fmt.Sprintf("no person matches @%s", name))
 		default:
-			bad[shortsyntax.Fold(name)] = true
-			b.problem("ambiguous", fmt.Sprintf("%d people match +%s", len(matches), name), matches...)
+			b.problem("ambiguous", fmt.Sprintf("%d people match @%s", len(matches), name), matches...)
 		}
 	}
 	if len(bad) == 0 {
@@ -419,6 +515,17 @@ func (b *builder) resolveLinks(res shortsyntax.Result) {
 	}
 }
 
+func (b *builder) addLink(p Person) {
+	if b.subj != nil && b.subj.ID == p.ID {
+		return
+	}
+	for _, l := range b.links {
+		if l.ID == p.ID {
+			return
+		}
+	}
+	b.links = append(b.links, p)
+}
 func (b *builder) person(id int64) (*model.Person, error) {
 	if b.loaded != nil && b.loaded.ID == id {
 		return b.loaded, nil

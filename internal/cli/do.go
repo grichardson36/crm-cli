@@ -20,7 +20,7 @@ func registerDoCommand(root *cobra.Command) {
 
 func doCmd() *cobra.Command {
 	var personID int64
-	var dryRun, noSyntax bool
+	var dryRun, noSyntax, keepUnresolved, linkNew bool
 
 	cmd := &cobra.Command{
 		Use:   "do <text>",
@@ -51,6 +51,20 @@ func doCmd() *cobra.Command {
 			}
 			env.NoSyntax = noSyntax
 			plan := quick.Parse(text, env)
+			var created []string
+			if len(plan.Names) > 0 && (keepUnresolved || linkNew) {
+				plan, created, err = quick.SettleNames(cmd.Context(), quick.NewRepos(db), text, env, plan, keepUnresolved, linkNew, dryRun)
+				if err != nil {
+					return err
+				}
+				for _, name := range created {
+					if dryRun {
+						plan.Warnings = append(plan.Warnings, "would create a contact for "+name)
+					} else {
+						plan.Warnings = append(plan.Warnings, "created a contact for "+name)
+					}
+				}
+			}
 			if plan.Verb == "" {
 				return model.NewExitError(model.ErrUsage, "the text must start with a verb: n, note, t, task, log, set, tag or snooze (see 'crm help short-syntax')")
 			}
@@ -74,7 +88,9 @@ func doCmd() *cobra.Command {
 
 	cmd.Flags().Int64Var(&personID, "person", 0, "the person the line is about, so it needs no name")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print what the line would do, and write nothing")
-	cmd.Flags().BoolVar(&noSyntax, "no-syntax", false, "keep #, @, !, ~, *, + and ^ as plain text")
+	cmd.Flags().BoolVar(&noSyntax, "no-syntax", false, "keep #, @, !, ~, by, remind, every and dates as plain text")
+	cmd.Flags().BoolVar(&keepUnresolved, "keep-unresolved", false, "keep names that match nobody or several people as plain text instead of failing")
+	cmd.Flags().BoolVar(&linkNew, "link-new", false, "create a contact for each @name that matches nobody, and link it (never done without this flag)")
 	return cmd
 }
 

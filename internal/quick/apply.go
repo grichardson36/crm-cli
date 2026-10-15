@@ -191,6 +191,7 @@ type Output struct {
 	Changes      []Change            `json:"changes"`
 	Warnings     []string            `json:"warnings,omitempty"`
 	Problems     []Problem           `json:"problems,omitempty"`
+	Names        []NameRef           `json:"names,omitempty"`
 	NeedsConfirm bool                `json:"needs_confirm,omitempty"`
 	Syntax       *shortsyntax.Result `json:"syntax,omitempty"`
 }
@@ -199,7 +200,7 @@ type Output struct {
 func OutputOf(p *Plan, res *Result) Output {
 	o := Output{
 		Input: p.Input, Verb: p.Verb, DryRun: res == nil, Preview: p.Preview, Subject: p.Subject, Links: p.Links,
-		Changes: p.Changes, Warnings: p.Warnings, Problems: p.Problems, NeedsConfirm: p.NeedsConfirm, Syntax: p.Syntax,
+		Changes: p.Changes, Warnings: p.Warnings, Problems: p.Problems, Names: p.Names, NeedsConfirm: p.NeedsConfirm, Syntax: p.Syntax,
 	}
 	if res != nil {
 		o.Applied = res.Applied
@@ -559,3 +560,47 @@ func labelOrID(c Change) string {
 	}
 	return fmt.Sprintf("#%d", c.ID)
 }
+
+// SettleNames answers the names of a plan without asking, for commands and agents. keep turns
+// every unsettled name into plain text. linkNew creates a contact for a name that matched nobody
+// and links it. In a dry run nothing is created: those names are kept as text and returned in
+// created, which lists the names that would have been made. The plan is parsed again.
+func SettleNames(ctx context.Context, r Repos, line string, env Env, plan *Plan, keep, linkNew, dry bool) (*Plan, []string, error) {
+	if len(plan.Names) == 0 || (!keep && !linkNew) {
+		return plan, nil, nil
+	}
+	// Do nothing when a name would stay unsettled: no contact is made for a line that still fails.
+	for _, ref := range plan.Names {
+		if !keep && !(len(ref.Candidates) == 0 && linkNew) {
+			return plan, nil, nil
+		}
+	}
+	choices := map[string]NameChoice{}
+	var created []string
+	for _, ref := range plan.Names {
+		switch {
+		case len(ref.Candidates) == 0 && linkNew:
+			created = append(created, ref.Text)
+			if dry {
+				choices[ref.Key] = NameChoice{Action: "text"}
+				continue
+			}
+			parts := strings.Fields(strings.ReplaceAll(ref.Text, "_", " "))
+			in := model.CreatePersonInput{FirstName: parts[0]}
+			if len(parts) > 1 {
+				in.FirstName = strings.Join(parts[:len(parts)-1], " ")
+				last := parts[len(parts)-1]
+				in.LastName = &last
+			}
+			p, err := r.People.Create(ctx, in)
+			if err != nil {
+				return plan, created, err
+			}
+			choices[ref.Key] = NameChoice{Action: "link", PersonID: p.ID, Name: strings.TrimSpace(p.FirstName + " " + strOf(p.LastName))}
+		case keep:
+			choices[ref.Key] = NameChoice{Action: "text"}
+		}
+	}
+	env.Choices = choices
+	return Parse(line, env), created, nil
+}

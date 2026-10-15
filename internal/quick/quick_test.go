@@ -953,4 +953,125 @@ func TestQuotedTextIsNotRead(t *testing.T) {
 	require.Empty(t, p.Problems)
 	assert.Contains(t, p.Preview, `"read \"fri #x @Bob\" notes"`)
 	assert.Empty(t, p.Syntax.Tags)
+}
+func TestUnsettledNamesBecomeNameRefs(t *testing.T) {
+	f := newFixture(t)
+	env := f.env("Bob Baker")
+
+	// Several matches: the line waits for a choice, and the refs carry the candidates.
+	p := Parse("n coffee with @Sam", env)
+	assert.False(t, p.Ready())
+	require.Len(t, p.Names, 1)
+	ref := p.Names[0]
+	assert.Equal(t, "link", ref.Kind)
+	assert.Equal(t, "Sam", ref.Text)
+	assert.Equal(t, "@Sam", ref.Token)
+	assert.Equal(t, "@sam", ref.Key)
+	assert.Len(t, ref.Candidates, 2)
+	assert.Equal(t, -1, ref.Default, "several matches default to keep as text")
+	assert.Equal(t, []string{"ambiguous"}, problemCodes(p))
+	assert.Equal(t, "@Sam", p.Input[ref.Start:ref.End])
+
+	// No match at all.
+	p = Parse("n coffee with @Nobody and @Sam", env)
+	require.Len(t, p.Names, 2)
+	assert.Empty(t, p.Names[0].Candidates)
+	assert.Equal(t, -1, p.Names[0].Default)
+
+	// Only the start of a name: one candidate, preselected, but not linked without a click.
+	p = Parse("n coffee with @Zo", env)
+	require.Len(t, p.Names, 1)
+	assert.Equal(t, 0, p.Names[0].Default)
+	assert.Equal(t, []string{"unconfirmed"}, problemCodes(p))
+	assert.False(t, p.Ready())
+
+	// A settled name needs no choice.
+	p = Parse("n coffee with @Zoe", env)
+	assert.Empty(t, p.Names)
+	assert.True(t, p.Ready())
+}
+
+func TestChoicesSettleNames(t *testing.T) {
+	f := newFixture(t)
+	env := f.env("Bob Baker")
+	env.Choices = map[string]NameChoice{"@sam": {Action: "link", PersonID: f.ids["Sam Ng"], Name: "Sam Ng"}}
+	p := Parse("n coffee with @Sam", env)
+	require.Empty(t, p.Problems, p.Preview)
+	assert.Empty(t, p.Names)
+	require.Len(t, p.Links, 1)
+	assert.Equal(t, "Sam Ng", p.Links[0].Name)
+	res, err := Apply(context.Background(), f.repos, p)
+	require.NoError(t, err)
+	it, _ := f.repos.Interactions.FindByID(context.Background(), res.Changes[0].ID)
+	assert.ElementsMatch(t, []int64{f.ids["Bob Baker"], f.ids["Sam Ng"]}, it.PersonIDs)
+	assert.Equal(t, "coffee with", *it.Content)
+
+	// Keep as text: the @Sam stays in the note, and nothing is linked.
+	env.Choices = map[string]NameChoice{"@sam": {Action: "text"}}
+	p = Parse("n coffee with @Sam", env)
+	require.Empty(t, p.Problems, p.Preview)
+	assert.Empty(t, p.Names)
+	assert.Empty(t, p.Links)
+	assert.Contains(t, p.Preview, `"coffee with @Sam"`)
+
+	// One choice per name, even with several in the line.
+	env.Choices = map[string]NameChoice{
+		"@sam":    {Action: "text"},
+		"@nobody": {Action: "link", PersonID: f.ids["Mark Twain"], Name: "Mark Twain"},
+	}
+	p = Parse("n @Sam and @Nobody met", env)
+	require.Empty(t, p.Problems, p.Preview)
+	require.Len(t, p.Links, 1)
+	assert.Equal(t, "Mark Twain", p.Links[0].Name)
+	assert.Contains(t, p.Preview, `"@Sam and met"`)
+}
+
+func TestLeadingNamesNeedChoicesToo(t *testing.T) {
+	f := newFixture(t)
+	p := Parse("n Sam called", f.env(""))
+	require.Len(t, p.Names, 1)
+	assert.Equal(t, "lead", p.Names[0].Kind)
+	assert.Equal(t, "lead:sam", p.Names[0].Key)
+	assert.Len(t, p.Names[0].Candidates, 2)
+
+	env := f.env("")
+	env.Choices = map[string]NameChoice{"lead:sam": {Action: "link", PersonID: f.ids["Sam Lee"], Name: "Sam Lee"}}
+	p = Parse("n Sam called", env)
+	require.Empty(t, p.Problems, p.Preview)
+	assert.Equal(t, "Sam Lee", p.Subject.Name)
+	assert.Contains(t, p.Preview, `"called"`)
+
+	// Keep as text: Sam is not a name here, so the note has no person.
+	env.Choices = map[string]NameChoice{"lead:sam": {Action: "text"}}
+	p = Parse("n Sam called", env)
+	assert.Equal(t, []string{"no_person"}, problemCodes(p))
+	assert.Empty(t, p.Names)
+
+	// With a selected person the same choice keeps the words in the note.
+	env = f.env("Bob Baker")
+	p = Parse("n Sam: called", env)
+	require.Len(t, p.Names, 1, "a colon makes the name explicit, even with a selected person")
+	env.Choices = map[string]NameChoice{"lead:sam": {Action: "text"}}
+	p = Parse("n Sam: called", env)
+	require.Empty(t, p.Problems, p.Preview)
+	assert.Equal(t, "Bob Baker", p.Subject.Name)
+	assert.Contains(t, p.Preview, `"Sam: called"`)
+
+	// set Name: with an unknown name is a ref with no candidates.
+	p = Parse("set Priya: title=CTO", f.env(""))
+	require.Len(t, p.Names, 1)
+	assert.Empty(t, p.Names[0].Candidates)
+	env = f.env("")
+	env.Choices = map[string]NameChoice{"lead:priya": {Action: "link", PersonID: f.ids["Bob Baker"], Name: "Bob Baker"}}
+	p = Parse("set Priya: title=CTO", env)
+	require.Empty(t, p.Problems, p.Preview)
+	assert.Equal(t, "Bob Baker", p.Subject.Name)
+}
+
+func TestOutputCarriesTheNames(t *testing.T) {
+	f := newFixture(t)
+	p := Parse("n coffee with @Sam", f.env("Bob Baker"))
+	out := OutputOf(p, nil)
+	require.Len(t, out.Names, 1)
+	assert.Len(t, out.Names[0].Candidates, 2)
 }

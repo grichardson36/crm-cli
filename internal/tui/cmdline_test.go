@@ -8,6 +8,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -111,8 +112,10 @@ func TestCommandBarAmbiguousNameBlocksEnter(t *testing.T) {
 	assert.Contains(t, out, "Bob Baker")
 	assert.Contains(t, out, "Bob Brown")
 	press(m, "enter")
-	assert.Equal(t, modeOverlay, m.mode)
+	require.Equal(t, modeNames, m.mode, "the names list opens instead of saving")
 	assert.Empty(t, allNotes(t, m))
+	press(m, "esc")
+	assert.Equal(t, modeOverlay, m.mode, "esc goes back to editing the line")
 	// A full name is exact.
 	openBarAgain := func(line string) {
 		press(m, "ctrl+u")
@@ -548,12 +551,15 @@ func TestNotePromptAppliesTokens(t *testing.T) {
 	assert.Equal(t, "note added", m.status)
 	assert.False(t, m.statusIsErr)
 
-	// An unknown +Name is an error and writes nothing.
+	// An unknown @Name opens the names list and writes nothing until you answer.
 	press(m, "n")
 	typeText(m, "hello @Nobody")
 	press(m, "enter")
-	assert.True(t, m.statusIsErr)
+	require.Equal(t, modeNames, m.mode)
 	assert.Len(t, allNotes(t, m), 2)
+	press(m, "esc")
+	assert.Equal(t, modePrompt, m.mode, "esc goes back to the prompt")
+	assert.Equal(t, "hello @Nobody", m.input.Value())
 }
 
 func TestNotePromptKeepsTheChosenType(t *testing.T) {
@@ -757,4 +763,196 @@ func TestNotesDoNotReadBareDatesInTheBar(t *testing.T) {
 	press(m, "ctrl+u")
 	typeText(m, "n said fri is fine remind next week")
 	assert.Contains(t, m.View(), "remind Mon 19 Oct")
+}
+// --- the names list ---
+
+func namesModel(t *testing.T) (*Model, *repo.PersonRepo) {
+	m, pr := newTestModel(t)
+	_, err := pr.Create(context.Background(), model.CreatePersonInput{FirstName: "Bob", LastName: sp("Brown")})
+	require.NoError(t, err)
+	require.NoError(t, m.reload())
+	return m, pr
+}
+
+func TestNamesListKeepAsTextIsTheDefaultForSeveralMatches(t *testing.T) {
+	m, _ := namesModel(t)
+	press(m, "n")
+	typeText(m, "lunch with @Bob")
+	press(m, "enter")
+	require.Equal(t, modeNames, m.mode)
+	out := plain(m.View())
+	assert.Contains(t, out, "Link people in this line?")
+	assert.Contains(t, out, "@Bob")
+	assert.Contains(t, out, "[1] Bob Baker")
+	assert.Contains(t, out, "[2] Bob Brown")
+	assert.Contains(t, out, "*[x] keep as text", "keep as text is preselected")
+	press(m, "enter")
+	assert.Equal(t, modeNormal, m.mode)
+	its := allNotes(t, m)
+	require.Len(t, its, 1)
+	assert.Equal(t, "lunch with @Bob", *its[0].Content, "the words stay")
+	assert.Len(t, its[0].PersonIDs, 1, "nothing is linked")
+}
+
+func TestNamesListConnectToACandidate(t *testing.T) {
+	m, _ := namesModel(t)
+	press(m, "n")
+	typeText(m, "lunch with @Bob")
+	press(m, "enter")
+	press(m, "2")
+	assert.Contains(t, plain(m.View()), "*[2] Bob Brown")
+	press(m, "enter")
+	its := allNotes(t, m)
+	require.Len(t, its, 1)
+	assert.Equal(t, "lunch with", *its[0].Content)
+	assert.Len(t, its[0].PersonIDs, 2)
+	assert.Contains(t, m.status, "added")
+}
+
+func TestNamesListCreateMakesANewContactOnlyWhenAsked(t *testing.T) {
+	m, pr := namesModel(t)
+	before, _ := pr.ListSummaries(context.Background())
+	press(m, "n")
+	typeText(m, "met @Priya_Nair at the fair")
+	press(m, "enter")
+	require.Equal(t, modeNames, m.mode)
+	assert.Contains(t, plain(m.View()), "no match")
+	// Esc goes back to editing, and saving with the default creates nobody.
+	press(m, "esc", "enter", "enter")
+	after, _ := pr.ListSummaries(context.Background())
+	require.Len(t, after, len(before))
+	assert.Len(t, allNotes(t, m), 1, "kept as text, saved")
+
+	press(m, "n")
+	typeText(m, "met @Priya_Nair again")
+	press(m, "enter")
+	require.Equal(t, modeNames, m.mode)
+	press(m, "c")
+	assert.Contains(t, plain(m.View()), `*[c] create "Priya Nair"`)
+	press(m, "enter")
+	after, _ = pr.ListSummaries(context.Background())
+	require.Len(t, after, len(before)+1)
+	var priya int64
+	for _, p := range after {
+		if p.Name == "Priya Nair" {
+			priya = p.ID
+		}
+	}
+	require.NotZero(t, priya)
+	its := allNotes(t, m)
+	require.Len(t, its, 2)
+	var linked bool
+	for _, it := range its {
+		for _, id := range it.PersonIDs {
+			if id == priya {
+				linked = true
+				assert.Equal(t, "met again", *it.Content)
+			}
+		}
+	}
+	assert.True(t, linked)
+
+	// The new contact and the note undo together.
+	press(m, "ctrl+z")
+	after, _ = pr.ListSummaries(context.Background())
+	assert.Len(t, after, len(before))
+	assert.Len(t, allNotes(t, m), 1)
+	press(m, "ctrl+y")
+	after, _ = pr.ListSummaries(context.Background())
+	assert.Len(t, after, len(before)+1)
+}
+
+func TestNamesListSeveralNamesAndApplyToAll(t *testing.T) {
+	m, _ := namesModel(t)
+	press(m, "n")
+	typeText(m, "@Bob then @Bob again and @Nobody")
+	press(m, "enter")
+	require.Equal(t, modeNames, m.mode)
+	require.Len(t, m.names.refs, 2, "the same name is one row")
+	press(m, "1")
+	assert.Equal(t, 0, m.names.choice[0])
+	press(m, "j", "A")
+	assert.Equal(t, choiceText, m.names.choice[1])
+	press(m, "k", "A")
+	press(m, "enter")
+	its := allNotes(t, m)
+	require.Len(t, its, 1)
+	assert.Contains(t, *its[0].Content, "@Nobody")
+	assert.NotContains(t, *its[0].Content, "@Bob")
+}
+
+func TestNamesListRemembersTheChoiceInThisSession(t *testing.T) {
+	m, _ := namesModel(t)
+	press(m, "n")
+	typeText(m, "first @Bob")
+	press(m, "enter")
+	press(m, "2", "enter")
+	press(m, "n")
+	typeText(m, "second @Bob")
+	press(m, "enter")
+	require.Equal(t, modeNames, m.mode)
+	assert.Equal(t, 1, m.names.choice[0], "Bob Brown is preselected the second time")
+	press(m, "esc", "esc")
+}
+
+func TestNamesListInTheCommandBar(t *testing.T) {
+	m, _ := namesModel(t)
+	openBar(m, "n lunch with @Bob #deal")
+	press(m, "enter")
+	require.Equal(t, modeNames, m.mode)
+	press(m, "1", "enter")
+	assert.Equal(t, modeNormal, m.mode)
+	its := allNotes(t, m)
+	require.Len(t, its, 1)
+	assert.Equal(t, "lunch with", *its[0].Content)
+	tags, _ := m.tagr.GetForEntity(context.Background(), "interaction", its[0].ID)
+	assert.Len(t, tags, 1)
+
+	// A leading name that matches two people is listed too (no person is selected in Merge).
+	press(m, "6")
+	openBar(m, "n Bob called")
+	press(m, "enter")
+	require.Equal(t, modeNames, m.mode)
+	assert.Equal(t, "lead", m.names.refs[0].Kind)
+	press(m, "2", "enter")
+	its = allNotes(t, m)
+	require.Len(t, its, 2)
+}
+
+func TestNamesListMultiFieldSetStillAsksToConfirm(t *testing.T) {
+	m, pr := namesModel(t)
+	press(m, "6")
+	openBar(m, "set Bob: company=Zorg title=CTO")
+	press(m, "enter")
+	require.Equal(t, modeNames, m.mode)
+	press(m, "2", "enter")
+	require.Equal(t, modeOverlay, m.mode)
+	require.True(t, m.ov.cmd.confirming)
+	press(m, "enter")
+	var brown *model.Person
+	all, _ := pr.ListSummaries(context.Background())
+	for _, s := range all {
+		if s.Name == "Bob Brown" {
+			brown, _ = pr.FindByID(context.Background(), s.ID)
+		}
+	}
+	require.NotNil(t, brown)
+	assert.Equal(t, "Zorg", *brown.Company)
+}
+
+func TestNamesListFitsTheTerminal(t *testing.T) {
+	m, _ := namesModel(t)
+	for _, size := range [][2]int{{100, 30}, {60, 12}, {40, 10}} {
+		m.Update(tea.WindowSizeMsg{Width: size[0], Height: size[1]})
+		press(m, "n")
+		typeText(m, "a @Bob b @Nobody c @Zed d @Amy")
+		press(m, "enter")
+		require.Equal(t, modeNames, m.mode)
+		lines := strings.Split(m.View(), "\n")
+		assert.LessOrEqual(t, len(lines), size[1])
+		for _, l := range lines {
+			assert.LessOrEqual(t, lipgloss.Width(l), size[0], l)
+		}
+		press(m, "esc", "esc")
+	}
 }

@@ -125,4 +125,35 @@ func TestTaskTagsThroughMCP(t *testing.T) {
 	callJSON(t, s, "crm_task_list", map[string]any{"tag": "money"}, &list)
 	require.Len(t, list, 1)
 	assert.Equal(t, "pay rent", list[0]["title"])
+}
+func TestDoToolNamesAndTheSettleFlags(t *testing.T) {
+	s := setupTestServer(t)
+	var bob map[string]any
+	callJSON(t, s, "crm_person_create", map[string]any{"first_name": "Bob", "last_name": "Baker"}, &bob)
+	callJSON(t, s, "crm_person_create", map[string]any{"first_name": "Sam", "last_name": "Lee"}, &map[string]any{})
+	callJSON(t, s, "crm_person_create", map[string]any{"first_name": "Sam", "last_name": "Ng"}, &map[string]any{})
+
+	text, isErr := call(t, s, "crm_do", map[string]any{"text": "n coffee with @Sam", "person_id": bob["id"]})
+	require.True(t, isErr)
+	var bad map[string]any
+	require.NoError(t, json.Unmarshal([]byte(text), &bad))
+	names := bad["names"].([]any)
+	require.Len(t, names, 1)
+	assert.Len(t, names[0].(map[string]any)["candidates"], 2)
+
+	var out map[string]any
+	callJSON(t, s, "crm_do", map[string]any{"text": "n coffee with @Sam", "person_id": bob["id"], "keep_unresolved": true}, &out)
+	assert.Equal(t, true, out["applied"])
+	var list []map[string]any
+	callJSON(t, s, "crm_interaction_list", map[string]any{}, &list)
+	require.Len(t, list, 1)
+	assert.Equal(t, "coffee with @Sam", list[0]["content"])
+
+	callJSON(t, s, "crm_do", map[string]any{"text": "n met @Priya_Nair", "person_id": bob["id"], "link_new": true, "dry_run": true}, &out)
+	assert.Contains(t, out["warnings"], "would create a contact for Priya Nair")
+	callJSON(t, s, "crm_do", map[string]any{"text": "n met @Priya_Nair", "person_id": bob["id"], "link_new": true}, &out)
+	assert.Equal(t, true, out["applied"])
+	var found []map[string]any
+	callJSON(t, s, "crm_person_search", map[string]any{"query": "Priya"}, &found)
+	require.Len(t, found, 1)
 }

@@ -52,6 +52,9 @@ func (m *Model) baseView() string {
 	if m.mode == modeOverlay && m.ov != nil {
 		return m.overlayView()
 	}
+	if m.mode == modeNames && m.names != nil {
+		return m.namesView()
+	}
 	if m.tv != nil {
 		return m.textViewRender()
 	}

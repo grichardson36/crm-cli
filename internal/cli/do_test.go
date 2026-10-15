@@ -3,6 +3,7 @@ package cli_test
 import (
 	"encoding/json"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
@@ -341,4 +342,62 @@ func TestTaskTagUntagAndListByTag(t *testing.T) {
 	assert.Contains(t, stdout, `"dry_run":true`)
 	stdout, _, _ = crm(t, path, "task", "show", "1", "-f", "json")
 	assert.NotContains(t, stdout, "dry")
+}
+func TestDoUnsettledNamesCarryCandidatesInJSON(t *testing.T) {
+	path := doDB(t)
+	stdout, _, code := crm(t, path, "do", "n coffee with @Sam", "--person", "3", "-f", "json")
+	assert.Equal(t, 2, code)
+	out := decodeObject(t, stdout)
+	names := out["names"].([]any)
+	require.Len(t, names, 1)
+	ref := names[0].(map[string]any)
+	assert.Equal(t, "@Sam", ref["token"])
+	assert.Equal(t, "link", ref["kind"])
+	assert.Len(t, ref["candidates"], 2)
+	assert.Equal(t, float64(-1), ref["default"])
+
+	_, _, code = crm(t, path, "do", "n coffee with @Nobody", "--person", "3")
+	assert.Equal(t, 3, code, "no match is not found")
+	stdout, _, _ = crm(t, path, "log", "list", "-f", "json")
+	assert.Len(t, decodeList(t, stdout), 0, "nothing was written")
+}
+
+func TestDoKeepUnresolvedAndLinkNew(t *testing.T) {
+	path := doDB(t)
+	// Keep as text.
+	stdout, stderr, code := crm(t, path, "do", "n coffee with @Sam and @Nobody", "--person", "3", "--keep-unresolved", "-f", "json")
+	require.Equal(t, 0, code, stderr)
+	assert.Equal(t, true, decodeObject(t, stdout)["applied"])
+	stdout, _, _ = crm(t, path, "log", "list", "-f", "json")
+	logs := decodeList(t, stdout)
+	require.Len(t, logs, 1)
+	assert.Equal(t, "coffee with @Sam and @Nobody", logs[0]["content"])
+
+	// A dry run with --link-new creates nobody and says so.
+	stdout, _, code = crm(t, path, "do", "n met @Priya_Nair", "--person", "3", "--link-new", "--dry-run", "-f", "json")
+	require.Equal(t, 0, code)
+	assert.Contains(t, stdout, "would create a contact for Priya Nair")
+	stdout, _, _ = crm(t, path, "person", "list", "-f", "json")
+	assert.Len(t, decodeList(t, stdout), 3)
+
+	// For real: the contact is created and linked. Several matches are never guessed.
+	stdout, stderr, code = crm(t, path, "do", "n met @Priya_Nair and @Sam", "--person", "3", "--link-new", "-f", "json")
+	assert.Equal(t, 3, code, "the first unsettled name decides the error: %s", stderr)
+	stdout, _, _ = crm(t, path, "person", "list", "-f", "json")
+	assert.Len(t, decodeList(t, stdout), 3, "a line that still fails creates nobody")
+	stdout, stderr, code = crm(t, path, "do", "n met @Priya_Nair", "--person", "3", "--link-new", "-f", "json")
+	require.Equal(t, 0, code, stderr)
+	assert.Contains(t, stdout, "created a contact for Priya Nair")
+	stdout, _, _ = crm(t, path, "person", "list", "-f", "json")
+	people := decodeList(t, stdout)
+	require.Len(t, people, 4)
+	var priya float64
+	for _, p := range people {
+		if p["name"] == "Priya Nair" {
+			priya = p["id"].(float64)
+		}
+	}
+	require.NotZero(t, priya)
+	stdout, _, _ = crm(t, path, "log", "list", "--person", strconv.Itoa(int(priya)), "-f", "json")
+	assert.Len(t, decodeList(t, stdout), 1)
 }
