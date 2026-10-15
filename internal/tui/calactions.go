@@ -12,6 +12,7 @@ import (
 	"github.com/jdanielnd/crm-cli/internal/cal/input"
 	"github.com/jdanielnd/crm-cli/internal/cal/tz"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/shortsyntax"
 )
 
 // Context predicates for the calendar actions.
@@ -35,19 +36,26 @@ func whenCalRestore(m *Model) bool { return whenCalendar(m) && len(m.deletedEven
 
 // ---- add and edit ----
 
-// quickEvent is a parsed "title | when | repeat" line.
+// quickEvent is a parsed quick add line: "Lunch with @Sam fri 12:30 for 1h at Cafe Rio every week #food",
+// or the older "title | when | repeat".
 type quickEvent struct {
 	title      string
 	start, end time.Time
 	allDay     bool
 	rule       *string
 	hasWhen    bool
+	location   string
+	tags       []string
+	people     []string // names after @, resolved when the event is saved
 }
 
 // parseQuick reads "title | when | repeat". The when part takes the same phrases as `crm cal add
 // --start` ("fri 12:30 1h", "2026-10-20", "3pm"); a bare time means that time on the selected day.
 // Without a when part the event is all-day on the selected day.
 func (m *Model) parseQuick(value string) (quickEvent, error) {
+	if !strings.Contains(value, "|") {
+		return m.parseQuickSyntax(value)
+	}
 	parts := strings.Split(value, "|")
 	q := quickEvent{title: strings.TrimSpace(parts[0])}
 	if q.title == "" {
@@ -82,6 +90,70 @@ func (m *Model) parseQuick(value string) (quickEvent, error) {
 	return q, nil
 }
 
+// parseQuickSyntax reads a quick add line with the shared short syntax: the title with a date or
+// time (fri 12:30), a length (for 1h), a place (at Cafe Rio), a repeat (every week), attendees
+// (@Sam) and tags (#food). Without a date the event is all-day on the selected day, and a bare
+// time means that time on the selected day.
+func (m *Model) parseQuickSyntax(value string) (quickEvent, error) {
+	day := m.calSelDate()
+	base := tz.Instant(day, m.loc)
+	if day.Equal(m.calToday()) {
+		base = m.now()
+	}
+	env := m.quickEnv()
+	res := shortsyntax.Parse(value, shortsyntax.Options{
+		Now: base.In(m.loc), Disabled: m.noSyntax, Dates: true, Phrases: true, Names: env.Index.NameSet(),
+		Skip: []shortsyntax.Kind{shortsyntax.KindPriority, shortsyntax.KindDeadline, shortsyntax.KindCadence},
+	})
+	q := quickEvent{title: strings.TrimSpace(res.Title), location: res.Location, tags: res.Tags, people: res.People}
+	if q.title == "" {
+		return q, fmt.Errorf("type a title first")
+	}
+	if res.Due == nil {
+		q.start, q.allDay = day, true
+	} else {
+		q.hasWhen = true
+		span := input.SpanText{Start: res.Due.String()}
+		if res.DurationMin > 0 {
+			span.Duration = shortsyntax.FormatMinutes(res.DurationMin)
+		}
+		start, end, allDay, err := input.Span(span, m.loc, base)
+		if err != nil {
+			return q, err
+		}
+		q.start, q.end, q.allDay = start, end, allDay
+	}
+	if res.Recurrence != "" {
+		rule, err := input.Rule(input.RepeatText{Repeat: res.Recurrence, Changed: true}, "", q.allDay, m.loc, m.now())
+		if err != nil {
+			return q, err
+		}
+		q.rule = rule
+	}
+	return q, nil
+}
+
+// calAttendees resolves the @names of a quick add to people. A name that matches nobody or
+// several people stops the save, so an event never links the wrong person.
+func (m *Model) calAttendees(names []string) ([]model.EventAttendee, error) {
+	var out []model.EventAttendee
+	ix := m.quickEnv().Index
+	for _, name := range names {
+		matches, _ := ix.Resolve(name)
+		if len(matches) == 0 {
+			matches, _ = ix.ResolveLoose(name)
+		}
+		switch len(matches) {
+		case 1:
+			out = append(out, model.EventAttendee{PersonID: matches[0].ID})
+		case 0:
+			return nil, fmt.Errorf("no person matches @%s", name)
+		default:
+			return nil, fmt.Errorf("%d people match @%s: use the full name", len(matches), name)
+		}
+	}
+	return out, nil
+}
 // calPromptHint previews what the quick add line will create, or says what is wrong.
 func (m *Model) calPromptHint() (string, bool) {
 	q, err := m.parseQuick(m.input.Value())
@@ -111,7 +183,7 @@ func (m *Model) startCalAdd() tea.Cmd {
 		m.calGoto(m.calToday())
 	}
 	m.cal.pending = nil
-	m.startInput("cal-add", "event on "+m.calSelDate().Format("Mon 2 Jan")+" (title | when | repeat): ", "")
+	m.startInput("cal-add", "event on "+m.calSelDate().Format("Mon 2 Jan")+" (Lunch @Sam fri 12:30 for 1h at Cafe Rio every week): ", "")
 	return m.input.Focus()
 }
 
@@ -216,10 +288,20 @@ func (m *Model) calCreate(value string) {
 		m.setStatus(err.Error(), true)
 		return
 	}
-	in := model.CreateEventInput{Title: q.title, AllDay: q.allDay, Start: q.start, End: q.end, TZ: tz.Name(m.loc)}
+	in := model.CreateEventInput{Title: q.title, AllDay: q.allDay, Start: q.start, End: q.end, TZ: tz.Name(m.loc), Tags: q.tags}
+	if q.location != "" {
+		loc := q.location
+		in.Location = &loc
+	}
 	if q.rule != nil {
 		in.RRule = *q.rule
 	}
+	atts, err := m.calAttendees(q.people)
+	if err != nil {
+		m.setStatus(err.Error(), true)
+		return
+	}
+	in.Attendees = atts
 	e, err := m.er.Create(m.ctx, in)
 	if err != nil {
 		m.setStatus(err.Error(), true)

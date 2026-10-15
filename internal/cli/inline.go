@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/jdanielnd/crm-cli/internal/quick"
@@ -23,13 +22,18 @@ type inlineText struct {
 // parseInline reads the short syntax in text. With noSyntax the text is left as it is.
 // dates turns on plain-word dates (fri, tomorrow 3pm), which tasks and logs read and names do not.
 func parseInline(ctx context.Context, db *sql.DB, text string, noSyntax, dates bool, skip ...shortsyntax.Kind) (*inlineText, error) {
-	now := time.Now()
+	return parseInlineWith(ctx, db, text, noSyntax, dates, false, skip...)
+}
+
+// parseInlineWith also reads "at <place>" when phrases is set (events).
+func parseInlineWith(ctx context.Context, db *sql.DB, text string, noSyntax, dates, phrases bool, skip ...shortsyntax.Kind) (*inlineText, error) {
+	now := clockNow()
 	env, err := quick.LoadEnv(ctx, db, now, 0)
 	if err != nil {
 		return nil, err
 	}
 	res := shortsyntax.Parse(text, shortsyntax.Options{
-		Now: now, Disabled: noSyntax, Dates: dates, KnownTags: env.Tags, Names: env.Index.NameSet(), Skip: skip,
+		Now: now, Disabled: noSyntax, Dates: dates, Phrases: phrases, KnownTags: env.Tags, Names: env.Index.NameSet(), Skip: skip,
 	})
 	return &inlineText{Res: res, Env: env}, nil
 }

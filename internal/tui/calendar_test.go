@@ -525,3 +525,32 @@ func TestCalendarLoadsFastWith5000Events(t *testing.T) {
 }
 
 func toggle(m *Model, id string) { m.runAction(m.actionByID(id)) }
+
+func TestCalendarQuickAddReadsShortSyntax(t *testing.T) {
+	m := calModel(t)
+	q, err := m.parseQuick("Lunch fri 12:30 for 1h at Cafe Rio every week #food")
+	require.NoError(t, err)
+	assert.Equal(t, "Lunch", q.title)
+	assert.Equal(t, "Cafe Rio", q.location)
+	assert.Equal(t, []string{"food"}, q.tags)
+	assert.False(t, q.allDay)
+	assert.Equal(t, time.Hour, q.end.Sub(q.start))
+	require.NotNil(t, q.rule)
+	assert.Contains(t, *q.rule, "FREQ=WEEKLY")
+
+	// Saving stores the place and tag.
+	press(m, "+")
+	typeText(m, "Lunch fri 12:30 for 1h at Cafe Rio #food")
+	press(m, "enter")
+	list, _, err := m.er.List(context.Background(), model.EventFilters{From: utcT(2026, 10, 1, 0, 0), To: utcT(2026, 11, 1, 0, 0), Loc: m.loc})
+	require.NoError(t, err)
+	require.Len(t, list, 1)
+	assert.Equal(t, "Cafe Rio", list[0].Location)
+	assert.Equal(t, "Lunch", list[0].Title)
+
+	// An unknown @name stops the save.
+	press(m, "+")
+	typeText(m, "Call @Nobody fri 9am")
+	press(m, "enter")
+	assert.Contains(t, m.status, "no person matches")
+}

@@ -14,6 +14,7 @@ import (
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/format"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/shortsyntax"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -218,14 +219,57 @@ func calAddCmd() *cobra.Command {
 	var f calFlags
 	var personIDs []int64
 	var tags []string
+	var noSyntax bool
 
 	cmd := &cobra.Command{
 		Use:   "add <title>",
 		Short: "Add an event",
-		Args:  cobra.ExactArgs(1),
+		Long: "Add an event. The title can carry short syntax: fri 12:30 (when), for 1h (length), at Cafe Rio (place), every week (repeat), @Sam (attendee), #tag.\n" +
+			"Example: crm cal add \"Lunch with @Sam fri 12:30 for 1h at Cafe Rio\". Flags win over the same value in the title. See 'crm help short-syntax'.",
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			title := args[0]
+			repeatChanged := cmd.Flags().Changed("repeat")
+			if !noSyntax {
+				db, err := openDB()
+				if err != nil {
+					return err
+				}
+				inl, err := parseInlineWith(cmd.Context(), db, title, false, true, true,
+					shortsyntax.KindPriority, shortsyntax.KindDeadline, shortsyntax.KindCadence)
+				if err != nil {
+					db.Close()
+					return err
+				}
+				var ids []int64
+				if !cmd.Flags().Changed("person") {
+					ids, err = inl.people()
+				}
+				db.Close()
+				if err != nil {
+					return err
+				}
+				if inl.Res.Title == "" {
+					return model.NewExitError(model.ErrValidation, "the title is empty once the short syntax is removed")
+				}
+				title = inl.Res.Title
+				if strings.TrimSpace(f.start) == "" && inl.Res.Due != nil {
+					f.start = inl.Res.Due.String()
+				}
+				if f.duration == "" && f.end == "" && inl.Res.DurationMin > 0 {
+					f.duration = shortsyntax.FormatMinutes(inl.Res.DurationMin)
+				}
+				if f.location == "" && inl.Res.Location != "" {
+					f.location = inl.Res.Location
+				}
+				if !repeatChanged && inl.Res.Recurrence != "" {
+					f.repeat, repeatChanged = inl.Res.Recurrence, true
+				}
+				personIDs = append(personIDs, ids...)
+				tags = append(tags, inl.Res.Tags...)
+			}
 			if strings.TrimSpace(f.start) == "" {
-				return model.NewExitError(model.ErrValidation, "--start is required, e.g. --start \"fri 12:30\"")
+				return model.NewExitError(model.ErrValidation, "--start is required, e.g. --start \"fri 12:30\", or write it in the title: \"Lunch fri 12:30\"")
 			}
 			now := clockNow()
 			loc, err := displayZone(f.tzName)
@@ -236,7 +280,7 @@ func calAddCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			rule, err := input.Rule(input.RepeatText{Repeat: f.repeat, Changed: cmd.Flags().Changed("repeat"), Until: f.until, Count: f.count}, "", allDay, loc, now)
+			rule, err := input.Rule(input.RepeatText{Repeat: f.repeat, Changed: repeatChanged, Until: f.until, Count: f.count}, "", allDay, loc, now)
 			if err != nil {
 				return err
 			}
@@ -245,7 +289,7 @@ func calAddCmd() *cobra.Command {
 				return err
 			}
 			in := model.CreateEventInput{
-				Title: args[0], Notes: nilIfEmpty(f.notes), Location: nilIfEmpty(f.location),
+				Title: title, Notes: nilIfEmpty(f.notes), Location: nilIfEmpty(f.location),
 				AllDay: allDay, Start: start, End: end, TZ: tz.Name(loc), Status: f.status,
 				Reminders: reminders, Tags: tags,
 			}
@@ -287,6 +331,7 @@ func calAddCmd() *cobra.Command {
 	f.bind(cmd)
 	cmd.Flags().Int64SliceVar(&personIDs, "person", nil, "attendee person ID (repeatable)")
 	cmd.Flags().StringSliceVar(&tags, "tag", nil, "tag (repeatable)")
+	cmd.Flags().BoolVar(&noSyntax, "no-syntax", false, "keep the title as typed: do not read dates, places, repeats, @names or #tags")
 	cmd.Flags().BoolVar(&f.dryRun, "dry-run", false, "print the event that would be created and write nothing")
 	return cmd
 }
