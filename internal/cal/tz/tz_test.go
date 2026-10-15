@@ -29,7 +29,6 @@ func TestLoad(t *testing.T) {
 		{"Europe/London", "Europe/London", false},
 		{"UTC", "UTC", false},
 		{"Z", "UTC", false},
-		{"", "Local", false},
 		{"Mars/Olympus", "", true},
 	}
 	for _, tt := range tests {
@@ -49,7 +48,7 @@ func TestName(t *testing.T) {
 	assert.Equal(t, "America/Chicago", Name(mustLoad(t, "America/Chicago")))
 	assert.Equal(t, "UTC", Name(time.UTC))
 	assert.Equal(t, "UTC", Name(nil))
-	assert.Equal(t, "UTC", Name(time.Local), "the device zone has no stable name")
+	assert.Equal(t, "Local", Name(time.Local), "the unnamed device zone keeps its runtime name")
 }
 
 // Instant follows RFC 5545 section 3.3.5 for local times that do not exist or occur twice.
@@ -111,4 +110,36 @@ func TestParseInstantAndDate(t *testing.T) {
 	assert.Equal(t, "2026-10-16", d.Format(DateLayout))
 	_, err = ParseDate("16/10/2026")
 	assert.Error(t, err)
+}
+
+func TestDeviceZoneOrder(t *testing.T) {
+	env := func(m map[string]string) func(string) string { return func(k string) string { return m[k] } }
+	none := func() string { return "" }
+	tests := []struct {
+		name   string
+		env    map[string]string
+		system func() string
+		want   string
+	}{
+		{"CRM_TZ wins", map[string]string{"CRM_TZ": "Europe/Paris", "TZ": "Asia/Tokyo"}, func() string { return "America/Denver" }, "Europe/Paris"},
+		{"TZ next", map[string]string{"TZ": "Asia/Tokyo"}, func() string { return "America/Denver" }, "Asia/Tokyo"},
+		{"TZ with a leading colon", map[string]string{"TZ": ":Asia/Tokyo"}, none, "Asia/Tokyo"},
+		{"system name last", nil, func() string { return "America/Denver" }, "America/Denver"},
+		{"bad names are skipped", map[string]string{"CRM_TZ": "Nowhere/Land"}, func() string { return "America/Denver" }, "America/Denver"},
+		{"nothing known falls back to Local", nil, none, "Local"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, deviceFrom(env(tt.env), tt.system).String())
+		})
+	}
+}
+
+func TestWindowsToIANA(t *testing.T) {
+	assert.Equal(t, "America/Chicago", WindowsToIANA("Central Standard Time"))
+	assert.Equal(t, "", WindowsToIANA("Made Up Time"))
+	for win, iana := range windowsZones {
+		_, err := time.LoadLocation(iana)
+		assert.NoError(t, err, win)
+	}
 }

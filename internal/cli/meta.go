@@ -36,7 +36,10 @@ const (
 	taskFields   = "id,uuid,title,priority,completed,description,person_id,person_ids,deal_id,due_at,recurrence,completed_at,created_at,updated_at"
 	logFields    = "id,uuid,type,subject,content,direction,occurred_at,person_ids,created_at,updated_at"
 	tagFields    = "id,name"
-	syncFields   = "source,status,created,updated,skipped,inbox,errors,dry_run,note,run_id,since,next_cursor"
+	eventFields  = "id,uuid,title,notes,location,all_day,start,end,start_utc,end_utc,start_date,end_date,tz,rrule,repeat,status,busy,source,exdates,attendees,reminders,tags,local_start,local_end,display_tz,created_at,updated_at"
+	// instanceFields are the fields of one occurrence in cal list.
+	instanceFields = "id,event_id,uuid,series_id,title,location,status,busy,all_day,start,end,start_date,end_date,tz,recurring,occurrence,attendees,date,time,local_start,local_end,display_tz"
+	syncFields     = "source,status,created,updated,skipped,inbox,errors,dry_run,note,run_id,since,next_cursor"
 )
 
 // commandMeta is keyed by command path below the root.
@@ -105,6 +108,27 @@ var commandMeta = map[string]cmdMeta{
 	"task edit":   {mutates: true, fields: taskFields, target: "task", targetArgs: "first", examples: []string{`crm task edit 1 --priority low`}},
 	"task done":   {mutates: true, fields: taskFields, target: "task", targetArgs: "first", examples: []string{`crm task done 1`}},
 	"task delete": {mutates: true, target: "task", targetArgs: "first", examples: []string{`crm task delete 1`}},
+
+	// calendar
+	"cal add": {mutates: true, noDryRun: true, fields: eventFields, examples: []string{
+		`crm cal add "Lunch with Sam" --start "fri 12:30" --duration 1h --location "Cafe Rio" --person 1`,
+		`crm cal add "Standup" --start "2026-10-19 09:15" --duration 15m --repeat weekdays --tz America/Chicago --dry-run`}},
+	"cal list": {fields: instanceFields, examples: []string{
+		`crm cal list -f json`, `crm cal list --from 2026-10-19 --days 14 --tz America/Chicago -f json`, `crm cal list --person 1 --tag work -f json`}},
+	"cal show": {fields: eventFields, examples: []string{`crm cal show 1 -f json`}},
+	"cal edit": {mutates: true, noDryRun: true, fields: eventFields, examples: []string{
+		`crm cal edit 1 --location "Room 4"`,
+		`crm cal edit 1 --scope this --at 2026-10-26T14:00:00Z --start "2026-10-27 10:00" --dry-run`,
+		`crm cal edit 1 --scope following --at 2026-11-02T15:00:00Z --title "Standup v2"`}},
+	"cal rm": {mutates: true, target: "event", targetArgs: "first", examples: []string{
+		`crm cal rm 1`, `crm cal rm 1 --scope this --at 2026-10-26T14:00:00Z --dry-run`}},
+	"cal restore": {mutates: true, target: "event", targetArgs: "first", examples: []string{`crm cal restore 1`}},
+	"cal purge": {mutates: true, destructive: true, target: "event", targetArgs: "first", examples: []string{
+		`crm cal purge 1 --dry-run`, `crm cal purge 1 --yes`}},
+	"cal attendee": {examples: []string{`crm cal attendee add 1 2 --role organizer`}},
+	"cal attendee add": {mutates: true, fields: eventFields, target: "event", targetArgs: "first", examples: []string{
+		`crm cal attendee add 1 2`, `crm cal attendee add 1 2 --rsvp accepted --dry-run`}},
+	"cal attendee rm": {mutates: true, target: "event", targetArgs: "first", examples: []string{`crm cal attendee rm 1 2`}},
 
 	// interactions
 	"log call":    {mutates: true, fields: logFields, target: "person", targetArgs: "all", examples: []string{`crm log call 1 --subject "Intro call" --content "Agreed on Q4 timeline"`}},

@@ -13,7 +13,7 @@ import (
 // entityTables maps tagging entity types to the table that holds them.
 var entityTables = map[string]string{
 	"person": "people", "organization": "organizations",
-	"deal": "deals", "interaction": "interactions",
+	"deal": "deals", "interaction": "interactions", "event": "events",
 }
 
 // touchEntity bumps updated_at on a tagged entity. Table names come from entityTables only.
@@ -88,7 +88,7 @@ func (r *TagRepo) Apply(ctx context.Context, entityType string, entityID int64, 
 	// Verify entity exists. Table name is safe — entityType is validated above.
 	tableMap := map[string]string{
 		"person": "people", "organization": "organizations",
-		"deal": "deals", "interaction": "interactions",
+		"deal": "deals", "interaction": "interactions", "event": "events",
 	}
 	table := tableMap[entityType]
 	var exists int

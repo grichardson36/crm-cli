@@ -12,11 +12,12 @@ import (
 	_ "time/tzdata"
 )
 
-// Load resolves an IANA zone name. An empty name or "Local" is the device zone, "UTC" and "Z" are UTC.
+// Load resolves an IANA zone name. An empty name or "Local" is the device zone (see Device),
+// "UTC" and "Z" are UTC.
 func Load(name string) (*time.Location, error) {
 	switch strings.TrimSpace(name) {
 	case "", "Local", "local":
-		return time.Local, nil
+		return Device(), nil
 	case "UTC", "utc", "Z", "z":
 		return time.UTC, nil
 	}
@@ -27,17 +28,16 @@ func Load(name string) (*time.Location, error) {
 	return loc, nil
 }
 
-// Name is the IANA name to store for a location. The device zone has no stable name, so it is
-// stored as the name the runtime reports, and "UTC" when that is unavailable.
+// Name is the name to store for a location: the IANA name, or "Local" when only the unnamed
+// device zone is known.
 func Name(loc *time.Location) string {
 	if loc == nil {
 		return "UTC"
 	}
-	n := loc.String()
-	if n == "" || n == "Local" {
-		return "UTC"
+	if n := loc.String(); n != "" {
+		return n
 	}
-	return n
+	return "UTC"
 }
 
 // Wall returns the wall clock of an instant in loc as a floating time: a UTC time.Time whose

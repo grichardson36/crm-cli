@@ -275,7 +275,7 @@ type Relationship struct {
 }
 
 // Valid entity types for tagging.
-var EntityTypes = []string{"person", "organization", "deal", "interaction"}
+var EntityTypes = []string{"person", "organization", "deal", "interaction", "event"}
 
 // ValidEntityType checks if the given type is valid.
 func ValidEntityType(t string) bool {

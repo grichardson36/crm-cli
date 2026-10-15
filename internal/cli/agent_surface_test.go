@@ -75,7 +75,7 @@ func TestHelpTopicAndJSON(t *testing.T) {
 	assert.Equal(t, 0, code)
 	var list []map[string]string
 	jsonOut(t, stdout, &list)
-	assert.Len(t, list, 18)
+	assert.Len(t, list, 19)
 	assert.Equal(t, "overview", list[0]["name"])
 }
 

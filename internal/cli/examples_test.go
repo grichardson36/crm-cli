@@ -14,7 +14,7 @@ import (
 // seedTemplate builds a small database that every help example can run against:
 //
 //	people 1 Jane Smith (acme, vip, 14 days), 2 Bob Jones, 3 Janet Smyth (shares an email with 1), 4 Old Contact (archived)
-//	organization 1, task 1, deal 1, interaction 1, a linkedin link on person 1, and pair 1/2 dismissed as duplicates
+//	organization 1, task 1, deal 1, interaction 1, event 1, a linkedin link on person 1, and pair 1/2 dismissed as duplicates
 func seedTemplate(t *testing.T) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "template.db")
@@ -29,6 +29,7 @@ func seedTemplate(t *testing.T) string {
 		{"task", "add", "Send proposal", "--person", "1", "--due", "2026-11-01"},
 		{"deal", "add", "Website Redesign", "--value", "15000", "--person", "1", "--stage", "proposal"},
 		{"log", "note", "1", "--subject", "Intro", "--content", "Met at ReactConf"},
+		{"cal", "add", "Intro call", "--start", "2026-11-02 10:00", "--duration", "30m", "--person", "1"},
 		{"tag", "apply", "person", "1", "vip"},
 		{"person", "handle", "set", "1", "linkedin", "https://linkedin.com/in/janesmith"},
 		{"dupes", "dismiss", "1", "2"},
