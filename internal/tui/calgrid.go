@@ -31,6 +31,9 @@ func gridText(it *calItem) string {
 	case "due":
 		return "~ " + it.title
 	case "task":
+		if it.clock != "" {
+			return it.clock + " [ ] " + it.title
+		}
 		return "[ ] " + it.title
 	case "empty":
 		return ""

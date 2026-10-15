@@ -798,6 +798,9 @@ func (m *Model) runPrompt(kind, value string) {
 		return
 	}
 	switch kind {
+	case "task-schedule":
+		m.runTaskSchedule(value)
+		return
 	case "notetype-add":
 		m.addNoteType(value)
 		return

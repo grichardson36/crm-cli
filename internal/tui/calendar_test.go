@@ -453,7 +453,7 @@ func TestCalendarActionsAreInThePalette(t *testing.T) {
 		"cal-open", "cal-prev", "cal-next", "cal-today", "cal-agenda", "cal-day", "cal-week", "cal-month", "cal-left", "cal-right",
 		"cal-goto", "cal-birthdays", "cal-due", "cal-tasks", "cal-zone", "cal-add", "cal-delete", "cal-edit", "cal-restore",
 		"cal-attendee-add", "cal-attendee-remove", "cal-attendee-open", "cal-remind", "cal-tag", "cal-status", "cal-busy",
-		"cal-import", "cal-export", "view-calendar",
+		"cal-import", "cal-export", "cal-hours", "cal-hours-set", "view-calendar",
 	}
 	press(m, "ctrl+k")
 	require.Equal(t, modeOverlay, m.mode)

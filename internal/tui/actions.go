@@ -187,6 +187,14 @@ func buildActions() []action {
 			write: true, when: whenCalEvent, run: func(m *Model) tea.Cmd { m.calPickStatus(); return nil }},
 		{id: "cal-busy", title: "Calendar: toggle busy", group: "Calendar", desc: "show the event as busy or free in find-a-time",
 			write: true, when: whenCalEvent, run: func(m *Model) tea.Cmd { m.calToggleBusy(); return nil }},
+		{id: "cal-hours", title: "Calendar: working hours", group: "Calendar", desc: "show working hours, date overrides and the scheduling defaults (same as crm cal hours show)",
+			run: func(m *Model) tea.Cmd { m.showHours(); return nil }},
+		{id: "cal-hours-set", title: "Calendar: set working hours", group: "Calendar", desc: "set the hours of some weekdays, such as mon-fri 09:00-17:00 or sat off (same as crm cal hours set)",
+			write: true, run: func(m *Model) tea.Cmd { return m.startSetHours() }},
+		{id: "task-schedule", title: "Task: scheduling", group: "Contact", hint: "S", keys: []string{"S"}, desc: "set duration, a placed start time and a deadline of the selected task: 2h | fri 14:00 | oct 30",
+			write: true, when: whenSchedTask, run: func(m *Model) tea.Cmd { return m.startTaskSchedule() }},
+		{id: "task-auto", title: "Task: toggle auto-schedule", group: "Contact", hint: "A", keys: []string{"A"}, desc: "let the planner place the selected task, or not (it needs a duration)",
+			write: true, when: whenSchedTask, run: func(m *Model) tea.Cmd { m.toggleAutoSchedule(); return nil }},
 		{id: "cal-import", title: "Calendar: import ICS file", group: "Calendar", desc: "import events and tasks from an iCalendar file, shows the counts and asks y/n (same as crm cal import)",
 			write: true, run: func(m *Model) tea.Cmd {
 				m.startInput("cal-import", "ICS file to import: ", "")

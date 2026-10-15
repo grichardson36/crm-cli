@@ -390,6 +390,11 @@ func TestEveryWriteBumpsUpdatedAt(t *testing.T) {
 			_, err := f.tr.Update(ctx, f.task, model.UpdateTaskInput{Title: ptr("renamed")})
 			return err
 		}},
+		{"task scheduling fields", "tasks", func(f *fx) int64 { return f.task }, func(f *fx) error {
+			n := 90
+			_, err := f.tr.Update(ctx, f.task, model.UpdateTaskInput{Schedule: model.TaskSchedule{DurationMin: &n}})
+			return err
+		}},
 		{"task complete", "tasks", func(f *fx) int64 { return f.task }, func(f *fx) error {
 			_, err := f.tr.Complete(ctx, f.task)
 			return err

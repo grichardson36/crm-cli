@@ -33,7 +33,7 @@ const (
 	personFields = "id,uuid,first_name,last_name,name,email,phone,title,company,location,notes,summary,org_id,birthday,keep_in_touch,last_contacted_at,is_favorite,priority_tier,emails,phones,handles,created_at,updated_at"
 	orgFields    = "id,uuid,name,domain,industry,notes,summary,created_at,updated_at"
 	dealFields   = "id,uuid,title,stage,value,person_id,org_id,notes,closed_at,created_at,updated_at"
-	taskFields   = "id,uuid,title,priority,completed,description,person_id,person_ids,deal_id,due_at,recurrence,completed_at,created_at,updated_at"
+	taskFields   = "id,uuid,title,priority,completed,description,person_id,person_ids,deal_id,due_at,recurrence,completed_at,created_at,updated_at,duration_min,earliest_start,deadline_at,deadline_hard,min_chunk_min,auto_schedule,scheduled_start,scheduled_locked,schedule_name,schedule_issue"
 	logFields    = "id,uuid,type,subject,content,direction,occurred_at,person_ids,created_at,updated_at"
 	tagFields    = "id,name"
 	eventFields  = "id,uuid,title,notes,location,all_day,start,end,start_utc,end_utc,start_date,end_date,tz,rrule,repeat,status,busy,source,exdates,attendees,reminders,tags,local_start,local_end,display_tz,created_at,updated_at"
@@ -102,10 +102,12 @@ var commandMeta = map[string]cmdMeta{
 	// tasks
 	"task add": {mutates: true, fields: taskFields, examples: []string{
 		`crm task add "Send proposal" --person 1 --due 2026-11-01 --priority high`,
-		`crm task add "Call back" --person 1 --due 2026-11-01 --recurrence "7 days"`}},
+		`crm task add "Call back" --person 1 --due 2026-11-01 --recurrence "7 days"`,
+		`crm task add "Write report" --duration 2h --deadline 2026-11-06 --auto-schedule`}},
 	"task list":   {fields: taskFields, examples: []string{`crm task list -f json`, `crm task list --overdue -f json`}},
 	"task show":   {fields: taskFields, examples: []string{`crm task show 1 -f json`}},
-	"task edit":   {mutates: true, fields: taskFields, target: "task", targetArgs: "first", examples: []string{`crm task edit 1 --priority low`}},
+	"task edit":   {mutates: true, fields: taskFields, target: "task", targetArgs: "first", examples: []string{`crm task edit 1 --priority low`,
+		`crm task edit 1 --duration 90m --earliest-start 2026-11-02 --hard-deadline`, `crm task edit 1 --scheduled-start "2026-11-03 14:00" --dry-run`}},
 	"task done":   {mutates: true, fields: taskFields, target: "task", targetArgs: "first", examples: []string{`crm task done 1`}},
 	"task delete": {mutates: true, target: "task", targetArgs: "first", examples: []string{`crm task delete 1`}},
 
@@ -130,6 +132,15 @@ var commandMeta = map[string]cmdMeta{
 		`crm cal attendee add 1 2`, `crm cal attendee add 1 2 --rsvp accepted --dry-run`}},
 	"cal attendee rm": {mutates: true, target: "event", targetArgs: "first", examples: []string{`crm cal attendee rm 1 2`}},
 
+	"cal hours": {examples: []string{`crm cal hours show`}},
+	"cal hours show": {fields: "name,uuid,tz,weekly,overrides,default,config,start,end,local_start,local_end,date,hours", examples: []string{
+		`crm cal hours show -f json`, `crm cal hours show --expand today -f json`}},
+	"cal hours set": {mutates: true, fields: "name,uuid,tz,weekly,overrides,default,config", examples: []string{
+		`crm cal hours set mon-fri 09:00-17:00`, `crm cal hours set sat off`, `crm cal hours set mon,wed 08:00-12:00,13:00-16:00 --tz America/Chicago --dry-run`}},
+	"cal hours override": {mutates: true, fields: "name,uuid,tz,weekly,overrides,default,config", examples: []string{
+		`crm cal hours override 2026-12-24 09:00-12:00`, `crm cal hours override 2026-12-25 off`, `crm cal hours override 2026-12-25 --remove`}},
+	"cal hours config": {mutates: true, fields: "default_rule,buffer_min,step_min,horizon_days", examples: []string{
+		`crm cal hours config`, `crm cal hours config --buffer 15 --step 30 --horizon 21`}},
 	"cal import": {mutates: true, noDryRun: true, fields: "source,dry_run,calendar,events,overrides,todos,ignored,unmatched_attendees,warnings", examples: []string{
 		`crm cal import ./feed.ics --dry-run`, `crm cal import ./feed.ics --source work-feed --no-tasks`}},
 	"cal export": {fields: "events,overrides,todos,attendees_without_email,file,bytes", examples: []string{

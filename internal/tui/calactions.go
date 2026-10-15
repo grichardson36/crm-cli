@@ -199,6 +199,8 @@ func (m *Model) runCalPrompt(kind, value string) {
 		m.calImportPath(value)
 	case "cal-export":
 		m.calExportPath(value)
+	case "cal-hours":
+		m.calSetHours(value)
 	}
 }
 

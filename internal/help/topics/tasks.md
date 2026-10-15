@@ -39,6 +39,18 @@ crm task add "Weekly review" --due 2026-11-01 --recurrence weekly
 
 Examples of recurrence: `7 days`, `1 mon`, `weekly`.
 
+## Scheduling fields
+
+For the calendar and the planner. `--due` stays the soft date. A task without `--duration` is never placed, `task list` shows `no_duration` for auto-scheduled ones.
+
+```sh crm-example
+crm task edit 1 --duration 2h --earliest-start 2026-11-02 --deadline 2026-11-06 --hard-deadline
+crm task edit 1 --scheduled-start "2026-11-03 14:00"
+crm task edit 1 --auto-schedule --min-chunk 30m --schedule-name work
+```
+
+A time set with `--scheduled-start` is locked (`--lock=false` releases it) and shows as a block in the Calendar view. In the TUI `S` edits duration | start | deadline and `A` toggles auto-schedule.
+
 ## Preview before changing
 
 ```sh crm-example
@@ -48,4 +60,4 @@ crm task delete 1 --dry-run -f json
 
 ## Related topics
 
-`keep-in-touch`, `agents`, `tui` (the Tasks view, key 4; `t` adds a task, `x` completes one).
+`calendar` (working hours), `keep-in-touch`, `agents`, `tui` (the Tasks view, key 4; `t` adds a task, `x` completes one).

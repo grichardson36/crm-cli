@@ -56,4 +56,17 @@ crm cal import ./feed.ics --source work-feed
 
 Attendees are matched to people by email. Unknown addresses are listed and never created. Use one `--source` name per feed. Times without a zone are read in this device's zone and kept floating. An event deleted here is not created again by a later import.
 
+## Working hours
+
+Mon-Fri 09:00-17:00 in this device's zone until you change them. Hours are wall clock, so they follow daylight saving time. Buffer 10 min, step 15 min, horizon 14 days.
+
+```sh crm-example
+crm cal hours show
+crm cal hours set mon-fri 08:30-17:00 --tz America/Chicago
+crm cal hours set sat off
+crm cal hours override 2026-12-24 09:00-12:00
+crm cal hours config --buffer 15 --step 30 --horizon 21
+crm cal hours show --expand today
+```
+
 See also: `tasks`, `keep-in-touch`, `tui` (Calendar view, key 9), `agents`.

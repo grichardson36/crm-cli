@@ -229,6 +229,23 @@ func (m *Model) calLoad() error {
 			return err
 		}
 		for _, t := range tasks {
+			if t.ScheduledStart != nil {
+				if s, err := tz.ParseInstant(*t.ScheduledStart); err == nil {
+					d := floatDate(s, m.loc)
+					if !d.Before(from) && d.Before(to) {
+						sub := "scheduled"
+						if t.DurationMin != nil {
+							sub += ", " + lengthText(minutesDuration(*t.DurationMin))
+						}
+						it := &calItem{kind: "task", date: d, taskID: t.ID, rank: rankTimed, clock: s.In(m.loc).Format("15:04"), title: cleanCell(t.Title), sub: sub}
+						if len(t.PersonIDs) > 0 {
+							it.personID = t.PersonIDs[0]
+						}
+						add(it)
+						continue
+					}
+				}
+			}
 			if t.DueAt == nil {
 				continue
 			}
@@ -314,6 +331,9 @@ func (m *Model) calRows() []row {
 				r.title = "~ " + it.title
 			case "task":
 				r.title = "[ ] " + it.title
+				if it.clock != "" {
+					r.title = it.clock + " [ ] " + it.title
+				}
 			}
 			r.personID = it.personID
 			r.taskID = it.taskID
