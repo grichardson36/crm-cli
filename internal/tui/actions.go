@@ -309,6 +309,10 @@ func buildActions() []action {
 			run: func(m *Model) tea.Cmd { m.showDavConflicts(); return nil }},
 		{id: "dav-status", title: "DAV: status", group: "App", desc: "contacts exposed, last device activity and conflict counts (same as crm dav status)",
 			run: func(m *Model) tea.Cmd { m.showDavStatus(); return nil }},
+		{id: "theme-choose", title: "Theme: choose", group: "App", desc: "pick a color theme, previewed live as you move, remembered on this device (same as crm theme set)",
+			run: func(m *Model) tea.Cmd { m.openThemeChooser(); return nil }},
+		{id: "theme-reload", title: "Theme: reload", group: "App", desc: "re-read ~/.crm/themes/*.toml and apply the current theme again",
+			run: func(m *Model) tea.Cmd { m.reloadTheme(); return nil }},
 		{id: "quit", inCompare: true, title: "Quit", group: "App", hint: "q", keys: []string{"q", "ctrl+c"}, desc: "quit",
 			run: func(m *Model) tea.Cmd { return tea.Quit }},
 	}

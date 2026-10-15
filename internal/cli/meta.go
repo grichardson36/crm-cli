@@ -182,6 +182,12 @@ var commandMeta = map[string]cmdMeta{
 		`crm domains -f json`, `crm domains --dir ~/.crm -f json`}},
 	"init": {mutates: true, noDryRun: true, fields: "domain,path,created,imported,next_steps", examples: []string{
 		`crm init --domain personal --yes -f json`, `crm init --domain work --path ~/.crm/work.db --dry-run`}},
+	"theme":                {examples: []string{`crm theme list -f json`, `crm theme set nord`}},
+	"theme list":           {fields: themeListFields, examples: []string{`crm theme list -f json`}},
+	"theme set":            {mutates: true, examples: []string{`crm theme set nord`, `crm theme set my-theme --dry-run`}},
+	"theme show":           {fields: themeShowFields, examples: []string{`crm theme show -f json`, `crm theme show gruvbox`}},
+	"theme path":           {fields: "themes_dir,exists,config", examples: []string{`crm theme path`, `crm theme path -f json`}},
+	"theme init":           {mutates: true, fields: "name,path,created", examples: []string{`crm theme init my-theme`, `crm theme init my-theme --dry-run`}},
 	"doctor":               {fields: "ok,checks", examples: []string{`crm doctor -f json`}},
 	"agent":                {examples: []string{`crm agent`}},
 	"agent install-prompt": {examples: []string{`crm agent install-prompt`}},
