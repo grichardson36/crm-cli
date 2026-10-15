@@ -151,7 +151,7 @@ func Busy(ctx context.Context, db *sql.DB, from, to time.Time, loc *time.Locatio
 		return nil, err
 	}
 	for _, t := range tasks {
-		if t.ScheduledStart == nil || t.DurationMin == nil || (!t.ScheduledLocked && !busyTasks) {
+		if t.ScheduledStart == nil || (!t.ScheduledLocked && !busyTasks) {
 			continue
 		}
 		if cs := chunks[t.ID]; len(cs) > 0 {
@@ -168,7 +168,11 @@ func Busy(ctx context.Context, db *sql.DB, from, to time.Time, loc *time.Locatio
 		if err != nil {
 			continue
 		}
-		out = append(out, Span{s, s.Add(time.Duration(*t.DurationMin) * time.Minute)})
+		d := DefaultTaskDuration
+		if t.DurationMin != nil {
+			d = time.Duration(*t.DurationMin) * time.Minute
+		}
+		out = append(out, Span{s, s.Add(d)})
 	}
 	return Merge(out), nil
 }

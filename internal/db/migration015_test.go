@@ -11,14 +11,14 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-// 011 rebuilds taggings so a task can carry a tag. Existing tags must survive with their ids.
-func TestMigration011_TasksCanBeTaggedAndOldTagsSurvive(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "v10.db")
+// 015 rebuilds taggings so a task can carry a tag. Existing tags must survive with their ids.
+func TestMigration015_TasksCanBeTaggedAndOldTagsSurvive(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "v14.db")
 	raw, err := sql.Open("sqlite", path)
 	require.NoError(t, err)
 	_, err = raw.Exec("PRAGMA foreign_keys = ON")
 	require.NoError(t, err)
-	for _, f := range []string{"001_initial.sql", "002_dex_parity.sql", "003_dedupe.sql", "004_kit_notetypes_archive.sql", "005_external_ids_sync.sql", "006_dav.sql", "007_events.sql", "008_task_scheduling.sql", "009_plan.sql", "010_caldav.sql"} {
+	for _, f := range []string{"001_initial.sql", "002_dex_parity.sql", "003_dedupe.sql", "004_kit_notetypes_archive.sql", "005_external_ids_sync.sql", "006_dav.sql", "007_events.sql", "008_task_scheduling.sql", "009_plan.sql", "010_caldav.sql", "011_event_guests.sql", "012_priority_asap.sql", "013_booking.sql", "014_reminders_sent.sql"} {
 		_, err = raw.Exec(migrationSection(t, f, "up"))
 		require.NoError(t, err, f)
 	}
@@ -26,7 +26,7 @@ func TestMigration011_TasksCanBeTaggedAndOldTagsSurvive(t *testing.T) {
 		`INSERT INTO people (uuid, first_name) VALUES ('p1', 'Jane')`,
 		`INSERT INTO tags (name, uuid) VALUES ('vip', 't1'), ('old', 't2')`,
 		`INSERT INTO taggings (tag_id, entity_type, entity_id) VALUES (1, 'person', 1), (2, 'person', 1)`,
-		`PRAGMA user_version = 10`,
+		`PRAGMA user_version = 14`,
 	} {
 		_, err = raw.Exec(s)
 		require.NoError(t, err, s)
@@ -42,7 +42,7 @@ func TestMigration011_TasksCanBeTaggedAndOldTagsSurvive(t *testing.T) {
 
 	var version, n int
 	require.NoError(t, d.QueryRow(`PRAGMA user_version`).Scan(&version))
-	assert.Equal(t, 11, version, "011 is the 11th file, so the version is its position")
+	assert.Equal(t, 15, version, "015 is the 15th file, so the version is its position")
 
 	require.NoError(t, d.QueryRow(`SELECT COUNT(*) FROM taggings WHERE entity_type = 'person'`).Scan(&n))
 	assert.Equal(t, 2, n)

@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jdanielnd/crm-cli/internal/cal/tz"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/stretchr/testify/assert"
@@ -41,10 +42,19 @@ func TestPlanTasksReadsButNeverWrites(t *testing.T) {
 	require.NoError(t, d.QueryRow(`SELECT group_concat(updated_at || coalesce(scheduled_start, '-')) FROM tasks`).Scan(&before))
 	res := plan(t, d)
 	require.Len(t, res.Decisions, 2, "the manual task is not planned")
-	assert.Equal(t, 1, res.Summary.Placed)
-	assert.Equal(t, 1, res.Summary.Skipped)
+	assert.Equal(t, 2, res.Summary.Placed, "no length means 30 minutes")
+	nl := byTitle(*res)["No length"]
+	assert.Equal(t, "placed", nl.Decision)
 	placed := byTitle(*res)["Write report"]
-	assert.Equal(t, "2026-10-12T14:00:00Z", placed.Blocks[0].Start)
+	minutes := func(b Block) int {
+		st, _ := tz.ParseInstant(b.Start)
+		en, _ := tz.ParseInstant(b.End)
+		return int(en.Sub(st) / time.Minute)
+	}
+	assert.Equal(t, 30, minutes(nl.Blocks[0]), "a task with no length takes 30 minutes")
+	assert.Equal(t, 120, minutes(placed.Blocks[0]))
+	// Equal-ranked tasks may swap places (created in the same second), but one starts the day.
+	assert.Contains(t, []string{nl.Blocks[0].Start, placed.Blocks[0].Start}, "2026-10-12T14:00:00Z")
 	var after string
 	require.NoError(t, d.QueryRow(`SELECT group_concat(updated_at || coalesce(scheduled_start, '-')) FROM tasks`).Scan(&after))
 	assert.Equal(t, before, after, "a proposal writes nothing")

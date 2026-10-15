@@ -107,7 +107,7 @@ func registerScheduleTools(s *server.MCPServer, db *sql.DB, tr *repo.TaskRepo) {
 
 	s.AddTool(
 		gomcp.NewTool("crm_task_update",
-			gomcp.WithDescription("Change a task. Only the fields you pass change. Scheduling fields: duration, earliest_start, deadline, hard_deadline, min_chunk, auto_schedule, schedule_name, scheduled_start (locks), locked. An empty string clears a text field. An auto-scheduled task without a duration is listed with schedule_issue no_duration."),
+			gomcp.WithDescription("Change a task. Only the fields you pass change. Scheduling fields: duration, earliest_start, deadline, hard_deadline, min_chunk, auto_schedule, schedule_name, scheduled_start (locks), locked. An empty string clears a text field. A task without a duration is planned as 30 minutes, as in Motion. Priority: low, medium, high, asap."),
 			gomcp.WithNumber("id", gomcp.Required(), gomcp.Description("Task ID")),
 			gomcp.WithString("title", gomcp.Description("Title")),
 			gomcp.WithString("description", gomcp.Description("Description")),
@@ -118,7 +118,7 @@ func registerScheduleTools(s *server.MCPServer, db *sql.DB, tr *repo.TaskRepo) {
 			gomcp.WithString("deadline", gomcp.Description("The scheduler plans against this date or time")),
 			gomcp.WithBoolean("hard_deadline", gomcp.Description("The deadline may use hours outside working hours")),
 			gomcp.WithString("min_chunk", gomcp.Description("Smallest block the task may be split into")),
-			gomcp.WithBoolean("auto_schedule", gomcp.Description("Let the planner place it (needs a duration)")),
+			gomcp.WithBoolean("auto_schedule", gomcp.Description("Let the planner place it (30 min unless a duration is set)")),
 			gomcp.WithString("schedule_name", gomcp.Description("Working hours rule, default work")),
 			gomcp.WithString("scheduled_start", gomcp.Description("Place it at this date and time by hand; this locks it (empty unplaces)")),
 			gomcp.WithBoolean("locked", gomcp.Description("Keep the planner away from the placed time")),
@@ -151,7 +151,7 @@ func registerScheduleTools(s *server.MCPServer, db *sql.DB, tr *repo.TaskRepo) {
 			if err != nil {
 				return mcpError(err)
 			}
-			return jsonResult(taskView{Task: t, ScheduleIssue: repo.ScheduleIssue(t)})
+			return jsonResult(t)
 		},
 	)
 
@@ -330,7 +330,7 @@ func registerScheduleTools(s *server.MCPServer, db *sql.DB, tr *repo.TaskRepo) {
 
 	s.AddTool(
 		gomcp.NewTool("crm_cal_plan",
-			gomcp.WithDescription("Plan auto-scheduled tasks into free working time. The default is a proposal that writes nothing: per task the decision (placed, late, unfit), blocks, eta, slack and why. With apply true it writes only scheduled_start and split blocks (never locked tasks or events) and returns a journal_id; crm_cal_plan_undo reverses it. Tasks without a duration are skipped."),
+			gomcp.WithDescription("Plan auto-scheduled tasks into free working time. The default is a proposal that writes nothing: per task the decision (placed, late, unfit), blocks, eta, slack and why. With apply true it writes only scheduled_start and split blocks (never locked tasks or events) and returns a journal_id; crm_cal_plan_undo reverses it. A task with no duration is planned as 30 minutes."),
 			gomcp.WithBoolean("apply", gomcp.Description("Write the proposal. Default false")),
 			gomcp.WithArray("only", gomcp.Description("Plan only these task IDs"), gomcp.WithNumberItems()),
 			gomcp.WithArray("reject", gomcp.Description("With apply: leave these task IDs as they are"), gomcp.WithNumberItems()),
@@ -375,10 +375,4 @@ func registerScheduleTools(s *server.MCPServer, db *sql.DB, tr *repo.TaskRepo) {
 			return jsonResult(j)
 		},
 	)
-}
-
-// taskView is a task with its scheduling issue, if any.
-type taskView struct {
-	*model.Task
-	ScheduleIssue string `json:"schedule_issue,omitempty"`
 }

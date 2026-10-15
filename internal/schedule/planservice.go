@@ -21,8 +21,13 @@ type PlanOptions struct {
 	Only []int64
 }
 
+// DefaultTaskDuration is how long a task without a duration is planned for.
+const DefaultTaskDuration = 30 * time.Minute
+
 func priorityOf(p string) int {
 	switch p {
+	case "asap":
+		return 4
 	case "high":
 		return 3
 	case "low":
@@ -97,6 +102,7 @@ func PlanTasks(ctx context.Context, db *sql.DB, opt PlanOptions) (*PlanResult, e
 			}
 		}
 		pt := PlanTask{ID: t.ID, UUID: t.UUID, Title: t.Title, Priority: priorityOf(t.Priority), Schedule: t.ScheduleName, Hard: t.DeadlineHard}
+		pt.Duration = DefaultTaskDuration // Motion plans a task with no length as 30 minutes
 		if t.DurationMin != nil {
 			pt.Duration = time.Duration(*t.DurationMin) * time.Minute
 		}

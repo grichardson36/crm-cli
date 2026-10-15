@@ -42,15 +42,6 @@ func archivedIDs(t *testing.T, pr *repo.PersonRepo) map[int64]bool {
 	return out
 }
 
-func rowIndex(c *compareState, label string) int {
-	for i, r := range c.rows {
-		if r.label == label {
-			return i
-		}
-	}
-	return -1
-}
-
 func TestMergeViewListsGroupsHighFirstAndCyclesLevel(t *testing.T) {
 	m, _ := dupeModel(t)
 	press(m, "6")
@@ -88,113 +79,6 @@ func TestMergeViewEmptyMessage(t *testing.T) {
 	press(m, "6")
 	assert.Empty(t, m.rows)
 	assert.Contains(t, m.View(), "No duplicates")
-}
-
-func TestCompareFlowPickAndApply(t *testing.T) {
-	m, pr := dupeModel(t)
-	ctx := context.Background()
-	press(m, "6", "j", "enter")
-	require.NotNil(t, m.cmp)
-	c := m.cmp
-	require.Len(t, c.members, 2)
-	assert.Equal(t, int64(2), c.members[0].id, "the lowest id is the default survivor")
-	assert.Equal(t, 0, c.surv)
-	for _, label := range []string{"name", "title", "company", "location", "birthday", "keep in touch"} {
-		assert.GreaterOrEqual(t, rowIndex(c, label), 0, label)
-	}
-	assert.Equal(t, -1, rowIndex(c, "notes"), "equal fields are not shown")
-	out := m.View()
-	assert.Contains(t, out, "#2 Bob Baker")
-	assert.Contains(t, out, "#4 bob baker")
-	assert.Contains(t, out, "keeps the record")
-	assert.Contains(t, out, "Combined, always")
-	assert.Contains(t, out, "interactions")
-	assert.Contains(t, out, "result:")
-
-	// The survivor's company wins by default. Tab flips it to the other person.
-	press(m, "j", "j") // name, title, company
-	require.Equal(t, "company", c.rows[c.cur].label)
-	assert.Equal(t, 0, c.resolved(c.cur))
-	press(m, "tab")
-	assert.Equal(t, 1, c.resolved(c.cur))
-	press(m, " ")
-	assert.Equal(t, 0, c.resolved(c.cur), "space flips back")
-	press(m, "tab")
-	assert.Equal(t, 1, c.resolved(c.cur))
-
-	// An empty survivor value defaults to the first person that has one.
-	assert.Equal(t, 1, c.resolved(rowIndex(c, "title")))
-
-	press(m, "m")
-	assert.Nil(t, m.cmp, "compare closes after the merge")
-	assert.Contains(t, m.status, "merged 1 into #2")
-	assert.False(t, m.statusIsErr)
-	keep := personByID(t, pr, 2)
-	assert.Equal(t, "Globex Inc", str(keep.Company), "picked value won")
-	assert.Equal(t, "CTO", str(keep.Title))
-	assert.Equal(t, "Bob", keep.FirstName, "survivor name kept")
-	assert.True(t, archivedIDs(t, pr)[4])
-	_ = ctx
-
-	// The merged group is gone from the list, the HIGH group is still there.
-	require.Len(t, m.rows, 1)
-	assert.Contains(t, m.rows[0].title, "HIGH")
-}
-
-func TestCompareChangeSurvivor(t *testing.T) {
-	m, pr := dupeModel(t)
-	press(m, "6", "j", "enter", "s")
-	require.NotNil(t, m.cmp)
-	assert.Equal(t, 1, m.cmp.surv)
-	assert.Contains(t, m.View(), "keeps the record")
-	press(m, "m")
-	assert.Nil(t, m.cmp)
-	assert.True(t, archivedIDs(t, pr)[2], "the old survivor is archived")
-	assert.False(t, archivedIDs(t, pr)[4])
-	assert.Equal(t, "bob", personByID(t, pr, 4).FirstName)
-}
-
-func TestCompareEscAndQLeaveWithoutMerging(t *testing.T) {
-	m, pr := dupeModel(t)
-	for _, k := range []string{"esc", "q"} {
-		press(m, "6", "enter")
-		require.NotNil(t, m.cmp, k)
-		press(m, k)
-		assert.Nil(t, m.cmp, k)
-		assert.Empty(t, archivedIDs(t, pr))
-	}
-	assert.NotEqual(t, modeOverlay, m.mode)
-}
-
-func TestCompareSwallowsOtherKeys(t *testing.T) {
-	m, pr := dupeModel(t)
-	press(m, "6", "enter")
-	require.NotNil(t, m.cmp)
-	for _, k := range []string{"c", "f", "n", "t", "#", "T", "1", "2", "x", "+", "u", "M"} {
-		press(m, k)
-		assert.NotNil(t, m.cmp, k)
-		assert.Equal(t, modeNormal, m.mode, k)
-		assert.Equal(t, viewMerge, m.view, k)
-	}
-	assert.False(t, personByID(t, pr, 3).IsFavorite)
-	assert.Empty(t, archivedIDs(t, pr))
-}
-
-func TestCompareClickPicksValue(t *testing.T) {
-	m, _ := dupeModel(t)
-	press(m, "6", "j", "enter")
-	c := m.cmp
-	row := rowIndex(c, "company")
-	require.GreaterOrEqual(t, row, 0)
-	colW, _ := c.geometry(m.width)
-	// Body line 2 is the first field row, and the screen has the title line above it.
-	click(m, cmpLabelW+colW+1, 1+2+row)
-	assert.Equal(t, row, c.cur)
-	assert.Equal(t, 1, c.resolved(row))
-	click(m, cmpLabelW+1, 1+2+row)
-	assert.Equal(t, 0, c.resolved(row))
-	m.Update(tea.MouseMsg{X: 3, Y: 5, Button: tea.MouseButtonWheelDown, Action: tea.MouseActionPress})
-	assert.Equal(t, row+1, c.cur)
 }
 
 func TestDismissAndUndoDismiss(t *testing.T) {
@@ -530,12 +414,10 @@ func TestNumberAndBracketKeysCoverEveryView(t *testing.T) {
 	}
 	assert.Equal(t, viewCalendar, m.view)
 	press(m, "]")
-	assert.Equal(t, viewCalendar, m.view, "] steps the calendar period instead of changing view")
-	press(m, "1", "[")
-	assert.Equal(t, viewCalendar, m.view, "[ wraps back from Home")
-	press(m, "8", "]")
-	assert.Equal(t, viewCalendar, m.view)
-	press(m, "7", "]")
+	assert.Equal(t, viewHome, m.view, "] wraps around, also from the Calendar")
+	press(m, "[")
+	assert.Equal(t, viewCalendar, m.view, "[ wraps back")
+	press(m, "[")
 	assert.Equal(t, viewSync, m.view)
 }
 

@@ -696,16 +696,22 @@ func TestParseAndCompleteStayFastOnABigList(t *testing.T) {
 		"set Mark Twain Ba: company=Acme title=CTO",
 		"t buy milk @",
 	}
-	start := time.Now()
-	const rounds = 20
-	for i := 0; i < rounds; i++ {
-		for _, l := range lines {
-			Parse(l, env)
-			Complete(l, len(l), env)
+	// Best of three runs, so a busy machine does not fail the test.
+	const rounds = 10
+	best := time.Hour
+	for attempt := 0; attempt < 3; attempt++ {
+		start := time.Now()
+		for i := 0; i < rounds; i++ {
+			for _, l := range lines {
+				Parse(l, env)
+				Complete(l, len(l), env)
+			}
+		}
+		if per := time.Since(start) / (rounds * time.Duration(len(lines))); per < best {
+			best = per
 		}
 	}
-	per := time.Since(start) / (rounds * time.Duration(len(lines)))
-	assert.Less(t, per, 100*time.Millisecond, "one keystroke should cost far less than a frame")
+	assert.Less(t, best, 100*time.Millisecond, "one keystroke should cost far less than a frame")
 }
 
 func TestRedoAfterUndoAndGuards(t *testing.T) {

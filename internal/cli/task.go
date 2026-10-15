@@ -81,9 +81,6 @@ func taskToMap(t *model.Task) map[string]any {
 	m["auto_schedule"] = t.AutoSchedule
 	m["scheduled_locked"] = t.ScheduledLocked
 	m["schedule_name"] = t.ScheduleName
-	if issue := repo.ScheduleIssue(t); issue != "" {
-		m["schedule_issue"] = issue
-	}
 	return m
 }
 

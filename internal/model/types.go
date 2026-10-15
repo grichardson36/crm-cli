@@ -374,7 +374,7 @@ func ValidDealStage(s string) bool {
 }
 
 // Priority levels
-var Priorities = []string{"low", "medium", "high"}
+var Priorities = []string{"low", "medium", "high", "asap"}
 
 // ValidPriority checks if the given priority is valid.
 func ValidPriority(p string) bool {

@@ -33,12 +33,13 @@ const (
 	personFields = "id,uuid,first_name,last_name,name,email,phone,title,company,location,notes,summary,org_id,birthday,keep_in_touch,last_contacted_at,is_favorite,priority_tier,emails,phones,handles,created_at,updated_at"
 	orgFields    = "id,uuid,name,domain,industry,notes,summary,created_at,updated_at"
 	dealFields   = "id,uuid,title,stage,value,person_id,org_id,notes,closed_at,created_at,updated_at"
-	taskFields   = "id,uuid,title,priority,completed,description,person_id,person_ids,deal_id,due_at,recurrence,tags,completed_at,created_at,updated_at,duration_min,earliest_start,deadline_at,deadline_hard,min_chunk_min,auto_schedule,scheduled_start,scheduled_locked,schedule_name,schedule_issue"
+	taskFields   = "id,uuid,title,priority,completed,description,person_id,person_ids,deal_id,due_at,recurrence,tags,completed_at,created_at,updated_at,duration_min,earliest_start,deadline_at,deadline_hard,min_chunk_min,auto_schedule,scheduled_start,scheduled_locked,schedule_name"
 	logFields    = "id,uuid,type,subject,content,direction,occurred_at,person_ids,created_at,updated_at"
 	tagFields    = "id,name"
 	eventFields  = "id,uuid,title,notes,location,all_day,start,end,start_utc,end_utc,start_date,end_date,tz,rrule,repeat,status,busy,source,exdates,attendees,reminders,tags,local_start,local_end,display_tz,created_at,updated_at"
 	// instanceFields are the fields of one occurrence in cal list.
 	instanceFields = "id,event_id,uuid,series_id,title,location,status,busy,all_day,start,end,start_date,end_date,tz,recurring,occurrence,attendees,date,time,local_start,local_end,display_tz"
+	bookLinkFields = "id,uuid,name,title,slug,description,host_email,durations,schedule,horizon_days,start_after,min_notice_min,slot_step_min,buffer_before_min,buffer_after_min,max_per_day,max_per_week,max_per_month,busy_tasks,location_kind,location,questions,reminders_min,followup_after_min,max_uses,expires_at,active,created_at,updated_at"
 	syncFields     = "source,status,created,updated,skipped,inbox,errors,dry_run,note,run_id,since,next_cursor"
 )
 
@@ -146,6 +147,25 @@ var commandMeta = map[string]cmdMeta{
 		`crm cal free --len 45m --within 7d -f json`, `crm cal free --len 30m --from "mon" --notice 4h --buffer 15 --limit 5`}},
 	"cal plan": {mutates: true, noDryRun: true, fields: "mode,applied,dry_run,now,horizon_end,summary,tasks,diff,journal_id,id,note,undone", examples: []string{
 		`crm cal plan -f json`, `crm cal plan --apply --dry-run -f json`, `crm cal plan --apply --reject 3 --lock 5`, `crm cal plan --undo`, `crm cal plan --history`}},
+	"cal invite": {noDryRun: true, examples: []string{`crm cal invite 1 --to jane@example.com --from me@example.com --out invite.ics`}},
+	"cal due-reminders": {noDryRun: true, mutates: true, fields: "event_id,title,start,local_start,fire_at,minutes_before,method,location,people,guests,starts_in", examples: []string{
+		`crm cal due-reminders -f json`, `crm cal due-reminders --within 15m --dry-run -f json`}},
+	"book remind": {noDryRun: true, mutates: true, fields: "booking_id,link,kind,minutes_before,send_at,to,reply_to,subject,body", examples: []string{
+		`crm book remind -f json`, `crm book remind --dry-run`}},
+	"book": {examples: []string{`crm book list`}},
+	"book add": {mutates: true, noDryRun: true, fields: bookLinkFields, examples: []string{
+		`crm book add "Intro call" --email me@example.com --len 30m,45m --notice 4h --buffer 10 --max-day 3 --where https://meet.example.com/room`,
+		`crm book add "Sales demo" --question "Company!" --question "Agenda" --remind 1d --followup 1d --dry-run`}},
+	"book list": {fields: bookLinkFields + ",invitee_email,start,end,status,event_id,person_id", examples: []string{`crm book list`, `crm book list --bookings --link intro -f json`}},
+	"book offer": {fields: "link,title,tz,length_min,reason,slots,text", examples: []string{`crm book offer intro --count 8`, `crm book offer intro --tz America/New_York -f json`}},
+	"book export": {fields: "file,slots,bytes", examples: []string{`crm book export intro --out ./site`}},
+	"book confirm": {mutates: true, noDryRun: true, fields: "dry_run,booking,event,person,person_id,note,task_id", examples: []string{
+		`crm book confirm intro --at "tue 10:00" --name "Jane Doe" --email jane@example.com --invite invite.ics`,
+		`crm book confirm intro/2026-10-20T15:00:00Z/30 --name Jane --email jane@example.com --dry-run`}},
+	"book cancel":  {mutates: true, noDryRun: true, fields: "id,uuid,link,status,start,end,invitee_email,event_id", examples: []string{`crm book cancel 3 --invite cancel.ics`, `crm book cancel 3 --dry-run`}},
+	"book pause":   {mutates: true, fields: bookLinkFields, examples: []string{`crm book pause intro`}},
+	"book resume":  {mutates: true, fields: bookLinkFields, examples: []string{`crm book resume intro`}},
+	"book rm":      {mutates: true, fields: bookLinkFields, examples: []string{`crm book rm intro`}},
 	"cal hours": {examples: []string{`crm cal hours show`}},
 	"cal hours show": {fields: "name,uuid,tz,weekly,overrides,default,config,start,end,local_start,local_end,date,hours", examples: []string{
 		`crm cal hours show -f json`, `crm cal hours show --expand today -f json`}},
@@ -155,7 +175,7 @@ var commandMeta = map[string]cmdMeta{
 		`crm cal hours override 2026-12-24 09:00-12:00`, `crm cal hours override 2026-12-25 off`, `crm cal hours override 2026-12-25 --remove`}},
 	"cal hours config": {mutates: true, fields: "default_rule,buffer_min,step_min,horizon_days", examples: []string{
 		`crm cal hours config`, `crm cal hours config --buffer 15 --step 30 --horizon 21`}},
-	"cal import": {mutates: true, noDryRun: true, fields: "source,dry_run,calendar,events,overrides,todos,ignored,unmatched_attendees,warnings", examples: []string{
+	"cal import": {mutates: true, noDryRun: true, fields: "source,dry_run,calendar,events,overrides,todos,ignored,warnings", examples: []string{
 		`crm cal import ./feed.ics --dry-run`, `crm cal import ./feed.ics --source work-feed --no-tasks`}},
 	"cal export": {fields: "events,overrides,todos,attendees_without_email,file,bytes", examples: []string{
 		`crm cal export --out ./crm.ics`, `crm cal export --from 2026-01-01 --to 2027-01-01 --tasks`}},

@@ -39,7 +39,7 @@ func TestMigration007_UpgradeFromV6KeepsTaggings(t *testing.T) {
 
 	var version, n int
 	require.NoError(t, d.QueryRow(`PRAGMA user_version`).Scan(&version))
-	assert.Equal(t, 11, version)
+	assert.Equal(t, 15, version)
 	require.NoError(t, d.QueryRow(`SELECT COUNT(*) FROM taggings WHERE entity_type = 'person'`).Scan(&n))
 	assert.Equal(t, 2, n, "existing taggings survive the rebuild")
 
@@ -99,6 +99,8 @@ func TestMigration007_EventsConstraintsAndDown(t *testing.T) {
 	require.NoError(t, d.QueryRow(`SELECT (SELECT COUNT(*) FROM event_people) + (SELECT COUNT(*) FROM event_reminders)`).Scan(&n))
 	assert.Equal(t, 0, n)
 
+	_, err = d.Exec(migrationSection(t, "011_event_guests.sql", "down"))
+	require.NoError(t, err)
 	down := migrationSection(t, "007_events.sql", "down")
 	_, err = d.Exec(down)
 	require.NoError(t, err)

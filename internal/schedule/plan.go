@@ -40,7 +40,7 @@ type PlanTask struct {
 	SoftDeadline bool
 	// Hard lets the planner use time outside working hours to meet the deadline.
 	Hard bool
-	// Priority is 1 (low), 2 (medium) or 3 (high).
+	// Priority is 1 (low), 2 (medium), 3 (high) or 4 (ASAP, placed before everything else).
 	Priority int
 	Created  time.Time
 	Schedule string
@@ -150,6 +150,9 @@ func Plan(in PlanInput) PlanResult {
 	}
 	sort.SliceStable(list, func(i, j int) bool {
 		a, b := list[i], list[j]
+		if (a.t.Priority == 4) != (b.t.Priority == 4) {
+			return a.t.Priority == 4 // ASAP goes before everything, as in Motion
+		}
 		if a.t.Hard != b.t.Hard {
 			return a.t.Hard
 		}
@@ -190,7 +193,7 @@ func Plan(in PlanInput) PlanResult {
 			d.SlackMin = &mins
 		}
 		d.Why = append(d.Why, fmt.Sprintf("rank %d of %d: %s", rank+1, len(list), deadlineWhy(r, in.Now)))
-		d.Why = append(d.Why, fmt.Sprintf("priority %s, needs %s", map[int]string{1: "low", 2: "medium", 3: "high"}[t.Priority], fmtLen(t.Duration)))
+		d.Why = append(d.Why, fmt.Sprintf("priority %s, needs %s", map[int]string{1: "low", 2: "medium", 3: "high", 4: "asap"}[t.Priority], fmtLen(t.Duration)))
 
 		from := in.Now
 		if t.Earliest.After(from) {

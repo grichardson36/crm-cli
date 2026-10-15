@@ -110,16 +110,41 @@ func buildActions() []action {
 
 	return []action{
 		// Merge compare screen. These come first so their keys win while the screen is open.
-		{id: "cmp-pick", title: "Pick value", group: "Compare", hint: "tab", keys: []string{"tab", " "}, desc: "compare: use the next person's value for the row (tab or space)",
-			foot: 6, footIn: inBoth, inCompare: true, when: whenCompare, run: func(m *Model) tea.Cmd { m.cmp.pick(1); m.cmpPreview(); return nil }},
-		{id: "cmp-pick-back", title: "Pick previous value", group: "Compare", hint: "shift+tab", keys: []string{"shift+tab"}, desc: "compare: use the previous person's value for the row",
-			inCompare: true, when: whenCompare, run: func(m *Model) tea.Cmd { m.cmp.pick(-1); m.cmpPreview(); return nil }},
-		{id: "cmp-survivor", title: "Change survivor", group: "Compare", hint: "s", keys: []string{"s"}, desc: "compare: keep the next person as the survivor",
-			foot: 7, footIn: inBoth, inCompare: true, when: whenCompare, run: func(m *Model) tea.Cmd { m.cmp.nextSurvivor(); m.cmpPreview(); return nil }},
-		{id: "cmp-apply", title: "Apply merge", group: "Compare", hint: "m", keys: []string{"m"}, desc: "compare: merge now, dropped people are archived and can be restored",
-			write: true, foot: 8, footIn: inBoth, inCompare: true, when: whenCompare, run: func(m *Model) tea.Cmd { m.applyMerge(); return nil }},
-		{id: "cmp-back", title: "Close compare", group: "Compare", hint: "esc", keys: []string{"esc", "q"}, desc: "compare: leave without merging (also q)",
-			foot: 9, footIn: inBoth, inCompare: true, when: whenCompare, run: func(m *Model) tea.Cmd { m.cmp = nil; return nil }},
+		{id: "cmp-left", title: "Use candidate 1", group: "Compare", hint: "←/→", keys: []string{"left", "h", "1"}, desc: "compare: the field takes the left person's value (a list item goes in). Also h and 1",
+			foot: 6, footIn: inBoth, inCompare: true, when: whenCmpEdit, run: func(m *Model) tea.Cmd { m.cmpTake(0); return nil }},
+		{id: "cmp-right", title: "Use candidate 2", group: "Compare", hint: "→", keys: []string{"right", "l", "2"}, desc: "compare: the field takes the right person's value (a list item goes in). Also l and 2",
+			inCompare: true, when: whenCmpEdit, run: func(m *Model) tea.Cmd { m.cmpTake(1); return nil }},
+		{id: "cmp-pick", title: "Toggle value or item", group: "Compare", hint: "space", keys: []string{"tab", " "}, desc: "compare: switch a field to the other person's value, or put a list item in or out of the result (tab or space)",
+			foot: 7, footIn: inBoth, inCompare: true, when: whenCmpEdit, run: func(m *Model) tea.Cmd { m.cmp.toggle(); m.cmpPreview(); return nil }},
+		{id: "cmp-pick-back", title: "Toggle value or item (back)", group: "Compare", hint: "shift+tab", keys: []string{"shift+tab"}, desc: "compare: same as space",
+			inCompare: true, when: whenCmpEdit, run: func(m *Model) tea.Cmd { m.cmp.toggle(); m.cmpPreview(); return nil }},
+		{id: "cmp-survivor", title: "Change survivor", group: "Compare", hint: "s", keys: []string{"s"}, desc: "compare: keep the other person's record and id as the survivor",
+			foot: 8, footIn: inBoth, inCompare: true, when: whenCmpEdit, run: func(m *Model) tea.Cmd { m.cmp.nextSurvivor(); m.cmpPreview(); return nil }},
+		{id: "cmp-pair", title: "Change pair", group: "Compare", hint: "p", keys: []string{"p"}, desc: "compare: groups of three or more merge two people at a time, p moves to the next pair",
+			foot: 9, footIn: inBoth, footIf: whenCmpGroup, inCompare: true, when: whenCmpEdit, run: func(m *Model) tea.Cmd { m.cmp.nextPair(); m.cmpPreview(); return nil }},
+		{id: "cmp-view", title: "Switch pane", group: "Compare", hint: "r", keys: []string{"r"}, desc: "compare: narrow terminals show fewer panes, r switches between candidates and the result",
+			foot: 5, footIn: inBoth, footIf: whenCmpNarrow, inCompare: true, when: whenCmpEdit, run: func(m *Model) tea.Cmd { m.cmp.nextPage(); return nil }},
+		{id: "cmp-confirm", title: "Merge (with summary)", group: "Compare", hint: "enter", keys: []string{"enter", "y"}, desc: "compare: enter shows what will be archived and moved, enter again merges",
+			write: true, foot: 11, footIn: inBoth, inCompare: true, when: whenCompare, run: func(m *Model) tea.Cmd {
+				if m.cmp.confirm {
+					m.applyMerge()
+					return nil
+				}
+				m.cmpPreview()
+				m.cmp.confirm = true
+				return nil
+			}},
+		{id: "cmp-apply", title: "Apply merge", group: "Compare", hint: "m", keys: []string{"m"}, desc: "compare: merge now without the summary, the dropped person is archived and can be restored",
+			write: true, inCompare: true, when: whenCompare, run: func(m *Model) tea.Cmd { m.applyMerge(); return nil }},
+		{id: "cmp-back", title: "Close compare", group: "Compare", hint: "esc", keys: []string{"esc", "q"}, desc: "compare: leave without merging (also q), from the summary go back to the fields",
+			foot: 12, footIn: inBoth, inCompare: true, when: whenCompare, run: func(m *Model) tea.Cmd {
+				if m.cmp.confirm {
+					m.cmp.confirm = false
+					return nil
+				}
+				m.cmp = nil
+				return nil
+			}},
 
 		// Calendar view. These come before the generic keys so [ ] h l and friends mean the calendar here.
 		{id: "cal-open", title: "Calendar: open", group: "Calendar", hint: "enter", keys: []string{"enter"}, desc: "edit the event, open the person of a birthday or task, add on an empty day, or open the day (Month)",
@@ -130,20 +155,20 @@ func buildActions() []action {
 				}
 				return m.calOpen()
 			}},
-		{id: "cal-prev", title: "Calendar: previous period", group: "Calendar", hint: "[", keys: []string{"["}, desc: "step back one week (Agenda, Week), day (Day) or month (Month)",
-			foot: 41, footIn: inList, when: whenCalendar, run: func(m *Model) tea.Cmd { m.calStep(-1); return nil }},
-		{id: "cal-next", title: "Calendar: next period", group: "Calendar", hint: "]", keys: []string{"]"}, desc: "step forward one week (Agenda, Week), day (Day) or month (Month)",
-			foot: 42, footIn: inList, when: whenCalendar, run: func(m *Model) tea.Cmd { m.calStep(1); return nil }},
+		{id: "cal-prev", title: "Calendar: previous period", group: "Calendar", hint: "shift+tab", keys: []string{"shift+tab"}, desc: "step back one week (Agenda, Week), day (Day) or month (Month). [ and ] still switch views",
+			foot: 41, footIn: inList, when: whenCalList, run: func(m *Model) tea.Cmd { m.calStep(-1); return nil }},
+		{id: "cal-next", title: "Calendar: next period", group: "Calendar", hint: "tab", keys: []string{"tab"}, desc: "step forward one week (Agenda, Week), day (Day) or month (Month). [ and ] still switch views",
+			foot: 42, footIn: inList, when: whenCalList, run: func(m *Model) tea.Cmd { m.calStep(1); return nil }},
 		{id: "cal-today", title: "Calendar: today", group: "Calendar", hint: "t", keys: []string{"t"}, desc: "jump to today",
-			foot: 40, footIn: inList, when: whenCalendar, run: func(m *Model) tea.Cmd { m.calReload(m.calToday()); return nil }},
+			foot: 40, footIn: inList, when: whenCalList, run: func(m *Model) tea.Cmd { m.calReload(m.calToday()); return nil }},
 		{id: "cal-agenda", title: "Calendar: agenda", group: "Calendar", hint: "a", keys: []string{"a"}, desc: "list the next two weeks by day",
-			foot: 50, footIn: inList, when: whenCalendar, run: func(m *Model) tea.Cmd { m.calSetMode(calAgenda); return nil }},
+			foot: 50, footIn: inList, when: whenCalList, run: func(m *Model) tea.Cmd { m.calSetMode(calAgenda); return nil }},
 		{id: "cal-day", title: "Calendar: day", group: "Calendar", hint: "d", keys: []string{"d"}, desc: "one day",
-			foot: 51, footIn: inList, when: whenCalendar, run: func(m *Model) tea.Cmd { m.calSetMode(calDay); return nil }},
+			foot: 51, footIn: inList, when: whenCalList, run: func(m *Model) tea.Cmd { m.calSetMode(calDay); return nil }},
 		{id: "cal-week", title: "Calendar: week", group: "Calendar", hint: "w", keys: []string{"w"}, desc: "seven day grid (agenda list on a narrow terminal)",
-			foot: 52, footIn: inList, when: whenCalendar, run: func(m *Model) tea.Cmd { m.calSetMode(calWeek); return nil }},
+			foot: 52, footIn: inList, when: whenCalList, run: func(m *Model) tea.Cmd { m.calSetMode(calWeek); return nil }},
 		{id: "cal-month", title: "Calendar: month", group: "Calendar", hint: "m", keys: []string{"m"}, desc: "month grid, enter opens a day (agenda list on a narrow terminal)",
-			foot: 53, footIn: inList, when: whenCalendar, run: func(m *Model) tea.Cmd { m.calSetMode(calMonth); return nil }},
+			foot: 53, footIn: inList, when: whenCalList, run: func(m *Model) tea.Cmd { m.calSetMode(calMonth); return nil }},
 		{id: "cal-left", title: "Calendar: previous day", group: "Calendar", hint: "h", keys: []string{"h", "left"}, desc: "grid: select the previous day",
 			when: whenCalGrid, run: func(m *Model) tea.Cmd { m.calMoveDay(-1); return nil }},
 		{id: "cal-right", title: "Calendar: next day", group: "Calendar", hint: "l", keys: []string{"l", "right"}, desc: "grid: select the next day",
@@ -156,18 +181,18 @@ func buildActions() []action {
 				m.startInput("cal-goto", "go to date: ", "")
 				return m.input.Focus()
 			}},
-		{id: "cal-birthdays", title: "Calendar: birthdays on/off", group: "Calendar", hint: "b", keys: []string{"b"}, desc: "show or hide birthdays",
+		{id: "cal-birthdays", title: "Calendar: birthdays on/off", group: "Calendar", desc: "show or hide birthdays",
 			when: whenCalendar, run: func(m *Model) tea.Cmd { m.calToggle(&m.cal.birthdays, "birthdays"); return nil }},
-		{id: "cal-due", title: "Calendar: keep-in-touch on/off", group: "Calendar", hint: "u", keys: []string{"u"}, desc: "show or hide who is due to reach out",
+		{id: "cal-due", title: "Calendar: keep-in-touch on/off", group: "Calendar", desc: "show or hide who is due to reach out",
 			when: whenCalendar, run: func(m *Model) tea.Cmd { m.calToggle(&m.cal.due, "keep-in-touch"); return nil }},
-		{id: "cal-tasks", title: "Calendar: tasks on/off", group: "Calendar", hint: "T", keys: []string{"T"}, desc: "show or hide tasks on their due date",
+		{id: "cal-tasks", title: "Calendar: tasks on/off", group: "Calendar", desc: "show or hide tasks on their due date",
 			when: whenCalendar, run: func(m *Model) tea.Cmd { m.calToggle(&m.cal.tasks, "tasks"); return nil }},
 		{id: "cal-zone", title: "Calendar: show times in zone", group: "Calendar", desc: "show times in another IANA zone for this session, such as Europe/London",
 			when: whenCalendar, run: func(m *Model) tea.Cmd {
 				m.startInput("cal-zone", "zone ("+tz.Name(m.loc)+"): ", "")
 				return m.input.Focus()
 			}},
-		{id: "cal-delete", title: "Calendar: delete event", group: "Calendar", hint: "D", keys: []string{"D"}, desc: "delete the event (asks which instances for a repeat, then y/n)",
+		{id: "cal-delete", title: "Calendar: delete event", group: "Calendar", hint: "#", keys: []string{"#"}, desc: "delete the event (asks which instances for a repeat, then y/n)",
 			write: true, foot: 31, footIn: inList, when: whenCalEvent, run: func(m *Model) tea.Cmd { m.pendingCmd = nil; m.calDelete(); return m.pendingCmd }},
 		{id: "cal-edit", title: "Calendar: edit event", group: "Calendar", desc: "edit title, time and repeat of the event as one line (also enter)",
 			write: true, when: whenCalEvent, run: func(m *Model) tea.Cmd { m.calEdit(); return m.pendingCmd }},
@@ -187,7 +212,7 @@ func buildActions() []action {
 			write: true, when: whenCalEvent, run: func(m *Model) tea.Cmd { m.calPickStatus(); return nil }},
 		{id: "cal-busy", title: "Calendar: toggle busy", group: "Calendar", desc: "show the event as busy or free in find-a-time",
 			write: true, when: whenCalEvent, run: func(m *Model) tea.Cmd { m.calToggleBusy(); return nil }},
-		{id: "cal-free", title: "Calendar: find a time", group: "Calendar", hint: "f", keys: []string{"f"}, desc: "list free slots of a length inside working hours, pick one to add an event (same as crm cal free)",
+		{id: "cal-free", title: "Calendar: find a time", group: "Calendar", desc: "list free slots of a length inside working hours, pick one to add an event (same as crm cal free)",
 			when: whenCalendar, run: func(m *Model) tea.Cmd { return m.startFindTime() }},
 		{id: "find-time", title: "Find a time", group: "Calendar", desc: "list free slots of a length inside working hours from any view (same as crm cal free)",
 			run: func(m *Model) tea.Cmd { return m.startFindTime() }},
@@ -203,6 +228,30 @@ func buildActions() []action {
 			write: true, when: whenSchedTask, run: func(m *Model) tea.Cmd { return m.startTaskSchedule() }},
 		{id: "task-auto", title: "Task: toggle auto-schedule", group: "Contact", hint: "A", keys: []string{"A"}, desc: "let the planner place the selected task, or not (it needs a duration)",
 			write: true, when: whenSchedTask, run: func(m *Model) tea.Cmd { m.toggleAutoSchedule(); return nil }},
+		{id: "remind-due", title: "Reminders: due now", group: "Calendar", desc: "list event reminders that are due and booking messages ready to send, without marking them (same as crm cal due-reminders and crm book remind --dry-run)",
+			run: func(m *Model) tea.Cmd { m.showReminders(); return nil }},
+		{id: "remind-mark", title: "Reminders: mark due as sent", group: "Calendar", desc: "mark the due event reminders and booking messages as handed out, so they are not listed again",
+			write: true, run: func(m *Model) tea.Cmd { m.markReminders(); return nil }},
+		{id: "book-links", title: "Booking: links and bookings", group: "Booking", desc: "list booking links and booked meetings (same as crm book list)",
+			run: func(m *Model) tea.Cmd { m.bookShowLinks(); return nil }},
+		{id: "book-add", title: "Booking: add link", group: "Booking", desc: "name | lengths | your email, such as Intro call | 30m,45m | me@example.com (same as crm book add, other settings use the CLI)",
+			write: true, run: func(m *Model) tea.Cmd { return m.startBookPrompt("book-add", "new link (name | lengths | email): ", "") }},
+		{id: "book-offer", title: "Booking: offer times", group: "Booking", desc: "link | length | count | invitee zone: shows the next open times as text and copies it (same as crm book offer)",
+			run: func(m *Model) tea.Cmd { return m.startBookPrompt("book-offer", "offer (link | length | count | zone): ", "") }},
+		{id: "book-export", title: "Booking: export web page", group: "Booking", desc: "link | folder: writes index.html with one mail button per open time (same as crm book export)",
+			run: func(m *Model) tea.Cmd { return m.startBookPrompt("book-export", "export (link | folder): ", "") }},
+		{id: "book-confirm", title: "Booking: confirm a time", group: "Booking", desc: "link | when | name | email | invite file: books the time, makes the event, links the contact (same as crm book confirm)",
+			write: true, run: func(m *Model) tea.Cmd { return m.startBookPrompt("book-confirm", "confirm (link | when | name | email | invite.ics): ", "") }},
+		{id: "book-cancel", title: "Booking: cancel", group: "Booking", desc: "booking id | cancellation file: cancels the booking and deletes its event (same as crm book cancel)",
+			write: true, run: func(m *Model) tea.Cmd { return m.startBookPrompt("book-cancel", "cancel (booking id | cancel.ics): ", "") }},
+		{id: "book-pause", title: "Booking: pause link", group: "Booking", desc: "stop offering times from a link (same as crm book pause)",
+			write: true, run: func(m *Model) tea.Cmd { return m.startBookPrompt("book-pause", "pause link: ", "") }},
+		{id: "book-resume", title: "Booking: resume link", group: "Booking", desc: "offer times from a paused link again (same as crm book resume)",
+			write: true, run: func(m *Model) tea.Cmd { return m.startBookPrompt("book-resume", "resume link: ", "") }},
+		{id: "book-rm", title: "Booking: delete link", group: "Booking", desc: "delete a link, its bookings and events stay (same as crm book rm)",
+			write: true, run: func(m *Model) tea.Cmd { return m.startBookPrompt("book-rm", "delete link: ", "") }},
+		{id: "cal-invite", title: "Calendar: write invitation", group: "Calendar", desc: "write an .ics invitation for the selected event to attach to an email (same as crm cal invite)",
+			when: whenCalEvent, run: func(m *Model) tea.Cmd { return m.startCalInvite() }},
 		{id: "cal-import", title: "Calendar: import ICS file", group: "Calendar", desc: "import events and tasks from an iCalendar file, shows the counts and asks y/n (same as crm cal import)",
 			write: true, run: func(m *Model) tea.Cmd {
 				m.startInput("cal-import", "ICS file to import: ", "")

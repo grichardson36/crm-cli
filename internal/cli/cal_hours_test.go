@@ -108,31 +108,20 @@ func TestTaskSchedulingFlags(t *testing.T) {
 	assert.Equal(t, true, task["auto_schedule"])
 	assert.Equal(t, "deep", task["schedule_name"])
 	assert.Equal(t, "2026-11-10", task["due_at"])
-	assert.Nil(t, task["schedule_issue"])
 
-	// An auto-scheduled task without a duration is reported.
+	// An auto-scheduled task without a duration is allowed: the planner uses 30 minutes.
 	noLen := calJSON(t, db, "task", "add", "Plan trip", "--auto-schedule")
-	assert.Equal(t, "no_duration", noLen[0]["schedule_issue"])
-	listed := calJSON(t, db, "task", "list")
-	var issues int
-	for _, row := range listed {
-		if row["schedule_issue"] == "no_duration" {
-			issues++
-		}
-	}
-	assert.Equal(t, 1, issues)
+	assert.Nil(t, noLen[0]["duration_min"])
 
 	// Placing by hand locks; the lock can be released.
 	placed := calJSON(t, db, "task", "edit", "2", "--duration", "45m", "--scheduled-start", "mon 14:00")
 	assert.Equal(t, "2026-10-19T19:00:00Z", placed[0]["scheduled_start"])
 	assert.Equal(t, true, placed[0]["scheduled_locked"])
-	assert.Nil(t, placed[0]["schedule_issue"])
 	unlocked := calJSON(t, db, "task", "edit", "2", "--lock=false")
 	assert.Equal(t, false, unlocked[0]["scheduled_locked"])
 	cleared := calJSON(t, db, "task", "edit", "2", "--scheduled-start", "", "--duration", "")
 	assert.Nil(t, cleared[0]["scheduled_start"])
 	assert.Nil(t, cleared[0]["duration_min"])
-	assert.Equal(t, "no_duration", cleared[0]["schedule_issue"])
 
 	// Unchanged flags leave the fields alone.
 	again := calJSON(t, db, "task", "edit", "1", "--priority", "low")
@@ -149,5 +138,4 @@ func TestTaskSchedulingFlags(t *testing.T) {
 	}
 	table := calOK(t, db, "task", "list", "-f", "table")
 	assert.Contains(t, table, "LENGTH")
-	assert.Contains(t, table, "no_duration")
 }

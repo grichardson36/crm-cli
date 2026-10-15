@@ -17,9 +17,11 @@ import (
 // Context predicates for the calendar actions.
 func whenCalendar(m *Model) bool { return m.view == viewCalendar && m.cmp == nil }
 
+func whenCalList(m *Model) bool { return whenCalendar(m) && m.focus == focusList }
+
 func whenCalEvent(m *Model) bool {
 	it := m.calSelected()
-	return whenCalendar(m) && it != nil && it.kind == "event"
+	return whenCalList(m) && it != nil && it.kind == "event"
 }
 
 func whenCalGrid(m *Model) bool { return whenCalendar(m) && m.calGrid() && m.focus == focusList }
@@ -203,6 +205,8 @@ func (m *Model) runCalPrompt(kind, value string) {
 		m.calSetHours(value)
 	case "cal-free":
 		m.calFreeRun(value)
+	case "cal-invite":
+		m.calInviteRun(value)
 	}
 }
 
@@ -225,6 +229,10 @@ func (m *Model) calCreate(value string) {
 	if !q.allDay {
 		day = floatDate(q.start, m.loc)
 	}
+	id := e.ID
+	m.record("add event "+truncateLabel(e.Title),
+		func() error { return m.er.Archive(m.ctx, id, model.ScopeAll, "") },
+		func() error { return m.er.Restore(m.ctx, id) })
 	m.afterWriteCal(day, e.ID)
 	m.setStatus("event added", false)
 }
@@ -356,6 +364,9 @@ func (m *Model) calDelete() {
 			}
 			if scope == model.ScopeAll {
 				m.deletedEvents = append(m.deletedEvents, target)
+				m.record("delete event "+truncateLabel(snapshot.Title),
+					func() error { return m.er.Restore(m.ctx, target) },
+					func() error { return m.er.Archive(m.ctx, target, model.ScopeAll, "") })
 			}
 			m.afterWriteCal(m.calSelDate(), 0)
 			m.setStatus("event deleted (palette: Restore last deleted event)", false)
@@ -646,9 +657,6 @@ func (m *Model) calImportPath(path string) {
 		}
 		m.afterWriteCal(m.calSelDate(), 0)
 		msg := fmt.Sprintf("imported %d new, %d changed", done.Events.Created+done.Overrides.Created+done.Todos.Created, done.Events.Updated+done.Overrides.Updated+done.Todos.Updated)
-		if n := len(done.UnmatchedAttendees); n > 0 {
-			msg += fmt.Sprintf(", %d attendee address(es) matched nobody", n)
-		}
 		m.setStatus(msg, false)
 	}}
 }
