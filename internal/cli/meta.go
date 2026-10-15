@@ -145,6 +145,10 @@ var commandMeta = map[string]cmdMeta{
 	"cal plan": {mutates: true, noDryRun: true, fields: "mode,applied,dry_run,now,horizon_end,summary,tasks,diff,journal_id,id,note,undone", examples: []string{
 		`crm cal plan -f json`, `crm cal plan --apply --dry-run -f json`, `crm cal plan --apply --reject 3 --lock 5`, `crm cal plan --undo`, `crm cal plan --history`}},
 	"cal invite": {noDryRun: true, examples: []string{`crm cal invite 1 --to jane@example.com --from me@example.com --out invite.ics`}},
+	"cal due-reminders": {noDryRun: true, mutates: true, fields: "event_id,title,start,local_start,fire_at,minutes_before,method,location,people,guests,starts_in", examples: []string{
+		`crm cal due-reminders -f json`, `crm cal due-reminders --within 15m --dry-run -f json`}},
+	"book remind": {noDryRun: true, mutates: true, fields: "booking_id,link,kind,minutes_before,send_at,to,reply_to,subject,body", examples: []string{
+		`crm book remind -f json`, `crm book remind --dry-run`}},
 	"book": {examples: []string{`crm book list`}},
 	"book add": {mutates: true, noDryRun: true, fields: bookLinkFields, examples: []string{
 		`crm book add "Intro call" --email me@example.com --len 30m,45m --notice 4h --buffer 10 --max-day 3 --where https://meet.example.com/room`,

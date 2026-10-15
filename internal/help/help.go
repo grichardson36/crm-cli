@@ -15,7 +15,7 @@ var topicsFS embed.FS
 // order is the reading order of the topic list. Topics not listed here follow alphabetically.
 var order = []string{
 	"overview", "people", "orgs", "contact-methods", "keep-in-touch", "birthdays", "tasks", "notes", "note-types", "short-syntax", "tags",
-	"duplicates", "archive", "domains", "import", "sync", "sync-inbox", "dav", "dav-server", "calendar", "calendar-ics", "calendar-plan", "caldav", "book", "output", "errors", "agents",
+	"duplicates", "archive", "domains", "import", "sync", "sync-inbox", "dav", "dav-server", "calendar", "calendar-ics", "calendar-plan", "caldav", "book", "reminders", "output", "errors", "agents",
 	"tui", "tui-keys", "theme", "install", "backup",
 }
 

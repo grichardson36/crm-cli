@@ -34,6 +34,6 @@ crm tag apply event 1 work
 
 `cal purge ID --yes` removes a deleted event for good. Add `--dry-run` to any change to preview it.
 
-TUI: `tab` and `shift+tab` step the period, `#` deletes, `ctrl+z` undoes. The rest is in the palette. ICS: `calendar-ics`. Booking links: `book`. Hours, planning, free time: `calendar-plan`.
+TUI: `tab` and `shift+tab` step the period, `#` deletes, `ctrl+z` undoes. The rest is in the palette. ICS: `calendar-ics`. Booking: `book`. Reminders: `reminders`. Hours, planning, free time: `calendar-plan`.
 
 See also: calendar-ics, calendar-plan, caldav, book, tasks, tui.

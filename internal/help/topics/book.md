@@ -32,6 +32,6 @@ crm book cancel 3 --invite cancel.ics
 
 The time must still be open, and two confirmations cannot both take it. Confirm makes the event, links the contact with that email (none is created), logs a meeting, and with `--follow-up` adds a task. Attach the `.ics` to your reply. `crm cal invite EVENT --to a@b.c` makes one for any event.
 
-`crm book pause|resume|rm LINK` and `crm book list --bookings` manage the rest.
+`crm book pause|resume|rm LINK` and `crm book list --bookings` manage the rest. Reminders and follow-ups: `crm help reminders`.
 
-See also: calendar, calendar-plan, caldav, tasks.
+See also: calendar, calendar-plan, reminders, tasks.

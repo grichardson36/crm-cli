@@ -42,7 +42,7 @@ func registerBookCommands(rootCmd *cobra.Command) {
 		Short: "Booking links without a server: offer times as text, a web page or mail links, and confirm replies",
 	}
 	bookCmd.AddCommand(bookAddCmd(), bookListCmd(), bookOfferCmd(), bookExportCmd(), bookConfirmCmd(), bookCancelCmd(),
-		bookPauseCmd(false), bookPauseCmd(true), bookRemoveCmd())
+		bookPauseCmd(false), bookPauseCmd(true), bookRemoveCmd(), bookRemindCmd())
 	rootCmd.AddCommand(bookCmd)
 }
 
