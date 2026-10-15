@@ -36,4 +36,4 @@ Read stderr with `-f json` and branch on `error.code`: `not_found` (search again
 
 Never touch the database file: no `sqlite3`, no copying while crm runs, no deleting `-wal` or `-shm`. Use `crm backup DEST.db`. Log with `crm log` and a clear subject, then set a task. Keep `summary` short and append. Run `crm dupes` after bulk changes. Report changes to the owner with record IDs. `crm mcp serve` exposes the same data as MCP tools and the topics as `crm://help/TOPIC` (optional).
 
-See also: errors, output, duplicates, archive, install.
+See also: short-syntax, errors, output, duplicates, archive, install.

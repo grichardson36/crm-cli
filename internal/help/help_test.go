@@ -11,7 +11,7 @@ import (
 )
 
 var requiredTopics = []string{
-	"overview", "people", "orgs", "contact-methods", "keep-in-touch", "birthdays", "tasks", "notes", "note-types", "tags",
+	"overview", "people", "orgs", "contact-methods", "keep-in-touch", "birthdays", "tasks", "notes", "note-types", "short-syntax", "tags",
 	"duplicates", "archive", "domains", "import", "sync", "sync-inbox", "dav", "dav-server", "output", "errors", "agents",
 	"tui", "tui-keys", "theme", "install", "backup",
 }

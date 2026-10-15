@@ -34,4 +34,4 @@ crm log rm 1
 
 Types are data, not a fixed list, and each says whether logging it resets the keep-in-touch clock. See `crm help note-types`.
 
-See also: note-types, keep-in-touch, tags, tui-keys.
+See also: short-syntax, note-types, keep-in-touch, tags, tui-keys.

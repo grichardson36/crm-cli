@@ -286,8 +286,14 @@ func buildActions() []action {
 			}},
 
 		// App.
-		{id: "palette", inCompare: true, title: "Command palette", group: "App", hint: "ctrl+k", keys: []string{"ctrl+k", ":"}, desc: "search and run any action (also :)",
+		{id: "palette", inCompare: true, title: "Command palette", group: "App", hint: "ctrl+k", keys: []string{"ctrl+k", ":"}, desc: "search and run any action (also :). Type a command to use it as a command line: n Sam called #deal @fri",
 			foot: 1, footIn: inBoth, run: func(m *Model) tea.Cmd { return m.openPalette() }},
+		{id: "undo", title: "Undo", group: "App", hint: "ctrl+z", keys: []string{"ctrl+z", "U"}, desc: "undo the last data change of this session (also U). A toast says what was undone",
+			write: true, run: func(m *Model) tea.Cmd { return m.undoLast() }},
+		{id: "redo", title: "Redo", group: "App", hint: "ctrl+r", keys: []string{"ctrl+r", "ctrl+y"}, desc: "redo the change that was just undone (also ctrl+y)",
+			write: true, run: func(m *Model) tea.Cmd { return m.redoLast() }},
+		{id: "syntax-toggle", title: "Toggle short syntax", group: "App", desc: "turn #tag @date !deadline ~30m *3m +Name ^high on or off in the command bar and the note and task prompts",
+			run: func(m *Model) tea.Cmd { m.toggleSyntax(); return nil }},
 		{id: "help", inCompare: true, title: "Help", group: "App", hint: "?", keys: []string{"?"}, desc: "show every key",
 			foot: 80, footIn: inBoth, run: func(m *Model) tea.Cmd { m.openHelp(); return nil }},
 		{id: "help-topics", title: "Help: topics", group: "App", desc: "list the built-in help topics, filter and read one (same as crm help)",
@@ -357,7 +363,7 @@ func (m *Model) markContacted() {
 	when := m.now().UTC().Format("2006-01-02 15:04:05")
 	empty := ""
 	m.bulk(ids, "marked as contacted", "contacted", func(id int64) error {
-		_, err := m.pr.Update(m.ctx, id, model.UpdatePersonInput{LastContactedAt: &when, SnoozedUntil: &empty})
+		_, err := m.hUpdatePerson(m.ctx, id, model.UpdatePersonInput{LastContactedAt: &when, SnoozedUntil: &empty})
 		return err
 	})
 }
@@ -386,7 +392,7 @@ func (m *Model) toggleFavorite() {
 		msg = "unfavorited"
 	}
 	m.bulk(ids, msg, msg, func(id int64) error {
-		_, err := m.pr.Update(m.ctx, id, model.UpdatePersonInput{IsFavorite: &fav})
+		_, err := m.hUpdatePerson(m.ctx, id, model.UpdatePersonInput{IsFavorite: &fav})
 		return err
 	})
 }
@@ -402,7 +408,7 @@ func (m *Model) completeTask() {
 		m.setStatus("select a task in the Tasks view (4) or a task row", true)
 		return
 	}
-	task, err := m.tr.Complete(m.ctx, id)
+	task, err := m.hCompleteTask(m.ctx, id)
 	if err != nil {
 		m.setStatus(err.Error(), true)
 		return
@@ -450,7 +456,7 @@ func (m *Model) pickCadence(ids []int64) {
 	m.openPicker("Keep in touch", items, func(m *Model, it overlayItem) {
 		v := it.value
 		m.bulk(ids, "keep in touch set", "keep in touch set", func(id int64) error {
-			_, err := m.pr.Update(m.ctx, id, model.UpdatePersonInput{KeepInTouch: &v})
+			_, err := m.hUpdatePerson(m.ctx, id, model.UpdatePersonInput{KeepInTouch: &v})
 			return err
 		})
 	})
@@ -467,7 +473,7 @@ func (m *Model) pickTier(ids []int64) {
 	m.openPicker("Priority tier", items, func(m *Model, it overlayItem) {
 		n, _ := strconv.Atoi(it.value)
 		m.bulk(ids, "priority set", "priority set", func(id int64) error {
-			_, err := m.pr.Update(m.ctx, id, model.UpdatePersonInput{PriorityTier: &n})
+			_, err := m.hUpdatePerson(m.ctx, id, model.UpdatePersonInput{PriorityTier: &n})
 			return err
 		})
 	})

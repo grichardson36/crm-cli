@@ -56,7 +56,7 @@ func newTestModel(t *testing.T) (*Model, *repo.PersonRepo) {
 
 var specialKeys = map[string]tea.KeyType{
 	"enter": tea.KeyEnter, "esc": tea.KeyEsc, "tab": tea.KeyTab, "shift+tab": tea.KeyShiftTab,
-	"ctrl+d": tea.KeyCtrlD, "ctrl+k": tea.KeyCtrlK, "ctrl+u": tea.KeyCtrlU,
+	"ctrl+d": tea.KeyCtrlD, "ctrl+k": tea.KeyCtrlK, "ctrl+u": tea.KeyCtrlU, "ctrl+z": tea.KeyCtrlZ, "ctrl+r": tea.KeyCtrlR, "ctrl+y": tea.KeyCtrlY,
 	"left": tea.KeyLeft, "right": tea.KeyRight, "up": tea.KeyUp, "down": tea.KeyDown,
 }
 

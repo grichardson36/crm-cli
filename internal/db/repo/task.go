@@ -286,6 +286,34 @@ func (r *TaskRepo) Update(ctx context.Context, id int64, input model.UpdateTaskI
 	return r.FindByID(ctx, id)
 }
 
+// Restore brings an archived task back.
+func (r *TaskRepo) Restore(ctx context.Context, id int64) error {
+	result, err := r.db.ExecContext(ctx,
+		"UPDATE tasks SET archived = 0, updated_at = datetime('now') WHERE id = ? AND archived = 1", id)
+	if err != nil {
+		return fmt.Errorf("restore task %d: %w", id, err)
+	}
+	if rows, _ := result.RowsAffected(); rows == 0 {
+		return fmt.Errorf("archived task %d: %w", id, model.ErrNotFound)
+	}
+	return nil
+}
+
+// Reopen marks a completed task as open again. It does not remove a next occurrence that
+// Complete created: archive that task yourself.
+func (r *TaskRepo) Reopen(ctx context.Context, id int64) error {
+	result, err := r.db.ExecContext(ctx,
+		`UPDATE tasks SET completed = 0, completed_at = NULL, updated_at = datetime('now')
+		 WHERE id = ? AND archived = 0 AND completed = 1`, id)
+	if err != nil {
+		return fmt.Errorf("reopen task %d: %w", id, err)
+	}
+	if rows, _ := result.RowsAffected(); rows == 0 {
+		return fmt.Errorf("completed task %d: %w", id, model.ErrNotFound)
+	}
+	return nil
+}
+
 // Archive soft-deletes a task.
 func (r *TaskRepo) Archive(ctx context.Context, id int64) error {
 	result, err := r.db.ExecContext(ctx,

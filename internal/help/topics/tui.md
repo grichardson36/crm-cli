@@ -35,4 +35,4 @@ These work in `--read-only` mode. Each opens a scrollable page (`j` / `k`, `g` /
 
 All keys, editing, merge, archive, notes, sync and Home are in `crm help tui-keys`.
 
-See also: tui-keys, theme, keep-in-touch, duplicates, archive.
+See also: short-syntax, tui-keys, theme, keep-in-touch, duplicates, archive.
