@@ -640,6 +640,8 @@ func (m *Model) finishEdit() {
 func (m *Model) applyEdit(e *editState, v string) error {
 	ctx := m.ctx
 	pid := m.formPerson
+	m.beginGroup() // an edit that adds then removes a value undoes as one step
+	defer m.endGroup("")
 	if m.creating {
 		return m.createPerson(v)
 	}
@@ -677,22 +679,22 @@ func (m *Model) applyEdit(e *editState, v string) error {
 			}
 			in.Birthday = &v
 		}
-		if _, err := m.pr.Update(ctx, pid, in); err != nil {
+		if _, err := m.hUpdatePerson(ctx, pid, in); err != nil {
 			return err
 		}
 		m.setStatus("saved "+e.field, false)
 		m.finishEdit()
 	case rkEmail:
 		if e.add {
-			if err := m.pr.AddEmail(ctx, pid, v, nil, false); err != nil {
+			if err := m.hAddEmail(ctx, pid, v, nil, false); err != nil {
 				return err
 			}
 		} else {
 			old := m.form[e.row]
-			if err := m.pr.AddEmail(ctx, pid, v, old.lbl, old.primary); err != nil {
+			if err := m.hAddEmail(ctx, pid, v, old.lbl, old.primary); err != nil {
 				return err
 			}
-			if err := m.pr.RemoveEmail(ctx, pid, e.oldValue); err != nil {
+			if err := m.hRemoveEmail(ctx, pid, e.oldValue); err != nil {
 				return err
 			}
 		}
@@ -701,15 +703,15 @@ func (m *Model) applyEdit(e *editState, v string) error {
 		m.selectRow(rkEmail, v)
 	case rkPhone:
 		if e.add {
-			if err := m.pr.AddPhone(ctx, pid, v, nil, false); err != nil {
+			if err := m.hAddPhone(ctx, pid, v, nil, false); err != nil {
 				return err
 			}
 		} else {
 			old := m.form[e.row]
-			if err := m.pr.AddPhone(ctx, pid, v, old.lbl, old.primary); err != nil {
+			if err := m.hAddPhone(ctx, pid, v, old.lbl, old.primary); err != nil {
 				return err
 			}
-			if err := m.pr.RemovePhone(ctx, pid, e.oldValue); err != nil {
+			if err := m.hRemovePhone(ctx, pid, e.oldValue); err != nil {
 				return err
 			}
 		}
@@ -721,11 +723,11 @@ func (m *Model) applyEdit(e *editState, v string) error {
 		if e.add && !e.kindTouched {
 			kind = inferHandleKind(v)
 		}
-		if err := m.pr.SetHandle(ctx, pid, kind, v); err != nil {
+		if err := m.hSetHandle(ctx, pid, kind, v); err != nil {
 			return err
 		}
 		if !e.add && kind != e.origKind {
-			if err := m.pr.RemoveHandle(ctx, pid, e.origKind); err != nil {
+			if err := m.hRemoveHandle(ctx, pid, e.origKind); err != nil {
 				return err
 			}
 		}
@@ -735,15 +737,15 @@ func (m *Model) applyEdit(e *editState, v string) error {
 	case rkTag:
 		name := strings.TrimLeft(v, "#")
 		if e.add {
-			if err := m.tagr.Apply(ctx, "person", pid, name); err != nil {
+			if err := m.hTagApply(ctx, "person", pid, name); err != nil {
 				return err
 			}
 		} else {
-			if err := m.tagr.Apply(ctx, "person", pid, name); err != nil {
+			if err := m.hTagApply(ctx, "person", pid, name); err != nil {
 				return err
 			}
 			if name != e.oldValue {
-				if err := m.tagr.Remove(ctx, "person", pid, e.oldValue); err != nil {
+				if err := m.hTagRemove(ctx, "person", pid, e.oldValue); err != nil {
 					return err
 				}
 			}
@@ -769,7 +771,7 @@ func (m *Model) applyEdit(e *editState, v string) error {
 			if hasDue {
 				in.DueAt = &due
 			}
-			if _, err := m.tr.Update(ctx, m.form[e.row].id, in); err != nil {
+			if _, err := m.hUpdateTask(ctx, m.form[e.row].id, in); err != nil {
 				return err
 			}
 		}
@@ -778,7 +780,7 @@ func (m *Model) applyEdit(e *editState, v string) error {
 		m.selectRow(rkTask, title)
 	case rkNote:
 		id := m.form[e.row].id
-		if _, err := m.ir.Update(ctx, id, model.UpdateInteractionInput{Content: &v}); err != nil {
+		if _, err := m.hUpdateNote(ctx, id, model.UpdateInteractionInput{Content: &v}); err != nil {
 			return err
 		}
 		m.setStatus("note saved", false)
@@ -803,7 +805,7 @@ func (m *Model) createPerson(name string) error {
 		last := parts[len(parts)-1]
 		in.LastName = &last
 	}
-	p, err := m.pr.Create(m.ctx, in)
+	p, err := m.hCreatePerson(m.ctx, in)
 	if err != nil {
 		return err
 	}
@@ -861,15 +863,15 @@ func (m *Model) askDelete() {
 	var do func() error
 	switch r.kind {
 	case rkEmail:
-		what, do = "email "+r.value, func() error { return m.pr.RemoveEmail(m.ctx, pid, r.value) }
+		what, do = "email "+r.value, func() error { return m.hRemoveEmail(m.ctx, pid, r.value) }
 	case rkPhone:
-		what, do = "phone "+r.value, func() error { return m.pr.RemovePhone(m.ctx, pid, r.value) }
+		what, do = "phone "+r.value, func() error { return m.hRemovePhone(m.ctx, pid, r.value) }
 	case rkHandle:
-		what, do = r.key+" link", func() error { return m.pr.RemoveHandle(m.ctx, pid, r.key) }
+		what, do = r.key+" link", func() error { return m.hRemoveHandle(m.ctx, pid, r.key) }
 	case rkTag:
-		what, do = "tag "+r.value, func() error { return m.tagr.Remove(m.ctx, "person", pid, r.value) }
+		what, do = "tag "+r.value, func() error { return m.hTagRemove(m.ctx, "person", pid, r.value) }
 	case rkTask:
-		what, do = "task "+r.value, func() error { return m.tr.Archive(m.ctx, r.id) }
+		what, do = "task "+r.value, func() error { return m.hArchiveTask(m.ctx, r.id) }
 	case rkNote:
 		m.askDeleteNote(r)
 		return
@@ -879,13 +881,13 @@ func (m *Model) askDelete() {
 	case rkCadence:
 		what, do = "keep in touch", func() error {
 			e := ""
-			_, err := m.pr.Update(m.ctx, pid, model.UpdatePersonInput{KeepInTouch: &e})
+			_, err := m.hUpdatePerson(m.ctx, pid, model.UpdatePersonInput{KeepInTouch: &e})
 			return err
 		}
 	case rkTier:
 		what, do = "priority", func() error {
 			z := 0
-			_, err := m.pr.Update(m.ctx, pid, model.UpdatePersonInput{PriorityTier: &z})
+			_, err := m.hUpdatePerson(m.ctx, pid, model.UpdatePersonInput{PriorityTier: &z})
 			return err
 		}
 	case rkField:
@@ -910,7 +912,7 @@ func (m *Model) askDelete() {
 			case "birthday":
 				in.Birthday = &e
 			}
-			_, err := m.pr.Update(m.ctx, pid, in)
+			_, err := m.hUpdatePerson(m.ctx, pid, in)
 			return err
 		}
 	}

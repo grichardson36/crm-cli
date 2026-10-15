@@ -229,31 +229,179 @@ func TestCommandBarMultiFieldSetShowsOldAndNewAndNeedsConfirm(t *testing.T) {
 	assert.Equal(t, 3, *p.BirthdayMonth)
 }
 
-func TestCommandBarUndo(t *testing.T) {
+func TestCommandBarUndoAndRedo(t *testing.T) {
 	m, pr := newTestModel(t)
 	openBar(m, "n called #deal @fri")
 	press(m, "enter")
 	require.Len(t, allNotes(t, m), 1)
+	assert.Contains(t, m.View(), "Done: note on Zed Adams", "a toast confirms the command")
 	openBar(m, "set company=Zorg")
 	press(m, "enter")
 	assert.Equal(t, "Zorg", *personByID(t, pr, 1).Company)
-	require.Len(t, m.undo, 2)
+	require.Len(t, m.hist, 2)
 
-	press(m, "U")
-	assert.Contains(t, m.status, "undone")
+	press(m, "ctrl+z")
+	assert.Contains(t, m.View(), "Undone: set company on Zed Adams")
 	assert.Equal(t, "Acme", *personByID(t, pr, 1).Company)
 	assert.Len(t, allNotes(t, m), 1)
 
-	press(m, "U")
+	press(m, "ctrl+z")
 	assert.Empty(t, allNotes(t, m), "the note is archived again")
 	tasks, _ := m.tr.FindAll(context.Background(), model.TaskFilters{})
 	assert.Empty(t, tasks)
+	tags, _ := m.tagr.GetForEntity(context.Background(), "interaction", 1)
+	assert.Empty(t, tags)
 
-	// With nothing left the key does nothing, and the action says why.
-	press(m, "U")
-	m.undoCommand()
-	assert.True(t, m.statusIsErr)
-	assert.Contains(t, m.status, "nothing to undo")
+	press(m, "ctrl+z")
+	assert.Contains(t, m.View(), "Nothing to undo")
+
+	press(m, "ctrl+r")
+	assert.Contains(t, m.View(), "Redone: add note on Zed Adams")
+	assert.Len(t, allNotes(t, m), 1)
+	tasks, _ = m.tr.FindAll(context.Background(), model.TaskFilters{})
+	assert.Len(t, tasks, 1)
+	press(m, "ctrl+y")
+	assert.Equal(t, "Zorg", *personByID(t, pr, 1).Company, "ctrl+y is redo too")
+	press(m, "ctrl+r")
+	assert.Contains(t, m.View(), "Nothing to redo")
+
+	// A new change clears what could be redone.
+	press(m, "ctrl+z")
+	openBar(m, "set title=CTO")
+	press(m, "enter")
+	assert.Empty(t, m.redoStack)
+	press(m, "ctrl+r")
+	assert.Contains(t, m.View(), "Nothing to redo")
+}
+
+func TestUndoIsRefusedWhenTheTargetChangedSince(t *testing.T) {
+	m, pr := newTestModel(t)
+	press(m, "enter") // nothing: stay in the list
+	openBar(m, "set company=Zorg")
+	press(m, "enter")
+	// Someone else (a sync, the CLI) changes the same field.
+	_, err := pr.Update(context.Background(), 1, model.UpdatePersonInput{Company: sp("Elsewhere")})
+	require.NoError(t, err)
+	press(m, "ctrl+z")
+	assert.True(t, m.toast.isErr)
+	assert.Contains(t, m.toast.text, "Cannot undo set company on Zed Adams")
+	assert.Contains(t, m.toast.text, "company of Zed Adams changed since")
+	assert.Equal(t, "Elsewhere", *personByID(t, pr, 1).Company, "nothing was written")
+	assert.Len(t, m.hist, 1, "the entry stays, so it can be retried")
+
+	// The same guard protects field edits made with f, p and the detail pane.
+	press(m, "f")
+	_, err = pr.Update(context.Background(), 1, model.UpdatePersonInput{IsFavorite: func() *bool { b := false; return &b }()})
+	require.NoError(t, err)
+	press(m, "ctrl+z")
+	assert.Contains(t, m.toast.text, "favorite of Zed Adams changed since")
+}
+
+func TestUndoCoversEditsTagsBulkAndFavorites(t *testing.T) {
+	m, pr := newTestModel(t)
+	// Favorite, then undo.
+	press(m, "f")
+	assert.True(t, personByID(t, pr, 1).IsFavorite)
+	press(m, "ctrl+z")
+	assert.False(t, personByID(t, pr, 1).IsFavorite)
+	assert.Contains(t, m.toast.text, "Undone: set favorite on Zed Adams")
+	press(m, "ctrl+r")
+	assert.True(t, personByID(t, pr, 1).IsFavorite)
+
+	// Tag from the prompt, undo removes it.
+	press(m, "T")
+	typeText(m, "vip")
+	press(m, "enter")
+	tags, _ := m.tagr.GetForEntity(context.Background(), "person", 1)
+	require.Len(t, tags, 1)
+	press(m, "ctrl+z")
+	tags, _ = m.tagr.GetForEntity(context.Background(), "person", 1)
+	assert.Empty(t, tags)
+
+	// One bulk action over marked people undoes in one step.
+	press(m, " ", " ")
+	press(m, "T")
+	typeText(m, "batch")
+	press(m, "enter")
+	for _, id := range []int64{1, 2} {
+		assert.True(t, m.hasTag(context.Background(), "person", id, "batch"), "person %d", id)
+	}
+	press(m, "ctrl+z")
+	for _, id := range []int64{1, 2} {
+		assert.False(t, m.hasTag(context.Background(), "person", id, "batch"), "person %d", id)
+	}
+
+	// An inline edit in the detail pane.
+	press(m, "g", "tab")
+	goTo(t, m, "company")
+	press(m, "enter")
+	replaceText(m, "Initrode")
+	press(m, "enter")
+	assert.Equal(t, "Initrode", *personByID(t, pr, 1).Company)
+	press(m, "ctrl+z")
+	assert.Equal(t, "Acme", *personByID(t, pr, 1).Company)
+	assert.Contains(t, m.toast.text, "Undone: set company on Zed Adams")
+}
+
+func TestUndoNoteDeleteAndTaskComplete(t *testing.T) {
+	m, _ := newTestModel(t)
+	press(m, "n")
+	typeText(m, "a note")
+	press(m, "enter")
+	press(m, "t")
+	typeText(m, "a task")
+	press(m, "enter")
+	require.Len(t, m.hist, 2)
+	press(m, "ctrl+z", "ctrl+z")
+	assert.Empty(t, allNotes(t, m))
+	tasks, _ := m.tr.FindAll(context.Background(), model.TaskFilters{})
+	assert.Empty(t, tasks)
+	press(m, "ctrl+r", "ctrl+r")
+	assert.Len(t, allNotes(t, m), 1)
+	tasks, _ = m.tr.FindAll(context.Background(), model.TaskFilters{})
+	assert.Len(t, tasks, 1)
+
+	// Completing a task, and undoing it, reopens it.
+	press(m, "4", "x")
+	tasks, _ = m.tr.FindAll(context.Background(), model.TaskFilters{})
+	assert.Empty(t, tasks)
+	press(m, "ctrl+z")
+	tasks, _ = m.tr.FindAll(context.Background(), model.TaskFilters{})
+	assert.Len(t, tasks, 1)
+	assert.Contains(t, m.toast.text, "Undone: complete task a task")
+}
+
+func TestToastExpiresAndFitsNarrowTerminals(t *testing.T) {
+	m, _ := newTestModel(t)
+	cmd := m.showToast("a very long message that will not fit in a narrow terminal at all, really", false)
+	require.NotNil(t, cmd)
+	for _, size := range [][2]int{{100, 30}, {40, 10}, {20, 8}} {
+		m.Update(tea.WindowSizeMsg{Width: size[0], Height: size[1]})
+		lines := strings.Split(m.View(), "\n")
+		assert.LessOrEqual(t, len(lines), size[1])
+		for _, l := range lines {
+			assert.LessOrEqual(t, lipgloss.Width(l), size[0])
+		}
+		assert.Contains(t, m.View(), "a ")
+	}
+	// A stale timer does not clear a newer toast.
+	old := m.toast.seq
+	m.showToast("newer", false)
+	m.Update(toastExpireMsg{seq: old})
+	require.NotNil(t, m.toast)
+	m.Update(toastExpireMsg{seq: m.toast.seq})
+	assert.Nil(t, m.toast)
+	assert.NotContains(t, m.View(), "newer")
+}
+
+func TestToastShowsOverOtherScreensAndInReadOnly(t *testing.T) {
+	m, _ := newTestModel(t)
+	m.readOnly = true
+	press(m, "ctrl+z")
+	assert.True(t, m.toast.isErr)
+	assert.Contains(t, m.View(), "read-only: undo is disabled")
+	press(m, "?")
+	assert.Contains(t, m.View(), "read-only: undo is disabled", "the toast shows on the help screen too")
 }
 
 // paletteItem finds an action in the open palette by id.
@@ -268,16 +416,23 @@ func paletteItem(t *testing.T, m *Model, id string) overlayItem {
 	return overlayItem{}
 }
 
-func TestCommandBarUndoIsAPaletteActionAndReadOnlyGreysIt(t *testing.T) {
-	m, _ := newTestModel(t)
+func TestUndoAndRedoArePaletteActions(t *testing.T) {
+	m, pr := newTestModel(t)
+	press(m, "f")
 	press(m, "ctrl+k")
-	typeText(m, "undo last")
-	assert.Equal(t, "not here", paletteItem(t, m, "undo-command").disabled, "nothing to undo yet")
+	typeText(m, "undo")
+	assert.Empty(t, paletteItem(t, m, "undo").disabled)
+	press(m, "enter")
+	assert.False(t, personByID(t, pr, 1).IsFavorite)
+	press(m, "ctrl+k")
+	typeText(m, "redo")
+	press(m, "enter")
+	assert.True(t, personByID(t, pr, 1).IsFavorite)
 	press(m, "esc")
 	m.readOnly = true
 	press(m, "ctrl+k")
-	typeText(m, "undo last")
-	assert.Equal(t, "read-only", paletteItem(t, m, "undo-command").disabled)
+	typeText(m, "undo")
+	assert.Equal(t, "read-only", paletteItem(t, m, "undo").disabled)
 }
 
 func TestCommandBarReadOnlyOnlyLooks(t *testing.T) {
@@ -499,12 +654,12 @@ func TestPeopleSearchUnderstandsPriorityAndCadenceTokens(t *testing.T) {
 
 func TestCommandBarActionsAreInTheRegistry(t *testing.T) {
 	m, _ := newTestModel(t)
-	for _, id := range []string{"undo-command", "syntax-toggle"} {
+	for _, id := range []string{"undo", "syntax-toggle"} {
 		a := m.actionByID(id)
 		require.NotNil(t, a, id)
 		assert.NotEmpty(t, a.desc)
 	}
-	assert.True(t, m.actionByID("undo-command").write, "undo changes data, so read-only blocks it")
+	assert.True(t, m.actionByID("undo").write, "undo changes data, so read-only blocks it")
 	assert.False(t, m.actionByID("syntax-toggle").write)
-	assert.Contains(t, m.helpText(), "undo the last command-bar line")
+	assert.Contains(t, m.helpText(), "undo the last data change")
 }

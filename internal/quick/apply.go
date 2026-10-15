@@ -218,6 +218,229 @@ func Undo(ctx context.Context, r Repos, changes []Change) error {
 	return firstErr
 }
 
+// Redo applies changes again after Undo reversed them, oldest first. Archived notes and tasks
+// are restored, tags are put back and fields get their new value again.
+func Redo(ctx context.Context, r Repos, changes []Change) error {
+	var firstErr error
+	keep := func(err error) {
+		if err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	updates := map[int64]*model.UpdatePersonInput{}
+	var order []int64
+	for _, c := range changes {
+		switch {
+		case c.Op == "create" && c.Entity == "interaction":
+			keep(r.Interactions.Restore(ctx, c.ID))
+		case c.Op == "create" && c.Entity == "task":
+			keep(r.Tasks.Restore(ctx, c.ID))
+		case c.Op == "tag":
+			keep(r.Tags.Apply(ctx, c.Entity, c.ID, c.New))
+		case c.Op == "untag":
+			keep(r.Tags.Remove(ctx, c.Entity, c.ID, c.New))
+		case c.Op == "update" && c.Entity == "person":
+			if kind, ok := handleKey(c.Field); ok {
+				if c.New == "" {
+					keep(r.People.RemoveHandle(ctx, c.ID, kind))
+				} else {
+					keep(r.People.SetHandle(ctx, c.ID, kind, c.New))
+				}
+				continue
+			}
+			def, ok := lookupField(c.Field)
+			if !ok {
+				continue
+			}
+			in := updates[c.ID]
+			if in == nil {
+				in = &model.UpdatePersonInput{}
+				updates[c.ID] = in
+				order = append(order, c.ID)
+			}
+			def.set(in, c.New)
+		}
+	}
+	for _, id := range order {
+		_, err := r.People.Update(ctx, id, *updates[id])
+		keep(err)
+	}
+	return firstErr
+}
+
+// Summarize words what changes did, for messages: "add note on Sam Lee, tag #deal".
+func Summarize(changes []Change) string {
+	var parts []string
+	fields := map[int64][]string{}
+	var fieldOrder []int64
+	names := map[int64]string{}
+	for _, c := range changes {
+		switch {
+		case c.Op == "create":
+			parts = append(parts, "add "+c.Label)
+		case c.Op == "tag":
+			parts = append(parts, "tag #"+c.New)
+		case c.Op == "untag":
+			parts = append(parts, "remove tag #"+c.New)
+		case c.Op == "update" && c.Entity == "person":
+			if _, ok := fields[c.ID]; !ok {
+				fieldOrder = append(fieldOrder, c.ID)
+				names[c.ID] = c.Label
+			}
+			fields[c.ID] = append(fields[c.ID], c.Field)
+		}
+	}
+	for _, id := range fieldOrder {
+		parts = append(parts, "set "+strings.Join(fields[id], ", ")+" on "+names[id])
+	}
+	if len(parts) == 0 {
+		return "change"
+	}
+	if len(parts) > 3 {
+		return strings.Join(parts[:2], ", ") + fmt.Sprintf(" (+%d more)", len(parts)-2)
+	}
+	return strings.Join(parts, ", ")
+}
+
+// CheckUndo says why changes cannot be undone any more: a field was edited since. It returns nil
+// when it is safe to call Undo.
+func CheckUndo(ctx context.Context, r Repos, changes []Change) error {
+	return checkFields(ctx, r, changes, func(c Change) string { return c.New }, "now")
+}
+
+// CheckRedo says why changes cannot be redone: a field was edited since the undo.
+func CheckRedo(ctx context.Context, r Repos, changes []Change) error {
+	return checkFields(ctx, r, changes, func(c Change) string { return c.Old }, "now")
+}
+
+func checkFields(ctx context.Context, r Repos, changes []Change, expect func(Change) string, _ string) error {
+	for _, c := range changes {
+		if c.Op != "update" || c.Entity != "person" || c.Field == "snooze" {
+			continue
+		}
+		p, err := r.People.FindByID(ctx, c.ID)
+		if err != nil {
+			return fmt.Errorf("%s is gone or archived", c.Label)
+		}
+		var cur string
+		if kind, ok := handleKey(c.Field); ok {
+			if err := r.People.LoadDetails(ctx, p); err != nil {
+				return err
+			}
+			cur = handleValue(p, kind)
+		} else if def, ok := lookupField(c.Field); ok {
+			cur = def.get(p)
+		} else {
+			continue
+		}
+		if cur != expect(c) {
+			return fmt.Errorf("%s of %s changed since: it is now %s", c.Field, c.Label, orEmpty(cur))
+		}
+	}
+	return nil
+}
+
+// StaleFields lists the fields of cur whose value is not what expected sets. Name parts, birthday,
+// last contacted and organization are not compared.
+func StaleFields(cur *model.Person, expected model.UpdatePersonInput) []string {
+	var out []string
+	cmp := func(set *string, have string, name string) {
+		if set != nil && *set != have {
+			out = append(out, name)
+		}
+	}
+	cmp(expected.Email, strOf(cur.Email), "email")
+	cmp(expected.Phone, strOf(cur.Phone), "phone")
+	cmp(expected.Title, strOf(cur.Title), "title")
+	cmp(expected.Company, strOf(cur.Company), "company")
+	cmp(expected.Location, strOf(cur.Location), "location")
+	cmp(expected.Notes, strOf(cur.Notes), "notes")
+	cmp(expected.Summary, strOf(cur.Summary), "summary")
+	cmp(expected.KeepInTouch, strOf(cur.KeepInTouch), "keep in touch")
+	if expected.IsFavorite != nil && *expected.IsFavorite != cur.IsFavorite {
+		out = append(out, "favorite")
+	}
+	if expected.PriorityTier != nil {
+		have := 0
+		if cur.PriorityTier != nil {
+			have = *cur.PriorityTier
+		}
+		if have != *expected.PriorityTier {
+			out = append(out, "priority")
+		}
+	}
+	return out
+}
+
+// InverseUpdate returns the update that puts back the values an update is about to overwrite.
+// before is the person as it was.
+func InverseUpdate(before *model.Person, in model.UpdatePersonInput) model.UpdatePersonInput {
+	var inv model.UpdatePersonInput
+	str := func(set bool, v string) *string {
+		if !set {
+			return nil
+		}
+		return &v
+	}
+	inv.FirstName = str(in.FirstName != nil, before.FirstName)
+	inv.LastName = str(in.LastName != nil, strOf(before.LastName))
+	inv.Email = str(in.Email != nil, strOf(before.Email))
+	inv.Phone = str(in.Phone != nil, strOf(before.Phone))
+	inv.Title = str(in.Title != nil, strOf(before.Title))
+	inv.Company = str(in.Company != nil, strOf(before.Company))
+	inv.Location = str(in.Location != nil, strOf(before.Location))
+	inv.Notes = str(in.Notes != nil, strOf(before.Notes))
+	inv.Summary = str(in.Summary != nil, strOf(before.Summary))
+	if in.OrgID != nil && before.OrgID != nil {
+		v := *before.OrgID
+		inv.OrgID = &v
+	}
+	if def, ok := lookupField("birthday"); ok {
+		inv.Birthday = str(in.Birthday != nil, def.get(before))
+	}
+	inv.KeepInTouch = str(in.KeepInTouch != nil, strOf(before.KeepInTouch))
+	inv.SnoozedUntil = str(in.SnoozedUntil != nil, strOf(before.KeepInTouchSnoozedUntil))
+	inv.LastContactedAt = str(in.LastContactedAt != nil, strOf(before.LastContactedAt))
+	if in.IsFavorite != nil {
+		v := before.IsFavorite
+		inv.IsFavorite = &v
+	}
+	if in.PriorityTier != nil {
+		v := 0
+		if before.PriorityTier != nil {
+			v = *before.PriorityTier
+		}
+		inv.PriorityTier = &v
+	}
+	return inv
+}
+
+// UpdateFields names the fields an update sets, for messages.
+func UpdateFields(in model.UpdatePersonInput) []string {
+	var out []string
+	add := func(set bool, name string) {
+		if set {
+			out = append(out, name)
+		}
+	}
+	add(in.FirstName != nil || in.LastName != nil, "name")
+	add(in.Email != nil, "email")
+	add(in.Phone != nil, "phone")
+	add(in.Title != nil, "title")
+	add(in.Company != nil, "company")
+	add(in.Location != nil, "location")
+	add(in.Notes != nil, "notes")
+	add(in.Summary != nil, "summary")
+	add(in.OrgID != nil, "organization")
+	add(in.Birthday != nil, "birthday")
+	add(in.KeepInTouch != nil, "keep in touch")
+	add(in.SnoozedUntil != nil, "snooze")
+	add(in.LastContactedAt != nil, "last contacted")
+	add(in.IsFavorite != nil, "favorite")
+	add(in.PriorityTier != nil, "priority")
+	return out
+}
+
 // Describe writes a change as one human line.
 func (c Change) Describe() string {
 	switch c.Op {

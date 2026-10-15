@@ -61,7 +61,7 @@ func fit(s string, width int) string {
 }
 
 // View implements tea.Model.
-func (m *Model) View() string {
+func (m *Model) baseView() string {
 	if m.width == 0 {
 		return "loading..."
 	}

@@ -159,7 +159,12 @@ type Model struct {
 	qtags     []string
 	qtypes    []string
 	cmdPerson int64
-	undo      [][]quick.Change
+	hist      []histEntry
+	redoStack []histEntry
+	grp       []histEntry
+	grpDepth  int
+	toast     *toast
+	toastSeq  int
 	noSyntax  bool
 }
 
@@ -592,6 +597,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case tea.MouseMsg:
 		return m.handleMouse(msg)
+	case toastExpireMsg:
+		if m.toast != nil && m.toast.seq == msg.seq {
+			m.toast = nil
+		}
+		return m, nil
 	case syncDoneMsg:
 		m.finishSync(msg)
 		return m, nil
@@ -657,8 +667,9 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // runAction runs an action, enforcing read-only mode.
 func (m *Model) runAction(a *action) tea.Cmd {
 	if a.write && m.readOnly {
-		m.setStatus("read-only: "+strings.ToLower(a.title)+" is disabled", true)
-		return nil
+		msg := "read-only: " + strings.ToLower(a.title) + " is disabled"
+		m.setStatus(msg, true)
+		return m.showToast(msg, true)
 	}
 	return a.run(m)
 }
@@ -770,6 +781,7 @@ func (m *Model) handleConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m *Model) bulk(ids []int64, single, plural string, fn func(id int64) error) {
 	ok, failed := 0, 0
 	var first error
+	m.beginGroup()
 	for _, id := range ids {
 		if err := fn(id); err != nil {
 			failed++
@@ -779,6 +791,11 @@ func (m *Model) bulk(ids []int64, single, plural string, fn func(id int64) error
 			continue
 		}
 		ok++
+	}
+	if ok > 1 {
+		m.endGroup(fmt.Sprintf("%s: %d people", plural, ok))
+	} else {
+		m.endGroup("")
 	}
 	if m.focus == focusList {
 		m.marked = map[int64]bool{}
@@ -821,7 +838,7 @@ func (m *Model) runPrompt(kind, value string) {
 		}
 		until := m.now().UTC().AddDate(0, 0, days).Format("2006-01-02 15:04:05")
 		m.bulk(ids, fmt.Sprintf("snoozed for %d days", days), "snoozed", func(id int64) error {
-			_, err := m.pr.Update(m.ctx, id, model.UpdatePersonInput{SnoozedUntil: &until})
+			_, err := m.hUpdatePerson(m.ctx, id, model.UpdatePersonInput{SnoozedUntil: &until})
 			return err
 		})
 		return
@@ -834,9 +851,9 @@ func (m *Model) runPrompt(kind, value string) {
 		}
 		m.bulk(ids, "tag "+map[bool]string{true: "removed", false: "added"}[remove], "tagged "+name, func(id int64) error {
 			if remove {
-				return m.tagr.Remove(m.ctx, "person", id, name)
+				return m.hTagRemove(m.ctx, "person", id, name)
 			}
-			return m.tagr.Apply(m.ctx, "person", id, name)
+			return m.hTagApply(m.ctx, "person", id, name)
 		})
 		return
 	case "note":
@@ -856,6 +873,7 @@ func (m *Model) runPrompt(kind, value string) {
 		}
 		m.noteType = typ
 		m.setStatus(typ+" added"+extras(plan), false)
+		m.pendingCmd = m.showToast(typ+" added"+extras(plan), false)
 	case "task":
 		if pid == 0 {
 			m.setStatus("no person selected", true)
@@ -870,6 +888,7 @@ func (m *Model) runPrompt(kind, value string) {
 			return
 		}
 		m.setStatus("task added"+extras(plan), false)
+		m.pendingCmd = m.showToast("task added"+extras(plan), false)
 	}
 	m.afterWrite()
 }

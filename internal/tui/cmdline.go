@@ -285,39 +285,10 @@ func (m *Model) cmdRun() tea.Cmd {
 		return nil
 	}
 	m.closeOverlay()
-	m.pushUndo(res.Changes)
+	m.recordQuick(p.Preview, res.Changes)
 	m.afterWrite()
 	m.setStatus("done: "+p.Preview, false)
-	return nil
-}
-
-func (m *Model) pushUndo(changes []quick.Change) {
-	if len(changes) == 0 {
-		return
-	}
-	m.undo = append(m.undo, changes)
-	if len(m.undo) > 50 {
-		m.undo = m.undo[len(m.undo)-50:]
-	}
-}
-
-func whenUndo(m *Model) bool { return len(m.undo) > 0 }
-
-// undoCommand reverses the last command-bar line of this session.
-func (m *Model) undoCommand() {
-	n := len(m.undo)
-	if n == 0 {
-		m.setStatus("nothing to undo in this session", true)
-		return
-	}
-	changes := m.undo[n-1]
-	m.undo = m.undo[:n-1]
-	if err := quick.Undo(m.ctx, m.qrepos(), changes); err != nil {
-		m.setStatus("undo failed: "+err.Error(), true)
-		return
-	}
-	m.afterWrite()
-	m.setStatus("undone: "+changes[0].Describe(), false)
+	return m.showToast("Done: "+p.Preview, false)
 }
 
 func (m *Model) toggleSyntax() {
@@ -343,7 +314,7 @@ func (m *Model) runLine(line string, env quick.Env) (*quick.Plan, error) {
 	if err != nil {
 		return plan, err
 	}
-	m.pushUndo(res.Changes)
+	m.recordQuick(plan.Preview, res.Changes)
 	return plan, nil
 }
 

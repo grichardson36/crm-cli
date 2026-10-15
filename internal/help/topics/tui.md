@@ -42,7 +42,7 @@ Jump with the number keys, cycle with `[` and `]`, or press `v` for the view swi
 
 ## Command bar
 
-`ctrl+k` is also a command line. Type a verb and a space, such as `n Sam called about the deal #deal @fri`, and a line shows what will happen. `tab` completes verbs, names, tags, dates and cadences. `enter` runs it. `set Sam: company=Acme title=CTO` shows old and new values and needs a second `enter`. `U` undoes the last one. With a person selected, no name is needed. `#friend ^high` also filter the People search. See `short-syntax`.
+`ctrl+k` is also a command line. Type a verb and a space, such as `n Sam called about the deal #deal @fri`, and a line shows what will happen. `tab` completes verbs, names, tags, dates and cadences. `enter` runs it. `set Sam: company=Acme title=CTO` shows old and new values and needs a second `enter`. `ctrl+z` undoes the last data change of the session, any change, not only commands, and `ctrl+r` (or `ctrl+y`) redoes it. A toast names what was undone, and undo is refused with a reason if the record changed since. With a person selected, no name is needed. `#friend ^high` also filter the People search. See `short-syntax`.
 
 ## Edit pane
 

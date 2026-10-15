@@ -683,6 +683,50 @@ func TestParseAndCompleteStayFastOnABigList(t *testing.T) {
 	assert.Less(t, per, 25*time.Millisecond, "one keystroke should cost far less than a frame")
 }
 
+func TestRedoAfterUndoAndGuards(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	p := Parse("n Bob great call #deal @mon *1m", f.env(""))
+	res, err := Apply(ctx, f.repos, p)
+	require.NoError(t, err)
+	assert.Equal(t, "add note on Bob Baker, tag #deal (+2 more)", Summarize(res.Changes))
+	require.NoError(t, CheckUndo(ctx, f.repos, res.Changes))
+	require.NoError(t, Undo(ctx, f.repos, res.Changes))
+	require.NoError(t, CheckRedo(ctx, f.repos, res.Changes))
+	require.NoError(t, Redo(ctx, f.repos, res.Changes))
+	its, _ := f.repos.Interactions.FindAll(ctx, model.InteractionFilters{})
+	assert.Len(t, its, 1)
+	tasks, _ := f.repos.Tasks.FindAll(ctx, model.TaskFilters{})
+	assert.Len(t, tasks, 1)
+	assert.Equal(t, "1 mon", *f.person("Bob Baker").KeepInTouch)
+
+	// Someone changes the cadence: undo is refused with a reason.
+	_, err = f.pr.Update(ctx, f.ids["Bob Baker"], model.UpdatePersonInput{KeepInTouch: sp("6 mons")})
+	require.NoError(t, err)
+	err = CheckUndo(ctx, f.repos, res.Changes)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "cadence of Bob Baker changed since")
+}
+
+func TestInverseUpdateAndStaleFields(t *testing.T) {
+	f := newFixture(t)
+	before := f.person("Bob Baker")
+	tier := 2
+	fav := true
+	in := model.UpdatePersonInput{Company: sp("Acme"), PriorityTier: &tier, IsFavorite: &fav, KeepInTouch: sp("3 mons")}
+	inv := InverseUpdate(before, in)
+	assert.Equal(t, "", *inv.Company)
+	assert.Equal(t, 0, *inv.PriorityTier)
+	assert.False(t, *inv.IsFavorite)
+	assert.Equal(t, "", *inv.KeepInTouch)
+	assert.Nil(t, inv.Title)
+	assert.Equal(t, []string{"company", "keep in touch", "favorite", "priority"}, UpdateFields(in))
+	_, err := f.pr.Update(context.Background(), f.ids["Bob Baker"], in)
+	require.NoError(t, err)
+	assert.Empty(t, StaleFields(f.person("Bob Baker"), in))
+	assert.Equal(t, []string{"company", "keep in touch", "favorite", "priority"}, StaleFields(f.person("Bob Baker"), inv))
+}
+
 func TestChangeDescribe(t *testing.T) {
 	assert.Equal(t, "created task: x", Change{Op: "create", Entity: "task", Label: "x"}.Describe())
 	assert.Equal(t, "Bob company: (empty) -> Acme", Change{Op: "update", Label: "Bob", Field: "company", New: "Acme"}.Describe())
