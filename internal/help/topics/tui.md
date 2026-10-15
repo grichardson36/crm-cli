@@ -50,8 +50,8 @@ In the detail form: `enter` edits a row, `a` adds a row, `d` deletes the row (as
 
 ## Merge and archive
 
-- Merge view: `enter` opens the side by side compare. `m` cycles the lowest confidence shown. `D` dismisses a group and `u` undoes it.
-- In the compare screen: `tab` picks the other person's value for a row, `s` changes the survivor, `m` merges, `esc` leaves. Dropped people are archived and can be restored.
+- Merge view: `enter` opens the compare. `m` cycles the lowest confidence shown. `D` dismisses a group and `u` undoes it.
+- In the compare screen: three panes, candidate 1 | candidate 2 | final contact, with aligned rows. `j`/`k` move between rows. `left`/`right` (or `1`/`2`) take that person's value for a field or put a list item in. `space` flips a field or puts a list item in or out (emails, phones, links, tags, custom fields default to all). `s` changes the survivor, `p` changes the pair in a group of three or more, `r` switches panes under 110 columns, `enter` shows what is archived and moved and `enter` again merges, `m` merges without the summary, `esc` leaves. The dropped person is archived and can be restored.
 - `M` merges the marked people. `#` archives (asks y/n).
 - Archived view: `u` restores. `X` purges after you type the name.
 

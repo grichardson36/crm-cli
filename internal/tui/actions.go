@@ -102,16 +102,41 @@ func buildActions() []action {
 
 	return []action{
 		// Merge compare screen. These come first so their keys win while the screen is open.
-		{id: "cmp-pick", title: "Pick value", group: "Compare", hint: "tab", keys: []string{"tab", " "}, desc: "compare: use the next person's value for the row (tab or space)",
-			foot: 6, footIn: inBoth, inCompare: true, when: whenCompare, run: func(m *Model) tea.Cmd { m.cmp.pick(1); m.cmpPreview(); return nil }},
-		{id: "cmp-pick-back", title: "Pick previous value", group: "Compare", hint: "shift+tab", keys: []string{"shift+tab"}, desc: "compare: use the previous person's value for the row",
-			inCompare: true, when: whenCompare, run: func(m *Model) tea.Cmd { m.cmp.pick(-1); m.cmpPreview(); return nil }},
-		{id: "cmp-survivor", title: "Change survivor", group: "Compare", hint: "s", keys: []string{"s"}, desc: "compare: keep the next person as the survivor",
-			foot: 7, footIn: inBoth, inCompare: true, when: whenCompare, run: func(m *Model) tea.Cmd { m.cmp.nextSurvivor(); m.cmpPreview(); return nil }},
-		{id: "cmp-apply", title: "Apply merge", group: "Compare", hint: "m", keys: []string{"m"}, desc: "compare: merge now, dropped people are archived and can be restored",
-			write: true, foot: 8, footIn: inBoth, inCompare: true, when: whenCompare, run: func(m *Model) tea.Cmd { m.applyMerge(); return nil }},
-		{id: "cmp-back", title: "Close compare", group: "Compare", hint: "esc", keys: []string{"esc", "q"}, desc: "compare: leave without merging (also q)",
-			foot: 9, footIn: inBoth, inCompare: true, when: whenCompare, run: func(m *Model) tea.Cmd { m.cmp = nil; return nil }},
+		{id: "cmp-left", title: "Use candidate 1", group: "Compare", hint: "←/→", keys: []string{"left", "h", "1"}, desc: "compare: the field takes the left person's value (a list item goes in). Also h and 1",
+			foot: 6, footIn: inBoth, inCompare: true, when: whenCmpEdit, run: func(m *Model) tea.Cmd { m.cmpTake(0); return nil }},
+		{id: "cmp-right", title: "Use candidate 2", group: "Compare", hint: "→", keys: []string{"right", "l", "2"}, desc: "compare: the field takes the right person's value (a list item goes in). Also l and 2",
+			inCompare: true, when: whenCmpEdit, run: func(m *Model) tea.Cmd { m.cmpTake(1); return nil }},
+		{id: "cmp-pick", title: "Toggle value or item", group: "Compare", hint: "space", keys: []string{"tab", " "}, desc: "compare: switch a field to the other person's value, or put a list item in or out of the result (tab or space)",
+			foot: 7, footIn: inBoth, inCompare: true, when: whenCmpEdit, run: func(m *Model) tea.Cmd { m.cmp.toggle(); m.cmpPreview(); return nil }},
+		{id: "cmp-pick-back", title: "Toggle value or item (back)", group: "Compare", hint: "shift+tab", keys: []string{"shift+tab"}, desc: "compare: same as space",
+			inCompare: true, when: whenCmpEdit, run: func(m *Model) tea.Cmd { m.cmp.toggle(); m.cmpPreview(); return nil }},
+		{id: "cmp-survivor", title: "Change survivor", group: "Compare", hint: "s", keys: []string{"s"}, desc: "compare: keep the other person's record and id as the survivor",
+			foot: 8, footIn: inBoth, inCompare: true, when: whenCmpEdit, run: func(m *Model) tea.Cmd { m.cmp.nextSurvivor(); m.cmpPreview(); return nil }},
+		{id: "cmp-pair", title: "Change pair", group: "Compare", hint: "p", keys: []string{"p"}, desc: "compare: groups of three or more merge two people at a time, p moves to the next pair",
+			foot: 9, footIn: inBoth, footIf: whenCmpGroup, inCompare: true, when: whenCmpEdit, run: func(m *Model) tea.Cmd { m.cmp.nextPair(); m.cmpPreview(); return nil }},
+		{id: "cmp-view", title: "Switch pane", group: "Compare", hint: "r", keys: []string{"r"}, desc: "compare: narrow terminals show fewer panes, r switches between candidates and the result",
+			foot: 5, footIn: inBoth, footIf: whenCmpNarrow, inCompare: true, when: whenCmpEdit, run: func(m *Model) tea.Cmd { m.cmp.nextPage(); return nil }},
+		{id: "cmp-confirm", title: "Merge (with summary)", group: "Compare", hint: "enter", keys: []string{"enter", "y"}, desc: "compare: enter shows what will be archived and moved, enter again merges",
+			write: true, foot: 11, footIn: inBoth, inCompare: true, when: whenCompare, run: func(m *Model) tea.Cmd {
+				if m.cmp.confirm {
+					m.applyMerge()
+					return nil
+				}
+				m.cmpPreview()
+				m.cmp.confirm = true
+				return nil
+			}},
+		{id: "cmp-apply", title: "Apply merge", group: "Compare", hint: "m", keys: []string{"m"}, desc: "compare: merge now without the summary, the dropped person is archived and can be restored",
+			write: true, inCompare: true, when: whenCompare, run: func(m *Model) tea.Cmd { m.applyMerge(); return nil }},
+		{id: "cmp-back", title: "Close compare", group: "Compare", hint: "esc", keys: []string{"esc", "q"}, desc: "compare: leave without merging (also q), from the summary go back to the fields",
+			foot: 12, footIn: inBoth, inCompare: true, when: whenCompare, run: func(m *Model) tea.Cmd {
+				if m.cmp.confirm {
+					m.cmp.confirm = false
+					return nil
+				}
+				m.cmp = nil
+				return nil
+			}},
 
 		// Contact actions.
 		{id: "contacted", title: "Mark contacted", group: "Contact", hint: "c", keys: []string{"c", "e"}, desc: "mark contacted now (resets the keep-in-touch clock)",

@@ -61,15 +61,25 @@ func MergeFieldKeys() []string {
 // TODO(F12): record the merge in the undo journal so dropped people can be restored with the
 // records that were re-pointed (interactions, tasks, deals, relationships).
 func (r *PersonRepo) Merge(ctx context.Context, keepID int64, dropIDs []int64, choices map[string]int64) (*model.MergeResult, error) {
-	return r.merge(ctx, keepID, dropIDs, choices, false)
+	return r.merge(ctx, keepID, dropIDs, choices, model.MergeOptions{}, false)
+}
+
+// MergeWith is Merge with list-item exclusions and custom field choices. See model.MergeOptions.
+func (r *PersonRepo) MergeWith(ctx context.Context, keepID int64, dropIDs []int64, choices map[string]int64, opts model.MergeOptions) (*model.MergeResult, error) {
+	return r.merge(ctx, keepID, dropIDs, choices, opts, false)
+}
+
+// MergeDryRunWith is MergeWith rolled back.
+func (r *PersonRepo) MergeDryRunWith(ctx context.Context, keepID int64, dropIDs []int64, choices map[string]int64, opts model.MergeOptions) (*model.MergeResult, error) {
+	return r.merge(ctx, keepID, dropIDs, choices, opts, true)
 }
 
 // MergeDryRun runs the merge and rolls it back, so the result is exactly what Merge would do.
 func (r *PersonRepo) MergeDryRun(ctx context.Context, keepID int64, dropIDs []int64, choices map[string]int64) (*model.MergeResult, error) {
-	return r.merge(ctx, keepID, dropIDs, choices, true)
+	return r.merge(ctx, keepID, dropIDs, choices, model.MergeOptions{}, true)
 }
 
-func (r *PersonRepo) merge(ctx context.Context, keepID int64, dropIDs []int64, choices map[string]int64, dryRun bool) (*model.MergeResult, error) {
+func (r *PersonRepo) merge(ctx context.Context, keepID int64, dropIDs []int64, choices map[string]int64, opts model.MergeOptions, dryRun bool) (*model.MergeResult, error) {
 	if len(dropIDs) == 0 {
 		return nil, fmt.Errorf("merge needs at least one person to drop: %w", model.ErrValidation)
 	}
@@ -95,6 +105,12 @@ func (r *PersonRepo) merge(ctx context.Context, keepID int64, dropIDs []int64, c
 		norm[k] = v
 	}
 
+	for name, id := range opts.CustomFrom {
+		if !involved[id] {
+			return nil, fmt.Errorf("custom field %q: person %d is not the survivor or a dropped person: %w", name, id, model.ErrValidation)
+		}
+	}
+
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("begin merge: %w", err)
@@ -102,7 +118,7 @@ func (r *PersonRepo) merge(ctx context.Context, keepID int64, dropIDs []int64, c
 	defer func() { _ = tx.Rollback() }()
 
 	m := &merger{
-		ctx: ctx, tx: tx, keepID: keepID, dropIDs: dropIDs, choices: norm,
+		ctx: ctx, tx: tx, keepID: keepID, dropIDs: dropIDs, choices: norm, opts: opts,
 		res: &model.MergeResult{
 			KeepID: keepID, DropIDs: dropIDs, DryRun: dryRun,
 			Fields: []model.MergeFieldChange{},
@@ -140,8 +156,37 @@ type merger struct {
 	keepID  int64
 	dropIDs []int64
 	choices map[string]int64
+	opts    model.MergeOptions
 	res     *model.MergeResult
 	vals    map[int64]map[string]any
+}
+
+// excluded reports whether item is listed under kind in MergeOptions.Exclude (case-insensitive).
+// A non-nil key normalizes both sides first (emails, phones).
+func (m *merger) excluded(kind, item string, key func(string) string) bool {
+	norm := func(s string) string {
+		if key != nil {
+			return key(s)
+		}
+		return strings.ToLower(strings.TrimSpace(s))
+	}
+	want := norm(item)
+	for _, x := range m.opts.Exclude[kind] {
+		if want != "" && norm(x) == want {
+			return true
+		}
+	}
+	return false
+}
+
+func (m *merger) removed(name string, n int) {
+	if n == 0 {
+		return
+	}
+	if m.res.Removed == nil {
+		m.res.Removed = map[string]int{}
+	}
+	m.res.Removed[name] += n
 }
 
 func (m *merger) all() []int64 {
@@ -356,6 +401,23 @@ func (m *merger) combineContacts(name, table, col, legacy string, key func(strin
 	if err != nil {
 		return fmt.Errorf("list %s: %w", name, err)
 	}
+	// Items the caller excluded leave the survivor too.
+	var kept []contactRow
+	for _, c := range keepRows {
+		if !m.excluded(legacy, c.value, key) {
+			kept = append(kept, c)
+			continue
+		}
+		n, err := m.exec(fmt.Sprintf("DELETE FROM %s WHERE person_id = ? AND %s = ?", table, col), m.keepID, c.value)
+		if err != nil {
+			return fmt.Errorf("remove %s: %w", name, err)
+		}
+		if _, err := m.exec("UPDATE people SET "+legacy+" = NULL WHERE id = ? AND "+legacy+" = ?", m.keepID, c.value); err != nil {
+			return fmt.Errorf("remove %s: %w", legacy, err)
+		}
+		m.removed(name, max(n, 1))
+	}
+	keepRows = kept
 	have := map[string]bool{}
 	for _, c := range keepRows {
 		have[key(c.value)] = true
@@ -369,6 +431,13 @@ func (m *merger) combineContacts(name, table, col, legacy string, key func(strin
 		if err != nil {
 			return fmt.Errorf("list %s: %w", name, err)
 		}
+		var allowed []contactRow
+		for _, c := range rows {
+			if !m.excluded(legacy, c.value, key) {
+				allowed = append(allowed, c)
+			}
+		}
+		rows = allowed
 		if len(rows) > 0 {
 			primaryOf[d] = rows[0].value
 		}
@@ -465,6 +534,16 @@ func (m *merger) handles() error {
 	sort.Strings(kinds)
 	for _, kind := range kinds {
 		cur, hasCur := byPerson[m.keepID][kind]
+		if m.excluded("handle", kind, nil) {
+			if hasCur {
+				n, err := m.exec("DELETE FROM person_handles WHERE person_id = ? AND kind = ?", m.keepID, kind)
+				if err != nil {
+					return fmt.Errorf("remove handle: %w", err)
+				}
+				m.removed("handles", n)
+			}
+			continue
+		}
 		target, src := cur, m.keepID
 		if c, ok := m.choices[kind]; ok {
 			v, has := byPerson[c][kind]
@@ -498,21 +577,79 @@ func (m *merger) handles() error {
 
 // copyLists copies tags and custom field values. The survivor wins on a custom field name clash.
 func (m *merger) copyLists() error {
+	// Excluded tags and custom fields leave the survivor first, so nothing copies them back.
+	for _, name := range m.opts.Exclude["tag"] {
+		n, err := m.exec(`DELETE FROM taggings WHERE entity_type = 'person' AND entity_id = ?
+			AND tag_id IN (SELECT id FROM tags WHERE lower(name) = lower(?))`, m.keepID, strings.TrimSpace(name))
+		if err != nil {
+			return fmt.Errorf("remove tag: %w", err)
+		}
+		m.removed("tags", n)
+	}
+	for _, name := range m.opts.Exclude["custom_field"] {
+		n, err := m.exec(`DELETE FROM custom_fields WHERE entity_type = 'person' AND entity_id = ? AND lower(field_name) = lower(?)`,
+			m.keepID, strings.TrimSpace(name))
+		if err != nil {
+			return fmt.Errorf("remove custom field: %w", err)
+		}
+		m.removed("custom_fields", n)
+	}
 	for _, d := range m.dropIDs {
 		n, err := m.exec(`INSERT OR IGNORE INTO taggings (tag_id, entity_type, entity_id)
-			SELECT tag_id, 'person', ? FROM taggings WHERE entity_type = 'person' AND entity_id = ?`, m.keepID, d)
+			SELECT tag_id, 'person', ? FROM taggings WHERE entity_type = 'person' AND entity_id = ?
+			AND tag_id NOT IN (SELECT id FROM tags WHERE lower(name) IN (`+placeholders(len(m.opts.Exclude["tag"]))+`))`,
+			append([]any{m.keepID, d}, lowerArgs(m.opts.Exclude["tag"])...)...)
 		if err != nil {
 			return fmt.Errorf("copy tags: %w", err)
 		}
 		m.res.Added["tags"] += n
 		n, err = m.exec(`INSERT OR IGNORE INTO custom_fields (entity_type, entity_id, field_name, field_value)
-			SELECT 'person', ?, field_name, field_value FROM custom_fields WHERE entity_type = 'person' AND entity_id = ?`, m.keepID, d)
+			SELECT 'person', ?, field_name, field_value FROM custom_fields WHERE entity_type = 'person' AND entity_id = ?
+			AND lower(field_name) NOT IN (`+placeholders(len(m.opts.Exclude["custom_field"]))+`)`,
+			append([]any{m.keepID, d}, lowerArgs(m.opts.Exclude["custom_field"])...)...)
 		if err != nil {
 			return fmt.Errorf("copy custom fields: %w", err)
 		}
 		m.res.Added["custom_fields"] += n
 	}
+	// A custom field the caller took from a dropped person overrides the survivor's value.
+	names := make([]string, 0, len(m.opts.CustomFrom))
+	for name := range m.opts.CustomFrom {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		src := m.opts.CustomFrom[name]
+		if src == m.keepID || m.excluded("custom_field", name, nil) {
+			continue
+		}
+		n, err := m.exec(`UPDATE custom_fields SET field_value = (SELECT field_value FROM custom_fields
+				WHERE entity_type = 'person' AND entity_id = ? AND field_name = ?)
+			WHERE entity_type = 'person' AND entity_id = ? AND field_name = ?
+			AND field_value != (SELECT field_value FROM custom_fields WHERE entity_type = 'person' AND entity_id = ? AND field_name = ?)`,
+			src, name, m.keepID, name, src, name)
+		if err != nil {
+			return fmt.Errorf("take custom field: %w", err)
+		}
+		m.res.Added["custom_fields"] += n
+	}
 	return nil
+}
+
+// placeholders returns n SQL placeholders, or an empty string literal for n == 0 so IN () stays valid.
+func placeholders(n int) string {
+	if n == 0 {
+		return "''"
+	}
+	return strings.TrimSuffix(strings.Repeat("?,", n), ",")
+}
+
+func lowerArgs(in []string) []any {
+	out := make([]any, len(in))
+	for i, s := range in {
+		out[i] = strings.ToLower(strings.TrimSpace(s))
+	}
+	return out
 }
 
 // repoint moves interactions, task links, tasks and deals to the survivor.
@@ -613,6 +750,25 @@ func (m *merger) relationships() error {
 		m.res.Moved["relationships"]++
 	}
 	return nil
+}
+
+// CustomFields lists a person's custom field names and values, ordered by name.
+func (r *PersonRepo) CustomFields(ctx context.Context, personID int64) ([]model.PersonField, error) {
+	rows, err := r.db.QueryContext(ctx, `SELECT field_name, field_value FROM custom_fields
+		WHERE entity_type = 'person' AND entity_id = ? ORDER BY field_name`, personID)
+	if err != nil {
+		return nil, fmt.Errorf("list custom fields: %w", err)
+	}
+	defer rows.Close()
+	var out []model.PersonField
+	for rows.Next() {
+		var f model.PersonField
+		if err := rows.Scan(&f.Name, &f.Value); err != nil {
+			return nil, fmt.Errorf("scan custom field: %w", err)
+		}
+		out = append(out, f)
+	}
+	return out, rows.Err()
 }
 
 // archive soft-deletes the dropped people and clears dismissals between the merged people.

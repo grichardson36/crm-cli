@@ -42,4 +42,4 @@ crm dupes undismiss 1 2
 
 ## Related topics
 
-`archive` (restore a merged-away person), `agents` (always dry-run a merge), `tui` (the Merge view, key 5, has a side by side compare).
+`archive` (restore a merged-away person), `agents` (always dry-run a merge), `tui` (the Merge view, key 6, compares and merges in three panes: both people and the result).

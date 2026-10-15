@@ -292,7 +292,8 @@ var footShort = map[string]string{
 	"undo-dismiss": "undo", "merge-marked": "merge", "archive": "archive", "restore": "restore", "purge": "purge",
 	"home-open": "open", "sync-now": "sync", "sync-dry": "dry-run", "inbox-accept": "accept", "inbox-attach": "attach",
 	"inbox-ignore": "ignore", "goto-view": "views", "note-retype": "type",
-	"cmp-pick": "pick", "cmp-survivor": "survivor", "cmp-apply": "merge", "cmp-back": "back",
+	"cmp-left": "pick", "cmp-pick": "toggle", "cmp-survivor": "survivor", "cmp-pair": "pair", "cmp-view": "pane",
+	"cmp-confirm": "merge", "cmp-back": "back",
 }
 
 // footerSegs lists the hints for the focused pane, in order, limited to what fits the width.
