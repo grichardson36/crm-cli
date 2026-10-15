@@ -104,9 +104,9 @@ var commandMeta = map[string]cmdMeta{
 		`crm task add "Send proposal" --person 1 --due 2026-11-01 --priority high`,
 		`crm task add "Call back" --person 1 --due 2026-11-01 --recurrence "7 days"`,
 		`crm task add "Write report" --duration 2h --deadline 2026-11-06 --auto-schedule`}},
-	"task list":   {fields: taskFields, examples: []string{`crm task list -f json`, `crm task list --overdue -f json`}},
-	"task show":   {fields: taskFields, examples: []string{`crm task show 1 -f json`}},
-	"task edit":   {mutates: true, fields: taskFields, target: "task", targetArgs: "first", examples: []string{`crm task edit 1 --priority low`,
+	"task list": {fields: taskFields, examples: []string{`crm task list -f json`, `crm task list --overdue -f json`}},
+	"task show": {fields: taskFields, examples: []string{`crm task show 1 -f json`}},
+	"task edit": {mutates: true, fields: taskFields, target: "task", targetArgs: "first", examples: []string{`crm task edit 1 --priority low`,
 		`crm task edit 1 --duration 90m --earliest-start 2026-11-02 --hard-deadline`, `crm task edit 1 --scheduled-start "2026-11-03 14:00" --dry-run`}},
 	"task done":   {mutates: true, fields: taskFields, target: "task", targetArgs: "first", examples: []string{`crm task done 1`}},
 	"task delete": {mutates: true, target: "task", targetArgs: "first", examples: []string{`crm task delete 1`}},
@@ -132,6 +132,8 @@ var commandMeta = map[string]cmdMeta{
 		`crm cal attendee add 1 2`, `crm cal attendee add 1 2 --rsvp accepted --dry-run`}},
 	"cal attendee rm": {mutates: true, target: "event", targetArgs: "first", examples: []string{`crm cal attendee rm 1 2`}},
 
+	"cal free": {fields: "start,end,local_start,local_end,display_tz,date,time", examples: []string{
+		`crm cal free --len 45m --within 7d -f json`, `crm cal free --len 30m --from "mon" --notice 4h --buffer 15 --limit 5`}},
 	"cal hours": {examples: []string{`crm cal hours show`}},
 	"cal hours show": {fields: "name,uuid,tz,weekly,overrides,default,config,start,end,local_start,local_end,date,hours", examples: []string{
 		`crm cal hours show -f json`, `crm cal hours show --expand today -f json`}},

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jdanielnd/crm-cli/internal/cal/input"
 	"github.com/jdanielnd/crm-cli/internal/cal/tz"
 	"github.com/jdanielnd/crm-cli/internal/cal/when"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
@@ -267,6 +268,63 @@ func registerScheduleTools(s *server.MCPServer, db *sql.DB, tr *repo.TaskRepo) {
 				return mcpError(err)
 			}
 			return jsonResult(map[string]any{"hours": h, "config": cfg})
+		},
+	)
+
+	s.AddTool(
+		gomcp.NewTool("crm_cal_free",
+			gomcp.WithDescription("Find a time: meeting slots of a given length inside working hours, clear of busy events (repeats expanded), locked task blocks and buffers. Slots start on the step grid (default every 15 minutes), after the minimum notice, within the horizon (default 14 days). Only your own calendar is checked. Times are UTC; zone says the wall clock of the working hours."),
+			gomcp.WithString("length", gomcp.Required(), gomcp.Description("Meeting length: 30m, 45m, 1h30m")),
+			gomcp.WithString("from", gomcp.Description("Search from this date or phrase (default: now)")),
+			gomcp.WithNumber("within_days", gomcp.Description("Days to search (default: the horizon)")),
+			gomcp.WithString("rule", gomcp.Description("Working hours rule (default: the default rule)")),
+			gomcp.WithNumber("buffer", gomcp.Description("Minutes kept free around busy time (default: stored setting)")),
+			gomcp.WithNumber("step", gomcp.Description("Slots start every this many minutes (default: stored setting)")),
+			gomcp.WithString("notice", gomcp.Description("Minimum notice from now, such as 4h")),
+			gomcp.WithNumber("limit", gomcp.Description("Max slots (default 20)")),
+			gomcp.WithBoolean("busy_tasks", gomcp.Description("Also treat placed tasks that are not locked as busy")),
+		),
+		func(ctx context.Context, req gomcp.CallToolRequest) (*gomcp.CallToolResult, error) {
+			args := req.GetArguments()
+			length, err := when.ParseLength(req.GetString("length", ""))
+			if err != nil {
+				return validationError(err)
+			}
+			now := calNow()
+			p := schedule.FindParams{Length: length, Now: now, Rule: req.GetString("rule", ""), Limit: req.GetInt("limit", 20), BusyTasks: req.GetBool("busy_tasks", false)}
+			if v := req.GetString("notice", ""); v != "" {
+				if p.MinNotice, err = when.ParseLength(v); err != nil {
+					return validationError(err)
+				}
+			}
+			if v, ok := argInt64(args, "buffer"); ok {
+				b := time.Duration(v) * time.Minute
+				p.Buffer = &b
+			}
+			if v, ok := argInt64(args, "step"); ok {
+				st := time.Duration(v) * time.Minute
+				p.Step = &st
+			}
+			from := req.GetString("from", "")
+			days, _ := argInt64(args, "within_days")
+			if from != "" || days > 0 {
+				if days <= 0 {
+					days = 14
+				}
+				f, t, err := input.Window(from, "", int(days), tz.Device(), now)
+				if err != nil {
+					return validationError(err)
+				}
+				if from != "" {
+					p.From = f
+				}
+				p.To = t
+			}
+			res, err := schedule.FindTime(ctx, db, p)
+			if err != nil {
+				return mcpError(err)
+			}
+			return jsonResult(res)
 		},
 	)
 }

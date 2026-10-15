@@ -40,8 +40,6 @@ func Merge(in []Span) []Span {
 	return out
 }
 
-func minutes(d time.Duration) int { return int(d / time.Minute) }
-
 // Intervals expands working hours to instants within [from, to). Hours are wall clock in the rule's
 // zone, converted day by day, so they follow daylight saving time. A date override replaces the
 // weekly hours of its date. A wall time that does not exist (the spring forward gap) or repeats (the

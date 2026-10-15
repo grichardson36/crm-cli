@@ -69,4 +69,13 @@ crm cal hours config --buffer 15 --step 30 --horizon 21
 crm cal hours show --expand today
 ```
 
+## Find a time
+
+Free slots inside working hours, clear of busy events (repeats included), locked task blocks and the buffer. Slots start on the step grid, after the minimum notice. Only your own calendar is checked.
+
+```sh crm-example
+crm cal free --len 45m --within 7d
+crm cal free --len 30m --from "mon" --notice 4h --buffer 15 --limit 5 -f json
+```
+
 See also: `tasks`, `keep-in-touch`, `tui` (Calendar view, key 9), `agents`.

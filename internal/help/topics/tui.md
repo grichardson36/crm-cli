@@ -82,6 +82,7 @@ Opens on the Agenda (two weeks by day). `a` agenda, `d` day, `w` week grid, `m` 
 
 - `+` adds an event as one line: `Lunch | fri 12:30 1h | weekly`. The preview shows what will be created. `enter` edits the event under the cursor, `D` deletes it. A repeating event asks first: this, this and following, or all.
 - `b` birthdays, `u` keep-in-touch dates, `T` tasks switch overlays. Enter on one opens the person.
+- `f` finds a time: a length and a number of days, then pick a free slot to add an event. "Find a time" is also in the palette of every view.
 - The palette adds attendees, reminders, tags, status, busy, go to date, show times in another zone, import and export ICS files, and restore the last deleted event.
 
 ## Quit

@@ -201,6 +201,8 @@ func (m *Model) runCalPrompt(kind, value string) {
 		m.calExportPath(value)
 	case "cal-hours":
 		m.calSetHours(value)
+	case "cal-free":
+		m.calFreeRun(value)
 	}
 }
 
