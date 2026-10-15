@@ -121,11 +121,31 @@ func registerSearchCommand(rootCmd *cobra.Command) {
 				}
 			}
 
+			if entityType == "" || entityType == "event" {
+				er := repo.NewEventRepo(db)
+				events, err := er.Search(cmd.Context(), query, limit)
+				if err != nil {
+					return err
+				}
+				for _, e := range events {
+					detail := derefStr(e.StartDate)
+					if !e.AllDay {
+						detail = derefStr(e.StartUTC)
+					}
+					data = append(data, map[string]any{
+						"type":   "event",
+						"id":     e.ID,
+						"name":   e.Title,
+						"detail": detail,
+					})
+				}
+			}
+
 			return format.Output(os.Stdout, resolveFormat(), data, searchColumns, flagQuiet)
 		},
 	}
 
-	cmd.Flags().StringVar(&entityType, "type", "", "filter by entity type: person, organization, interaction, deal")
+	cmd.Flags().StringVar(&entityType, "type", "", "filter by entity type: person, organization, interaction, deal, event")
 	cmd.Flags().IntVar(&limit, "limit", 20, "max results per entity type")
 
 	rootCmd.AddCommand(cmd)

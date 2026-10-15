@@ -23,17 +23,26 @@ type overlayItem struct {
 
 // overlay is a filterable list shown instead of the main screen: the command palette or a picker.
 type overlay struct {
-	title    string
-	items    []overlayItem
-	filter   textinput.Model
-	shown    []int // indexes into items that match the filter
-	cursor   int
-	offset   int
-	palette  bool
-	digits   bool // a number key picks the item with that hint (view switcher)
-	onPick   func(m *Model, it overlayItem)
-	listTop  int // first screen line of the item list
-	pageSize int
+	title   string
+	items   []overlayItem
+	filter  textinput.Model
+	shown   []int // indexes into items that match the filter
+	cursor  int
+	offset  int
+	palette bool
+	digits  bool // a number key picks the item with that hint (view switcher)
+	onPick  func(m *Model, it overlayItem)
+	// onCursor runs when the cursor lands on a different item (live preview). onCancel runs when
+	// the overlay is closed without a pick. Both are optional.
+	onCursor  func(m *Model, it overlayItem)
+	onCancel  func(m *Model)
+	previewed string // id of the item onCursor saw last
+	listTop   int    // first screen line of the item list
+	pageSize  int
+	// cmd is the command-bar state while the palette text is a command line (verb and a space).
+	cmd *cmdState
+	// cycle remembers the last Tab completion, so Tab again moves to the next candidate.
+	cycle *cycleState
 }
 
 const overlayTop = 2 // title line, filter line
@@ -62,7 +71,7 @@ func fuzzyScore(query, text string) (int, bool) {
 }
 
 func (o *overlay) refilter() {
-	type scored struct{ idx, score int }
+	type scored struct{ idx, score, length int }
 	var list []scored
 	q := o.filter.Value()
 	for i, it := range o.items {
@@ -73,9 +82,14 @@ func (o *overlay) refilter() {
 		if it.disabled != "" {
 			s += 1000
 		}
-		list = append(list, scored{i, s})
+		list = append(list, scored{i, s, len(it.label)})
 	}
-	sort.SliceStable(list, func(a, b int) bool { return list[a].score < list[b].score })
+	sort.SliceStable(list, func(a, b int) bool {
+		if list[a].score != list[b].score {
+			return list[a].score < list[b].score
+		}
+		return q != "" && list[a].length < list[b].length // an exact short title beats a longer one that starts the same
+	})
 	o.shown = o.shown[:0]
 	for _, s := range list {
 		o.shown = append(o.shown, s.idx)
@@ -102,6 +116,7 @@ func (m *Model) newOverlay(title string, items []overlayItem, palette bool) *ove
 
 // openPalette lists every registry action. Actions that are blocked or out of context are greyed out.
 func (m *Model) openPalette() tea.Cmd {
+	m.cmdPerson = m.palettePerson()
 	items := make([]overlayItem, 0, len(m.actions))
 	for i := range m.actions {
 		a := &m.actions[i]
@@ -173,6 +188,7 @@ func (m *Model) openViewSwitcher() tea.Cmd {
 var viewBlurbs = [numViews]string{
 	"what needs attention today", "everyone, search with /", "people to reach out to", "open tasks",
 	"upcoming birthdays", "probable duplicates", "archived people, restore or purge", "sources and the inbox",
+	"events, birthdays and due dates by day",
 }
 
 // openPicker shows a small list of choices. onPick runs after the overlay closes.
@@ -214,10 +230,38 @@ func (m *Model) pickOverlay(i int) tea.Cmd {
 }
 
 func (m *Model) handleOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	mm, cmd := m.overlayKey(msg)
+	m.previewCursor()
+	return mm, cmd
+}
+
+// previewCursor tells the open overlay which item the cursor is on, once per change.
+func (m *Model) previewCursor() {
+	o := m.ov
+	if o == nil || o.onCursor == nil || o.cursor < 0 || o.cursor >= len(o.shown) {
+		return
+	}
+	it := o.items[o.shown[o.cursor]]
+	if it.id == o.previewed {
+		return
+	}
+	o.previewed = it.id
+	o.onCursor(m, it)
+}
+
+func (m *Model) overlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	o := m.ov
 	page := m.overlayPage()
+	if o.palette {
+		if mdl, c, ok := m.cmdKey(msg); ok {
+			return mdl, c
+		}
+	}
 	switch msg.String() {
 	case "esc", "ctrl+c":
+		if o.onCancel != nil {
+			o.onCancel(m)
+		}
 		m.closeOverlay()
 		return m, nil
 	case "enter":
@@ -249,11 +293,21 @@ func (m *Model) handleOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if o.filter.Value() != before {
 		o.refilter()
 	}
+	m.syncCmd()
 	return m, cmd
 }
 
 func (m *Model) handleOverlayMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	mm, cmd := m.overlayMouse(msg)
+	m.previewCursor()
+	return mm, cmd
+}
+
+func (m *Model) overlayMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	o := m.ov
+	if o.cmd != nil {
+		return m, nil
+	}
 	switch msg.Button {
 	case tea.MouseButtonWheelUp:
 		o.move(-3, m.overlayPage())
@@ -273,12 +327,15 @@ func (m *Model) handleOverlayMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 
 func (m *Model) overlayView() string {
 	o := m.ov
+	if o.cmd != nil {
+		return m.cmdView()
+	}
 	var b strings.Builder
-	b.WriteString(lipgloss.NewStyle().MaxWidth(m.width).Render(headStyle.Render(o.title)+dimStyle.Render("   enter run  esc close  up/down choose")) + "\n")
+	b.WriteString(lipgloss.NewStyle().MaxWidth(m.width).Render(m.st.Head.Render(o.title)+m.st.Dim.Render("   enter run  esc close  up/down choose")) + "\n")
 	b.WriteString(o.filter.View() + "\n")
 	page := m.overlayPage()
 	if len(o.shown) == 0 {
-		b.WriteString(dimStyle.Render("No matches."))
+		b.WriteString(m.st.Dim.Render("No matches."))
 		return b.String()
 	}
 	end := min(len(o.shown), o.offset+page)
@@ -298,11 +355,11 @@ func (m *Model) overlayView() string {
 		line = fit(line, m.width)
 		switch {
 		case i == o.cursor:
-			b.WriteString(selStyle.Render(line))
+			b.WriteString(m.st.Sel.Render(line))
 		case it.disabled != "":
-			b.WriteString(dimStyle.Render(line))
+			b.WriteString(m.st.Dim.Render(line))
 		default:
-			b.WriteString(nameStyle.Render(fit(it.hint, hintW)) + fit(it.label, titleW) + dimStyle.Render(fit(desc, max(0, room))))
+			b.WriteString(m.st.Name.Render(fit(it.hint, hintW)) + fit(it.label, titleW) + m.st.Dim.Render(fit(desc, max(0, room))))
 		}
 		if i < end-1 {
 			b.WriteString("\n")
@@ -339,10 +396,10 @@ func (m *Model) handleHelpKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // helpText is generated from the action registry so it matches the palette.
 func (m *Model) helpText() string {
-	order := []string{"Home", "Contact", "Edit pane", "Bulk", "Sync", "Merge", "Compare", "Archive", "Move", "Views", "App"}
+	order := []string{"Home", "Contact", "Calendar", "Edit pane", "Bulk", "Sync", "Merge", "Compare", "Archive", "Move", "Views", "App"}
 	var b strings.Builder
 	for _, g := range order {
-		b.WriteString(headStyle.Render(g) + "\n")
+		b.WriteString(m.st.Head.Render(g) + "\n")
 		for i := range m.actions {
 			a := &m.actions[i]
 			if a.group != g {
@@ -359,17 +416,17 @@ func (m *Model) helpText() string {
 			if a.hasKey(" ") {
 				key = "space"
 			}
-			line := nameStyle.Render(fit(key, 22)) + a.desc
+			line := m.st.Name.Render(fit(key, 22)) + a.desc
 			if a.write {
-				line += dimStyle.Render("  [edits data]")
+				line += m.st.Dim.Render("  [edits data]")
 			}
 			b.WriteString(line + "\n")
 		}
 		b.WriteString("\n")
 	}
-	b.WriteString(headStyle.Render("Mouse") + "\n")
-	b.WriteString(nameStyle.Render(fit("click", 22)) + "select a row, click again on a detail row to edit it\n")
-	b.WriteString(nameStyle.Render(fit("click footer", 22)) + "tap a footer key to run it, tap the status line for the palette\n")
-	b.WriteString(nameStyle.Render(fit("wheel, tabs", 22)) + "scroll, switch view (the More tab opens the view list)\n")
+	b.WriteString(m.st.Head.Render("Mouse") + "\n")
+	b.WriteString(m.st.Name.Render(fit("click", 22)) + "select a row, click again on a detail row to edit it\n")
+	b.WriteString(m.st.Name.Render(fit("click footer", 22)) + "tap a footer key to run it, tap the status line for the palette\n")
+	b.WriteString(m.st.Name.Render(fit("wheel, tabs", 22)) + "scroll, switch view (the More tab opens the view list)\n")
 	return strings.TrimRight(b.String(), "\n")
 }

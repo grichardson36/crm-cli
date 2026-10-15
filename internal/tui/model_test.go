@@ -56,7 +56,7 @@ func newTestModel(t *testing.T) (*Model, *repo.PersonRepo) {
 
 var specialKeys = map[string]tea.KeyType{
 	"enter": tea.KeyEnter, "esc": tea.KeyEsc, "tab": tea.KeyTab, "shift+tab": tea.KeyShiftTab,
-	"ctrl+d": tea.KeyCtrlD, "ctrl+k": tea.KeyCtrlK, "ctrl+u": tea.KeyCtrlU,
+	"ctrl+d": tea.KeyCtrlD, "ctrl+k": tea.KeyCtrlK, "ctrl+u": tea.KeyCtrlU, "ctrl+z": tea.KeyCtrlZ, "ctrl+r": tea.KeyCtrlR, "ctrl+y": tea.KeyCtrlY,
 	"left": tea.KeyLeft, "right": tea.KeyRight, "up": tea.KeyUp, "down": tea.KeyDown,
 }
 
@@ -217,9 +217,9 @@ func TestViewsDueBirthdaysTasks(t *testing.T) {
 	press(m, "]", "]", "]")
 	assert.Equal(t, viewSync, m.view)
 	press(m, "]")
-	assert.Equal(t, viewHome, m.view, "] wraps around")
-	press(m, "[")
-	assert.Equal(t, viewSync, m.view, "[ wraps back")
+	assert.Equal(t, viewCalendar, m.view)
+	press(m, "1", "[")
+	assert.Equal(t, viewCalendar, m.view, "[ wraps back from Home")
 }
 
 func TestMarkContactedRemovesFromDue(t *testing.T) {

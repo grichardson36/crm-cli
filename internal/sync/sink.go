@@ -21,6 +21,7 @@ const (
 
 // dbSink writes adapter output into the database, or only counts it in a dry run.
 type dbSink struct {
+	db     *sql.DB
 	opts   RunOptions
 	people *repo.PersonRepo
 	inter  *repo.InteractionRepo
@@ -32,10 +33,12 @@ type dbSink struct {
 
 	created, updated, skipped, inboxed, errs int
 	lastErr                                  string
+	notes                                    []string
 }
 
 func newSink(db *sql.DB, opts RunOptions) *dbSink {
 	return &dbSink{
+		db:     db,
 		opts:   opts,
 		people: repo.NewPersonRepo(db),
 		inter:  repo.NewInteractionRepo(db),
@@ -44,6 +47,25 @@ func newSink(db *sql.DB, opts RunOptions) *dbSink {
 		idx:    &matchIndex{db: db},
 	}
 }
+
+// DB implements Host.
+func (s *dbSink) DB() *sql.DB { return s.db }
+
+// IsDryRun implements Host.
+func (s *dbSink) IsDryRun() bool { return s.opts.DryRun }
+
+// Count implements Host.
+func (s *dbSink) Count(o Outcome) { _, _ = s.count(o, nil) }
+
+// Note implements Host.
+func (s *dbSink) Note(msg string) {
+	if len(s.notes) < 5 {
+		s.notes = append(s.notes, msg)
+	}
+}
+
+// Fail implements Host.
+func (s *dbSink) Fail(err error) { _, _ = s.count("", err) }
 
 func (s *dbSink) count(o Outcome, err error) (Outcome, error) {
 	if err != nil {

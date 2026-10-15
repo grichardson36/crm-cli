@@ -41,7 +41,7 @@ func (m *Model) askDeleteNote(r formRow) {
 	m.confirm = &confirmState{
 		prompt: fmt.Sprintf("delete the %s note from %s? y/n", r.typ, r.label),
 		yes: func() {
-			if err := m.ir.Archive(m.ctx, id); err != nil {
+			if err := m.hArchiveNote(m.ctx, id); err != nil {
 				m.setStatus(err.Error(), true)
 				return
 			}
@@ -80,7 +80,7 @@ func (m *Model) retypeNote() {
 			return
 		}
 		name := it.value
-		if _, err := m.ir.Update(m.ctx, id, model.UpdateInteractionInput{Type: &name}); err != nil {
+		if _, err := m.hUpdateNote(m.ctx, id, model.UpdateInteractionInput{Type: &name}); err != nil {
 			m.setStatus(err.Error(), true)
 			return
 		}
@@ -97,7 +97,7 @@ func (m *Model) restoreLastNote() {
 		return
 	}
 	id := m.deletedNotes[len(m.deletedNotes)-1]
-	if err := m.ir.Restore(m.ctx, id); err != nil {
+	if err := m.hRestoreNote(m.ctx, id); err != nil {
 		m.setStatus(err.Error(), true)
 		return
 	}

@@ -32,6 +32,4 @@ Purge refuses people who are not archived.
 2. `crm person archive ID` archives.
 3. Ask the owner before any purge, then run `--dry-run`, then `--yes`.
 
-## Related topics
-
-`duplicates` (merge archives the dropped people), `agents`, `tui` (the Archived view, key 6: `u` restores, `X` purges after you type the name).
+See also: duplicates (merge archives the dropped people), agents, tui-keys (Archived view, key 7: `u` restores, `X` purges after you type the name).

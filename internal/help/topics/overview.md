@@ -21,18 +21,11 @@ crm search jane
 crm due
 ```
 
-## Where to go next
-
-- `crm help people` add, find and edit people.
-- `crm help keep-in-touch` who you are due to contact.
-- `crm help notes` log what happened.
-- `crm help output` formats, exit codes, stdout and stderr.
-- `crm help agents` how an AI agent should use crm safely.
-- `crm help` lists every topic, `crm schema -f json` lists every command.
-
 ## Conventions
 
 - Data goes to stdout and human messages go to stderr, so `crm ... | jq` works.
 - `-f json` makes any command print JSON.
 - Commands that change data accept `--dry-run`. Commands that cannot be undone need `--yes`.
-- `crm <command> --help` shows the flags and examples of one command.
+- `crm <command> --help` shows the flags and examples of one command. `crm help` lists every topic and `crm schema -f json` lists every command.
+
+See also: people (add, find, edit), keep-in-touch (who is due), notes (log what happened), output (formats, exit codes), agents (safe use by an AI agent), install.

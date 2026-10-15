@@ -70,20 +70,60 @@ func personFieldValues(p *model.Person) map[string]string {
 // recordPersonFieldChanges writes a field_versions row for each field that differs between
 // before and after. It runs in the caller's transaction.
 func recordPersonFieldChanges(ctx context.Context, q DBTX, id int64, before, after *model.Person) error {
-	old, now := personFieldValues(before), personFieldValues(after)
+	return recordFieldChanges(ctx, q, "person", id, personFieldValues(before), personFieldValues(after))
+}
+
+// recordFieldChanges writes a field_versions row for each field whose value differs. It is how
+// two-way sync tells which side changed a field last.
+func recordFieldChanges(ctx context.Context, q DBTX, entity string, id int64, old, now map[string]string) error {
 	for field, v := range now {
 		if old[field] == v {
 			continue
 		}
 		_, err := q.ExecContext(ctx,
 			`INSERT INTO field_versions (entity, local_id, field, changed_at, device_id)
-			 VALUES ('person', ?, ?, datetime('now'), (SELECT value FROM meta WHERE key = 'device_id'))
+			 VALUES (?, ?, ?, datetime('now'), (SELECT value FROM meta WHERE key = 'device_id'))
 			 ON CONFLICT(entity, local_id, field) DO UPDATE SET
 			   changed_at = excluded.changed_at, device_id = excluded.device_id`,
-			id, field)
+			entity, id, field)
 		if err != nil {
 			return fmt.Errorf("record field version %s: %w", field, err)
 		}
 	}
 	return nil
+}
+
+func deref0(p *string) string {
+	if p == nil {
+		return "\x00"
+	}
+	return "s:" + *p
+}
+
+// eventFieldValues flattens the fields of an event that sync tracks. The schedule is one field,
+// because moving an event changes its start, end and zone together.
+func eventFieldValues(e *model.Event) map[string]string {
+	when := fmt.Sprintf("%t|%s|%s|%s|%s|%s", e.AllDay, deref0(e.StartUTC), deref0(e.EndUTC), deref0(e.StartDate), deref0(e.EndDate), deref0(e.TZ))
+	return map[string]string{
+		"title": "s:" + e.Title, "notes": deref0(e.Notes), "location": deref0(e.Location), "when": when,
+		"rrule": deref0(e.RRule), "status": "s:" + e.Status, "busy": "b:" + strconv.FormatBool(e.Busy),
+	}
+}
+
+// taskFieldValues flattens the fields of a task that sync tracks.
+func taskFieldValues(t *model.Task) map[string]string {
+	n := func(p *int) string {
+		if p == nil {
+			return "\x00"
+		}
+		return "i:" + strconv.Itoa(*p)
+	}
+	return map[string]string{
+		"title": "s:" + t.Title, "description": deref0(t.Description), "due_at": deref0(t.DueAt), "priority": "s:" + t.Priority,
+		"recurrence": deref0(t.Recurrence), "completed": "b:" + strconv.FormatBool(t.Completed),
+		"duration_min": n(t.DurationMin), "earliest_start": deref0(t.EarliestStart), "deadline_at": deref0(t.DeadlineAt),
+		"deadline_hard": "b:" + strconv.FormatBool(t.DeadlineHard), "min_chunk_min": n(t.MinChunkMin),
+		"auto_schedule": "b:" + strconv.FormatBool(t.AutoSchedule), "scheduled_start": deref0(t.ScheduledStart),
+		"scheduled_locked": "b:" + strconv.FormatBool(t.ScheduledLocked), "schedule_name": "s:" + t.ScheduleName,
+	}
 }

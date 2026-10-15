@@ -12,22 +12,6 @@ import (
 	"github.com/mattn/go-runewidth"
 )
 
-var (
-	accent    = lipgloss.AdaptiveColor{Light: "#5A56E0", Dark: "#9D9BFF"}
-	dim       = lipgloss.AdaptiveColor{Light: "#777777", Dark: "#888888"}
-	danger    = lipgloss.AdaptiveColor{Light: "#C0392B", Dark: "#FF7B72"}
-	good      = lipgloss.AdaptiveColor{Light: "#1E7E34", Dark: "#7EE787"}
-	tabOn     = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FFFFFF")).Background(lipgloss.Color("#5A56E0")).Padding(0, 1)
-	tabOff    = lipgloss.NewStyle().Foreground(dim).Padding(0, 1)
-	selStyle  = lipgloss.NewStyle().Reverse(true)
-	offStyle  = lipgloss.NewStyle().Underline(true)
-	dimStyle  = lipgloss.NewStyle().Foreground(dim)
-	nameStyle = lipgloss.NewStyle().Bold(true).Foreground(accent)
-	headStyle = lipgloss.NewStyle().Bold(true)
-	errStyle  = lipgloss.NewStyle().Foreground(danger)
-	okStyle   = lipgloss.NewStyle().Foreground(good)
-)
-
 func tabLabel(i int, name string) string { return fmt.Sprintf("%d %s", i+1, name) }
 
 // cleanCell removes emoji and control characters that break column widths in list cells.
@@ -61,7 +45,7 @@ func fit(s string, width int) string {
 }
 
 // View implements tea.Model.
-func (m *Model) View() string {
+func (m *Model) baseView() string {
 	if m.width == 0 {
 		return "loading..."
 	}
@@ -77,6 +61,10 @@ func (m *Model) View() string {
 	if m.cmp != nil {
 		return m.compareView()
 	}
+	if m.calGrid() {
+		body := m.calGridBody(m.width, m.bodyHeight())
+		return strings.Join([]string{m.tabsView(), body, m.footerView()}, "\n")
+	}
 	listW := m.listWidth()
 	bodyH := m.bodyHeight()
 	detailW := m.width - listW - 1
@@ -85,9 +73,9 @@ func (m *Model) View() string {
 	}
 
 	list := lipgloss.NewStyle().Width(listW).Height(bodyH).MaxHeight(bodyH).Render(m.listView(listW, bodyH))
-	sepStyle := dimStyle
+	sepStyle := m.st.Dim
 	if m.focus == focusDetail {
-		sepStyle = nameStyle
+		sepStyle = m.st.Name
 	}
 	sep := sepStyle.Render(strings.TrimRight(strings.Repeat("│\n", bodyH), "\n"))
 	detail := lipgloss.NewStyle().Width(detailW).Height(bodyH).MaxHeight(bodyH).PaddingLeft(1).Render(m.detail.View())
@@ -168,6 +156,8 @@ func (m *Model) countText() string {
 		return fmt.Sprintf("%d groups, %s+", len(m.rows), m.minLevel)
 	case viewArchived:
 		return fmt.Sprintf("%d archived", len(m.rows))
+	case viewCalendar:
+		return m.calCountText()
 	case viewSync:
 		sources, inbox := 0, 0
 		for _, r := range m.rows {
@@ -187,13 +177,13 @@ func (m *Model) tabsView() string {
 	var tabs []string
 	for _, seg := range m.tabLayout() {
 		if seg.on {
-			tabs = append(tabs, tabOn.Render(seg.label))
+			tabs = append(tabs, m.st.TabOn.Render(seg.label))
 		} else {
-			tabs = append(tabs, tabOff.Render(seg.label))
+			tabs = append(tabs, m.st.TabOff.Render(seg.label))
 		}
 	}
 	line := lipgloss.NewStyle().MaxWidth(m.width).Render(strings.Join(tabs, ""))
-	count := dimStyle.Render(m.countText())
+	count := m.st.Dim.Render(m.countText())
 	gap := m.width - lipgloss.Width(line) - lipgloss.Width(count)
 	if gap < 1 {
 		return line
@@ -205,25 +195,27 @@ func (m *Model) listView(w, h int) string {
 	if len(m.rows) == 0 {
 		switch {
 		case m.view == viewPeople && m.query != "":
-			return dimStyle.Render("No matches.")
+			return m.st.Dim.Render("No matches.")
 		case m.view == viewDue:
-			return dimStyle.Render("Nobody is due. Set a cadence with: crm person edit <id> --keep-in-touch \"3 mons\"")
+			return m.st.Dim.Render("Nobody is due. Set a cadence with: crm person edit <id> --keep-in-touch \"3 mons\"")
 		case m.view == viewBirthdays:
-			return dimStyle.Render("No birthdays in the next 90 days.")
+			return m.st.Dim.Render("No birthdays in the next 90 days.")
 		case m.view == viewTasks:
-			return dimStyle.Render("No open tasks. Press t on a person to add one.")
+			return m.st.Dim.Render("No open tasks. Press t on a person to add one.")
 		case m.view == viewMerge:
-			return dimStyle.Render("No duplicates at " + m.minLevel.String() + " confidence or above. m lowers the level.")
+			return m.st.Dim.Render("No duplicates at " + m.minLevel.String() + " confidence or above. m lowers the level.")
 		case m.view == viewArchived:
-			return dimStyle.Render("Nothing archived. # archives the selected person.")
+			return m.st.Dim.Render("Nothing archived. # archives the selected person.")
 		case m.view == viewSync:
-			return dimStyle.Render("No sync sources connected yet.")
+			return m.st.Dim.Render("No sync sources connected yet.")
+		case m.view == viewCalendar:
+			return m.st.Dim.Render("Nothing planned. + adds an event.")
 		}
-		return dimStyle.Render("Nothing here yet.")
+		return m.st.Dim.Render("Nothing here yet.")
 	}
-	cursorStyle := selStyle
+	cursorStyle := m.st.Sel
 	if m.focus == focusDetail {
-		cursorStyle = offStyle
+		cursorStyle = m.st.Off
 	}
 	anyMarks := len(m.marked) > 0
 	var b strings.Builder
@@ -237,7 +229,7 @@ func (m *Model) listView(w, h int) string {
 		if r.skip {
 			meta := runewidth.Truncate(cleanCell(r.meta), w/2, "…")
 			metaW := runewidth.StringWidth(meta)
-			b.WriteString(nameStyle.Render(fit(title, w-metaW-1)) + dimStyle.Render(" "+meta))
+			b.WriteString(m.st.Name.Render(fit(title, w-metaW-1)) + m.st.Dim.Render(" "+meta))
 			if i < end-1 {
 				b.WriteString("\n")
 			}
@@ -269,7 +261,7 @@ func (m *Model) listView(w, h int) string {
 			} else {
 				rest = strings.Repeat(" ", max(0, w-metaW-1-runewidth.StringWidth(name)))
 			}
-			b.WriteString(name + dimStyle.Render(rest+" "+meta))
+			b.WriteString(name + m.st.Dim.Render(rest+" "+meta))
 		}
 		if i < end-1 {
 			b.WriteString("\n")
@@ -291,9 +283,8 @@ var footShort = map[string]string{
 	"open": "open", "back": "back", "compare": "compare", "dupe-level": "level", "dismiss": "dismiss",
 	"undo-dismiss": "undo", "merge-marked": "merge", "archive": "archive", "restore": "restore", "purge": "purge",
 	"home-open": "open", "sync-now": "sync", "sync-dry": "dry-run", "inbox-accept": "accept", "inbox-attach": "attach",
-	"inbox-ignore": "ignore", "goto-view": "views", "note-retype": "type",
-	"cmp-left": "pick", "cmp-pick": "toggle", "cmp-survivor": "survivor", "cmp-pair": "pair", "cmp-view": "pane",
-	"cmp-confirm": "merge", "cmp-back": "back",
+	"inbox-ignore": "ignore", "cal-add": "add", "cal-open": "edit", "cal-delete": "delete", "cal-today": "today", "cal-prev": "prev", "cal-next": "next", "cal-agenda": "agenda", "cal-day": "day", "cal-week": "week", "cal-month": "month", "goto-view": "views", "note-retype": "type",
+	"cmp-left": "pick", "cmp-pick": "toggle", "cmp-survivor": "survivor", "cmp-pair": "pair", "cmp-view": "pane", "cmp-confirm": "merge", "cmp-back": "back",
 }
 
 // footerSegs lists the hints for the focused pane, in order, limited to what fits the width.
@@ -343,23 +334,23 @@ func (m *Model) footerView() string {
 	case modeSearch, modePrompt:
 		status = m.input.View()
 	case modeConfirm:
-		status = errStyle.Render(m.confirm.prompt)
+		status = m.st.Err.Render(m.confirm.prompt)
 	default:
 		switch {
 		case m.busy != "":
-			status = m.spin.View() + " " + dimStyle.Render(m.busy+"...")
+			status = m.spin.View() + " " + m.st.Dim.Render(m.busy+"...")
 		case m.status != "" && m.statusIsErr:
-			status = errStyle.Render(m.status)
+			status = m.st.Err.Render(m.status)
 		case m.status != "":
-			status = okStyle.Render(m.status)
+			status = m.st.Ok.Render(m.status)
 		case m.mode == modeEdit:
-			status = dimStyle.Render("editing: enter saves, esc cancels")
+			status = m.st.Dim.Render("editing: enter saves, esc cancels")
 		case m.query != "":
-			status = dimStyle.Render("filter: " + m.query + "  (esc clears)")
+			status = m.st.Dim.Render("filter: " + m.query + "  (esc clears)")
 		}
 	}
 	if n := len(m.markedIDs()); n > 0 && (m.mode == modeNormal) {
-		tag := nameStyle.Render(fmt.Sprintf("%d marked", n))
+		tag := m.st.Mark.Render(fmt.Sprintf("%d marked", n))
 		room := m.width - lipgloss.Width(tag) - 1
 		if room > 0 {
 			status = lipgloss.NewStyle().MaxWidth(room).Render(status)
@@ -381,28 +372,35 @@ func (m *Model) hintsLine() string {
 		if m.edit != nil && m.edit.kind == rkHandle {
 			h += "  tab change kind"
 		}
-		return dimStyle.Render(runewidth.Truncate(h, m.width, "…"))
+		return m.st.Dim.Render(runewidth.Truncate(h, m.width, "…"))
 	case modeConfirm:
-		return dimStyle.Render("y yes  n no")
+		return m.st.Dim.Render("y yes  n no")
 	case modeSearch, modePrompt:
 		if m.mode == modePrompt && m.promptKind == "note" {
-			return dimStyle.Render("enter save  tab type  esc cancel")
+			return m.st.Dim.Render("enter save  tab type  esc cancel")
 		}
-		return dimStyle.Render("enter confirm  esc cancel")
+		if m.mode == modePrompt && (m.promptKind == "cal-add" || m.promptKind == "cal-edit") {
+			hint, bad := m.calPromptHint()
+			if bad {
+				return m.st.Err.Render(runewidth.Truncate(hint, m.width, "…"))
+			}
+			return m.st.Dim.Render(runewidth.Truncate(hint+"   enter saves, esc cancels", m.width, "…"))
+		}
+		return m.st.Dim.Render("enter confirm  esc cancel")
 	}
 	var parts []string
 	if m.readOnly {
-		parts = append(parts, errStyle.Render("READ-ONLY"))
+		parts = append(parts, m.st.Warn.Render("READ-ONLY"))
 	}
 	for _, s := range m.footerSegs() {
-		parts = append(parts, nameStyle.Render(s.hint)+" "+dimStyle.Render(s.label))
+		parts = append(parts, m.st.Name.Render(s.hint)+" "+m.st.Dim.Render(s.label))
 	}
 	return strings.Join(parts, "  ")
 }
 
 func (m *Model) helpView() string {
-	title := headStyle.Render("Keys") + dimStyle.Render("   generated from the same action list as the palette (ctrl+k)")
-	foot := dimStyle.Render("j/k scroll  any other key closes  ctrl+k for every action")
+	title := m.st.Head.Render("Keys") + m.st.Dim.Render("   generated from the same action list as the palette (ctrl+k)")
+	foot := m.st.Dim.Render("j/k scroll  any other key closes  ctrl+k for every action")
 	cut := lipgloss.NewStyle().MaxWidth(m.width)
 	return cut.Render(title) + "\n" + m.helpVP.View() + "\n" + cut.Render(foot)
 }

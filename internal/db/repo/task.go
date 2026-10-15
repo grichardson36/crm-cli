@@ -23,7 +23,8 @@ func NewTaskRepo(db *sql.DB) *TaskRepo {
 }
 
 const taskColumns = `id, uuid, title, description, person_id, deal_id, due_at, priority,
-	completed, completed_at, archived, created_at, updated_at, recurrence`
+	completed, completed_at, archived, created_at, updated_at, recurrence,
+	duration_min, earliest_start, deadline_at, deadline_hard, min_chunk_min, auto_schedule, scheduled_start, scheduled_locked, schedule_name`
 
 func scanTask(row interface{ Scan(...any) error }) (*model.Task, error) {
 	var t model.Task
@@ -31,6 +32,8 @@ func scanTask(row interface{ Scan(...any) error }) (*model.Task, error) {
 		&t.ID, &t.UUID, &t.Title, &t.Description, &t.PersonID, &t.DealID,
 		&t.DueAt, &t.Priority, &t.Completed, &t.CompletedAt,
 		&t.Archived, &t.CreatedAt, &t.UpdatedAt, &t.Recurrence,
+		&t.DurationMin, &t.EarliestStart, &t.DeadlineAt, &t.DeadlineHard, &t.MinChunkMin, &t.AutoSchedule,
+		&t.ScheduledStart, &t.ScheduledLocked, &t.ScheduleName,
 	)
 	return &t, err
 }
@@ -78,11 +81,17 @@ func (r *TaskRepo) Create(ctx context.Context, input model.CreateTaskInput) (*mo
 		}
 	}
 
+	schedCols, schedVals, err := scheduleColumns(input.Schedule)
+	if err != nil {
+		return nil, err
+	}
+	cols := []string{"uuid", "title", "description", "person_id", "deal_id", "due_at", "priority", "recurrence"}
 	id := uuid.New().String()
+	vals := []any{id, input.Title, input.Description, input.PersonID, input.DealID, input.DueAt, input.Priority, input.Recurrence}
+	cols, vals = append(cols, schedCols...), append(vals, schedVals...)
+	ph := strings.TrimSuffix(strings.Repeat("?, ", len(cols)), ", ")
 	result, err := r.db.ExecContext(ctx,
-		`INSERT INTO tasks (uuid, title, description, person_id, deal_id, due_at, priority, recurrence)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		id, input.Title, input.Description, input.PersonID, input.DealID, input.DueAt, input.Priority, input.Recurrence)
+		"INSERT INTO tasks ("+strings.Join(cols, ", ")+") VALUES ("+ph+")", vals...)
 	if err != nil {
 		return nil, fmt.Errorf("create task: %w", err)
 	}
@@ -192,6 +201,9 @@ func (r *TaskRepo) Complete(ctx context.Context, id int64) (*model.Task, error) 
 	if err != nil {
 		return nil, err
 	}
+	if err := recordFieldChanges(ctx, r.db, "task", id, map[string]string{"completed": "b:false"}, map[string]string{"completed": "b:true"}); err != nil {
+		return nil, err
+	}
 	if done.Recurrence != nil && done.DueAt != nil {
 		nextDue, err := model.NextDue(*done.DueAt, *done.Recurrence, time.Now().UTC())
 		if err != nil {
@@ -260,10 +272,20 @@ func (r *TaskRepo) Update(ctx context.Context, id int64, input model.UpdateTaskI
 		}
 	}
 
+	schedCols, schedVals, err := scheduleColumns(input.Schedule)
+	if err != nil {
+		return nil, err
+	}
+	for i, c := range schedCols {
+		setClauses = append(setClauses, c+" = ?")
+		args = append(args, schedVals[i])
+	}
+
 	if len(setClauses) == 0 {
 		return r.FindByID(ctx, id)
 	}
 
+	before, _ := r.FindByID(ctx, id)
 	setClauses = append(setClauses, "updated_at = datetime('now')")
 	args = append(args, id)
 
@@ -283,7 +305,44 @@ func (r *TaskRepo) Update(ctx context.Context, id int64, input model.UpdateTaskI
 		}
 	}
 
-	return r.FindByID(ctx, id)
+	after, err := r.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if before != nil {
+		if err := recordFieldChanges(ctx, r.db, "task", id, taskFieldValues(before), taskFieldValues(after)); err != nil {
+			return nil, err
+		}
+	}
+	return after, nil
+}
+
+// Restore brings an archived task back.
+func (r *TaskRepo) Restore(ctx context.Context, id int64) error {
+	result, err := r.db.ExecContext(ctx,
+		"UPDATE tasks SET archived = 0, updated_at = datetime('now') WHERE id = ? AND archived = 1", id)
+	if err != nil {
+		return fmt.Errorf("restore task %d: %w", id, err)
+	}
+	if rows, _ := result.RowsAffected(); rows == 0 {
+		return fmt.Errorf("archived task %d: %w", id, model.ErrNotFound)
+	}
+	return nil
+}
+
+// Reopen marks a completed task as open again. It does not remove a next occurrence that
+// Complete created: archive that task yourself.
+func (r *TaskRepo) Reopen(ctx context.Context, id int64) error {
+	result, err := r.db.ExecContext(ctx,
+		`UPDATE tasks SET completed = 0, completed_at = NULL, updated_at = datetime('now')
+		 WHERE id = ? AND archived = 0 AND completed = 1`, id)
+	if err != nil {
+		return fmt.Errorf("reopen task %d: %w", id, err)
+	}
+	if rows, _ := result.RowsAffected(); rows == 0 {
+		return fmt.Errorf("completed task %d: %w", id, model.ErrNotFound)
+	}
+	return nil
 }
 
 // Archive soft-deletes a task.

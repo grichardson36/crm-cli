@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/jdanielnd/crm-cli/internal/integrations"
 	"os"
 	"strings"
 	"time"
@@ -13,10 +14,14 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/jdanielnd/crm-cli/internal/cal/tz"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/dedupe"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/quick"
+	"github.com/jdanielnd/crm-cli/internal/shortsyntax"
 	crmsync "github.com/jdanielnd/crm-cli/internal/sync"
+	"github.com/jdanielnd/crm-cli/internal/theme"
 )
 
 type viewKind int
@@ -30,10 +35,11 @@ const (
 	viewMerge
 	viewArchived
 	viewSync
+	viewCalendar
 	numViews
 )
 
-var viewNames = [numViews]string{"Home", "People", "Due", "Tasks", "Birthdays", "Merge", "Archived", "Sync"}
+var viewNames = [numViews]string{"Home", "People", "Due", "Tasks", "Birthdays", "Merge", "Archived", "Sync", "Calendar"}
 
 type mode int
 
@@ -68,6 +74,8 @@ type row struct {
 	jump int
 	// sync carries the Sync view data of the row.
 	sync *syncItem
+	// cal carries the Calendar view data of the row.
+	cal *calItem
 }
 
 // Model is the Bubble Tea model.
@@ -79,6 +87,7 @@ type Model struct {
 	tagr *repo.TagRepo
 	dr   *repo.DupeRepo
 	ntr  *repo.NoteTypeRepo
+	er   *repo.EventRepo
 	db   *sql.DB
 	now  func() time.Time
 
@@ -91,6 +100,10 @@ type Model struct {
 	spin spinner.Model
 	// deletedNotes is the session stack of deleted note ids for "Restore last deleted note".
 	deletedNotes []int64
+	// Calendar view state, the zone times are shown in and the session stack of deleted events.
+	cal           calState
+	loc           *time.Location
+	deletedEvents []int64
 
 	// clip copies text to the system clipboard (OSC52 by default). open launches a URL.
 	clip func(string)
@@ -150,6 +163,24 @@ type Model struct {
 
 	// noteType is the type used by the next note prompt (remembered between notes).
 	noteType string
+
+	// st holds every style of the active theme. Views draw only with it. See theme.go.
+	st        theme.Styles
+	themeName string // name of the active theme
+	darkBG    bool   // terminal has a dark background (resolves the auto theme)
+	// Command bar: caches for the quick package, the person the palette opened on, the changes of
+	// command lines run this session (newest last) for Undo, and the short syntax switch.
+	qix       *quick.Index
+	qtags     []string
+	qtypes    []string
+	cmdPerson int64
+	hist      []histEntry
+	redoStack []histEntry
+	grp       []histEntry
+	grpDepth  int
+	toast     *toast
+	toastSeq  int
+	noSyntax  bool
 }
 
 // New creates the model and loads data.
@@ -159,7 +190,7 @@ func New(ctx context.Context, db *sql.DB) (*Model, error) {
 	ri := textinput.New()
 	ri.CharLimit = 2000
 	ri.Prompt = ""
-	registry := crmsync.DefaultRegistry(os.Getenv)
+	registry := integrations.DefaultRegistry(os.Getenv)
 	m := &Model{
 		ctx:      ctx,
 		db:       db,
@@ -174,6 +205,9 @@ func New(ctx context.Context, db *sql.DB) (*Model, error) {
 		tagr:     repo.NewTagRepo(db),
 		dr:       repo.NewDupeRepo(db),
 		ntr:      repo.NewNoteTypeRepo(db),
+		er:       repo.NewEventRepo(db),
+		cal:      newCalState(),
+		loc:      tz.Device(),
 		minLevel: dedupe.Medium,
 		noteType: "note",
 		now:      time.Now,
@@ -185,6 +219,7 @@ func New(ctx context.Context, db *sql.DB) (*Model, error) {
 		actions:  buildActions(),
 		clip:     func(s string) { osc52Copy(os.Stdout, s) },
 		open:     openURL,
+		st:       defaultStyles(),
 	}
 	if err := m.reload(); err != nil {
 		return nil, err
@@ -200,6 +235,7 @@ func Run(ctx context.Context, db *sql.DB, readOnly bool, env Env) error {
 	}
 	m.readOnly = readOnly
 	m.env = env
+	m.applyStartupTheme()
 	_, err = tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion(), tea.WithContext(ctx)).Run()
 	return err
 }
@@ -224,6 +260,7 @@ func (m *Model) reload() error {
 		return err
 	}
 	m.people = people
+	m.qix, m.qtags, m.qtypes = nil, nil, nil
 	return m.rebuild(true)
 }
 
@@ -236,6 +273,10 @@ func (m *Model) afterWrite() {
 // or at the same position if that item is gone. Otherwise the cursor goes to the top.
 func (m *Model) rebuild(keep bool) error {
 	var keepPerson, keepTask int64
+	calKey := ""
+	if m.view == viewCalendar && m.cursor < len(m.rows) {
+		calKey = calRowKey(m.rows[m.cursor])
+	}
 	oldCursor := m.cursor
 	if keep && m.cursor < len(m.rows) {
 		keepPerson, keepTask = m.rows[m.cursor].personID, m.rows[m.cursor].taskID
@@ -249,6 +290,11 @@ func (m *Model) rebuild(keep bool) error {
 			return err
 		}
 		rows = hr
+	case viewCalendar:
+		if err := m.calLoad(); err != nil {
+			return err
+		}
+		rows = m.calRows()
 	case viewSync:
 		sr, err := m.syncRows()
 		if err != nil {
@@ -339,6 +385,9 @@ func (m *Model) rebuild(keep bool) error {
 	} else {
 		m.offset = 0
 	}
+	if m.view == viewCalendar {
+		m.cursor = m.calCursor(calKey)
+	}
 	m.settle()
 	m.clamp()
 	m.refreshDetail(true)
@@ -408,6 +457,23 @@ func matches(p model.PersonSummary, terms []string) bool {
 				return false
 			}
 			continue
+		}
+		// The short syntax tokens also filter: ^high (priority tier) and *3m (cadence).
+		if strings.HasPrefix(t, "^") {
+			if pr, ok := shortsyntax.ParsePriority(t[1:]); ok {
+				if p.PriorityTier != shortsyntax.TierOf(pr) {
+					return false
+				}
+				continue
+			}
+		}
+		if strings.HasPrefix(t, "*") {
+			if c, ok := shortsyntax.ParseCadence(t[1:]); ok {
+				if p.KeepInTouch != c {
+					return false
+				}
+				continue
+			}
 		}
 		if !strings.Contains(hay, t) && !strings.Contains(tags, t) {
 			return false
@@ -559,10 +625,18 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.tv.vp.Width, m.tv.vp.Height = m.width, max(1, m.height-2)
 		}
 		m.clamp()
+		if m.view == viewCalendar {
+			m.report(m.rebuild(true))
+		}
 		m.refreshDetail(true)
 		return m, nil
 	case tea.MouseMsg:
 		return m.handleMouse(msg)
+	case toastExpireMsg:
+		if m.toast != nil && m.toast.seq == msg.seq {
+			m.toast = nil
+		}
+		return m, nil
 	case syncDoneMsg:
 		m.finishSync(msg)
 		return m, nil
@@ -628,8 +702,9 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // runAction runs an action, enforcing read-only mode.
 func (m *Model) runAction(a *action) tea.Cmd {
 	if a.write && m.readOnly {
-		m.setStatus("read-only: "+strings.ToLower(a.title)+" is disabled", true)
-		return nil
+		msg := "read-only: " + strings.ToLower(a.title) + " is disabled"
+		m.setStatus(msg, true)
+		return m.showToast(msg, true)
 	}
 	return a.run(m)
 }
@@ -741,6 +816,7 @@ func (m *Model) handleConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m *Model) bulk(ids []int64, single, plural string, fn func(id int64) error) {
 	ok, failed := 0, 0
 	var first error
+	m.beginGroup()
 	for _, id := range ids {
 		if err := fn(id); err != nil {
 			failed++
@@ -750,6 +826,11 @@ func (m *Model) bulk(ids []int64, single, plural string, fn func(id int64) error
 			continue
 		}
 		ok++
+	}
+	if ok > 1 {
+		m.endGroup(fmt.Sprintf("%s: %d people", plural, ok))
+	} else {
+		m.endGroup("")
 	}
 	if m.focus == focusList {
 		m.marked = map[int64]bool{}
@@ -766,7 +847,14 @@ func (m *Model) bulk(ids []int64, single, plural string, fn func(id int64) error
 }
 
 func (m *Model) runPrompt(kind, value string) {
+	if strings.HasPrefix(kind, "cal-") {
+		m.runCalPrompt(kind, value)
+		return
+	}
 	switch kind {
+	case "task-schedule":
+		m.runTaskSchedule(value)
+		return
 	case "notetype-add":
 		m.addNoteType(value)
 		return
@@ -792,7 +880,7 @@ func (m *Model) runPrompt(kind, value string) {
 		}
 		until := m.now().UTC().AddDate(0, 0, days).Format("2006-01-02 15:04:05")
 		m.bulk(ids, fmt.Sprintf("snoozed for %d days", days), "snoozed", func(id int64) error {
-			_, err := m.pr.Update(m.ctx, id, model.UpdatePersonInput{SnoozedUntil: &until})
+			_, err := m.hUpdatePerson(m.ctx, id, model.UpdatePersonInput{SnoozedUntil: &until})
 			return err
 		})
 		return
@@ -805,9 +893,9 @@ func (m *Model) runPrompt(kind, value string) {
 		}
 		m.bulk(ids, "tag "+map[bool]string{true: "removed", false: "added"}[remove], "tagged "+name, func(id int64) error {
 			if remove {
-				return m.tagr.Remove(m.ctx, "person", id, name)
+				return m.hTagRemove(m.ctx, "person", id, name)
 			}
-			return m.tagr.Apply(m.ctx, "person", id, name)
+			return m.hTagApply(m.ctx, "person", id, name)
 		})
 		return
 	case "note":
@@ -815,28 +903,34 @@ func (m *Model) runPrompt(kind, value string) {
 			m.setStatus("no person selected", true)
 			return
 		}
+		// The note goes through the same reader as the command bar: #tag tags the note, +Name
+		// links people, @date makes a reminder and *3m sets the cadence.
 		typ := m.currentNoteType()
-		if _, err := m.ir.Create(m.ctx, model.CreateInteractionInput{Type: typ, Content: &value, PersonIDs: []int64{pid}}); err != nil {
+		env := m.quickEnvFor(pid)
+		env.NoteType = typ
+		plan, err := m.runLine("note "+value, env)
+		if err != nil {
 			m.setStatus(err.Error(), true)
 			return
 		}
 		m.noteType = typ
-		m.setStatus(typ+" added", false)
+		m.setStatus(typ+" added"+extras(plan), false)
+		m.pendingCmd = m.showToast(typ+" added"+extras(plan), false)
 	case "task":
 		if pid == 0 {
 			m.setStatus("no person selected", true)
 			return
 		}
 		title, due, _ := strings.Cut(value, "|")
-		in := model.CreateTaskInput{Title: strings.TrimSpace(title), Priority: "medium", PersonID: &pid}
-		if d := strings.TrimSpace(due); d != "" {
-			in.DueAt = &d
-		}
-		if _, err := m.tr.Create(m.ctx, in); err != nil {
+		env := m.quickEnvFor(pid)
+		env.DueOverride = m.normalizeDue(due)
+		plan, err := m.runLine("task "+strings.TrimSpace(title), env)
+		if err != nil {
 			m.setStatus(err.Error(), true)
 			return
 		}
-		m.setStatus("task added", false)
+		m.setStatus("task added"+extras(plan), false)
+		m.pendingCmd = m.showToast("task added"+extras(plan), false)
 	}
 	m.afterWrite()
 }

@@ -170,23 +170,25 @@ func (m *Model) emptyDetail() string {
 	line := func(s string) string { return runewidth.Truncate(s, w, "…") }
 	r, ok := m.selected()
 	if !ok {
-		return dimStyle.Render("Nothing selected.")
+		return m.st.Dim.Render("Nothing selected.")
 	}
 	var b strings.Builder
 	switch m.view {
 	case viewSync:
 		return m.syncItemDetail(r)
+	case viewCalendar:
+		return m.calDetail()
 	case viewMerge:
 		if m.cursor >= len(m.groups) {
 			return ""
 		}
 		g := m.groups[m.cursor]
-		b.WriteString(nameStyle.Render(fmt.Sprintf("%s confidence, %d people", levelBadge(g.Level), len(g.Members))) + "\n")
+		b.WriteString(m.st.Name.Render(fmt.Sprintf("%s confidence, %d people", levelBadge(g.Level), len(g.Members))) + "\n")
 		for _, reason := range g.Reasons {
-			b.WriteString(dimStyle.Render(line(reason)) + "\n")
+			b.WriteString(m.st.Dim.Render(line(reason)) + "\n")
 		}
 		for _, mb := range g.Members {
-			b.WriteString("\n" + headStyle.Render(line(fmt.Sprintf("#%d %s", mb.ID, cleanCell(mb.Name)))) + "\n")
+			b.WriteString("\n" + m.st.Head.Render(line(fmt.Sprintf("#%d %s", mb.ID, cleanCell(mb.Name)))) + "\n")
 			for _, p := range m.people {
 				if p.ID != mb.ID {
 					continue
@@ -201,35 +203,35 @@ func (m *Model) emptyDetail() string {
 					b.WriteString(line(strings.Join(role, " at ")) + "\n")
 				}
 				if p.AllEmails != "" {
-					b.WriteString(dimStyle.Render(line(p.AllEmails)) + "\n")
+					b.WriteString(m.st.Dim.Render(line(p.AllEmails)) + "\n")
 				}
 				if p.Location != "" {
-					b.WriteString(dimStyle.Render(line(cleanCell(p.Location))) + "\n")
+					b.WriteString(m.st.Dim.Render(line(cleanCell(p.Location))) + "\n")
 				}
 			}
 		}
-		b.WriteString("\n" + dimStyle.Render("enter compares and merges, D dismisses"))
+		b.WriteString("\n" + m.st.Dim.Render("enter compares and merges, D dismisses"))
 	case viewArchived:
 		p := m.arch[r.personID]
 		if p == nil {
-			return dimStyle.Render("Nothing selected.")
+			return m.st.Dim.Render("Nothing selected.")
 		}
 		_ = m.pr.LoadDetails(m.ctx, p)
-		b.WriteString(nameStyle.Render(line(fullName(p))) + dimStyle.Render("  archived "+dateOnly(p.UpdatedAt)) + "\n\n")
+		b.WriteString(m.st.Name.Render(line(fullName(p))) + m.st.Dim.Render("  archived "+dateOnly(p.UpdatedAt)) + "\n\n")
 		for _, kv := range [][2]string{{"title", str(p.Title)}, {"company", str(p.Company)}, {"location", str(p.Location)}, {"birthday", formatBirthdayParts(p)}} {
 			if kv[1] != "" {
-				b.WriteString(dimStyle.Render(fit(kv[0], labelWidth)) + line(kv[1]) + "\n")
+				b.WriteString(m.st.Dim.Render(fit(kv[0], labelWidth)) + line(kv[1]) + "\n")
 			}
 		}
 		for _, e := range p.Emails {
-			b.WriteString(dimStyle.Render(fit("email", labelWidth)) + line(e.Email) + "\n")
+			b.WriteString(m.st.Dim.Render(fit("email", labelWidth)) + line(e.Email) + "\n")
 		}
 		for _, ph := range p.Phones {
-			b.WriteString(dimStyle.Render(fit("phone", labelWidth)) + line(ph.PhoneNumber) + "\n")
+			b.WriteString(m.st.Dim.Render(fit("phone", labelWidth)) + line(ph.PhoneNumber) + "\n")
 		}
-		b.WriteString("\n" + dimStyle.Render("u restores, X purges forever"))
+		b.WriteString("\n" + m.st.Dim.Render("u restores, X purges forever"))
 	default:
-		return dimStyle.Render("Nothing selected.")
+		return m.st.Dim.Render("Nothing selected.")
 	}
 	return strings.TrimRight(b.String(), "\n")
 }

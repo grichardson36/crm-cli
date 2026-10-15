@@ -284,6 +284,15 @@ func NewServer(db *sql.DB, version string, opts ...Option) *server.MCPServer {
 			gomcp.WithString("priority", gomcp.Description("Priority: low, medium, high (default: medium)")),
 			gomcp.WithArray("person_ids", gomcp.Description("Link the task to several people"), gomcp.WithNumberItems()),
 			gomcp.WithString("recurrence", gomcp.Description("Repeat when completed, e.g. \"7 days\", \"1 mon\", weekly. Needs a due date")),
+			gomcp.WithString("duration", gomcp.Description("How long it takes: 30m, 2h")),
+			gomcp.WithString("earliest_start", gomcp.Description("Do not schedule before this date or time")),
+			gomcp.WithString("deadline", gomcp.Description("The scheduler plans against this date or time")),
+			gomcp.WithBoolean("hard_deadline", gomcp.Description("The deadline may use hours outside working hours")),
+			gomcp.WithString("min_chunk", gomcp.Description("Smallest block the task may be split into")),
+			gomcp.WithBoolean("auto_schedule", gomcp.Description("Let the planner place it (needs a duration)")),
+			gomcp.WithString("schedule_name", gomcp.Description("Working hours rule, default work")),
+			gomcp.WithString("scheduled_start", gomcp.Description("Place it at this date and time by hand; this locks it")),
+			gomcp.WithBoolean("locked", gomcp.Description("Keep the planner away from the placed time")),
 		),
 		taskCreateHandler(tr),
 	)
@@ -343,6 +352,9 @@ func NewServer(db *sql.DB, version string, opts ...Option) *server.MCPServer {
 	registerLogEditTools(s, ir)
 	registerSyncTools(s, db)
 	registerDavTools(s, db)
+	registerDoTools(s, db)
+	registerEventTools(s, db)
+	registerScheduleTools(s, db, tr)
 	registerHelpTools(s, o)
 
 	return s
@@ -890,6 +902,11 @@ func taskCreateHandler(tr *repo.TaskRepo) server.ToolHandlerFunc {
 			input.Recurrence = &rec
 		}
 
+		sched, err := scheduleFromArgs(args)
+		if err != nil {
+			return validationError(err)
+		}
+		input.Schedule = sched
 		task, err := tr.Create(ctx, input)
 		if err != nil {
 			return mcpError(err)

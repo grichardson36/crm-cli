@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/jdanielnd/crm-cli/internal/dedupe"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/theme"
 	"github.com/mattn/go-runewidth"
 )
 
@@ -85,6 +86,7 @@ type compareState struct {
 
 	preview    *model.MergeResult
 	previewErr string
+	st         theme.Styles
 }
 
 func (c *compareState) pair(j int) *cmpMember {
@@ -103,7 +105,7 @@ func (m *Model) openCompare(ids []int64, level dedupe.Level, reasons []string, m
 			sorted[j], sorted[j-1] = sorted[j-1], sorted[j]
 		}
 	}
-	c := &compareState{level: level, reasons: reasons, manual: manual, b: 1}
+	c := &compareState{level: level, reasons: reasons, manual: manual, b: 1, st: m.st}
 	for _, id := range sorted {
 		p, err := m.pr.FindByID(m.ctx, id)
 		if err == nil {
@@ -428,12 +430,6 @@ func (c *compareState) move(delta int) {
 	c.cur = cur
 }
 
-func abs(n int) int {
-	if n < 0 {
-		return -n
-	}
-	return n
-}
 
 // take sets the current row from candidate j: a single row takes its value, a list item goes in.
 // It reports false when the candidate has nothing for the row.
@@ -704,30 +700,30 @@ func (c *compareState) cell(i, pane, w int) string {
 	switch r.kind {
 	case rowInfo:
 		if pane == 2 {
-			return headStyle.Render(pad(fmt.Sprintf("%d (all moved)", r.nums[0]+r.nums[1])))
+			return c.st.Head.Render(pad(fmt.Sprintf("%d (all moved)", r.nums[0]+r.nums[1])))
 		}
-		return dimStyle.Render(pad(fmt.Sprint(r.nums[pane])))
+		return c.st.Dim.Render(pad(fmt.Sprint(r.nums[pane])))
 	case rowSingle:
 		if pane == 2 {
 			v := cmpLine(c.finalText(i))
 			if v == "" {
-				return dimStyle.Render(pad("-"))
+				return c.st.Dim.Render(pad("-"))
 			}
 			if diff {
-				return nameStyle.Render(pad("  " + v))
+				return c.st.Name.Render(pad("  " + v))
 			}
-			return dimStyle.Render(pad("  " + v))
+			return c.st.Dim.Render(pad("  " + v))
 		}
 		v := cmpLine(r.vals[pane])
 		if v == "" {
-			return dimStyle.Render(pad("  -"))
+			return c.st.Dim.Render(pad("  -"))
 		}
 		chosen := c.resolved(i) == pane
 		switch {
 		case !diff:
-			return dimStyle.Render(pad("  " + v))
+			return c.st.Dim.Render(pad("  " + v))
 		case chosen:
-			return nameStyle.Render(pad("✓ " + v))
+			return c.st.Name.Render(pad("✓ " + v))
 		}
 		return pad("  " + v)
 	}
@@ -739,36 +735,36 @@ func (c *compareState) cell(i, pane, w int) string {
 		case !in:
 			return ""
 		case diff:
-			return nameStyle.Render(pad("  " + txt))
+			return c.st.Name.Render(pad("  " + txt))
 		}
-		return dimStyle.Render(pad("  " + txt))
+		return c.st.Dim.Render(pad("  " + txt))
 	}
 	if !r.has[pane] {
 		return pad("")
 	}
 	switch {
 	case !in:
-		return dimStyle.Render(pad("✗ " + txt))
+		return c.st.Dim.Render(pad("✗ " + txt))
 	case diff:
-		return nameStyle.Render(pad("✓ " + txt))
+		return c.st.Name.Render(pad("✓ " + txt))
 	}
-	return dimStyle.Render(pad("✓ " + txt))
+	return c.st.Dim.Render(pad("✓ " + txt))
 }
 
 // gutterCell is the marker and label of row i. A bang marks a conflict, a tilde a difference.
 func (c *compareState) gutterCell(i, w int) string {
 	r := &c.rows[i]
-	mark, style := " ", dimStyle
+	mark, style := " ", c.st.Dim
 	switch {
 	case r.kind == rowInfo:
 	case c.conflict(i):
-		mark, style = "!", errStyle
+		mark, style = "!", c.st.Err
 	case r.differs():
-		mark, style = "~", headStyle
+		mark, style = "~", c.st.Head
 	}
 	label := fit(r.label, max(0, w-1))
 	if i == c.cur {
-		return selStyle.Render(mark + label)
+		return c.st.Sel.Render(mark + label)
 	}
 	return style.Render(mark + label)
 }
@@ -788,18 +784,18 @@ func (c *compareState) paneTitle(pane int) (string, string) {
 // render returns exactly h lines for the body and, for each line, the row shown there (or -1).
 func (c *compareState) render(width, h int) ([]string, []int) {
 	l := c.layout(width)
-	sep := dimStyle.Render(" │ ")
+	sep := c.st.Dim.Render(" │ ")
 	blank := strings.Repeat(" ", l.gutter)
 
 	head1, head2 := blank, blank
 	for _, p := range l.panes {
 		t1, t2 := c.paneTitle(p)
-		style := headStyle
+		style := c.st.Head
 		if p == c.s || p == 2 {
-			style = nameStyle
+			style = c.st.Name
 		}
 		head1 += sep + style.Render(fit(t1, l.pw))
-		head2 += sep + dimStyle.Render(fit(t2, l.pw))
+		head2 += sep + c.st.Dim.Render(fit(t2, l.pw))
 	}
 
 	// Summary line under the table, then room for the rows. Tiny screens drop the extras.
@@ -845,9 +841,9 @@ func (c *compareState) render(width, h int) ([]string, []int) {
 	if showSummary {
 		switch {
 		case c.previewErr != "":
-			lines = append(lines, errStyle.Render(c.previewErr))
+			lines = append(lines, c.st.Err.Render(c.previewErr))
 		case c.preview != nil:
-			lines = append(lines, dimStyle.Render("result: "+summarize(c.preview)))
+			lines = append(lines, c.st.Dim.Render("result: "+summarize(c.preview)))
 		default:
 			lines = append(lines, "")
 		}
@@ -868,16 +864,16 @@ func (c *compareState) confirmLines(h int) []string {
 	keep, drop := c.pair(c.s), c.pair(1-c.s)
 	var out []string
 	add := func(s string) { out = append(out, s) }
-	label := func(k string) string { return dimStyle.Render(fit(k, 10)) }
-	add(headStyle.Render(fmt.Sprintf("Merge #%d %s into #%d %s", drop.id, cleanCell(drop.name), keep.id, cleanCell(keep.name))))
+	label := func(k string) string { return c.st.Dim.Render(fit(k, 10)) }
+	add(c.st.Head.Render(fmt.Sprintf("Merge #%d %s into #%d %s", drop.id, cleanCell(drop.name), keep.id, cleanCell(keep.name))))
 	add("")
-	add(label("kept") + nameStyle.Render(fmt.Sprintf("#%d %s", keep.id, cleanCell(keep.name))) + dimStyle.Render("  keeps its id"))
-	add(label("archived") + fmt.Sprintf("#%d %s", drop.id, cleanCell(drop.name)) + dimStyle.Render(fmt.Sprintf("  merged into #%d, restorable from Archived", keep.id)))
+	add(label("kept") + c.st.Name.Render(fmt.Sprintf("#%d %s", keep.id, cleanCell(keep.name))) + c.st.Dim.Render("  keeps its id"))
+	add(label("archived") + fmt.Sprintf("#%d %s", drop.id, cleanCell(drop.name)) + c.st.Dim.Render(fmt.Sprintf("  merged into #%d, restorable from Archived", keep.id)))
 	add(label("notes") + fmt.Sprintf("%d move to #%d", drop.notes, keep.id))
 	add(label("interactions") + fmt.Sprintf("%d move to #%d", drop.interactions, keep.id))
 	add(label("tasks") + fmt.Sprintf("%d move to #%d", drop.tasks, keep.id))
 	if c.previewErr != "" {
-		add(errStyle.Render(c.previewErr))
+		add(c.st.Err.Render(c.previewErr))
 	} else if c.preview != nil {
 		res := c.preview
 		for _, name := range []string{"deals", "relationships"} {
@@ -887,11 +883,11 @@ func (c *compareState) confirmLines(h int) []string {
 		}
 		add(label("lists") + summarize(res))
 		for _, f := range res.Fields {
-			add(label(f.Field) + dimStyle.Render(fmt.Sprintf("%v", orDash(f.Old))) + " -> " + nameStyle.Render(fmt.Sprintf("%v", orDash(f.New))))
+			add(label(f.Field) + c.st.Dim.Render(fmt.Sprintf("%v", orDash(f.Old))) + " -> " + c.st.Name.Render(fmt.Sprintf("%v", orDash(f.New))))
 		}
 	}
 	add("")
-	add(dimStyle.Render("enter merges, esc goes back to the fields"))
+	add(c.st.Dim.Render("enter merges, esc goes back to the fields"))
 	for len(out) < h {
 		out = append(out, "")
 	}
@@ -907,6 +903,7 @@ func orDash(v any) any {
 
 func (m *Model) compareView() string {
 	c := m.cmp
+	c.st = m.st
 	title := "Merge"
 	if c.level != 0 {
 		title = "Duplicates " + levelBadge(c.level) + " confidence"
@@ -927,13 +924,14 @@ func (m *Model) compareView() string {
 	for i := range lines {
 		lines[i] = cut.Render(lines[i])
 	}
-	return cut.Render(headStyle.Render(runewidth.Truncate(title, m.width, "…"))) + "\n" + strings.Join(lines, "\n") + "\n" + m.footerView()
+	return cut.Render(c.st.Head.Render(runewidth.Truncate(title, m.width, "…"))) + "\n" + strings.Join(lines, "\n") + "\n" + m.footerView()
 }
 
 // --- mouse ---
 
 func (m *Model) handleCompareMouse(x, y int, wheel int) {
 	c := m.cmp
+	c.st = m.st
 	if c.confirm {
 		return
 	}
