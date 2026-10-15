@@ -31,6 +31,7 @@ These work in `--read-only` mode. Each opens a scrollable page (`j` / `k`, `g` /
 - "Help: topics" lists topics with a filter. "Help: search" lists matching lines.
 - "Doctor" runs the checks of `crm doctor` with the fix line for each problem.
 - "Where" shows the open database. "Domains" lists the databases in the data directory.
+- "DAV: info", "DAV: conflicts" and "DAV: status" show the phone sync details, logged conflicts and counts. They never start the server (`crm help dav`).
 
 All keys, editing, merge, archive, notes, sync and Home are in `crm help tui-keys`.
 

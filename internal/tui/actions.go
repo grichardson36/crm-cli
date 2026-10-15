@@ -303,6 +303,12 @@ func buildActions() []action {
 			run: func(m *Model) tea.Cmd { m.showWhere(); return nil }},
 		{id: "domains", title: "Domains", group: "App", desc: "list the databases in the data directory (same as crm domains)",
 			run: func(m *Model) tea.Cmd { m.showDomains(); return nil }},
+		{id: "dav-info", title: "DAV: info", group: "App", desc: "phone sync connection details and setup steps, read-only (same as crm dav info)",
+			run: func(m *Model) tea.Cmd { m.showDavInfo(); return nil }},
+		{id: "dav-conflicts", title: "DAV: conflicts", group: "App", desc: "fields where the phone and the CRM both changed, read-only (same as crm dav conflicts)",
+			run: func(m *Model) tea.Cmd { m.showDavConflicts(); return nil }},
+		{id: "dav-status", title: "DAV: status", group: "App", desc: "contacts exposed, last device activity and conflict counts (same as crm dav status)",
+			run: func(m *Model) tea.Cmd { m.showDavStatus(); return nil }},
 		{id: "quit", inCompare: true, title: "Quit", group: "App", hint: "q", keys: []string{"q", "ctrl+c"}, desc: "quit",
 			run: func(m *Model) tea.Cmd { return tea.Quit }},
 	}
