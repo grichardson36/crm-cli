@@ -327,6 +327,54 @@ func registerScheduleTools(s *server.MCPServer, db *sql.DB, tr *repo.TaskRepo) {
 			return jsonResult(res)
 		},
 	)
+
+	s.AddTool(
+		gomcp.NewTool("crm_cal_plan",
+			gomcp.WithDescription("Plan auto-scheduled tasks into free working time. The default is a proposal that writes nothing: per task the decision (placed, late, unfit), blocks, eta, slack and why. With apply true it writes only scheduled_start and split blocks (never locked tasks or events) and returns a journal_id; crm_cal_plan_undo reverses it. Tasks without a duration are skipped."),
+			gomcp.WithBoolean("apply", gomcp.Description("Write the proposal. Default false")),
+			gomcp.WithArray("only", gomcp.Description("Plan only these task IDs"), gomcp.WithNumberItems()),
+			gomcp.WithArray("reject", gomcp.Description("With apply: leave these task IDs as they are"), gomcp.WithNumberItems()),
+			gomcp.WithArray("lock", gomcp.Description("With apply: lock these task IDs at their proposed time"), gomcp.WithNumberItems()),
+			gomcp.WithNumber("horizon_days", gomcp.Description("Days to plan ahead (default: the stored horizon)")),
+		),
+		func(ctx context.Context, req gomcp.CallToolRequest) (*gomcp.CallToolResult, error) {
+			args := req.GetArguments()
+			days, _ := argInt64(args, "horizon_days")
+			res, err := schedule.PlanTasks(ctx, db, schedule.PlanOptions{Now: calNow(), HorizonDays: int(days), Only: argIDs(args, "only")})
+			if err != nil {
+				return mcpError(err)
+			}
+			out := map[string]any{"applied": false, "now": res.Now, "horizon_end": res.Horizon, "summary": res.Summary, "tasks": res.Decisions}
+			if req.GetBool("apply", false) {
+				rej, lk := map[int64]bool{}, map[int64]bool{}
+				for _, id := range argIDs(args, "reject") {
+					rej[id] = true
+				}
+				for _, id := range argIDs(args, "lock") {
+					lk[id] = true
+				}
+				j, err := schedule.Apply(ctx, db, res, schedule.ApplyOptions{Reject: rej, Lock: lk})
+				if err != nil {
+					return mcpError(err)
+				}
+				out["applied"], out["journal_id"] = true, j.ID
+			}
+			return jsonResult(out)
+		},
+	)
+
+	s.AddTool(
+		gomcp.NewTool("crm_cal_plan_undo",
+			gomcp.WithDescription("Undo the most recent applied plan: tasks get back the times and blocks it replaced."),
+		),
+		func(ctx context.Context, req gomcp.CallToolRequest) (*gomcp.CallToolResult, error) {
+			j, err := repo.NewPlanRepo(db).Undo(ctx)
+			if err != nil {
+				return mcpError(err)
+			}
+			return jsonResult(j)
+		},
+	)
 }
 
 // taskView is a task with its scheduling issue, if any.

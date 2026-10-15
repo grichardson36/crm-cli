@@ -8,6 +8,7 @@ import (
 
 	"github.com/jdanielnd/crm-cli/internal/cal/recur"
 	"github.com/jdanielnd/crm-cli/internal/cal/tz"
+	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/mattn/go-runewidth"
 )
@@ -228,7 +229,28 @@ func (m *Model) calLoad() error {
 		if err != nil {
 			return err
 		}
+		chunks, err := repo.NewPlanRepo(m.db).Chunks(m.ctx)
+		if err != nil {
+			return err
+		}
 		for _, t := range tasks {
+			if cs := chunks[t.ID]; len(cs) > 0 {
+				for i, c := range cs {
+					s, err1 := tz.ParseInstant(c.Start)
+					e, err2 := tz.ParseInstant(c.End)
+					d := floatDate(s, m.loc)
+					if err1 != nil || err2 != nil || d.Before(from) || !d.Before(to) {
+						continue
+					}
+					it := &calItem{kind: "task", date: d, taskID: t.ID, rank: rankTimed, clock: s.In(m.loc).Format("15:04"), title: cleanCell(t.Title),
+						sub: fmt.Sprintf("block %d of %d, %s", i+1, len(cs), lengthText(e.Sub(s)))}
+					if len(t.PersonIDs) > 0 {
+						it.personID = t.PersonIDs[0]
+					}
+					add(it)
+				}
+				continue
+			}
 			if t.ScheduledStart != nil {
 				if s, err := tz.ParseInstant(*t.ScheduledStart); err == nil {
 					d := floatDate(s, m.loc)

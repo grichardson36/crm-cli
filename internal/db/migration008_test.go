@@ -15,7 +15,7 @@ func TestMigration008_TaskSchedulingAndHours(t *testing.T) {
 
 	var version int
 	require.NoError(t, d.QueryRow(`PRAGMA user_version`).Scan(&version))
-	assert.Equal(t, 8, version)
+	assert.Equal(t, 9, version)
 
 	// Existing tasks keep working and get the defaults.
 	_, err = d.Exec(`INSERT INTO tasks (uuid, title) VALUES ('t1', 'Old task')`)

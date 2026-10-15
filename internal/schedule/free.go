@@ -146,8 +146,22 @@ func Busy(ctx context.Context, db *sql.DB, from, to time.Time, loc *time.Locatio
 	if err != nil {
 		return nil, err
 	}
+	chunks, err := repo.NewPlanRepo(db).Chunks(ctx)
+	if err != nil {
+		return nil, err
+	}
 	for _, t := range tasks {
 		if t.ScheduledStart == nil || t.DurationMin == nil || (!t.ScheduledLocked && !busyTasks) {
+			continue
+		}
+		if cs := chunks[t.ID]; len(cs) > 0 {
+			for _, c := range cs {
+				s, err1 := tz.ParseInstant(c.Start)
+				e, err2 := tz.ParseInstant(c.End)
+				if err1 == nil && err2 == nil {
+					out = append(out, Span{s, e})
+				}
+			}
 			continue
 		}
 		s, err := tz.ParseInstant(*t.ScheduledStart)

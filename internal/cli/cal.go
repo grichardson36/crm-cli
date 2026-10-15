@@ -184,6 +184,7 @@ func registerCalCommands(rootCmd *cobra.Command) {
 	registerCalICSCommands(calCmd)
 	registerCalHoursCommands(calCmd)
 	registerCalFreeCommand(calCmd)
+	registerCalPlanCommand(calCmd)
 	rootCmd.AddCommand(calCmd)
 }
 

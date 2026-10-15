@@ -134,6 +134,8 @@ var commandMeta = map[string]cmdMeta{
 
 	"cal free": {fields: "start,end,local_start,local_end,display_tz,date,time", examples: []string{
 		`crm cal free --len 45m --within 7d -f json`, `crm cal free --len 30m --from "mon" --notice 4h --buffer 15 --limit 5`}},
+	"cal plan": {mutates: true, noDryRun: true, fields: "mode,applied,dry_run,now,horizon_end,summary,tasks,diff,journal_id,id,note,undone", examples: []string{
+		`crm cal plan -f json`, `crm cal plan --apply --dry-run -f json`, `crm cal plan --apply --reject 3 --lock 5`, `crm cal plan --undo`, `crm cal plan --history`}},
 	"cal hours": {examples: []string{`crm cal hours show`}},
 	"cal hours show": {fields: "name,uuid,tz,weekly,overrides,default,config,start,end,local_start,local_end,date,hours", examples: []string{
 		`crm cal hours show -f json`, `crm cal hours show --expand today -f json`}},

@@ -69,6 +69,23 @@ crm cal hours config --buffer 15 --step 30 --horizon 21
 crm cal hours show --expand today
 ```
 
+## Plan tasks
+
+`crm cal plan` proposes times for tasks with `--auto-schedule` and a duration. It never writes. Order: hard deadlines, then least slack, priority, deadline, creation. Each task takes the earliest free time inside its working hours, clear of events, locked tasks and buffers. Every row says why. `--min-chunk` lets a task split into blocks.
+
+```sh crm-example
+crm task edit 1 --duration 2h --deadline 2026-11-06 --auto-schedule
+crm cal plan
+crm cal plan --apply --dry-run -f json
+```
+
+```sh crm-example-skip
+crm cal plan --apply
+crm cal plan --undo
+```
+
+`--apply` writes only `scheduled_start` and the blocks, as movable times. `--reject ID` skips a row and `--lock ID` pins it. Re-run the plan after events change. `--history` lists applied plans.
+
 ## Find a time
 
 Free slots inside working hours, clear of busy events (repeats included), locked task blocks and the buffer. Slots start on the step grid, after the minimum notice. Only your own calendar is checked.
