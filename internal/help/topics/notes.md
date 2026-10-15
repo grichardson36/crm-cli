@@ -47,4 +47,4 @@ crm log add --type call 1 "Talked about the offsite"
 
 ## Related topics
 
-`keep-in-touch`, `tags` (tag an interaction with `crm tag apply interaction ID NAME`), `tui` (`n` adds a note, `N` picks the type).
+`keep-in-touch`, `tags` (tag an interaction with `crm tag apply interaction ID NAME`), `tui` (`n` adds a note, `N` picks the type), `short-syntax` (`crm do "n Jane called #deal @fri"`).

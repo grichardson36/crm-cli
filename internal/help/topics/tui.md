@@ -81,4 +81,4 @@ These palette actions mirror the CLI commands and work in `--read-only` mode. Ea
 
 ## Related topics
 
-`keep-in-touch`, `duplicates`, `archive`.
+`keep-in-touch`, `duplicates`, `archive`, `short-syntax` (the command bar).

@@ -10,7 +10,7 @@ import (
 )
 
 var requiredTopics = []string{
-	"overview", "people", "contact-methods", "keep-in-touch", "birthdays", "tasks", "notes", "tags",
+	"overview", "people", "contact-methods", "keep-in-touch", "birthdays", "tasks", "notes", "short-syntax", "tags",
 	"duplicates", "archive", "domains", "import", "sync", "dav", "output", "agents", "tui", "install",
 }
 

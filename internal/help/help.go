@@ -14,7 +14,7 @@ var topicsFS embed.FS
 
 // order is the reading order of the topic list. Topics not listed here follow alphabetically.
 var order = []string{
-	"overview", "people", "contact-methods", "keep-in-touch", "birthdays", "tasks", "notes", "tags",
+	"overview", "people", "contact-methods", "keep-in-touch", "birthdays", "tasks", "notes", "short-syntax", "tags",
 	"duplicates", "archive", "domains", "import", "sync", "dav", "output", "agents", "tui", "install",
 }
 

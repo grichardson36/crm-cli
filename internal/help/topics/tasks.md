@@ -48,4 +48,4 @@ crm task delete 1 --dry-run -f json
 
 ## Related topics
 
-`keep-in-touch`, `agents`, `tui` (the Tasks view, key 4; `t` adds a task, `x` completes one).
+`keep-in-touch`, `agents`, `tui` (the Tasks view, key 4; `t` adds a task, `x` completes one), `short-syntax` (`crm task add "Call back @fri 3pm ^high +Jane"`).
