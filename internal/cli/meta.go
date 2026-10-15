@@ -33,7 +33,7 @@ const (
 	personFields = "id,uuid,first_name,last_name,name,email,phone,title,company,location,notes,summary,org_id,birthday,keep_in_touch,last_contacted_at,is_favorite,priority_tier,emails,phones,handles,created_at,updated_at"
 	orgFields    = "id,uuid,name,domain,industry,notes,summary,created_at,updated_at"
 	dealFields   = "id,uuid,title,stage,value,person_id,org_id,notes,closed_at,created_at,updated_at"
-	taskFields   = "id,uuid,title,priority,completed,description,person_id,person_ids,deal_id,due_at,recurrence,completed_at,created_at,updated_at"
+	taskFields   = "id,uuid,title,priority,completed,description,person_id,person_ids,deal_id,due_at,recurrence,tags,completed_at,created_at,updated_at"
 	logFields    = "id,uuid,type,subject,content,direction,occurred_at,person_ids,created_at,updated_at"
 	tagFields    = "id,name"
 	syncFields   = "source,status,created,updated,skipped,inbox,errors,dry_run,note,run_id,since,next_cursor"
@@ -101,13 +101,15 @@ var commandMeta = map[string]cmdMeta{
 	"task add": {mutates: true, noDryRun: true, fields: taskFields, examples: []string{
 		`crm task add "Send proposal" --person 1 --due 2026-11-01 --priority high`,
 		`crm task add "Call back" --person 1 --due 2026-11-01 --recurrence "7 days"`,
-		`crm task add "Call back @fri 3pm ~30m ^high +Jane" --dry-run`}},
+		`crm task add "Call back #work @fri 3pm ~30m ^high +Jane" --dry-run`}},
 	"do": {mutates: true, noDryRun: true, fields: "input,verb,dry_run,applied,preview,subject,links,changes,warnings,problems,needs_confirm,syntax", examples: []string{
 		`crm do "n Jane called about the deal #deal @fri" --dry-run`,
 		`crm do "t Jane send the contract @mon ^high"`,
 		`crm do "set Jane: company=Acme title=CTO" --dry-run -f json`,
 		`crm do "tag note" --person 1`}},
-	"task list":   {fields: taskFields, examples: []string{`crm task list -f json`, `crm task list --overdue -f json`}},
+	"task list":   {fields: taskFields, examples: []string{`crm task list -f json`, `crm task list --overdue -f json`, `crm task list --tag work -f json`}},
+	"task tag":    {mutates: true, fields: taskFields, target: "task", targetArgs: "first", examples: []string{`crm task tag 1 work urgent`}},
+	"task untag":  {mutates: true, fields: taskFields, target: "task", targetArgs: "first", examples: []string{`crm task untag 1 urgent`}},
 	"task show":   {fields: taskFields, examples: []string{`crm task show 1 -f json`}},
 	"task edit":   {mutates: true, fields: taskFields, target: "task", targetArgs: "first", examples: []string{`crm task edit 1 --priority low`}},
 	"task done":   {mutates: true, fields: taskFields, target: "task", targetArgs: "first", examples: []string{`crm task done 1`}},
@@ -385,7 +387,7 @@ func dryRunTargets(m cmdMeta, args []string) ([]recordRef, error) {
 		}
 	case "tag":
 		if len(args) >= 2 {
-			if !model.ValidEntityType(args[0]) {
+			if !model.ValidTaggable(args[0]) {
 				return nil, model.NewExitError(model.ErrValidation, "invalid entity type: %s (must be one of: %s)", args[0], strings.Join(model.EntityTypes, ", "))
 			}
 			id, err := parse(args[1])

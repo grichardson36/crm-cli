@@ -90,3 +90,39 @@ func TestDoToolErrors(t *testing.T) {
 	}
 	assert.Contains(t, titles, "keep @fri literal")
 }
+
+func TestTaskTagsThroughMCP(t *testing.T) {
+	s := setupTestServer(t)
+	names := toolNames(s.ListTools())
+	assert.Contains(t, names, "crm_task_tag")
+	assert.Contains(t, names, "crm_task_untag")
+
+	var task map[string]any
+	callJSON(t, s, "crm_task_create", map[string]any{"title": "A", "tags": []any{"work", "#urgent"}}, &task)
+	assert.Equal(t, []any{"urgent", "work"}, task["tags"])
+	callJSON(t, s, "crm_task_create", map[string]any{"title": "B"}, &task)
+	callJSON(t, s, "crm_task_tag", map[string]any{"id": task["id"], "tags": []any{"home", "work"}}, &task)
+	assert.Equal(t, []any{"home", "work"}, task["tags"])
+
+	var list []map[string]any
+	callJSON(t, s, "crm_task_list", map[string]any{"tag": "home"}, &list)
+	require.Len(t, list, 1)
+	callJSON(t, s, "crm_task_list", map[string]any{"tag": "work"}, &list)
+	assert.Len(t, list, 2)
+
+	callJSON(t, s, "crm_task_untag", map[string]any{"id": task["id"], "tags": []any{"work"}}, &task)
+	assert.Equal(t, []any{"home"}, task["tags"])
+	_, isErr := call(t, s, "crm_task_untag", map[string]any{"id": task["id"], "tags": []any{"work"}})
+	assert.True(t, isErr)
+	_, isErr = call(t, s, "crm_task_tag", map[string]any{"id": task["id"], "tags": []any{}})
+	assert.True(t, isErr)
+
+	// crm_tag_apply takes tasks as well, and crm_do tags a task from its text.
+	text, isErr := call(t, s, "crm_tag_apply", map[string]any{"entity_type": "task", "entity_id": task["id"], "tag": "extra"})
+	assert.False(t, isErr, text)
+	var out map[string]any
+	callJSON(t, s, "crm_do", map[string]any{"text": "t pay rent #money"}, &out)
+	callJSON(t, s, "crm_task_list", map[string]any{"tag": "money"}, &list)
+	require.Len(t, list, 1)
+	assert.Equal(t, "pay rent", list[0]["title"])
+}

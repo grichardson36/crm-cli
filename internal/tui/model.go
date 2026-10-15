@@ -316,6 +316,12 @@ func (m *Model) rebuild(keep bool) error {
 			if t.Recurrence != nil {
 				r.sub = "repeats " + *t.Recurrence
 			}
+			for _, tg := range t.Tags {
+				if r.sub != "" {
+					r.sub += " "
+				}
+				r.sub += "#" + tg
+			}
 			rows = append(rows, r)
 		}
 	case viewMerge:
@@ -818,6 +824,9 @@ func (m *Model) runPrompt(kind, value string) {
 		return
 	case "purge":
 		m.purgeCurrent(value)
+		return
+	case "tasktag":
+		m.tagTask(value)
 		return
 	case "help-search":
 		m.openHelpSearch(value)

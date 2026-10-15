@@ -248,6 +248,9 @@ func (m *Model) personRows(p *model.Person) []formRow {
 			if t.DueAt != nil {
 				r.suffix = "  due " + *t.DueAt
 			}
+			for _, tg := range t.Tags {
+				r.suffix += "  #" + tg
+			}
 			if i == 0 {
 				r.head = taskHead
 			}

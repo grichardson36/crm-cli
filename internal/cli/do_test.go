@@ -199,10 +199,12 @@ func TestTaskAddNoSyntaxAndWarnings(t *testing.T) {
 	require.Equal(t, 0, code)
 	assert.Equal(t, "Call back @fri #work", decodeList(t, stdout)[0]["title"])
 
-	stdout, stderr, code := crm(t, path, "task", "add", "Fix sink #home", "-f", "json")
-	require.Equal(t, 0, code)
-	assert.Equal(t, "Fix sink #home", decodeList(t, stdout)[0]["title"])
-	assert.Contains(t, stderr, "tasks cannot carry tags yet")
+	stdout, stderr, code := crm(t, path, "task", "add", "Fix sink #home #house", "-f", "json")
+	require.Equal(t, 0, code, stderr)
+	created := decodeList(t, stdout)[0]
+	assert.Equal(t, "Fix sink", created["title"])
+	assert.Equal(t, []any{"home", "house"}, created["tags"])
+	assert.Empty(t, stderr)
 
 	_, _, code = crm(t, path, "task", "add", "Ping +Sam", "-f", "json")
 	assert.Equal(t, 2, code, "ambiguous +Sam")
@@ -296,3 +298,46 @@ func TestPlainNamesAndTitlesAreUnchanged(t *testing.T) {
 	require.Equal(t, 0, code)
 	assert.Equal(t, "Email jane@example.com about +1 555 0100", decodeList(t, stdout)[0]["title"])
 }
+
+func TestTaskTagUntagAndListByTag(t *testing.T) {
+	path := doDB(t)
+	crm(t, path, "task", "add", "One #work", "-q")
+	crm(t, path, "task", "add", "Two", "--tag", "home", "--tag", "work", "-q")
+	crm(t, path, "task", "add", "Three", "-q")
+
+	stdout, stderr, code := crm(t, path, "task", "tag", "3", "#urgent", "work", "-f", "json")
+	require.Equal(t, 0, code, stderr)
+	assert.Equal(t, []any{"urgent", "work"}, decodeList(t, stdout)[0]["tags"])
+
+	stdout, _, code = crm(t, path, "task", "list", "--tag", "work", "-f", "json")
+	require.Equal(t, 0, code)
+	assert.Len(t, decodeList(t, stdout), 3)
+	stdout, _, _ = crm(t, path, "task", "list", "--tag", "home", "-f", "json")
+	list := decodeList(t, stdout)
+	require.Len(t, list, 1)
+	assert.Equal(t, "Two", list[0]["title"])
+	assert.Equal(t, []any{"home", "work"}, list[0]["tags"])
+
+	stdout, _, code = crm(t, path, "task", "untag", "3", "work", "-f", "json")
+	require.Equal(t, 0, code)
+	assert.Equal(t, []any{"urgent"}, decodeList(t, stdout)[0]["tags"])
+	_, _, code = crm(t, path, "task", "untag", "3", "work", "-f", "json")
+	assert.Equal(t, 3, code, "the tag is not on the task")
+	_, _, code = crm(t, path, "task", "tag", "99", "x")
+	assert.Equal(t, 3, code)
+	_, _, code = crm(t, path, "task", "tag", "x", "x")
+	assert.Equal(t, 2, code)
+
+	// The generic tag commands accept tasks too.
+	_, stderr, code = crm(t, path, "tag", "apply", "task", "1", "generic")
+	require.Equal(t, 0, code, stderr)
+	stdout, _, _ = crm(t, path, "tag", "show", "task", "1", "-f", "json")
+	assert.Len(t, decodeList(t, stdout), 2)
+	_, _, code = crm(t, path, "tag", "apply", "bogus", "1", "x")
+	assert.Equal(t, 2, code)
+
+	stdout, _, _ = crm(t, path, "task", "tag", "1", "dry", "--dry-run", "-f", "json")
+	assert.Contains(t, stdout, `"dry_run":true`)
+	stdout, _, _ = crm(t, path, "task", "show", "1", "-f", "json")
+	assert.NotContains(t, stdout, "dry")
+}

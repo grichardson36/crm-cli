@@ -95,6 +95,14 @@ func (r *TaskRepo) Create(ctx context.Context, input model.CreateTaskInput) (*mo
 	if err := r.linkPeople(ctx, taskID, people); err != nil {
 		return nil, err
 	}
+	if len(input.Tags) > 0 {
+		tr := NewTagRepo(r.db)
+		for _, name := range input.Tags {
+			if err := tr.Apply(ctx, "task", taskID, name); err != nil {
+				return nil, err
+			}
+		}
+	}
 	return r.FindByID(ctx, taskID)
 }
 
@@ -111,7 +119,30 @@ func (r *TaskRepo) FindByID(ctx context.Context, id int64) (*model.Task, error) 
 	if err := r.loadPeople(ctx, t); err != nil {
 		return nil, err
 	}
+	if err := r.loadTags(ctx, t); err != nil {
+		return nil, err
+	}
 	return t, nil
+}
+
+// loadTags fills the tag names of a task.
+func (r *TaskRepo) loadTags(ctx context.Context, t *model.Task) error {
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT tg.name FROM tags tg JOIN taggings x ON x.tag_id = tg.id
+		 WHERE x.entity_type = 'task' AND x.entity_id = ? ORDER BY tg.name`, t.ID)
+	if err != nil {
+		return fmt.Errorf("load task tags: %w", err)
+	}
+	defer rows.Close()
+	t.Tags = nil
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return fmt.Errorf("scan task tag: %w", err)
+		}
+		t.Tags = append(t.Tags, name)
+	}
+	return rows.Err()
 }
 
 // FindAll returns tasks with optional filters.
@@ -126,6 +157,10 @@ func (r *TaskRepo) FindAll(ctx context.Context, filters model.TaskFilters) ([]*m
 	if filters.DealID != nil {
 		query += " AND deal_id = ?"
 		args = append(args, *filters.DealID)
+	}
+	if filters.Tag != nil {
+		query += " AND id IN (SELECT x.entity_id FROM taggings x JOIN tags tg ON tg.id = x.tag_id WHERE x.entity_type = 'task' AND tg.name = ?)"
+		args = append(args, *filters.Tag)
 	}
 	if filters.Overdue {
 		query += " AND completed = 0 AND due_at IS NOT NULL AND due_at < datetime('now')"
@@ -161,6 +196,9 @@ func (r *TaskRepo) FindAll(ctx context.Context, filters model.TaskFilters) ([]*m
 	rows.Close()
 	for _, t := range tasks {
 		if err := r.loadPeople(ctx, t); err != nil {
+			return nil, err
+		}
+		if err := r.loadTags(ctx, t); err != nil {
 			return nil, err
 		}
 	}

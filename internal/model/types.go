@@ -216,6 +216,8 @@ type Task struct {
 	Recurrence  *string `json:"recurrence"`
 	PersonIDs   []int64 `json:"person_ids,omitempty"`
 	NextTaskID  *int64  `json:"next_task_id,omitempty"`
+	// Tags are filled by TaskRepo.FindByID and FindAll.
+	Tags []string `json:"tags,omitempty"`
 	ID          int64   `json:"id"`
 	UUID        string  `json:"uuid"`
 	Title       string  `json:"title"`
@@ -242,6 +244,8 @@ type CreateTaskInput struct {
 	// PersonIDs links the task to several people. PersonID is added to it.
 	PersonIDs  []int64
 	Recurrence *string
+	// Tags are applied to the new task.
+	Tags []string
 }
 
 // UpdateTaskInput holds optional fields for updating a task.
@@ -262,6 +266,8 @@ type TaskFilters struct {
 	Overdue          bool
 	IncludeCompleted bool
 	Limit            int
+	// Tag keeps only tasks that carry this tag.
+	Tag *string
 }
 
 // Relationship represents a person-to-person link.
@@ -276,6 +282,19 @@ type Relationship struct {
 
 // Valid entity types for tagging.
 var EntityTypes = []string{"person", "organization", "deal", "interaction"}
+
+// TaggableTypes are the entities that can carry tags: the searchable ones and tasks.
+var TaggableTypes = []string{"person", "organization", "deal", "interaction", "task"}
+
+// ValidTaggable checks if tags can be put on the given entity type.
+func ValidTaggable(t string) bool {
+	for _, et := range TaggableTypes {
+		if et == t {
+			return true
+		}
+	}
+	return false
+}
 
 // ValidEntityType checks if the given type is valid.
 func ValidEntityType(t string) bool {

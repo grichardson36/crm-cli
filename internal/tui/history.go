@@ -529,3 +529,53 @@ func (m *Model) hRestoreNote(ctx context.Context, id int64) error {
 		func() error { return m.ir.Restore(m.ctx, id) })
 	return nil
 }
+
+// taskTarget is the task the T key tags: the selected row in the Tasks view, or a saved task row
+// in the detail pane. 0 when there is none.
+func (m *Model) taskTarget() int64 {
+	if m.focus == focusDetail && m.fcur < len(m.form) {
+		if r := m.form[m.fcur]; r.kind == rkTask && !r.empty {
+			return r.id
+		}
+		return 0
+	}
+	if m.view == viewTasks {
+		if r, ok := m.selected(); ok {
+			return r.taskID
+		}
+	}
+	return 0
+}
+
+func whenTaskTarget(m *Model) bool { return m.taskTarget() != 0 }
+
+// tagTask adds a tag to the target task, or removes it when the text starts with -.
+func (m *Model) tagTask(value string) {
+	id := m.taskTarget()
+	if id == 0 {
+		m.setStatus("select a task first", true)
+		return
+	}
+	remove := strings.HasPrefix(value, "-")
+	name := strings.TrimLeft(strings.TrimSpace(strings.TrimPrefix(value, "-")), "#")
+	if name == "" {
+		m.setStatus("enter a tag name (prefix with - to remove)", true)
+		return
+	}
+	var err error
+	if remove {
+		err = m.hTagRemove(m.ctx, "task", id, name)
+	} else {
+		err = m.hTagApply(m.ctx, "task", id, name)
+	}
+	if err != nil {
+		m.setStatus(err.Error(), true)
+		return
+	}
+	if remove {
+		m.setStatus("tag #"+name+" removed from the task", false)
+	} else {
+		m.setStatus("task tagged #"+name, false)
+	}
+	m.afterWrite()
+}

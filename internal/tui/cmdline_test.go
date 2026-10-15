@@ -663,3 +663,62 @@ func TestCommandBarActionsAreInTheRegistry(t *testing.T) {
 	assert.False(t, m.actionByID("syntax-toggle").write)
 	assert.Contains(t, m.helpText(), "undo the last data change")
 }
+
+func TestTasksCarryTagsInTheTui(t *testing.T) {
+	m, _ := newTestModel(t)
+	// A task made from the prompt reads #tag.
+	press(m, "t")
+	typeText(m, "send deck #work")
+	press(m, "enter")
+	tasks, _ := m.tr.FindAll(context.Background(), model.TaskFilters{})
+	require.Len(t, tasks, 1)
+	assert.Equal(t, "send deck", tasks[0].Title)
+	assert.Equal(t, []string{"work"}, tasks[0].Tags)
+
+	// Tags show in the Tasks view rows.
+	press(m, "4")
+	require.Len(t, m.rows, 1)
+	assert.Contains(t, m.rows[0].sub, "#work")
+	assert.Contains(t, m.View(), "#work")
+
+	// T tags the task, not its person, and -name removes.
+	press(m, "T")
+	typeText(m, "urgent")
+	press(m, "enter")
+	tasks, _ = m.tr.FindAll(context.Background(), model.TaskFilters{})
+	assert.Equal(t, []string{"urgent", "work"}, tasks[0].Tags)
+	people, _ := m.tagr.GetEntities(context.Background(), "urgent", "person")
+	assert.Empty(t, people)
+	assert.Contains(t, m.rows[0].sub, "#urgent")
+	press(m, "T")
+	typeText(m, "-work")
+	press(m, "enter")
+	tasks, _ = m.tr.FindAll(context.Background(), model.TaskFilters{})
+	assert.Equal(t, []string{"urgent"}, tasks[0].Tags)
+
+	// Undo covers task tags.
+	press(m, "ctrl+z")
+	tasks, _ = m.tr.FindAll(context.Background(), model.TaskFilters{})
+	assert.Equal(t, []string{"urgent", "work"}, tasks[0].Tags)
+	assert.Contains(t, m.toast.text, "Undone: tag #work on task")
+
+	// In the detail pane a task row shows its tags and T tags it too.
+	press(m, "2", "tab")
+	goTo(t, m, "task")
+	assert.Contains(t, m.View(), "#urgent")
+	press(m, "T")
+	typeText(m, "fromdetail")
+	press(m, "enter")
+	tasks, _ = m.tr.FindAll(context.Background(), model.TaskFilters{})
+	assert.Contains(t, tasks[0].Tags, "fromdetail")
+
+	// The command bar tags a task from its text as well.
+	openBar(m, "t call plumber #home")
+	assert.NotContains(t, m.View(), "stays in the title")
+	assert.Contains(t, m.View(), "tag #home (new)")
+	press(m, "enter")
+	home := "home"
+	tasks, _ = m.tr.FindAll(context.Background(), model.TaskFilters{Tag: &home})
+	require.Len(t, tasks, 1)
+	assert.Equal(t, "call plumber", tasks[0].Title)
+}

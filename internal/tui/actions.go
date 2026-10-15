@@ -138,6 +138,11 @@ func buildActions() []action {
 			}},
 		{id: "favorite", title: "Toggle favorite", group: "Contact", hint: "f", keys: []string{"f"}, desc: "toggle favorite (all marked people if any)",
 			write: true, when: whenPerson, run: func(m *Model) tea.Cmd { m.toggleFavorite(); return nil }},
+		{id: "task-tag", title: "Tag task", group: "Contact", hint: "T", keys: []string{"T"}, desc: "add a tag to the selected task (prefix with - to remove). In the Tasks view, or on a task row in the detail pane",
+			write: true, when: whenTaskTarget, run: func(m *Model) tea.Cmd {
+				m.startInput("tasktag", "tag task (-name removes): ", "")
+				return m.input.Focus()
+			}},
 		{id: "tag", title: "Tag", group: "Contact", hint: "T", keys: []string{"T"}, desc: "add a tag (prefix with - to remove) on the person or all marked",
 			write: true, foot: 31, footIn: inList, footIf: whenMarks, when: whenPerson, run: func(m *Model) tea.Cmd {
 				m.startPrompt("tag", "tag (-name removes): ", "")

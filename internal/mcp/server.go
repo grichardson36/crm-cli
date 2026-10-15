@@ -284,6 +284,7 @@ func NewServer(db *sql.DB, version string, opts ...Option) *server.MCPServer {
 			gomcp.WithString("priority", gomcp.Description("Priority: low, medium, high (default: medium)")),
 			gomcp.WithArray("person_ids", gomcp.Description("Link the task to several people"), gomcp.WithNumberItems()),
 			gomcp.WithString("recurrence", gomcp.Description("Repeat when completed, e.g. \"7 days\", \"1 mon\", weekly. Needs a due date")),
+			gomcp.WithArray("tags", gomcp.Description("Tags to put on the task"), gomcp.WithStringItems()),
 		),
 		taskCreateHandler(tr),
 	)
@@ -302,6 +303,7 @@ func NewServer(db *sql.DB, version string, opts ...Option) *server.MCPServer {
 			gomcp.WithNumber("person_id", gomcp.Description("Filter by person ID")),
 			gomcp.WithBoolean("overdue", gomcp.Description("Show only overdue tasks")),
 			gomcp.WithBoolean("include_completed", gomcp.Description("Include completed tasks")),
+			gomcp.WithString("tag", gomcp.Description("Only tasks with this tag")),
 			gomcp.WithNumber("limit", gomcp.Description("Max results")),
 		),
 		taskListHandler(tr),
@@ -311,7 +313,7 @@ func NewServer(db *sql.DB, version string, opts ...Option) *server.MCPServer {
 	s.AddTool(
 		gomcp.NewTool("crm_tag_apply",
 			gomcp.WithDescription("Apply a tag to an entity"),
-			gomcp.WithString("entity_type", gomcp.Required(), gomcp.Description("Entity type: person, organization, deal, interaction")),
+			gomcp.WithString("entity_type", gomcp.Required(), gomcp.Description("Entity type: person, organization, deal, interaction, task")),
 			gomcp.WithNumber("entity_id", gomcp.Required(), gomcp.Description("Entity ID")),
 			gomcp.WithString("tag", gomcp.Required(), gomcp.Description("Tag name")),
 		),
@@ -343,6 +345,7 @@ func NewServer(db *sql.DB, version string, opts ...Option) *server.MCPServer {
 	registerLogEditTools(s, ir)
 	registerSyncTools(s, db)
 	registerDavTools(s, db)
+	registerTaskTagTools(s, db)
 	registerDoTools(s, db)
 	registerHelpTools(s, o)
 
@@ -890,6 +893,13 @@ func taskCreateHandler(tr *repo.TaskRepo) server.ToolHandlerFunc {
 		if rec, ok := argString(args, "recurrence"); ok && rec != "" {
 			input.Recurrence = &rec
 		}
+		if raw, ok := args["tags"].([]any); ok {
+			for _, v := range raw {
+				if s, ok := v.(string); ok && strings.TrimSpace(s) != "" {
+					input.Tags = append(input.Tags, strings.TrimLeft(strings.TrimSpace(s), "#"))
+				}
+			}
+		}
 
 		task, err := tr.Create(ctx, input)
 		if err != nil {
@@ -909,6 +919,9 @@ func taskListHandler(tr *repo.TaskRepo) server.ToolHandlerFunc {
 
 		if pid := int64(req.GetInt("person_id", 0)); pid > 0 {
 			filters.PersonID = &pid
+		}
+		if tag := req.GetString("tag", ""); tag != "" {
+			filters.Tag = &tag
 		}
 
 		tasks, err := tr.FindAll(ctx, filters)

@@ -22,6 +22,7 @@ var taskColumns = []format.ColumnDef{
 	{Header: "Done", Field: "completed"},
 	{Header: "Person", Field: "person_id"},
 	{Header: "Repeats", Field: "recurrence"},
+	{Header: "Tags", Field: "tags"},
 }
 
 func taskToMap(t *model.Task) map[string]any {
@@ -45,6 +46,9 @@ func taskToMap(t *model.Task) map[string]any {
 	}
 	if t.Recurrence != nil {
 		m["recurrence"] = *t.Recurrence
+	}
+	if len(t.Tags) > 0 {
+		m["tags"] = t.Tags
 	}
 	if t.DealID != nil {
 		m["deal_id"] = *t.DealID
@@ -78,6 +82,8 @@ func registerTaskCommands(rootCmd *cobra.Command) {
 	taskCmd.AddCommand(taskEditCmd())
 	taskCmd.AddCommand(taskDoneCmd())
 	taskCmd.AddCommand(taskDeleteCmd())
+	taskCmd.AddCommand(taskTagCmd(false))
+	taskCmd.AddCommand(taskTagCmd(true))
 
 	rootCmd.AddCommand(taskCmd)
 }
@@ -87,11 +93,12 @@ func taskAddCmd() *cobra.Command {
 	var personIDs []int64
 	var dealID int64
 	var dryRun, noSyntax bool
+	var tagFlags []string
 
 	cmd := &cobra.Command{
 		Use:   "add <title>",
 		Short: "Add a new task",
-		Long: "Add a new task. The title can carry short syntax: @fri 3pm (due), !mon (deadline), ~30m (estimate), ^high (priority), +Name (link a person).\n" +
+		Long: "Add a new task. The title can carry short syntax: #tag (tag), @fri 3pm (due), !mon (deadline), ~30m (estimate), ^high (priority), +Name (link a person).\n" +
 			"Flags win over the same value in the title. Use --dry-run to see what was read, --no-syntax to keep the title as typed. See 'crm help short-syntax'.",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -105,22 +112,17 @@ func taskAddCmd() *cobra.Command {
 				return model.NewExitError(model.ErrValidation, "invalid priority: %s (must be one of: %s)", priority, strings.Join(model.Priorities, ", "))
 			}
 
-			in, err := parseInline(cmd.Context(), db, args[0], noSyntax, shortsyntax.KindTag, shortsyntax.KindCadence)
+			in, err := parseInline(cmd.Context(), db, args[0], noSyntax, shortsyntax.KindCadence)
 			if err != nil {
 				return err
 			}
 			if in.Res.Title == "" {
 				return model.NewExitError(model.ErrValidation, "the title is empty once the short syntax is removed")
 			}
-			if !noSyntax {
-				probe := shortsyntax.Parse(args[0], shortsyntax.Options{Skip: []shortsyntax.Kind{shortsyntax.KindDue, shortsyntax.KindDeadline,
-					shortsyntax.KindDuration, shortsyntax.KindCadence, shortsyntax.KindPriority, shortsyntax.KindPerson}})
-				if len(probe.Tags) > 0 {
-					fmt.Fprintf(os.Stderr, "crm: tasks cannot carry tags yet: #%s stays in the title\n", strings.Join(probe.Tags, " #"))
-				}
-			}
 			tf := quick.TaskFieldsOf(in.Res)
+			tags := append([]string(nil), tagFlags...)
 			input := model.CreateTaskInput{
+				Tags:        append(tags, in.Res.Tags...),
 				Title:       in.Res.Title,
 				Description: nilIfEmpty(description),
 				Priority:    priority,
@@ -155,7 +157,7 @@ func taskAddCmd() *cobra.Command {
 					"dry_run": true, "syntax": in.Res,
 					"task": map[string]any{
 						"title": input.Title, "description": input.Description, "due_at": input.DueAt, "priority": input.Priority,
-						"person_ids": ids, "deal_id": input.DealID, "recurrence": input.Recurrence,
+						"person_ids": ids, "deal_id": input.DealID, "recurrence": input.Recurrence, "tags": input.Tags,
 					},
 				})
 			}
@@ -177,6 +179,7 @@ func taskAddCmd() *cobra.Command {
 	cmd.Flags().Int64SliceVar(&personIDs, "person", nil, "associated person ID (repeatable)")
 	cmd.Flags().Int64Var(&dealID, "deal", 0, "associated deal ID")
 	cmd.Flags().StringVar(&recurrence, "recurrence", "", "repeat after completion, e.g. \"7 days\", \"1 mon\", weekly (needs --due)")
+	cmd.Flags().StringSliceVar(&tagFlags, "tag", nil, "tag the task (repeatable); #tag in the title does the same")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print what was read from the title and what would be created, and write nothing")
 	cmd.Flags().BoolVar(&noSyntax, "no-syntax", false, "keep the title as typed: do not read @, !, ~, ^ or + tokens")
 
@@ -187,6 +190,7 @@ func taskListCmd() *cobra.Command {
 	var personID, dealID int64
 	var overdue, all bool
 	var limit int
+	var tag string
 
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -202,6 +206,9 @@ func taskListCmd() *cobra.Command {
 				Limit:            limit,
 				Overdue:          overdue,
 				IncludeCompleted: all,
+			}
+			if tag != "" {
+				filters.Tag = &tag
 			}
 			if cmd.Flags().Changed("person") {
 				filters.PersonID = &personID
@@ -222,6 +229,7 @@ func taskListCmd() *cobra.Command {
 
 	cmd.Flags().Int64Var(&personID, "person", 0, "filter by person ID")
 	cmd.Flags().Int64Var(&dealID, "deal", 0, "filter by deal ID")
+	cmd.Flags().StringVar(&tag, "tag", "", "only tasks with this tag")
 	cmd.Flags().BoolVar(&overdue, "overdue", false, "show only overdue tasks")
 	cmd.Flags().BoolVar(&all, "all", false, "include completed tasks")
 	cmd.Flags().IntVar(&limit, "limit", 0, "max results")
@@ -385,3 +393,48 @@ func taskDeleteCmd() *cobra.Command {
 		},
 	}
 }
+
+// taskTagCmd is "task tag" (add tags) or "task untag" (remove tags).
+func taskTagCmd(remove bool) *cobra.Command {
+	use, short := "tag <id> <tag>...", "Add tags to a task"
+	if remove {
+		use, short = "untag <id> <tag>...", "Remove tags from a task"
+	}
+	return &cobra.Command{
+		Use:   use,
+		Short: short,
+		Args:  cobra.MinimumNArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			id, err := strconv.ParseInt(args[0], 10, 64)
+			if err != nil {
+				return model.NewExitError(model.ErrValidation, "invalid task ID: %s", args[0])
+			}
+			db, err := openDB()
+			if err != nil {
+				return err
+			}
+			defer db.Close()
+
+			tr := repo.NewTagRepo(db)
+			for _, name := range args[1:] {
+				name = strings.TrimLeft(name, "#")
+				if name == "" {
+					continue
+				}
+				if remove {
+					err = tr.Remove(cmd.Context(), "task", id, name)
+				} else {
+					err = tr.Apply(cmd.Context(), "task", id, name)
+				}
+				if err != nil {
+					return err
+				}
+			}
+			task, err := repo.NewTaskRepo(db).FindByID(cmd.Context(), id)
+			if err != nil {
+				return err
+			}
+			return format.Output(os.Stdout, resolveFormat(), []map[string]any{taskToMap(task)}, taskColumns, flagQuiet)
+		},
+	}
+}

@@ -112,7 +112,7 @@ type Repos struct {
 	Tags         *repo.TagRepo
 }
 
-type runState struct{ interactionID int64 }
+type runState struct{ interactionID, taskID int64 }
 
 type op struct {
 	preview []Change
@@ -545,13 +545,7 @@ func (b *builder) capture(verb, rest string, off int) {
 	var res shortsyntax.Result
 	switch verb {
 	case "task":
-		res = b.syntax(text, off, shortsyntax.KindTag, shortsyntax.KindCadence)
-		// A tag on a task cannot be stored yet. Tell the user and leave the text alone.
-		probe := shortsyntax.Parse(text, shortsyntax.Options{Now: b.env.now(), Disabled: b.env.NoSyntax, Skip: []shortsyntax.Kind{
-			shortsyntax.KindDue, shortsyntax.KindDeadline, shortsyntax.KindDuration, shortsyntax.KindCadence, shortsyntax.KindPriority, shortsyntax.KindPerson}})
-		if len(probe.Tags) > 0 {
-			b.warn("tasks cannot carry tags yet: #%s stays in the title", strings.Join(probe.Tags, " #"))
-		}
+		res = b.syntax(text, off, shortsyntax.KindCadence)
 	case "log":
 		res = b.syntax(text, off, shortsyntax.KindDeadline, shortsyntax.KindDuration, shortsyntax.KindPriority)
 	default:
@@ -763,12 +757,34 @@ func (b *builder) planTask(title string, res shortsyntax.Result) {
 			if err != nil {
 				return nil, err
 			}
+			st.taskID = t.ID
 			done := ch
 			done.ID = t.ID
 			return []Change{done}, nil
 		},
 	})
 	p.Changes = append(p.Changes, ch)
+	for _, t := range res.Tags {
+		tag := b.canonTag(t)
+		tch := Change{Op: "tag", Entity: "task", Field: "tag", New: tag}
+		p.ops = append(p.ops, op{
+			preview: []Change{tch},
+			run: func(ctx context.Context, r Repos, st *runState) ([]Change, error) {
+				if err := r.Tags.Apply(ctx, "task", st.taskID, tag); err != nil {
+					return nil, err
+				}
+				done := tch
+				done.ID = st.taskID
+				return []Change{done}, nil
+			},
+		})
+		p.Changes = append(p.Changes, tch)
+		s := "tag #" + tag
+		if _, known := b.tagMap[shortsyntax.Fold(t)]; !known && b.env.Tags != nil {
+			s += " (new)"
+		}
+		parts = append(parts, s)
+	}
 	p.Preview = strings.Join(parts, " | ")
 }
 
