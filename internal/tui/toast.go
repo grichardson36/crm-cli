@@ -5,7 +5,6 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mattn/go-runewidth"
 )
 
@@ -53,9 +52,9 @@ func (m *Model) toastLine() string {
 	if pad := m.width - runewidth.StringWidth(text); pad > 0 {
 		text += strings.Repeat(" ", pad)
 	}
-	bg := lipgloss.Color("#1E7E34")
+	st := m.st.Ok
 	if m.toast.isErr {
-		bg = lipgloss.Color("#C0392B")
+		st = m.st.Err
 	}
-	return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FFFFFF")).Background(bg).Render(text)
+	return st.Bold(true).Reverse(true).Render(text)
 }

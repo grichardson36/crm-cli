@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/jdanielnd/crm-cli/internal/integrations"
 	"os"
 
 	crmsync "github.com/jdanielnd/crm-cli/internal/sync"
@@ -14,7 +15,7 @@ import (
 // registerSyncTools adds the sync runner and inbox tools. Only adapters registered in
 // this build can run, and none of them can delete records.
 func registerSyncTools(s *server.MCPServer, db *sql.DB) {
-	runner := crmsync.NewRunner(db, crmsync.DefaultRegistry(os.Getenv))
+	runner := crmsync.NewRunner(db, integrations.DefaultRegistry(os.Getenv))
 	inbox := crmsync.NewInbox(db)
 
 	s.AddTool(

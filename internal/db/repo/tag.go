@@ -13,7 +13,7 @@ import (
 // entityTables maps tagging entity types to the table that holds them.
 var entityTables = map[string]string{
 	"person": "people", "organization": "organizations",
-	"deal": "deals", "interaction": "interactions", "task": "tasks",
+	"deal": "deals", "interaction": "interactions", "event": "events", "task": "tasks",
 }
 
 // touchEntity bumps updated_at on a tagged entity. Table names come from entityTables only.

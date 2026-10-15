@@ -310,9 +310,10 @@ func (m *Model) refreshDetail(force bool) {
 	if m.creating {
 		return
 	}
+	m.calTrack()
 	r, ok := m.selected()
 	key := fmt.Sprintf("%d/%d", r.personID, r.taskID)
-	if m.view == viewMerge || m.view == viewSync {
+	if m.view == viewMerge || m.view == viewSync || m.view == viewCalendar {
 		key += fmt.Sprintf("/%d", m.cursor)
 	}
 	if !ok {
@@ -358,7 +359,7 @@ func (m *Model) syncDetail() {
 	}
 	if m.formTitle != "" {
 		title := runewidth.Truncate(m.formTitle, max(1, w), "…")
-		push(lipgloss.NewStyle().MaxWidth(max(1, w)).Render(nameStyle.Render(title)), -1)
+		push(lipgloss.NewStyle().MaxWidth(max(1, w)).Render(m.st.Name.Render(title)), -1)
 		push("", -1)
 	}
 	for i, r := range m.form {
@@ -366,7 +367,7 @@ func (m *Model) syncDetail() {
 			if len(lines) > 0 && lines[len(lines)-1] != "" {
 				push("", -1)
 			}
-			push(headStyle.Render(runewidth.Truncate(r.head, max(1, w), "…")), -1)
+			push(m.st.Head.Render(runewidth.Truncate(r.head, max(1, w), "…")), -1)
 		}
 		m.rowStart[i] = len(lines)
 		for _, l := range m.renderRow(i, r, w) {
@@ -397,7 +398,7 @@ func (m *Model) renderRow(i int, r formRow, w int) []string {
 	}
 
 	if m.mode == modeEdit && m.edit != nil && m.edit.row == i {
-		line := dimStyle.Render(label) + m.rowInput.View()
+		line := m.st.Dim.Render(label) + m.rowInput.View()
 		return []string{lipgloss.NewStyle().MaxWidth(w).Render(line)}
 	}
 
@@ -424,11 +425,11 @@ func (m *Model) renderRow(i int, r formRow, w int) []string {
 	plain := label + first + suffix
 	switch {
 	case selected:
-		out = append(out, selStyle.Render(fit(plain, w)))
+		out = append(out, m.st.Sel.Render(fit(plain, w)))
 	case valueStyled:
-		out = append(out, dimStyle.Render(label+first))
+		out = append(out, m.st.Dim.Render(label+first))
 	default:
-		out = append(out, dimStyle.Render(label)+first+dimStyle.Render(suffix))
+		out = append(out, m.st.Dim.Render(label)+first+m.st.Dim.Render(suffix))
 	}
 
 	var more []string
@@ -446,7 +447,7 @@ func (m *Model) renderRow(i int, r formRow, w int) []string {
 		more = rest
 	}
 	for _, l := range more {
-		out = append(out, dimStyle.Render(fit(strings.Repeat(" ", labelWidth)+runewidth.Truncate(l, max(1, w-labelWidth), "…"), w)))
+		out = append(out, m.st.Dim.Render(fit(strings.Repeat(" ", labelWidth)+runewidth.Truncate(l, max(1, w-labelWidth), "…"), w)))
 	}
 	return out
 }

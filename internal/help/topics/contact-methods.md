@@ -31,8 +31,6 @@ Kinds: linkedin, twitter, facebook, instagram, telegram, whatsapp, tiktok, youtu
 crm person show 1 -f json
 ```
 
-In JSON the person has `emails`, `phones` and `handles` arrays. In the table view they appear as comma separated columns.
+In JSON the person has `emails`, `phones` and `handles` arrays. In the table view they appear as comma separated columns. Duplicate detection (`crm help duplicates`) and sync matching (`crm help sync`) use emails, phones and links. Keep them accurate.
 
-## Why this matters
-
-Duplicate detection (`crm help duplicates`) and sync matching (`crm help sync`) use emails, phones and links. Keep them accurate.
+See also: people, duplicates, sync.

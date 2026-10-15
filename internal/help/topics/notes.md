@@ -32,19 +32,6 @@ crm log rm 1
 
 `log rm` archives the interaction: it leaves lists and cannot be edited, but stays in the database.
 
-## Note types
+Types are data, not a fixed list, and each says whether logging it resets the keep-in-touch clock. See `crm help note-types`.
 
-Types are data, not a fixed list. Each type says whether logging it resets the keep-in-touch clock.
-
-```sh crm-example
-crm log types
-crm log types add standup --counts-as-contact=false
-crm log types rm note
-crm log add --type call 1 "Talked about the offsite"
-```
-
-`log types rm` archives a type. Existing interactions keep it. `log add --type NAME PERSON_ID TEXT` logs any active type. Text after the person ID becomes the content.
-
-## Related topics
-
-`keep-in-touch`, `tags` (tag an interaction with `crm tag apply interaction ID NAME`), `tui` (`n` adds a note, `N` picks the type), `short-syntax` (`crm do "n Jane called #deal @fri"`).
+See also: short-syntax, note-types, keep-in-touch, tags, tui-keys.

@@ -23,6 +23,9 @@ var taskColumns = []format.ColumnDef{
 	{Header: "Person", Field: "person_id"},
 	{Header: "Repeats", Field: "recurrence"},
 	{Header: "Tags", Field: "tags"},
+	{Header: "Length", Field: "duration_min"},
+	{Header: "Placed", Field: "scheduled_start"},
+	{Header: "Issue", Field: "schedule_issue"},
 }
 
 func taskToMap(t *model.Task) map[string]any {
@@ -59,6 +62,28 @@ func taskToMap(t *model.Task) map[string]any {
 	if t.CompletedAt != nil {
 		m["completed_at"] = *t.CompletedAt
 	}
+	if t.DurationMin != nil {
+		m["duration_min"] = *t.DurationMin
+	}
+	if t.EarliestStart != nil {
+		m["earliest_start"] = *t.EarliestStart
+	}
+	if t.DeadlineAt != nil {
+		m["deadline_at"] = *t.DeadlineAt
+	}
+	if t.MinChunkMin != nil {
+		m["min_chunk_min"] = *t.MinChunkMin
+	}
+	if t.ScheduledStart != nil {
+		m["scheduled_start"] = *t.ScheduledStart
+	}
+	m["deadline_hard"] = t.DeadlineHard
+	m["auto_schedule"] = t.AutoSchedule
+	m["scheduled_locked"] = t.ScheduledLocked
+	m["schedule_name"] = t.ScheduleName
+	if issue := repo.ScheduleIssue(t); issue != "" {
+		m["schedule_issue"] = issue
+	}
 	return m
 }
 
@@ -94,6 +119,7 @@ func taskAddCmd() *cobra.Command {
 	var dealID int64
 	var dryRun, noSyntax bool
 	var tagFlags []string
+	var sf *schedFlags
 
 	cmd := &cobra.Command{
 		Use:   "add <title>",
@@ -120,9 +146,8 @@ func taskAddCmd() *cobra.Command {
 				return model.NewExitError(model.ErrValidation, "the title is empty once the short syntax is removed")
 			}
 			tf := quick.TaskFieldsOf(in.Res)
-			tags := append([]string(nil), tagFlags...)
 			input := model.CreateTaskInput{
-				Tags:        append(tags, in.Res.Tags...),
+				Tags:        append(append([]string(nil), tagFlags...), in.Res.Tags...),
 				Title:       in.Res.Title,
 				Description: nilIfEmpty(description),
 				Priority:    priority,
@@ -151,6 +176,9 @@ func taskAddCmd() *cobra.Command {
 				input.DealID = &dealID
 			}
 			input.Recurrence = nilIfEmpty(recurrence)
+			if input.Schedule, err = sf.build(cmd); err != nil {
+				return err
+			}
 
 			if dryRun {
 				return printInlineDryRun(map[string]any{
@@ -183,14 +211,15 @@ func taskAddCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print what was read from the title and what would be created, and write nothing")
 	cmd.Flags().BoolVar(&noSyntax, "no-syntax", false, "keep the title as typed: do not read @, !, ~, ^ or + tokens")
 
+	sf = bindScheduleFlags(cmd)
 	return cmd
 }
 
 func taskListCmd() *cobra.Command {
 	var personID, dealID int64
 	var overdue, all bool
-	var limit int
 	var tag string
+	var limit int
 
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -204,11 +233,9 @@ func taskListCmd() *cobra.Command {
 
 			filters := model.TaskFilters{
 				Limit:            limit,
+				Tag:              nilIfEmpty(tag),
 				Overdue:          overdue,
 				IncludeCompleted: all,
-			}
-			if tag != "" {
-				filters.Tag = &tag
 			}
 			if cmd.Flags().Changed("person") {
 				filters.PersonID = &personID
@@ -269,6 +296,7 @@ func taskShowCmd() *cobra.Command {
 func taskEditCmd() *cobra.Command {
 	var title, description, due, priority, recurrence string
 	var personID, dealID int64
+	var sf *schedFlags
 
 	cmd := &cobra.Command{
 		Use:   "edit <id>",
@@ -311,6 +339,9 @@ func taskEditCmd() *cobra.Command {
 			if cmd.Flags().Changed("recurrence") {
 				input.Recurrence = &recurrence
 			}
+			if input.Schedule, err = sf.build(cmd); err != nil {
+				return err
+			}
 
 			r := repo.NewTaskRepo(db)
 			task, err := r.Update(cmd.Context(), id, input)
@@ -330,6 +361,7 @@ func taskEditCmd() *cobra.Command {
 	cmd.Flags().Int64Var(&personID, "person", 0, "add an associated person ID")
 	cmd.Flags().Int64Var(&dealID, "deal", 0, "associated deal ID")
 	cmd.Flags().StringVar(&recurrence, "recurrence", "", "repeat after completion (empty clears)")
+	sf = bindScheduleFlags(cmd)
 
 	return cmd
 }

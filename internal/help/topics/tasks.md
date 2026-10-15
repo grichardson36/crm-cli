@@ -4,7 +4,7 @@ Follow-ups with a due date and priority, optionally linked to people and a deal.
 
 ## Add and list
 
-Priorities: low, medium (default), high. Dates are `YYYY-MM-DD` or an ISO 8601 timestamp.
+Priorities: low, medium (default), high. Dates are `YYYY-MM-DD` or an ISO 8601 timestamp. `--person` can repeat. `--all` includes completed tasks. `--limit N` caps the list.
 
 ```sh crm-example
 crm task add "Send proposal" --person 1 --due 2026-11-01 --priority high
@@ -15,8 +15,6 @@ crm task list --person 1 --all
 crm task show 1
 ```
 
-`--person` can repeat. `--all` includes completed tasks. `--limit N` caps the list.
-
 ## Change and finish
 
 ```sh crm-example
@@ -26,26 +24,16 @@ crm task done 1
 crm task delete 1
 ```
 
-`task delete` archives the task. `task done` marks it completed.
+`task delete` archives the task. `task done` marks it completed. Both accept `--dry-run` to preview.
 
 ## Recurring tasks
 
-A recurring task needs `--due`. When you complete it, the next occurrence is created.
+A recurring task needs `--due`. When you complete it, the next occurrence is created. Examples of recurrence: `7 days`, `1 mon`, `weekly`.
 
 ```sh crm-example
 crm task add "Monthly check-in" --person 1 --due 2026-11-01 --recurrence "1 mon"
 crm task add "Weekly review" --due 2026-11-01 --recurrence weekly
-```
-
-Examples of recurrence: `7 days`, `1 mon`, `weekly`.
-
-## Preview before changing
-
-```sh crm-example
 crm task done 1 --dry-run
-crm task delete 1 --dry-run -f json
 ```
 
-## Related topics
-
-`keep-in-touch`, `agents`, `tui` (the Tasks view, key 4; `t` adds a task, `x` completes one), `short-syntax` (`crm task add "Call back @fri 3pm ^high +Jane"`).
+See also: calendar, short-syntax, keep-in-touch, agents, tui.

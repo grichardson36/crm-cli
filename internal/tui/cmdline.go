@@ -34,37 +34,25 @@ type cycleState struct {
 	after      string
 }
 
-var (
-	chipTag    = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#1F6FB2", Dark: "#7CC4FF"})
-	chipNew    = chipTag.Underline(true)
-	chipWhen   = lipgloss.NewStyle().Foreground(good)
-	chipPerson = lipgloss.NewStyle().Bold(true).Foreground(accent)
-	chipOther  = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#9A6700", Dark: "#E3B341"})
-	chipField  = lipgloss.NewStyle().Bold(true).Foreground(dim)
-	chipBad    = lipgloss.NewStyle().Foreground(danger).Underline(true)
-)
-
-// markStyle picks the style of a highlighted range.
-func markStyle(mk quick.Mark) lipgloss.Style {
+// markStyle picks the style of a highlighted range from the active theme.
+func (m *Model) markStyle(mk quick.Mark) lipgloss.Style {
 	if mk.Bad {
-		return chipBad
+		return m.st.Err.Underline(true)
 	}
 	switch mk.Kind {
-	case "verb":
-		return nameStyle
-	case "subject", "person":
-		return chipPerson
+	case "verb", "subject", "person":
+		return m.st.Name
 	case "tag":
 		if mk.New {
-			return chipNew
+			return m.st.Mark.Underline(true)
 		}
-		return chipTag
+		return m.st.Mark
 	case "due", "deadline":
-		return chipWhen
+		return m.st.Ok
 	case "duration", "cadence", "priority", "location", "recurrence":
-		return chipOther
+		return m.st.Warn
 	case "field", "escape":
-		return chipField
+		return m.st.Dim.Bold(true)
 	}
 	return lipgloss.NewStyle()
 }
@@ -371,7 +359,7 @@ func (m *Model) cmdInputLine(o *overlay) string {
 		st := lipgloss.NewStyle()
 		for _, mk := range marks {
 			if bi >= mk.Start && bi < mk.End {
-				st = markStyle(mk)
+				st = m.markStyle(mk)
 			}
 		}
 		if bi == cursor {
@@ -395,7 +383,7 @@ func (m *Model) cmdInputLine(o *overlay) string {
 		skip++
 	}
 	var b strings.Builder
-	b.WriteString(dimStyle.Render("> "))
+	b.WriteString(m.st.Dim.Render("> "))
 	for _, c := range cells[skip:] {
 		b.WriteString(c.style.Render(c.s))
 	}
@@ -409,58 +397,58 @@ func (m *Model) cmdView() string {
 	p := c.plan
 	cut := lipgloss.NewStyle().MaxWidth(m.width)
 	var lines []string
-	lines = append(lines, cut.Render(headStyle.Render("Command bar")+dimStyle.Render("   enter run  tab complete  esc close")))
+	lines = append(lines, cut.Render(m.st.Head.Render("Command bar")+m.st.Dim.Render("   enter run  tab complete  esc close")))
 	lines = append(lines, cut.Render(m.cmdInputLine(o)))
 
 	preview := p.Preview
-	style := nameStyle
+	style := m.st.Name
 	switch {
 	case m.readOnly:
-		preview, style = "read-only: "+preview, errStyle
+		preview, style = "read-only: "+preview, m.st.Err
 	case len(p.Problems) > 0:
-		style = errStyle
+		style = m.st.Err
 	case !p.Ready():
-		style = dimStyle
+		style = m.st.Dim
 	}
 	preview = runewidth.Truncate(preview, 3*max(1, m.width)-3, "…")
 	lines = append(lines, lipgloss.NewStyle().Width(max(1, m.width)).Render(style.Render(preview)))
 
 	if c.confirming {
-		lines = append(lines, cut.Render(headStyle.Render("Confirm "+p.Subject.Name)))
+		lines = append(lines, cut.Render(m.st.Head.Render("Confirm "+p.Subject.Name)))
 		for _, ch := range p.Changes {
 			switch ch.Op {
 			case "update":
-				lines = append(lines, cut.Render(fmt.Sprintf("  %s  %s -> %s", fit(ch.Field, 10), dimStyle.Render(orNone(ch.Old)), nameStyle.Render(orNone(ch.New)))))
+				lines = append(lines, cut.Render(fmt.Sprintf("  %s  %s -> %s", fit(ch.Field, 10), m.st.Dim.Render(orNone(ch.Old)), m.st.Name.Render(orNone(ch.New)))))
 			default:
 				lines = append(lines, cut.Render("  "+ch.Describe()))
 			}
 		}
-		lines = append(lines, cut.Render(dimStyle.Render("enter apply  esc back  (U undoes it afterwards)")))
+		lines = append(lines, cut.Render(m.st.Dim.Render("enter apply  esc back  (U undoes it afterwards)")))
 		return strings.Join(lines, "\n")
 	}
 	if c.msg != "" {
-		lines = append(lines, cut.Render(errStyle.Render(c.msg)))
+		lines = append(lines, cut.Render(m.st.Err.Render(c.msg)))
 	}
 	room := max(0, m.height-strings.Count(strings.Join(lines, "\n"), "\n")-2)
 	var rest []string
 	for i, cand := range c.comp.Candidates {
 		line := "  " + cand
 		if i == c.sel {
-			rest = append(rest, cut.Render(selStyle.Render(fit(line, m.width))))
+			rest = append(rest, cut.Render(m.st.Sel.Render(fit(line, m.width))))
 		} else {
 			rest = append(rest, cut.Render(line))
 		}
 	}
 	if len(p.Problems) > 0 {
 		for _, cand := range p.Problems[0].Candidates {
-			rest = append(rest, cut.Render(dimStyle.Render("  "+cand.Name)))
+			rest = append(rest, cut.Render(m.st.Dim.Render("  "+cand.Name)))
 		}
 	}
 	for _, w := range p.Warnings {
-		rest = append(rest, cut.Render(dimStyle.Render("  note: "+w)))
+		rest = append(rest, cut.Render(m.st.Dim.Render("  note: "+w)))
 	}
 	if len(rest) == 0 {
-		rest = append(rest, cut.Render(dimStyle.Render("  verbs: n note, t task, log, set, tag, snooze   tokens: #tag @date !deadline ~30m *3m +Name ^high")))
+		rest = append(rest, cut.Render(m.st.Dim.Render("  verbs: n note, t task, log, set, tag, snooze   tokens: #tag @date !deadline ~30m *3m +Name ^high")))
 	}
 	if len(rest) > room {
 		rest = rest[:room]

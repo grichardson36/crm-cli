@@ -77,6 +77,8 @@ func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 					}
 				}
 			}
+		case m.calGrid() && msg.Y >= 1 && msg.Y <= m.bodyHeight():
+			m.calClick(msg.X, msg.Y)
 		case inList:
 			idx := m.offset + msg.Y - 1
 			if idx >= 0 && idx < len(m.rows) && msg.Y-1 < m.bodyHeight() && !m.rows[idx].skip {

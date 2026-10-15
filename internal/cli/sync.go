@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"github.com/jdanielnd/crm-cli/internal/integrations"
 	"os"
 	"strconv"
 
@@ -26,7 +27,7 @@ func newRunner() (*crmsync.Runner, func(), error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	return crmsync.NewRunner(db, crmsync.DefaultRegistry(os.Getenv)), func() { db.Close() }, nil
+	return crmsync.NewRunner(db, integrations.DefaultRegistry(os.Getenv)), func() { db.Close() }, nil
 }
 
 func syncListCmd() *cobra.Command {
@@ -35,7 +36,7 @@ func syncListCmd() *cobra.Command {
 		Short: "List available sync sources",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			registry := crmsync.DefaultRegistry(os.Getenv)
+			registry := integrations.DefaultRegistry(os.Getenv)
 			data := []map[string]any{}
 			for _, n := range registry.Names() {
 				data = append(data, map[string]any{"source": n})

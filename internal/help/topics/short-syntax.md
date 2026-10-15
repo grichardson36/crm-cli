@@ -16,16 +16,12 @@ A token starts a word and counts only when it parses, so `jane@example.com`, `+1
 | `+Name` | link a person | `+Sam`, `+Sam_Lee` |
 | `^high` | priority | `^top ^high ^medium ^low` |
 
-A time with no date means today, or tomorrow when it has passed. A weekday is always in the future.
-
 ## Where it works
 
 ```sh crm-example
 crm do "n Jane called about the deal #deal @fri" --dry-run
-crm do "t Jane send the contract @mon ^high"
 crm do "set Jane: company=Acme title=CTO"
 crm task add "Call back @fri 3pm ~30m +Jane" --dry-run
-crm person add "Sam Lee #friend *3m" --dry-run
 crm log add --type call 1 "Talked about the offsite #trip @yesterday" --dry-run
 ```
 
@@ -39,4 +35,4 @@ Flags win over tokens. `--dry-run` shows what was read. `--no-syntax` turns it o
 
 `ctrl+k` opens the command bar. Type `n Sam called #deal @fri` and a preview line shows what will happen. `tab` completes verbs, names, tags, dates and cadences. `enter` runs it. A `set` with two or more fields shows old and new values and waits for another `enter`. `ctrl+z` undoes and `ctrl+r` redoes (session only). With a person selected no name is needed. The note and task prompts (`n`, `t`) read the same tokens. In the People search, `#friend ^high *3m` filter the list. The palette action "Toggle short syntax" turns all of it off.
 
-See also: `tasks`, `notes`, `tags`, `tui`, `agents`.
+See also: tasks, notes, tags, tui, agents.

@@ -23,66 +23,17 @@ Jump with the number keys, cycle with `[` and `]`, or press `v` for the view swi
 | 6 | Merge | groups of probable duplicates |
 | 7 | Archived | archived people |
 | 8 | Sync | sync sources and the inbox of unmatched records |
+| 9 | Calendar | events, birthdays, keep-in-touch dates and tasks by day |
 
-## Moving
+## Palette actions that mirror CLI commands
 
-- `j` / `k` or arrows: next and previous row. `g` / `G`: first and last. `ctrl+d` / `ctrl+u`: half page.
-- `tab` or `l`: move into the detail form. `esc`, `h` or `tab`: back to the list.
-- `J` / `K`: scroll the detail pane.
-- `/` search by name, company, email, location and tags. `#tag` filters by tag. `esc` clears.
-- `o` toggles sort between name and recently updated. `r` reloads.
+These work in `--read-only` mode. Each opens a scrollable page (`j` / `k`, `g` / `G`, `esc` goes back).
 
-## Contact keys
+- "Help: topics" lists topics with a filter. "Help: search" lists matching lines.
+- "Doctor" runs the checks of `crm doctor` with the fix line for each problem.
+- "Where" shows the open database. "Domains" lists the databases in the data directory.
+- "DAV: info", "DAV: conflicts" and "DAV: status" show the phone sync details, logged conflicts and counts. They never start the server (`crm help dav`).
 
-- `c` mark contacted now (resets the keep-in-touch clock). `s` snooze for N days.
-- `n` add a note of the last used type. `N` pick the type first.
-- `t` add a task: `title | optional due date`. `x` complete the selected task.
-- `f` toggle favorite. `T` add a tag, `-name` removes it. `F` set the cadence. `p` set the priority tier.
-- `+` create a contact.
+All keys, editing, merge, archive, notes, sync and Home are in `crm help tui-keys`.
 
-## Command bar
-
-`ctrl+k` is also a command line. Type a verb and a space, such as `n Sam called about the deal #deal @fri`, and a line shows what will happen. `tab` completes verbs, names, tags, dates and cadences. `enter` runs it. `set Sam: company=Acme title=CTO` shows old and new values and needs a second `enter`. `ctrl+z` undoes the last data change of the session, any change, not only commands, and `ctrl+r` (or `ctrl+y`) redoes it. A toast names what was undone, and undo is refused with a reason if the record changed since. With a person selected, no name is needed. `#friend ^high` also filter the People search. See `short-syntax`.
-
-## Edit pane
-
-In the detail form: `enter` edits a row, `a` adds a row, `d` deletes the row (asks y/n), `y` copies the value, `o` opens a link, email or phone on this machine.
-
-## Several people at once
-
-`space` marks a row and `*` marks all visible. Then `c`, `f`, `T`, `F`, `p` and `#` apply to every marked person.
-
-## Merge and archive
-
-- Merge view: `enter` opens the side by side compare. `m` cycles the lowest confidence shown. `D` dismisses a group and `u` undoes it.
-- In the compare screen: `tab` picks the other person's value for a row, `s` changes the survivor, `m` merges, `esc` leaves. Dropped people are archived and can be restored.
-- `M` merges the marked people. `#` archives (asks y/n).
-- Archived view: `u` restores. `X` purges after you type the name.
-
-## Notes
-
-In the detail form, on a note row: `enter` edits the text, `t` changes the type, `d` deletes (asks y/n). "Restore last deleted note" is in the palette.
-
-## Sync view
-
-`s` runs a sync for the selected source, `d` does a dry run. In the inbox: `a` accepts (creates a person), `p` attaches to an existing person, `i` ignores.
-
-## Home
-
-`enter` on an item opens that person in People with the detail form focused.
-
-## Help, doctor and where from the palette
-
-These palette actions mirror the CLI commands and work in `--read-only` mode. Each opens a scrollable page: `j` / `k`, `g` / `G`, `esc` goes back.
-
-- "Help: topics" lists the topics with a filter, `enter` opens one. "Help: search" asks for a word and lists the matching lines.
-- "Doctor" runs the checks of `crm doctor` on the open database, with the fix line for each problem.
-- "Where" shows the open database: path, domain, schema version, device id, size. "Domains" lists the databases in the data directory.
-
-## Quit
-
-`q` or `ctrl+c`.
-
-## Related topics
-
-`keep-in-touch`, `duplicates`, `archive`, `short-syntax` (the command bar).
+See also: calendar, short-syntax, tui-keys, theme, keep-in-touch, duplicates, archive.

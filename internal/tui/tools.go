@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"github.com/jdanielnd/crm-cli/internal/integrations"
 	"os"
 	"path/filepath"
 	"sort"
@@ -13,7 +14,6 @@ import (
 	"github.com/jdanielnd/crm-cli/internal/db"
 	"github.com/jdanielnd/crm-cli/internal/doctor"
 	"github.com/jdanielnd/crm-cli/internal/help"
-	crmsync "github.com/jdanielnd/crm-cli/internal/sync"
 )
 
 // Env describes where the open database lives. The CLI fills it in. Fields may be empty
@@ -69,8 +69,8 @@ func (m *Model) handleTextKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m *Model) textViewRender() string {
 	cut := lipgloss.NewStyle().MaxWidth(m.width)
-	title := headStyle.Render(m.tv.title)
-	foot := dimStyle.Render("j/k scroll  g/G top/bottom  esc back  ctrl+k for every action")
+	title := m.st.Head.Render(m.tv.title)
+	foot := m.st.Dim.Render("j/k scroll  g/G top/bottom  esc back  ctrl+k for every action")
 	return cut.Render(title) + "\n" + m.tv.vp.View() + "\n" + cut.Render(foot)
 }
 
@@ -130,7 +130,7 @@ func (m *Model) showDoctor() {
 		DBPath:      m.env.DBPath,
 		Version:     m.env.Version,
 		MCPTools:    m.env.MCPTools,
-		SyncSources: crmsync.DefaultRegistry(os.Getenv).Names(),
+		SyncSources: integrations.DefaultRegistry(os.Getenv).Names(),
 	})
 	var b strings.Builder
 	for _, c := range rep.Checks {

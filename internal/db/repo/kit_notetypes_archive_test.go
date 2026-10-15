@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"testing"
+	"time"
 
 	"github.com/jdanielnd/crm-cli/internal/db"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
@@ -289,7 +290,9 @@ func TestEveryWriteBumpsUpdatedAt(t *testing.T) {
 		tagr                                 *repo.TagRepo
 		rr                                   *repo.RelationshipRepo
 		nr                                   *repo.NoteTypeRepo
+		er                                   *repo.EventRepo
 		person, other, org, deal, task, note int64
+		event, series                        int64
 	}
 	ctx := context.Background()
 
@@ -387,11 +390,68 @@ func TestEveryWriteBumpsUpdatedAt(t *testing.T) {
 			_, err := f.tr.Update(ctx, f.task, model.UpdateTaskInput{Title: ptr("renamed")})
 			return err
 		}},
+		{"task scheduling fields", "tasks", func(f *fx) int64 { return f.task }, func(f *fx) error {
+			n := 90
+			_, err := f.tr.Update(ctx, f.task, model.UpdateTaskInput{Schedule: model.TaskSchedule{DurationMin: &n}})
+			return err
+		}},
 		{"task complete", "tasks", func(f *fx) int64 { return f.task }, func(f *fx) error {
 			_, err := f.tr.Complete(ctx, f.task)
 			return err
 		}},
 		{"task archive", "tasks", func(f *fx) int64 { return f.task }, func(f *fx) error { return f.tr.Archive(ctx, f.task) }},
+		{"event update", "events", func(f *fx) int64 { return f.event }, func(f *fx) error {
+			_, err := f.er.Update(ctx, f.event, model.UpdateEventInput{Title: ptr("renamed")}, "", "")
+			return err
+		}},
+		{"event archive", "events", func(f *fx) int64 { return f.event }, func(f *fx) error { return f.er.Archive(ctx, f.event, "", "") }},
+		{"event restore", "events", func(f *fx) int64 { return f.event }, func(f *fx) error {
+			if err := f.er.Archive(ctx, f.event, "", ""); err != nil {
+				return err
+			}
+			if _, err := f.d.Exec(`UPDATE events SET updated_at = ?`, old); err != nil {
+				return err
+			}
+			return f.er.Restore(ctx, f.event)
+		}},
+		{"event add attendee", "events", func(f *fx) int64 { return f.event }, func(f *fx) error {
+			return f.er.SetAttendee(ctx, f.event, model.EventAttendee{PersonID: f.person})
+		}},
+		{"event remove attendee", "events", func(f *fx) int64 { return f.event }, func(f *fx) error {
+			if err := f.er.SetAttendee(ctx, f.event, model.EventAttendee{PersonID: f.person}); err != nil {
+				return err
+			}
+			if _, err := f.d.Exec(`UPDATE events SET updated_at = ?`, old); err != nil {
+				return err
+			}
+			return f.er.RemoveAttendee(ctx, f.event, f.person)
+		}},
+		{"event set reminders", "events", func(f *fx) int64 { return f.event }, func(f *fx) error {
+			return f.er.SetReminders(ctx, f.event, []model.EventReminder{{MinutesBefore: 10}})
+		}},
+		{"tag event", "events", func(f *fx) int64 { return f.event }, func(f *fx) error {
+			return f.tagr.Apply(ctx, "event", f.event, "new")
+		}},
+		{"untag event", "events", func(f *fx) int64 { return f.event }, func(f *fx) error {
+			return f.tagr.Remove(ctx, "event", f.event, "vip")
+		}},
+		{"delete tag touches tagged events", "events", func(f *fx) int64 { return f.event }, func(f *fx) error {
+			return f.tagr.Delete(ctx, "vip")
+		}},
+		{"skip one instance of a series", "events", func(f *fx) int64 { return f.series }, func(f *fx) error {
+			return f.er.Archive(ctx, f.series, "this", "2026-03-09T14:00:00Z")
+		}},
+		{"override one instance of a series", "events", func(f *fx) int64 { return f.series }, func(f *fx) error {
+			_, err := f.er.Update(ctx, f.series, model.UpdateEventInput{Title: ptr("one-off")}, "this", "2026-03-09T14:00:00Z")
+			return err
+		}},
+		{"end a series", "events", func(f *fx) int64 { return f.series }, func(f *fx) error {
+			return f.er.Archive(ctx, f.series, "following", "2026-03-16T14:00:00Z")
+		}},
+		{"split a series", "events", func(f *fx) int64 { return f.series }, func(f *fx) error {
+			_, err := f.er.Update(ctx, f.series, model.UpdateEventInput{Title: ptr("later")}, "following", "2026-03-16T14:00:00Z")
+			return err
+		}},
 		{"note type archive", "note_types", func(f *fx) int64 { return f.note }, func(f *fx) error { return f.nr.Archive(ctx, "standup") }},
 		{"note type restore", "note_types", func(f *fx) int64 { return f.note }, func(f *fx) error {
 			if err := f.nr.Archive(ctx, "standup"); err != nil {
@@ -411,7 +471,7 @@ func TestEveryWriteBumpsUpdatedAt(t *testing.T) {
 			f := &fx{
 				d: d, pr: repo.NewPersonRepo(d), or: repo.NewOrgRepo(d), dr: repo.NewDealRepo(d),
 				tr: repo.NewTaskRepo(d), tagr: repo.NewTagRepo(d), rr: repo.NewRelationshipRepo(d),
-				nr: repo.NewNoteTypeRepo(d),
+				nr: repo.NewNoteTypeRepo(d), er: repo.NewEventRepo(d),
 			}
 			p, err := f.pr.Create(ctx, model.CreatePersonInput{FirstName: "Jane", Email: ptr("jane@x.com"), Phone: ptr("+15550001")})
 			require.NoError(t, err)
@@ -432,8 +492,14 @@ func TestEveryWriteBumpsUpdatedAt(t *testing.T) {
 				require.NoError(t, f.tagr.Apply(ctx, e.typ, e.id, "vip"))
 			}
 			f.person, f.other, f.org, f.deal, f.task, f.note = p.ID, o.ID, org.ID, deal.ID, task.ID, nt.ID
+			ev, err := f.er.Create(ctx, model.CreateEventInput{Title: "Event", Start: time.Date(2026, 10, 16, 14, 0, 0, 0, time.UTC), TZ: "UTC"})
+			require.NoError(t, err)
+			require.NoError(t, f.tagr.Apply(ctx, "event", ev.ID, "vip"))
+			series, err := f.er.Create(ctx, model.CreateEventInput{Title: "Series", Start: time.Date(2026, 3, 2, 15, 0, 0, 0, time.UTC), TZ: "America/Chicago", RRule: "FREQ=WEEKLY;BYDAY=MO"})
+			require.NoError(t, err)
+			f.event, f.series = ev.ID, series.ID
 
-			for _, table := range []string{"people", "organizations", "deals", "tasks", "note_types", "tags"} {
+			for _, table := range []string{"people", "organizations", "deals", "tasks", "note_types", "tags", "events"} {
 				_, err := d.Exec(`UPDATE `+table+` SET updated_at = ?`, old)
 				require.NoError(t, err)
 			}
@@ -449,7 +515,7 @@ func TestEveryWriteBumpsUpdatedAt(t *testing.T) {
 
 func TestSyncColumnsPresent(t *testing.T) {
 	d := openRaw(t)
-	for _, table := range []string{"people", "organizations", "interactions", "tasks", "tags", "deals", "note_types"} {
+	for _, table := range []string{"people", "organizations", "interactions", "tasks", "tags", "deals", "note_types", "events"} {
 		var uuidCol, updatedCol int
 		require.NoError(t, d.QueryRow(`SELECT COUNT(*) FROM pragma_table_info(?) WHERE name = 'uuid'`, table).Scan(&uuidCol))
 		require.NoError(t, d.QueryRow(`SELECT COUNT(*) FROM pragma_table_info(?) WHERE name = 'updated_at'`, table).Scan(&updatedCol))

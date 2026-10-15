@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -33,7 +34,7 @@ func TestCommandBarShowsALivePreviewAndRunsANote(t *testing.T) {
 	require.NotNil(t, m.ov.cmd, "a verb and a space switch the palette to a command line")
 	require.True(t, m.ov.cmd.plan.Ready())
 
-	out := m.View()
+	out := plain(m.View())
 	assert.Contains(t, out, "Command bar")
 	assert.Contains(t, out, `note on Zed Adams: "called about the deal"`)
 	assert.Contains(t, out, "tag #deal (new)")
@@ -72,7 +73,7 @@ func TestCommandBarMarksChips(t *testing.T) {
 		}
 	}
 	assert.Equal(t, []string{"verb", "tag", "tag", "due"}, kinds)
-	assert.Contains(t, m.View(), "tag #brandnew (new)")
+	assert.Contains(t, plain(m.View()), "tag #brandnew (new)")
 }
 
 func TestCommandBarNameWorksWithoutASelectedPerson(t *testing.T) {
@@ -80,7 +81,7 @@ func TestCommandBarNameWorksWithoutASelectedPerson(t *testing.T) {
 	press(m, "6") // the Merge view has no selected person
 	openBar(m, "n Bob called back")
 	require.NotNil(t, m.ov.cmd)
-	assert.Contains(t, m.View(), `note on Bob Baker: "called back"`)
+	assert.Contains(t, plain(m.View()), `note on Bob Baker: "called back"`)
 	press(m, "enter")
 	its := allNotes(t, m)
 	require.Len(t, its, 1)
@@ -91,10 +92,10 @@ func TestCommandBarNeedsAPersonOrAName(t *testing.T) {
 	m, _ := newTestModel(t)
 	press(m, "6")
 	openBar(m, "n called back")
-	assert.Contains(t, m.View(), "who is this about?")
+	assert.Contains(t, plain(m.View()), "who is this about?")
 	press(m, "enter")
 	assert.Equal(t, modeOverlay, m.mode, "the bar stays open")
-	assert.Contains(t, m.View(), "who is this about?")
+	assert.Contains(t, plain(m.View()), "who is this about?")
 	assert.Empty(t, allNotes(t, m))
 }
 
@@ -105,7 +106,7 @@ func TestCommandBarAmbiguousNameBlocksEnter(t *testing.T) {
 	require.NoError(t, m.reload())
 	press(m, "6")
 	openBar(m, "n Bob called back")
-	out := m.View()
+	out := plain(m.View())
 	assert.Contains(t, out, "2 people match")
 	assert.Contains(t, out, "Bob Baker")
 	assert.Contains(t, out, "Bob Brown")
@@ -146,7 +147,7 @@ func TestCommandBarTabCompletesVerbsNamesTagsDatesAndCadences(t *testing.T) {
 	press(m, "ctrl+u")
 	typeText(m, "n Ba")
 	assert.Equal(t, []string{"Bob Baker "}, m.ov.cmd.comp.Candidates)
-	assert.Contains(t, m.View(), "Bob Baker")
+	assert.Contains(t, plain(m.View()), "Bob Baker")
 	press(m, "tab")
 	assert.Equal(t, "n Bob Baker ", m.ov.filter.Value())
 
@@ -189,13 +190,13 @@ func TestCommandBarTabWithNothingToCompleteSaysSo(t *testing.T) {
 	openBar(m, "n hello world")
 	press(m, "tab")
 	assert.Equal(t, "n hello world", m.ov.filter.Value())
-	assert.Contains(t, m.View(), "nothing to complete")
+	assert.Contains(t, plain(m.View()), "nothing to complete")
 }
 
 func TestCommandBarSingleFieldSetAppliesAtOnce(t *testing.T) {
 	m, pr := newTestModel(t)
 	openBar(m, "set company=Zorg")
-	assert.Contains(t, m.View(), "set Zed Adams: company Zorg")
+	assert.Contains(t, plain(m.View()), "set Zed Adams: company Zorg")
 	press(m, "enter")
 	assert.Equal(t, modeNormal, m.mode, "one field needs no confirmation")
 	assert.Equal(t, "Zorg", *personByID(t, pr, 1).Company)
@@ -208,7 +209,7 @@ func TestCommandBarMultiFieldSetShowsOldAndNewAndNeedsConfirm(t *testing.T) {
 	press(m, "enter")
 	require.Equal(t, modeOverlay, m.mode, "the first enter asks")
 	require.True(t, m.ov.cmd.confirming)
-	out := m.View()
+	out := plain(m.View())
 	assert.Contains(t, out, "Confirm Zed Adams")
 	assert.Contains(t, out, "company")
 	assert.Contains(t, out, "Acme -> Zorg")
@@ -234,14 +235,14 @@ func TestCommandBarUndoAndRedo(t *testing.T) {
 	openBar(m, "n called #deal @fri")
 	press(m, "enter")
 	require.Len(t, allNotes(t, m), 1)
-	assert.Contains(t, m.View(), "Done: note on Zed Adams", "a toast confirms the command")
+	assert.Contains(t, plain(m.View()), "Done: note on Zed Adams", "a toast confirms the command")
 	openBar(m, "set company=Zorg")
 	press(m, "enter")
 	assert.Equal(t, "Zorg", *personByID(t, pr, 1).Company)
 	require.Len(t, m.hist, 2)
 
 	press(m, "ctrl+z")
-	assert.Contains(t, m.View(), "Undone: set company on Zed Adams")
+	assert.Contains(t, plain(m.View()), "Undone: set company on Zed Adams")
 	assert.Equal(t, "Acme", *personByID(t, pr, 1).Company)
 	assert.Len(t, allNotes(t, m), 1)
 
@@ -253,17 +254,17 @@ func TestCommandBarUndoAndRedo(t *testing.T) {
 	assert.Empty(t, tags)
 
 	press(m, "ctrl+z")
-	assert.Contains(t, m.View(), "Nothing to undo")
+	assert.Contains(t, plain(m.View()), "Nothing to undo")
 
 	press(m, "ctrl+r")
-	assert.Contains(t, m.View(), "Redone: add note on Zed Adams")
+	assert.Contains(t, plain(m.View()), "Redone: add note on Zed Adams")
 	assert.Len(t, allNotes(t, m), 1)
 	tasks, _ = m.tr.FindAll(context.Background(), model.TaskFilters{})
 	assert.Len(t, tasks, 1)
 	press(m, "ctrl+y")
 	assert.Equal(t, "Zorg", *personByID(t, pr, 1).Company, "ctrl+y is redo too")
 	press(m, "ctrl+r")
-	assert.Contains(t, m.View(), "Nothing to redo")
+	assert.Contains(t, plain(m.View()), "Nothing to redo")
 
 	// A new change clears what could be redone.
 	press(m, "ctrl+z")
@@ -271,7 +272,7 @@ func TestCommandBarUndoAndRedo(t *testing.T) {
 	press(m, "enter")
 	assert.Empty(t, m.redoStack)
 	press(m, "ctrl+r")
-	assert.Contains(t, m.View(), "Nothing to redo")
+	assert.Contains(t, plain(m.View()), "Nothing to redo")
 }
 
 func TestUndoIsRefusedWhenTheTargetChangedSince(t *testing.T) {
@@ -377,12 +378,12 @@ func TestToastExpiresAndFitsNarrowTerminals(t *testing.T) {
 	require.NotNil(t, cmd)
 	for _, size := range [][2]int{{100, 30}, {40, 10}, {20, 8}} {
 		m.Update(tea.WindowSizeMsg{Width: size[0], Height: size[1]})
-		lines := strings.Split(m.View(), "\n")
+		lines := strings.Split(plain(m.View()), "\n")
 		assert.LessOrEqual(t, len(lines), size[1])
 		for _, l := range lines {
 			assert.LessOrEqual(t, lipgloss.Width(l), size[0])
 		}
-		assert.Contains(t, m.View(), "a ")
+		assert.Contains(t, plain(m.View()), "a ")
 	}
 	// A stale timer does not clear a newer toast.
 	old := m.toast.seq
@@ -391,7 +392,7 @@ func TestToastExpiresAndFitsNarrowTerminals(t *testing.T) {
 	require.NotNil(t, m.toast)
 	m.Update(toastExpireMsg{seq: m.toast.seq})
 	assert.Nil(t, m.toast)
-	assert.NotContains(t, m.View(), "newer")
+	assert.NotContains(t, plain(m.View()), "newer")
 }
 
 func TestToastShowsOverOtherScreensAndInReadOnly(t *testing.T) {
@@ -399,9 +400,9 @@ func TestToastShowsOverOtherScreensAndInReadOnly(t *testing.T) {
 	m.readOnly = true
 	press(m, "ctrl+z")
 	assert.True(t, m.toast.isErr)
-	assert.Contains(t, m.View(), "read-only: undo is disabled")
+	assert.Contains(t, plain(m.View()), "read-only: undo is disabled")
 	press(m, "?")
-	assert.Contains(t, m.View(), "read-only: undo is disabled", "the toast shows on the help screen too")
+	assert.Contains(t, plain(m.View()), "read-only: undo is disabled", "the toast shows on the help screen too")
 }
 
 // paletteItem finds an action in the open palette by id.
@@ -440,10 +441,10 @@ func TestCommandBarReadOnlyOnlyLooks(t *testing.T) {
 	m.readOnly = true
 	openBar(m, "n hello")
 	require.NotNil(t, m.ov.cmd)
-	assert.Contains(t, m.View(), "read-only")
+	assert.Contains(t, plain(m.View()), "read-only")
 	press(m, "enter")
 	assert.Equal(t, modeOverlay, m.mode)
-	assert.Contains(t, m.View(), "read-only: this line would change data")
+	assert.Contains(t, plain(m.View()), "read-only: this line would change data")
 	assert.Empty(t, allNotes(t, m))
 }
 
@@ -457,7 +458,7 @@ func TestCommandBarLogTaskTagAndSnooze(t *testing.T) {
 	assert.Equal(t, "2026-10-12 12:00:00", its[0].OccurredAt)
 
 	openBar(m, "t send deck @fri 3pm ^high")
-	assert.Contains(t, m.View(), `task for Zed Adams: "send deck"`)
+	assert.Contains(t, plain(m.View()), `task for Zed Adams: "send deck"`)
 	press(m, "enter")
 	tasks, _ := m.tr.FindAll(context.Background(), model.TaskFilters{})
 	require.Len(t, tasks, 1)
@@ -502,7 +503,7 @@ func TestCommandBarFitsTheTerminal(t *testing.T) {
 			if strings.HasPrefix(line, "set") {
 				press(m, "enter")
 			}
-			out := m.View()
+			out := plain(m.View())
 			lines := strings.Split(out, "\n")
 			assert.LessOrEqual(t, len(lines), size[1], "height at %v for %q", size, line)
 			for _, l := range lines {
@@ -612,7 +613,7 @@ func TestShortSyntaxToggle(t *testing.T) {
 	assert.Equal(t, "keep #this @fri", *its[0].Content)
 
 	openBar(m, "n and #this too")
-	assert.Contains(t, m.View(), `"and #this too"`)
+	assert.Contains(t, plain(m.View()), `"and #this too"`)
 	press(m, "esc")
 
 	press(m, "ctrl+k")
@@ -664,6 +665,11 @@ func TestCommandBarActionsAreInTheRegistry(t *testing.T) {
 	assert.Contains(t, m.helpText(), "undo the last data change")
 }
 
+var ansiRE = regexp.MustCompile("\x1b\\[[0-9;]*m")
+
+// plain drops style codes, so tests read the text the user sees whatever the theme.
+func plain(s string) string { return ansiRE.ReplaceAllString(s, "") }
+
 func TestTasksCarryTagsInTheTui(t *testing.T) {
 	m, _ := newTestModel(t)
 	// A task made from the prompt reads #tag.
@@ -700,7 +706,7 @@ func TestTasksCarryTagsInTheTui(t *testing.T) {
 	press(m, "ctrl+z")
 	tasks, _ = m.tr.FindAll(context.Background(), model.TaskFilters{})
 	assert.Equal(t, []string{"urgent", "work"}, tasks[0].Tags)
-	assert.Contains(t, m.toast.text, "Undone: tag #work on task")
+	assert.Contains(t, m.toast.text, "Undone: remove tag #work from task")
 
 	// In the detail pane a task row shows its tags and T tags it too.
 	press(m, "2", "tab")

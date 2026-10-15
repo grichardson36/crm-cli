@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/jdanielnd/crm-cli/internal/dedupe"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/theme"
 	"github.com/mattn/go-runewidth"
 )
 
@@ -417,7 +418,7 @@ func (c *compareState) geometry(width int) (colW, vis int) {
 }
 
 // render returns exactly h lines for the body and, for each line, the field row shown there (or -1).
-func (c *compareState) render(width, h int) ([]string, []int) {
+func (c *compareState) render(st *theme.Styles, width, h int) ([]string, []int) {
 	colW, vis := c.geometry(width)
 	end := min(len(c.members), c.colOff+vis)
 	pad := strings.Repeat(" ", cmpLabelW)
@@ -428,11 +429,11 @@ func (c *compareState) render(width, h int) ([]string, []int) {
 		mb := c.members[j]
 		title := fmt.Sprintf("#%d %s", mb.id, cleanCell(mb.name))
 		if j == c.surv {
-			head += nameStyle.Render(fit(title, colW))
-			sub += nameStyle.Render(fit("keeps the record", colW))
+			head += st.Name.Render(fit(title, colW))
+			sub += st.Name.Render(fit("keeps the record", colW))
 		} else {
-			head += headStyle.Render(fit(title, colW))
-			sub += dimStyle.Render(fit("archived after merge", colW))
+			head += st.Head.Render(fit(title, colW))
+			sub += st.Dim.Render(fit("archived after merge", colW))
 		}
 	}
 	if c.colOff > 0 || end < len(c.members) {
@@ -446,14 +447,14 @@ func (c *compareState) render(width, h int) ([]string, []int) {
 		rowAt = append(rowAt, r)
 	}
 	if len(c.rows) == 0 {
-		push(dimStyle.Render("No field differs. The lists below are combined."), -1)
+		push(st.Dim.Render("No field differs. The lists below are combined."), -1)
 	}
 	for i, row := range c.rows {
 		label := fit(row.label, cmpLabelW)
 		if i == c.cur {
-			label = selStyle.Render(label)
+			label = st.Sel.Render(label)
 		} else {
-			label = dimStyle.Render(label)
+			label = st.Dim.Render(label)
 		}
 		win := c.resolved(i)
 		line := label
@@ -463,18 +464,18 @@ func (c *compareState) render(width, h int) ([]string, []int) {
 				v = "-"
 			}
 			if j == win {
-				line += nameStyle.Render(fit("✓ "+v, colW))
+				line += st.Name.Render(fit("✓ "+v, colW))
 			} else {
-				line += dimStyle.Render(fit("  "+v, colW))
+				line += st.Dim.Render(fit("  "+v, colW))
 			}
 		}
 		push(line, i)
 	}
 	nFields := len(body)
 	push("", -1)
-	push(headStyle.Render("Combined, always"), -1)
+	push(st.Head.Render("Combined, always"), -1)
 	for k, name := range countLabels {
-		line := dimStyle.Render(fit(name, cmpLabelW))
+		line := st.Dim.Render(fit(name, cmpLabelW))
 		for j := c.colOff; j < end; j++ {
 			line += fit(fmt.Sprint(c.members[j].counts[k]), colW)
 		}
@@ -483,9 +484,9 @@ func (c *compareState) render(width, h int) ([]string, []int) {
 	push("", -1)
 	switch {
 	case c.previewErr != "":
-		push(errStyle.Render(c.previewErr), -1)
+		push(st.Err.Render(c.previewErr), -1)
 	case c.preview != nil:
-		push(dimStyle.Render("result: "+summarize(c.preview)), -1)
+		push(st.Dim.Render("result: "+summarize(c.preview)), -1)
 	}
 
 	// The two header lines stay put, the field rows scroll to keep the cursor visible.
@@ -520,11 +521,11 @@ func (m *Model) compareView() string {
 		title += "  " + strings.Join(c.reasons, "; ")
 	}
 	cut := lipgloss.NewStyle().MaxWidth(m.width)
-	lines, _ := c.render(m.width, m.bodyHeight())
+	lines, _ := c.render(&m.st, m.width, m.bodyHeight())
 	for i := range lines {
 		lines[i] = cut.Render(lines[i])
 	}
-	return cut.Render(headStyle.Render(runewidth.Truncate(title, m.width, "…"))) + "\n" + strings.Join(lines, "\n") + "\n" + m.footerView()
+	return cut.Render(m.st.Head.Render(runewidth.Truncate(title, m.width, "…"))) + "\n" + strings.Join(lines, "\n") + "\n" + m.footerView()
 }
 
 // --- detail text for views without a form ---
@@ -535,23 +536,25 @@ func (m *Model) emptyDetail() string {
 	line := func(s string) string { return runewidth.Truncate(s, w, "…") }
 	r, ok := m.selected()
 	if !ok {
-		return dimStyle.Render("Nothing selected.")
+		return m.st.Dim.Render("Nothing selected.")
 	}
 	var b strings.Builder
 	switch m.view {
 	case viewSync:
 		return m.syncItemDetail(r)
+	case viewCalendar:
+		return m.calDetail()
 	case viewMerge:
 		if m.cursor >= len(m.groups) {
 			return ""
 		}
 		g := m.groups[m.cursor]
-		b.WriteString(nameStyle.Render(fmt.Sprintf("%s confidence, %d people", levelBadge(g.Level), len(g.Members))) + "\n")
+		b.WriteString(m.st.Name.Render(fmt.Sprintf("%s confidence, %d people", levelBadge(g.Level), len(g.Members))) + "\n")
 		for _, reason := range g.Reasons {
-			b.WriteString(dimStyle.Render(line(reason)) + "\n")
+			b.WriteString(m.st.Dim.Render(line(reason)) + "\n")
 		}
 		for _, mb := range g.Members {
-			b.WriteString("\n" + headStyle.Render(line(fmt.Sprintf("#%d %s", mb.ID, cleanCell(mb.Name)))) + "\n")
+			b.WriteString("\n" + m.st.Head.Render(line(fmt.Sprintf("#%d %s", mb.ID, cleanCell(mb.Name)))) + "\n")
 			for _, p := range m.people {
 				if p.ID != mb.ID {
 					continue
@@ -566,35 +569,35 @@ func (m *Model) emptyDetail() string {
 					b.WriteString(line(strings.Join(role, " at ")) + "\n")
 				}
 				if p.AllEmails != "" {
-					b.WriteString(dimStyle.Render(line(p.AllEmails)) + "\n")
+					b.WriteString(m.st.Dim.Render(line(p.AllEmails)) + "\n")
 				}
 				if p.Location != "" {
-					b.WriteString(dimStyle.Render(line(cleanCell(p.Location))) + "\n")
+					b.WriteString(m.st.Dim.Render(line(cleanCell(p.Location))) + "\n")
 				}
 			}
 		}
-		b.WriteString("\n" + dimStyle.Render("enter compares and merges, D dismisses"))
+		b.WriteString("\n" + m.st.Dim.Render("enter compares and merges, D dismisses"))
 	case viewArchived:
 		p := m.arch[r.personID]
 		if p == nil {
-			return dimStyle.Render("Nothing selected.")
+			return m.st.Dim.Render("Nothing selected.")
 		}
 		_ = m.pr.LoadDetails(m.ctx, p)
-		b.WriteString(nameStyle.Render(line(fullName(p))) + dimStyle.Render("  archived "+dateOnly(p.UpdatedAt)) + "\n\n")
+		b.WriteString(m.st.Name.Render(line(fullName(p))) + m.st.Dim.Render("  archived "+dateOnly(p.UpdatedAt)) + "\n\n")
 		for _, kv := range [][2]string{{"title", str(p.Title)}, {"company", str(p.Company)}, {"location", str(p.Location)}, {"birthday", formatBirthdayParts(p)}} {
 			if kv[1] != "" {
-				b.WriteString(dimStyle.Render(fit(kv[0], labelWidth)) + line(kv[1]) + "\n")
+				b.WriteString(m.st.Dim.Render(fit(kv[0], labelWidth)) + line(kv[1]) + "\n")
 			}
 		}
 		for _, e := range p.Emails {
-			b.WriteString(dimStyle.Render(fit("email", labelWidth)) + line(e.Email) + "\n")
+			b.WriteString(m.st.Dim.Render(fit("email", labelWidth)) + line(e.Email) + "\n")
 		}
 		for _, ph := range p.Phones {
-			b.WriteString(dimStyle.Render(fit("phone", labelWidth)) + line(ph.PhoneNumber) + "\n")
+			b.WriteString(m.st.Dim.Render(fit("phone", labelWidth)) + line(ph.PhoneNumber) + "\n")
 		}
-		b.WriteString("\n" + dimStyle.Render("u restores, X purges forever"))
+		b.WriteString("\n" + m.st.Dim.Render("u restores, X purges forever"))
 	default:
-		return dimStyle.Render("Nothing selected.")
+		return m.st.Dim.Render("Nothing selected.")
 	}
 	return strings.TrimRight(b.String(), "\n")
 }
@@ -607,7 +610,7 @@ func (m *Model) handleCompareMouse(x, y int, wheel int) {
 		c.move(wheel)
 		return
 	}
-	_, rowAt := c.render(m.width, m.bodyHeight())
+	_, rowAt := c.render(&m.st, m.width, m.bodyHeight())
 	line := y - 1
 	if line < 0 || line >= len(rowAt) || rowAt[line] < 0 {
 		return
