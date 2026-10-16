@@ -64,7 +64,7 @@ func registerTaskTagTools(s *server.MCPServer, db *sql.DB) {
 func registerTaskDeleteTool(s *server.MCPServer, tr *repo.TaskRepo) {
 	s.AddTool(
 		gomcp.NewTool("crm_task_delete",
-			gomcp.WithDescription("Delete (archive) a task. It leaves lists and the calendar. Set restore to true to bring a deleted task back."),
+			gomcp.WithDescription("Delete (archive) a task. It leaves lists. Set restore to true to bring a deleted task back."),
 			gomcp.WithNumber("id", gomcp.Required(), gomcp.Description("Task ID")),
 			gomcp.WithBoolean("restore", gomcp.Description("Restore a deleted task instead")),
 		),

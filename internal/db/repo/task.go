@@ -23,8 +23,7 @@ func NewTaskRepo(db *sql.DB) *TaskRepo {
 }
 
 const taskColumns = `id, uuid, title, description, person_id, deal_id, due_at, priority,
-	completed, completed_at, archived, created_at, updated_at, recurrence,
-	duration_min, earliest_start, deadline_at, deadline_hard, min_chunk_min, auto_schedule, scheduled_start, scheduled_locked, schedule_name`
+	completed, completed_at, archived, created_at, updated_at, recurrence`
 
 func scanTask(row interface{ Scan(...any) error }) (*model.Task, error) {
 	var t model.Task
@@ -32,8 +31,6 @@ func scanTask(row interface{ Scan(...any) error }) (*model.Task, error) {
 		&t.ID, &t.UUID, &t.Title, &t.Description, &t.PersonID, &t.DealID,
 		&t.DueAt, &t.Priority, &t.Completed, &t.CompletedAt,
 		&t.Archived, &t.CreatedAt, &t.UpdatedAt, &t.Recurrence,
-		&t.DurationMin, &t.EarliestStart, &t.DeadlineAt, &t.DeadlineHard, &t.MinChunkMin, &t.AutoSchedule,
-		&t.ScheduledStart, &t.ScheduledLocked, &t.ScheduleName,
 	)
 	return &t, err
 }
@@ -81,14 +78,9 @@ func (r *TaskRepo) Create(ctx context.Context, input model.CreateTaskInput) (*mo
 		}
 	}
 
-	schedCols, schedVals, err := scheduleColumns(input.Schedule)
-	if err != nil {
-		return nil, err
-	}
 	cols := []string{"uuid", "title", "description", "person_id", "deal_id", "due_at", "priority", "recurrence"}
 	id := uuid.New().String()
 	vals := []any{id, input.Title, input.Description, input.PersonID, input.DealID, input.DueAt, input.Priority, input.Recurrence}
-	cols, vals = append(cols, schedCols...), append(vals, schedVals...)
 	ph := strings.TrimSuffix(strings.Repeat("?, ", len(cols)), ", ")
 	result, err := r.db.ExecContext(ctx,
 		"INSERT INTO tasks ("+strings.Join(cols, ", ")+") VALUES ("+ph+")", vals...)
@@ -308,15 +300,6 @@ func (r *TaskRepo) Update(ctx context.Context, id int64, input model.UpdateTaskI
 			setClauses = append(setClauses, "recurrence = ?")
 			args = append(args, *input.Recurrence)
 		}
-	}
-
-	schedCols, schedVals, err := scheduleColumns(input.Schedule)
-	if err != nil {
-		return nil, err
-	}
-	for i, c := range schedCols {
-		setClauses = append(setClauses, c+" = ?")
-		args = append(args, schedVals[i])
 	}
 
 	if len(setClauses) == 0 {

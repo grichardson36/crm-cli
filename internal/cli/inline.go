@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/jdanielnd/crm-cli/internal/quick"
@@ -19,21 +20,27 @@ type inlineText struct {
 	Env quick.Env
 }
 
+// clockNow is the current time. CRM_NOW (RFC 3339) replaces it, so tests and agents can run
+// relative phrases such as "fri 3pm" against a fixed clock.
+func clockNow() time.Time {
+	if v := os.Getenv("CRM_NOW"); v != "" {
+		if t, err := time.Parse(time.RFC3339, v); err == nil {
+			return t
+		}
+	}
+	return time.Now()
+}
+
 // parseInline reads the short syntax in text. With noSyntax the text is left as it is.
 // dates turns on plain-word dates (fri, tomorrow 3pm), which tasks and logs read and names do not.
 func parseInline(ctx context.Context, db *sql.DB, text string, noSyntax, dates bool, skip ...shortsyntax.Kind) (*inlineText, error) {
-	return parseInlineWith(ctx, db, text, noSyntax, dates, false, skip...)
-}
-
-// parseInlineWith also reads "at <place>" when phrases is set (events).
-func parseInlineWith(ctx context.Context, db *sql.DB, text string, noSyntax, dates, phrases bool, skip ...shortsyntax.Kind) (*inlineText, error) {
 	now := clockNow()
 	env, err := quick.LoadEnv(ctx, db, now, 0)
 	if err != nil {
 		return nil, err
 	}
 	res := shortsyntax.Parse(text, shortsyntax.Options{
-		Now: now, Disabled: noSyntax, Dates: dates, Phrases: phrases, KnownTags: env.Tags, Names: env.Index.NameSet(), Skip: skip,
+		Now: now, Disabled: noSyntax, Dates: dates, KnownTags: env.Tags, Names: env.Index.NameSet(), Skip: skip,
 	})
 	return &inlineText{Res: res, Env: env}, nil
 }

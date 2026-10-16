@@ -135,7 +135,7 @@ func TestDeadlineAndDueTogether(t *testing.T) {
 }
 
 // TestNotSyntax lists text that looks like syntax but is not. The title must stay unchanged, even
-// with plain-word dates and places switched on.
+// with plain-word dates switched on.
 func TestNotSyntax(t *testing.T) {
 	texts := []string{
 		// emails, phones, urls
@@ -239,9 +239,7 @@ func TestNotSyntax(t *testing.T) {
 	}
 	for _, text := range texts {
 		t.Run(text, func(t *testing.T) {
-			o := opts()
-			o.Phrases = true
-			r := Parse(text, o)
+			r := Parse(text, opts())
 			assert.Equal(t, strings.TrimSpace(text), r.Title, "title changed: %+v", r.Spans)
 			assert.True(t, r.Empty(), "spans: %+v", r.Spans)
 			assert.Nil(t, r.Due)
@@ -647,11 +645,10 @@ func TestCombinedExamples(t *testing.T) {
 	assert.Equal(t, "high", r.Priority)
 	assert.Equal(t, []string{"Sam Lee"}, r.People)
 
-	r = Parse("lunch at Cafe Rio fri 12:30 for 1h", Options{Now: testNow, Dates: true, Phrases: true})
-	assert.Equal(t, "Cafe Rio", r.Location)
+	r = Parse("lunch at Cafe Rio fri 12:30 for 1h", Options{Now: testNow, Dates: true})
 	assert.Equal(t, "2026-10-16 12:30", whenStr(r.Due))
 	assert.Equal(t, 60, r.DurationMin)
-	assert.Equal(t, "lunch", r.Title)
+	assert.Equal(t, "lunch at Cafe Rio", r.Title, "an at-phrase is plain text")
 }
 
 func TestDatePhraseDoesNotSwallowTheTitle(t *testing.T) {
@@ -743,37 +740,13 @@ func TestWhitespaceAndNewlinesSurvive(t *testing.T) {
 func TestDeterministicForTheSameClock(t *testing.T) {
 	text := "Call Sam fri 3pm #work ~15m @Sam !high every 3m by mon at HQ"
 	o := opts()
-	o.Phrases = true
 	assert.Equal(t, Parse(text, o), Parse(text, o))
 }
 
-func TestLocationPhrase(t *testing.T) {
-	o := Options{Now: testNow, Phrases: true}
-	cases := []struct{ in, loc, title string }{
-		{"lunch at Cafe Rio", "Cafe Rio", "lunch"},
-		{"lunch at Cafe Rio #food", "Cafe Rio", "lunch"},
-		{"lunch at Cafe Rio, then walk", "Cafe Rio", "lunch, then walk"},
-		{"at the office", "the office", ""},
-		{"meet at home #family", "home", "meet"},
-		{"AT Cafe Rio", "Cafe Rio", ""},
-		{"standup at HQ ~15m", "HQ", "standup"},
-		{"drinks at 3pm", "", "drinks at 3pm"},
-		{"drinks at", "", "drinks at"},
-		{"drinks at #x", "", "drinks at"},
-		{"at . .", "", "at . ."},
-		{"look at one two three four five six", "one two three four five", "look six"},
-	}
-	for _, c := range cases {
-		t.Run(c.in, func(t *testing.T) {
-			r := Parse(c.in, o)
-			assert.Equal(t, c.loc, r.Location)
-			assert.Equal(t, c.title, r.Title)
-		})
-	}
-	// Without Phrases an "at" stays text.
+func TestAtPlaceIsPlainText(t *testing.T) {
 	r := Parse("lunch at Cafe Rio", Options{Now: testNow})
 	assert.Equal(t, "lunch at Cafe Rio", r.Title)
-	assert.Empty(t, r.Location)
+	assert.True(t, r.Empty())
 }
 
 func TestClockMovesRelativeResults(t *testing.T) {
@@ -860,10 +833,10 @@ func TestInvariants(t *testing.T) {
 		"ok.", "1/2", "now", "tom", "Tom",
 	}
 	rng := rand.New(rand.NewSource(7))
-	for _, phrases := range []bool{false, true} {
+	{
 		for _, dates := range []bool{false, true} {
 			o := opts()
-			o.Phrases, o.Dates = phrases, dates
+			o.Dates = dates
 			o.People = []string{"Sam Lee", "José García"}
 			for n := 0; n < 400; n++ {
 				count := 1 + rng.Intn(9)

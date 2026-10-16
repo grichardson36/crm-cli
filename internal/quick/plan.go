@@ -860,7 +860,7 @@ func (b *builder) planTask(title string, res shortsyntax.Result) {
 		subj, links = &links[0], links[1:]
 		p.Subject, p.Links = subj, links
 	}
-	tf := TaskFieldsOf(res, b.env.now().Location())
+	tf := TaskFieldsOf(res)
 	prio, due, description := tf.Priority, tf.Due, tf.Description
 	if b.env.DueOverride != "" {
 		due = b.env.DueOverride
@@ -889,8 +889,10 @@ func (b *builder) planTask(title string, res shortsyntax.Result) {
 	} else if res.Due != nil {
 		parts = append(parts, "due "+formatWhen(*res.Due))
 	}
-	if res.Deadline != nil {
-		parts = append(parts, "deadline "+formatWhen(*res.Deadline))
+	if res.Deadline != nil && res.Due != nil {
+		b.warn("the deadline %q is ignored because the task already has a due date", formatWhen(*res.Deadline))
+	} else if res.Deadline != nil && b.env.DueOverride == "" {
+		parts = append(parts, "due "+formatWhen(*res.Deadline))
 	}
 	if res.Recurrence != "" {
 		parts = append(parts, "repeats "+strings.TrimPrefix(res.Recurrence, "every "))
@@ -899,13 +901,13 @@ func (b *builder) planTask(title string, res shortsyntax.Result) {
 		parts = append(parts, res.TaskPriority()+" priority")
 	}
 	if res.DurationMin > 0 {
-		parts = append(parts, formatMinutes(res.DurationMin))
+		b.warn("the duration %s is ignored: tasks have no duration field", formatMinutes(res.DurationMin))
 	}
 	ch := Change{Op: "create", Entity: "task", Label: title, Field: "due", New: due}
 	p.ops = append(p.ops, op{
 		preview: []Change{ch},
 		run: func(ctx context.Context, r Repos, st *runState) ([]Change, error) {
-			in := model.CreateTaskInput{Title: title, Priority: prio, Schedule: tf.Schedule}
+			in := model.CreateTaskInput{Title: title, Priority: prio}
 			if due != "" {
 				in.DueAt = &due
 			}

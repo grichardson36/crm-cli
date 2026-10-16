@@ -10,13 +10,12 @@ A token counts only when it parses, so `jane@example.com`, `#42` and `every time
 |---|---|
 | `#deal` | tag, unknown tags are created |
 | `@Sam`, `@Sam_Lee` | link a person (several matches or none: you choose) |
-| `fri 3pm`, `tomorrow`, `next week`, `in 2 weeks`, `mar 4` | due date or time (tasks, logs, events) |
-| `by fri` | deadline |
+| `fri 3pm`, `tomorrow`, `next week`, `in 2 weeks`, `mar 4` | due date or time (tasks and logs) |
+| `by fri` | due date, when the task has no other due date |
 | `remind fri` | reminder date in a note, where bare dates are not read |
-| `~30m`, `for 2 hours` | duration |
+| `~30m`, `for 2 hours` | duration. Read and removed from the title, then ignored with a warning (tasks have no duration field) |
 | `!high`, `!!!` (`!!` is medium) | priority |
 | `every 3m`, `every 2 weeks`, `every fri` | repeat. A cadence crm knows (1w 2w 6w 1m 3m 6m 1y) also sets keep in touch |
-| `at Cafe Rio` | place (events) |
 
 A time with no date means today, or tomorrow when it has passed. `sat` or `mon` alone is a day only with a helper (`on sat`, `sat 3pm`).
 
@@ -26,7 +25,7 @@ A time with no date means today, or tomorrow when it has passed. `sat` or `mon` 
 crm do "n Jane called about the deal #deal remind fri" --dry-run
 crm do "t Jane send the contract fri 3pm by mon !high"
 crm do "set Jane: company=Acme title=CTO"
-crm task add "Call back fri 3pm for 30m @Jane" --dry-run
+crm task add "Call back fri 3pm @Jane" --dry-run
 crm log add --type call 1 "Talked about the offsite #trip yesterday" --dry-run
 ```
 

@@ -237,7 +237,7 @@ func personDef() *objDef {
 		can:  map[verb]bool{vAdd: true, vEdit: true, vLink: true, vUnlink: true, vDelete: true, vRestore: true, vMark: true},
 		ids:  map[verb]string{vAdd: "new", vDelete: "archive", vRestore: "restore", vEdit: "person-edit"},
 		selected: func(m *Model) int64 {
-			if !whenPerson(m) || m.view == viewCalendar || m.view == viewSync || m.view == viewMerge {
+			if !whenPerson(m) || m.view == viewSync || m.view == viewMerge {
 				return 0
 			}
 			return m.curPerson()
@@ -268,7 +268,7 @@ func personDef() *objDef {
 			switch v {
 			case vAdd:
 				if key == "+" {
-					return m.view < numViews && m.view != viewCalendar && m.view != viewTasks
+					return m.view < numViews && m.view != viewTasks
 				}
 				// a is the Add row key in the detail form, so it adds a person only from a people list.
 				switch m.view {

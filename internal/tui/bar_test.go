@@ -200,11 +200,9 @@ func TestBarEqualsScopeListsEverySetting(t *testing.T) {
 	assert.Equal(t, map[string]int{kindSetting: len(m.settingList())}, kindsOf(m))
 	got := strings.Join(settingLabels(m), "\n")
 	for _, want := range []string{"Theme: ", "Keys: defaults", "Short syntax: on", "Read-only: off", "Database: ", "Doctor",
-		"Sync sources: 0", "Working hours: mon-fri 09:00-17:00", "Display zone: "} {
+		"Sync sources: 0"} {
 		assert.Contains(t, got, want)
 	}
-	typeText(m, "hours")
-	assert.Len(t, settingLabels(m), 2, "working hours, and set working hours")
 }
 
 func TestBarSettingToggleRunsTheAction(t *testing.T) {

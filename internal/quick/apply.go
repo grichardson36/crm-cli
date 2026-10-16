@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jdanielnd/crm-cli/internal/cal/tz"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/jdanielnd/crm-cli/internal/shortsyntax"
@@ -26,13 +25,11 @@ type TaskFields struct {
 	Description string
 	// Recurrence is the stored repeat ("2 weeks"), when the phrase is an interval.
 	Recurrence string
-	// Schedule carries the duration (~30m, for 30m) and the deadline (by fri).
-	Schedule model.TaskSchedule
 }
 
-// TaskFieldsOf maps a parse result to task columns. Priority defaults to medium. loc is the zone
-// of the clock, used for the instant of a deadline that has a time.
-func TaskFieldsOf(res shortsyntax.Result, loc *time.Location) TaskFields {
+// TaskFieldsOf maps a parse result to task columns. Priority defaults to medium. A deadline
+// (by fri) becomes the due date when no other due date is given.
+func TaskFieldsOf(res shortsyntax.Result) TaskFields {
 	tf := TaskFields{Priority: res.TaskPriority()}
 	if tf.Priority == "" {
 		tf.Priority = "medium"
@@ -40,13 +37,8 @@ func TaskFieldsOf(res shortsyntax.Result, loc *time.Location) TaskFields {
 	if res.Due != nil {
 		tf.Due = res.Due.String()
 	}
-	if res.DurationMin > 0 {
-		n := res.DurationMin
-		tf.Schedule.DurationMin = &n
-	}
-	if res.Deadline != nil {
-		d := DeadlineText(*res.Deadline, loc)
-		tf.Schedule.DeadlineAt = &d
+	if tf.Due == "" && res.Deadline != nil {
+		tf.Due = res.Deadline.String()
 	}
 	if res.Recurrence != "" {
 		if rec, ok := RecurrenceOf(res.Recurrence); ok {
@@ -56,22 +48,6 @@ func TaskFieldsOf(res shortsyntax.Result, loc *time.Location) TaskFields {
 		}
 	}
 	return tf
-}
-
-// DeadlineText is the stored deadline of a task: the date for an all-day deadline, otherwise the
-// instant in UTC.
-func DeadlineText(w shortsyntax.When, loc *time.Location) string {
-	if w.Time == "" || w.Date == "" {
-		return w.Date
-	}
-	if loc == nil {
-		loc = time.Local
-	}
-	t, err := time.ParseInLocation("2006-01-02 15:04", w.Date+" "+w.Time, loc)
-	if err != nil {
-		return w.Date
-	}
-	return tz.FormatInstant(t)
 }
 
 // RecurrenceOf turns "every 2 weeks" or "every month" into a task repeat such as "2 weeks" or
@@ -603,4 +579,4 @@ func SettleNames(ctx context.Context, r Repos, line string, env Env, plan *Plan,
 	}
 	env.Choices = choices
 	return Parse(line, env), created, nil
-}
+}

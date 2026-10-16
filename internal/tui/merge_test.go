@@ -412,13 +412,11 @@ func TestNumberAndBracketKeysCoverEveryView(t *testing.T) {
 		press(m, string(rune('0'+v)))
 		assert.Equal(t, viewKind(v-1), m.view)
 	}
-	assert.Equal(t, viewCalendar, m.view)
-	press(m, "]")
-	assert.Equal(t, viewHome, m.view, "] wraps around, also from the Calendar")
-	press(m, "[")
-	assert.Equal(t, viewCalendar, m.view, "[ wraps back")
-	press(m, "[")
 	assert.Equal(t, viewSync, m.view)
+	press(m, "]")
+	assert.Equal(t, viewHome, m.view, "] wraps around, also from Sync")
+	press(m, "[")
+	assert.Equal(t, viewSync, m.view, "[ wraps back")
 }
 
 func TestCompareAndNewViewsFitTerminals(t *testing.T) {

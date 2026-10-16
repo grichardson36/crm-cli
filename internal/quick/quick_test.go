@@ -305,7 +305,8 @@ func TestTask(t *testing.T) {
 	assert.Contains(t, p.Preview, `task for Bob Baker: "call back"`)
 	assert.Contains(t, p.Preview, "due Fri 16 Oct 15:00")
 	assert.Contains(t, p.Preview, "high priority")
-	assert.Contains(t, p.Preview, "30m")
+	assert.Contains(t, p.Warnings, "the duration 30m is ignored: tasks have no duration field")
+	assert.Contains(t, p.Warnings, `the deadline "Mon 19 Oct" is ignored because the task already has a due date`)
 	res, err := Apply(context.Background(), f.repos, p)
 	require.NoError(t, err)
 	require.Len(t, res.Changes, 1)
@@ -316,24 +317,18 @@ func TestTask(t *testing.T) {
 	assert.Equal(t, "high", task.Priority)
 	assert.Equal(t, f.ids["Bob Baker"], *task.PersonID)
 	assert.Nil(t, task.Description)
-	require.NotNil(t, task.DurationMin)
-	assert.Equal(t, 30, *task.DurationMin)
-	require.NotNil(t, task.DeadlineAt)
-	assert.Equal(t, "2026-10-19", *task.DeadlineAt)
-	assert.Contains(t, p.Preview, "deadline Mon 19 Oct")
 }
 
-func TestTaskDeadlineIsItsOwnColumn(t *testing.T) {
+func TestTaskDeadlineBecomesDueWhenThereIsNoDueDate(t *testing.T) {
 	f := newFixture(t)
 	p := Parse("t Bob send deck by fri 5pm", f.env(""))
 	require.Empty(t, p.Problems)
-	assert.Contains(t, p.Preview, "deadline Fri 16 Oct 17:00")
+	assert.Contains(t, p.Preview, "due Fri 16 Oct 17:00")
 	res, err := Apply(context.Background(), f.repos, p)
 	require.NoError(t, err)
 	task, _ := f.repos.Tasks.FindByID(context.Background(), res.Changes[0].ID)
-	assert.Nil(t, task.DueAt, "a deadline does not set the soft due date")
-	require.NotNil(t, task.DeadlineAt)
-	assert.Equal(t, "2026-10-16T17:00:00Z", *task.DeadlineAt, "the clock is UTC in tests")
+	require.NotNil(t, task.DueAt)
+	assert.Equal(t, "2026-10-16 17:00", *task.DueAt)
 	assert.Nil(t, task.Description)
 }
 
@@ -911,7 +906,6 @@ func TestTaskRepeatDurationAndDeadline(t *testing.T) {
 	p := Parse("t Bob check in fri every 2 weeks for 45m by next mon !!!", f.env(""))
 	require.Empty(t, p.Problems, p.Preview)
 	assert.Contains(t, p.Preview, "repeats 2 weeks")
-	assert.Contains(t, p.Preview, "45m")
 	assert.Contains(t, p.Preview, "high priority")
 	res, err := Apply(context.Background(), f.repos, p)
 	require.NoError(t, err)
@@ -919,8 +913,6 @@ func TestTaskRepeatDurationAndDeadline(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "check in", task.Title)
 	assert.Equal(t, "2 weeks", *task.Recurrence)
-	assert.Equal(t, 45, *task.DurationMin)
-	assert.Equal(t, "2026-10-19", *task.DeadlineAt)
 	assert.Equal(t, "2026-10-16", *task.DueAt)
 	assert.Equal(t, "high", task.Priority)
 

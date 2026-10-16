@@ -1,5 +1,5 @@
 // Package shortsyntax parses inline short syntax out of free text: tags, people, dates,
-// deadlines, durations, priorities, repeats and places. It is a pure function of the text, the
+// deadlines, durations, priorities and repeats. It is a pure function of the text, the
 // options and a clock the caller injects, so the CLI, the MCP server, the TUI and agents read the
 // same text the same way.
 //
@@ -16,7 +16,6 @@
 //	                today, tomorrow, fri, next week, in 2 weeks, mar 4, 2026-11-01, 3pm, 15:00, noon
 //	every 3m        repeat. every day, every fri, every 2 weeks stay as raw text. A cadence that
 //	                crm knows (every 1w, 2w, 6w, 1m, 3m, 6m, 1y) also sets the keep-in-touch cadence
-//	at Place        location (only when Options.Phrases is set)
 //	\#              a backslash before a sigil keeps the text literal. Text in "double quotes" is not read.
 //
 // A token counts as syntax only when it parses validly. "a@b.com", "#42", "~5 items" and
@@ -43,7 +42,6 @@ const (
 	KindCadence    Kind = "cadence"
 	KindPerson     Kind = "person"
 	KindPriority   Kind = "priority"
-	KindLocation   Kind = "location"
 	KindRecurrence Kind = "recurrence"
 	KindEscape     Kind = "escape"
 )
@@ -95,7 +93,6 @@ type Result struct {
 	People []string `json:"people,omitempty"`
 	// Priority is top, high, medium, low or none.
 	Priority string `json:"priority,omitempty"`
-	Location string `json:"location,omitempty"`
 	// Recurrence is the raw "every ..." phrase, lower case: "every fri", "every 2 weeks".
 	Recurrence string `json:"recurrence,omitempty"`
 	Spans      []Span `json:"spans,omitempty"`
@@ -142,7 +139,7 @@ func (r Result) TaskPriority() string {
 }
 
 // Options control a parse. The zero value reads tags, people, priorities, durations, "by", "remind",
-// "for" and "every". Plain-word dates and "at <place>" are opt-in.
+// "for" and "every". Plain-word dates are opt-in.
 type Options struct {
 	// Now is the clock for relative dates. The zero value means time.Now().
 	Now time.Time
@@ -151,8 +148,6 @@ type Options struct {
 	// Dates reads dates and times written as plain words (fri, tomorrow 3pm, next week). Ordinary
 	// sentences contain such words, so notes leave this off and use "remind fri" instead.
 	Dates bool
-	// Phrases enables "at <place>".
-	Phrases bool
 	// KnownTags, when not nil, flags tags outside the list as new. Matching ignores case.
 	KnownTags []string
 	// People are known full names. They let "@Sam Lee" match two words.
@@ -399,9 +394,6 @@ func (p *parser) keyword(i, lead int) int {
 				if n := p.dateWord(i, lead, i+1, KindDue, true); n > 0 {
 					return n
 				}
-			}
-			if low == "at" && p.opts.Phrases {
-				return p.location(i)
 			}
 			return 0
 		}
@@ -725,55 +717,6 @@ func validNameToken(s string) bool {
 		}
 	}
 	return !first
-}
-
-// location reads "at <place>": the words up to the next token, a comma, or five words.
-func (p *parser) location(i int) int {
-	if p.skip[KindLocation] || p.res.Location != "" {
-		return 0
-	}
-	var parts []string
-	n := 1
-	end := p.words[i].end
-	for k := i + 1; k < len(p.words) && len(parts) < 5; k++ {
-		if p.quoted[k] || p.isTokenAt(k) {
-			break
-		}
-		w := p.words[k]
-		core, tail := trimTrail(w.text)
-		if core == "" {
-			break
-		}
-		if len(parts) == 0 {
-			if _, ok := parseWhen([]string{strings.ToLower(core)}, p.now, false); ok {
-				return 0
-			}
-			if r, _ := utf8.DecodeRuneInString(core); !unicode.IsLetter(r) && !unicode.IsDigit(r) {
-				return 0
-			}
-		}
-		parts = append(parts, core)
-		n++
-		end = w.end - tail
-		if tail > 0 && strings.ContainsAny(w.text[len(w.text)-tail:], ",;.:!?") {
-			break
-		}
-	}
-	if len(parts) == 0 {
-		return 0
-	}
-	place := strings.Join(parts, " ")
-	p.res.Location = place
-	p.add(KindLocation, p.words[i].start, end, place)
-	return n
-}
-
-// isTokenAt reports whether word k starts another token. It parses on a scratch copy so nothing is recorded.
-func (p *parser) isTokenAt(k int) bool {
-	scratch := newParser(p.text, p.opts)
-	scratch.words, scratch.quoted = p.words, p.quoted
-	scratch.opts.Phrases = false // "at" inside a place is part of the place
-	return scratch.token(k) > 0
 }
 
 var recurrenceWords = map[string]bool{

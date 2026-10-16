@@ -150,3 +150,5 @@ func TestDeleteTagIsGreyedOutInReadOnly(t *testing.T) {
 	}
 	t.Fatal("Delete tag is not listed")
 }
+
+func ip(n int64) *int64 { return &n }

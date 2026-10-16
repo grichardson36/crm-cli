@@ -50,7 +50,7 @@ func TestOrgsAndDealsStayOutOfDefaultNavigation(t *testing.T) {
 	runPalette(m, "deals view")
 	assert.Equal(t, viewDeals, m.view)
 	press(m, "[")
-	assert.Equal(t, viewCalendar, m.view)
+	assert.Equal(t, viewSync, m.view)
 }
 
 func TestOrgAddEditDeleteRestoreWithUndo(t *testing.T) {

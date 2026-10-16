@@ -62,7 +62,7 @@ func TestOpen_MigrationVersion(t *testing.T) {
 
 	var version int
 	_ = d.QueryRow("PRAGMA user_version").Scan(&version)
-	assert.Equal(t, 15, version)
+	assert.Equal(t, 7, version)
 }
 
 func TestMigration002_BackfillsFromV1(t *testing.T) {

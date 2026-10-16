@@ -100,30 +100,10 @@ func deref0(p *string) string {
 	return "s:" + *p
 }
 
-// eventFieldValues flattens the fields of an event that sync tracks. The schedule is one field,
-// because moving an event changes its start, end and zone together.
-func eventFieldValues(e *model.Event) map[string]string {
-	when := fmt.Sprintf("%t|%s|%s|%s|%s|%s", e.AllDay, deref0(e.StartUTC), deref0(e.EndUTC), deref0(e.StartDate), deref0(e.EndDate), deref0(e.TZ))
-	return map[string]string{
-		"title": "s:" + e.Title, "notes": deref0(e.Notes), "location": deref0(e.Location), "when": when,
-		"rrule": deref0(e.RRule), "status": "s:" + e.Status, "busy": "b:" + strconv.FormatBool(e.Busy),
-	}
-}
-
 // taskFieldValues flattens the fields of a task that sync tracks.
 func taskFieldValues(t *model.Task) map[string]string {
-	n := func(p *int) string {
-		if p == nil {
-			return "\x00"
-		}
-		return "i:" + strconv.Itoa(*p)
-	}
 	return map[string]string{
 		"title": "s:" + t.Title, "description": deref0(t.Description), "due_at": deref0(t.DueAt), "priority": "s:" + t.Priority,
 		"recurrence": deref0(t.Recurrence), "completed": "b:" + strconv.FormatBool(t.Completed),
-		"duration_min": n(t.DurationMin), "earliest_start": deref0(t.EarliestStart), "deadline_at": deref0(t.DeadlineAt),
-		"deadline_hard": "b:" + strconv.FormatBool(t.DeadlineHard), "min_chunk_min": n(t.MinChunkMin),
-		"auto_schedule": "b:" + strconv.FormatBool(t.AutoSchedule), "scheduled_start": deref0(t.ScheduledStart),
-		"scheduled_locked": "b:" + strconv.FormatBool(t.ScheduledLocked), "schedule_name": "s:" + t.ScheduleName,
 	}
 }

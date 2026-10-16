@@ -77,20 +77,6 @@ type Sink interface {
 	LogInteraction(ctx context.Context, source, externalID string, rec InteractionRecord) (Outcome, error)
 }
 
-// Host is what an adapter that manages more than people and interactions (events, say) can ask
-// of its sink: the database, whether this is a dry run, and a way to put its own work in the
-// run's counts. The built-in sink implements it, and adapters must work without it.
-type Host interface {
-	DB() *sql.DB
-	IsDryRun() bool
-	// Count adds one outcome to the run's counts.
-	Count(Outcome)
-	// Fail counts one error and keeps its message for the run note.
-	Fail(error)
-	// Note adds a line to the run note.
-	Note(string)
-}
-
 // Registry holds the adapters a process can run.
 type Registry struct {
 	adapters map[string]Adapter
@@ -114,9 +100,6 @@ func DefaultRegistry(getenv func(string) string) *Registry {
 	}
 	return NewRegistry(list...)
 }
-
-// Add registers another adapter.
-func (r *Registry) Add(a Adapter) { r.adapters[a.Name()] = a }
 
 // Get returns an adapter by name.
 func (r *Registry) Get(name string) (Adapter, error) {
@@ -210,12 +193,6 @@ func (r *Runner) Run(ctx context.Context, source string, opts RunOptions) (*RunR
 	}
 	if res.Status == model.SyncFailed {
 		res.NextCursor = since
-	}
-	for _, n := range sink.notes {
-		if res.Note != "" {
-			res.Note += "; "
-		}
-		res.Note += n
 	}
 	if res.Inbox > 0 {
 		if res.Note != "" {

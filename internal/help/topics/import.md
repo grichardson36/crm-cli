@@ -31,6 +31,6 @@ crm status
 crm dupes
 ```
 
-Imports often create duplicates. Review them with `crm help duplicates`. Pulling from live services (contacts, calendars, mail) goes through the sync runner. See `crm help sync`.
+Imports often create duplicates. Review them with `crm help duplicates`. Pulling from live services (contacts, mail) goes through the sync runner. See `crm help sync`.
 
 See also: duplicates, sync, install.

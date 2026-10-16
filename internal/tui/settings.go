@@ -5,9 +5,6 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/jdanielnd/crm-cli/internal/cal/tz"
-	"github.com/jdanielnd/crm-cli/internal/db/repo"
-	"github.com/jdanielnd/crm-cli/internal/model"
 )
 
 // Settings in the bar. Typing a setting name finds it with its current value, and enter opens the
@@ -63,45 +60,10 @@ func (m *Model) settingList() []setting {
 			action: "domains"},
 		{id: "doctor", name: "Doctor", words: "health check install problems fix", desc: "check the installation and database, with a fix for each problem",
 			action: "doctor"},
-		{id: "sync", name: "Sync sources", words: "adapters caldav carddav inbox", desc: "open the Sync view: sources, last runs and the inbox",
+		{id: "sync", name: "Sync sources", words: "adapters carddav inbox", desc: "open the Sync view: sources, last runs and the inbox",
 			value: func(m *Model) string { return fmt.Sprintf("%d", len(m.registry.Names())) },
 			run:   func(m *Model) tea.Cmd { m.switchView(viewSync); return nil }},
-		{id: "hours", name: "Working hours", words: "schedule availability week days", desc: "show working hours and the scheduling defaults",
-			value: func(m *Model) string { return m.hoursSummary() }, action: "cal-hours"},
-		{id: "hours-set", name: "Working hours: set", words: "schedule availability change edit", desc: "set the hours of some weekdays, such as mon-fri 09:00-17:00",
-			action: "cal-hours-set"},
-		{id: "zone", name: "Display zone", words: "timezone time zone tz", desc: "show times in another IANA zone for this session",
-			value: func(m *Model) string { return tz.Name(m.loc) }, action: "cal-zone"},
 	}
-}
-
-// hoursSummary is the weekly working hours on one line, such as "mon-fri 09:00-17:00".
-func (m *Model) hoursSummary() string {
-	h, err := repo.NewAvailabilityRepo(m.db).Get(m.ctx, "")
-	if err != nil {
-		return ""
-	}
-	var parts []string
-	days := model.WeekdayKeys
-	for i := 0; i < len(days); {
-		line := rangesLine(h.Weekly[days[i]])
-		j := i
-		for j+1 < len(days) && rangesLine(h.Weekly[days[j+1]]) == line {
-			j++
-		}
-		if line != "off" {
-			span := days[i]
-			if j > i {
-				span += "-" + days[j]
-			}
-			parts = append(parts, span+" "+line)
-		}
-		i = j + 1
-	}
-	if len(parts) == 0 {
-		return "off"
-	}
-	return strings.Join(parts, ", ")
 }
 
 func hasWordPrefix(words []string, prefix string) bool {

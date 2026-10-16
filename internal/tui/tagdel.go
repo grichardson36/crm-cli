@@ -5,7 +5,7 @@ import "fmt"
 // Delete a tag everywhere (same as crm tag delete). The undo puts the tag back on the records
 // that had it.
 
-var taggableEntities = []string{"person", "organization", "deal", "interaction", "event", "task"}
+var taggableEntities = []string{"person", "organization", "deal", "interaction", "task"}
 
 // openTagDelete lists the tags and asks y/n before deleting the one picked.
 func (m *Model) openTagDelete() {

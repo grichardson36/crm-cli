@@ -64,10 +64,6 @@ func (m *Model) baseView() string {
 	if m.cmp != nil {
 		return m.compareView()
 	}
-	if m.calGrid() {
-		body := m.calGridBody(m.width, m.bodyHeight())
-		return strings.Join([]string{m.tabsView(), body, m.footerView()}, "\n")
-	}
 	listW := m.listWidth()
 	bodyH := m.bodyHeight()
 	detailW := m.width - listW - 1
@@ -159,8 +155,6 @@ func (m *Model) countText() string {
 		return fmt.Sprintf("%d groups, %s+", len(m.rows), m.minLevel)
 	case viewArchived:
 		return fmt.Sprintf("%d archived", len(m.rows))
-	case viewCalendar:
-		return m.calCountText()
 	case viewOrgs:
 		return fmt.Sprintf("%d organizations", len(m.rows))
 	case viewDeals:
@@ -215,8 +209,6 @@ func (m *Model) listView(w, h int) string {
 			return m.st.Dim.Render("Nothing archived. # archives the selected person.")
 		case m.view == viewSync:
 			return m.st.Dim.Render("No sync sources connected yet.")
-		case m.view == viewCalendar:
-			return m.st.Dim.Render("Nothing planned. + adds an event.")
 		case m.view == viewOrgs:
 			return m.st.Dim.Render("No organizations. a adds one.")
 		case m.view == viewDeals:
@@ -294,7 +286,7 @@ var footShort = map[string]string{
 	"open": "open", "back": "back", "compare": "compare", "dupe-level": "level", "dismiss": "dismiss",
 	"undo-dismiss": "undo", "merge-marked": "merge", "archive": "archive", "restore": "restore", "purge": "purge",
 	"home-open": "open", "sync-now": "sync", "sync-dry": "dry-run", "inbox-accept": "accept", "inbox-attach": "attach",
-	"inbox-ignore": "ignore", "cal-add": "add", "cal-open": "edit", "cal-delete": "delete", "cal-today": "today", "cal-prev": "prev", "cal-next": "next", "cal-agenda": "agenda", "cal-day": "day", "cal-week": "week", "cal-month": "month", "goto-view": "views", "note-retype": "type",
+	"inbox-ignore": "ignore", "goto-view": "views", "note-retype": "type",
 	"org-add": "add", "org-edit": "edit", "org-delete": "delete",
 	"deal-add": "add", "deal-edit": "edit", "deal-delete": "delete", "deal-stage": "stage",
 	"cmp-left": "pick", "cmp-pick": "toggle", "cmp-survivor": "survivor", "cmp-pair": "pair", "cmp-view": "pane", "cmp-confirm": "merge", "cmp-back": "back",
@@ -398,13 +390,6 @@ func (m *Model) hintsLine() string {
 	case modePrompt:
 		if m.promptKind == "note" {
 			return m.st.Dim.Render("enter save  tab type  esc cancel")
-		}
-		if m.mode == modePrompt && (m.promptKind == "cal-add" || m.promptKind == "cal-edit") {
-			hint, bad := m.calPromptHint()
-			if bad {
-				return m.st.Err.Render(runewidth.Truncate(hint, m.width, "…"))
-			}
-			return m.st.Dim.Render(runewidth.Truncate(hint+"   enter saves, esc cancels", m.width, "…"))
 		}
 		return m.st.Dim.Render("enter confirm  esc cancel")
 	}

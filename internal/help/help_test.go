@@ -12,7 +12,7 @@ import (
 
 var requiredTopics = []string{
 	"overview", "people", "orgs", "links", "contact-methods", "keep-in-touch", "birthdays", "tasks", "notes", "note-types", "short-syntax", "tags",
-	"duplicates", "archive", "domains", "import", "sync", "sync-inbox", "dav", "dav-server", "calendar", "calendar-ics", "calendar-plan", "caldav", "book", "reminders", "output", "errors", "agents",
+	"duplicates", "archive", "domains", "import", "sync", "sync-inbox", "dav", "dav-server", "output", "errors", "agents",
 	"tui", "tui-keys", "keys", "theme", "install", "backup",
 }
 

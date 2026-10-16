@@ -24,7 +24,6 @@ var lookupSQL = map[string]string{
 	"deal":         "SELECT title, archived FROM deals WHERE id = ?",
 	"task":         "SELECT title, archived FROM tasks WHERE id = ?",
 	"interaction":  "SELECT coalesce(subject, type), archived FROM interactions WHERE id = ?",
-	"event":        "SELECT title, archived FROM events WHERE id = ?",
 }
 
 // LookupRecord finds a record by entity and ID, archived or not. It returns ErrNotFound when

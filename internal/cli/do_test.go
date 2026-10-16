@@ -168,7 +168,7 @@ func TestTaskAddInlineSyntax(t *testing.T) {
 	assert.Equal(t, "2026-12-24 15:00", task["due_at"])
 	assert.Equal(t, "high", task["priority"])
 	assert.Equal(t, []any{float64(3)}, task["person_ids"])
-	assert.Equal(t, float64(30), task["duration_min"])
+	assert.Contains(t, stderr, "the duration 30m is ignored")
 	assert.Equal(t, "Call back", out["syntax"].(map[string]any)["title"])
 
 	stdout, _, _ = crm(t, path, "task", "list", "-f", "json")
@@ -181,7 +181,12 @@ func TestTaskAddInlineSyntax(t *testing.T) {
 	assert.Equal(t, "Call back", created["title"])
 	assert.Equal(t, "2026-12-24 15:00", created["due_at"])
 	assert.Equal(t, float64(3), created["person_id"])
-	assert.Equal(t, "2026-12-30", created["deadline_at"])
+	assert.Contains(t, stderr, "the deadline", "by is ignored when a due date is given")
+
+	// With no other due date, by sets it.
+	stdout, stderr, code = crm(t, path, "task", "add", "Send deck by 2026-12-30", "-f", "json")
+	require.Equal(t, 0, code, stderr)
+	assert.Equal(t, "2026-12-30", decodeList(t, stdout)[0]["due_at"])
 }
 
 func TestTaskAddFlagsWinOverInlineSyntax(t *testing.T) {
@@ -407,53 +412,3 @@ func TestDoKeepUnresolvedAndLinkNew(t *testing.T) {
 	stdout, _, _ = crm(t, path, "log", "list", "--person", strconv.Itoa(int(priya)), "-f", "json")
 	assert.Len(t, decodeList(t, stdout), 1)
 }
-// calRun runs crm with a pinned clock: Tuesday 2026-10-13 12:00 UTC, zone UTC.
-func calRun(t *testing.T, path string, args ...string) (string, string, int) {
-	t.Helper()
-	home := filepath.Dir(path)
-	return crmEnv(t, home, []string{"CRM_NOW=2026-10-13T12:00:00Z", "TZ=UTC"}, append([]string{"--db", path}, args...)...)
-}
-
-func TestCalAddReadsShortSyntaxFromTheTitle(t *testing.T) {
-	path := doDB(t)
-	stdout, stderr, code := calRun(t, path, "cal", "add", "Lunch with @Bob fri 12:30 for 1h at Cafe Rio every week #food", "--dry-run", "-f", "json")
-	require.Equal(t, 0, code, stderr)
-	out := decodeObject(t, stdout)
-	ev := out["event"].(map[string]any)
-	assert.Equal(t, "Lunch with", ev["title"])
-	assert.Equal(t, "Cafe Rio", ev["location"])
-	assert.Equal(t, "2026-10-16T12:30:00Z", ev["start"])
-	assert.Equal(t, "2026-10-16T13:30:00Z", ev["end"])
-	assert.Contains(t, ev["rrule"], "FREQ=WEEKLY")
-
-	stdout, stderr, code = calRun(t, path, "cal", "add", "Lunch with @Bob fri 12:30 for 1h at Cafe Rio every week #food", "-f", "json")
-	require.Equal(t, 0, code, stderr)
-	created := decodeList(t, stdout)[0]
-	assert.Equal(t, "Lunch with", created["title"])
-	assert.Equal(t, "Cafe Rio", created["location"])
-	assert.Equal(t, []any{"food"}, created["tags"])
-	atts := created["attendees"].([]any)
-	require.Len(t, atts, 1)
-	assert.Equal(t, float64(3), atts[0].(map[string]any)["person_id"])
-}
-
-func TestCalAddFlagsWinAndStartIsStillRequired(t *testing.T) {
-	path := doDB(t)
-	stdout, stderr, code := calRun(t, path, "cal", "add", "Call fri 9am at Home", "--start", "2026-10-20 14:00", "--location", "Office", "--dry-run", "-f", "json")
-	require.Equal(t, 0, code, stderr)
-	ev := decodeObject(t, stdout)["event"].(map[string]any)
-	assert.Equal(t, "2026-10-20T14:00:00Z", ev["start"])
-	assert.Equal(t, "Office", ev["location"])
-	assert.Equal(t, "Call", ev["title"], "tokens are still removed from the title")
-
-	_, stderr, code = calRun(t, path, "cal", "add", "Call Sam", "-f", "json")
-	assert.Equal(t, 2, code)
-	assert.Contains(t, stderr, "write it in the title")
-
-	// --no-syntax keeps the title as typed and needs --start.
-	stdout, _, code = calRun(t, path, "cal", "add", "Lunch fri #x", "--no-syntax", "--start", "2026-10-20 14:00", "-f", "json")
-	require.Equal(t, 0, code)
-	assert.Equal(t, "Lunch fri #x", decodeList(t, stdout)[0]["title"])
-	_, _, code = calRun(t, path, "cal", "add", "Lunch with @Nobody fri", "-f", "json")
-	assert.Equal(t, 3, code)
-}

@@ -15,7 +15,7 @@ import (
 // keys, every change goes on the undo stack, and a delete is the same soft delete as the CLI
 // (archived), so ctrl+z and the Restore verb (u) bring it back.
 //
-// Pattern: one line with | between fields, as the task and booking prompts do. Edit opens the
+// Pattern: one line with | between fields, as the task prompt does. Edit opens the
 // same line filled with the current values. An organization is name | domain | industry | notes.
 // A deal is title | value | stage | organization | person | notes. An organization or person is
 // an id or a name. On an edit, a field you empty is cleared.
@@ -25,7 +25,7 @@ func orgPrompt() string  { return orgDef().prompt() }
 func dealPrompt() string { return dealDef().prompt() }
 
 // nextView is the view after v in the number-key cycle. Advanced views are outside the cycle: ]
-// goes to Home from them and [ to the Calendar.
+// goes to Home from them and [ to Sync.
 func nextView(v viewKind, dir int) viewKind {
 	if v >= numViews {
 		if dir > 0 {

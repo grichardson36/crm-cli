@@ -10,7 +10,7 @@ import (
 )
 
 // EntityState says whether a row exists and whether it is archived. entity is one of the
-// entities that can carry external ids (person, task, event, ...).
+// entities that can carry external ids (person, task, ...).
 func EntityState(ctx context.Context, q DBTX, entity string, id int64) (exists, archived bool, err error) {
 	table, ok := externalEntityTables[entity]
 	if !ok {
