@@ -356,6 +356,7 @@ func NewServer(db *sql.DB, version string, opts ...Option) *server.MCPServer {
 	registerDavTools(s, db)
 	registerTaskTagTools(s, db)
 	registerTaskDeleteTool(s, tr)
+	registerObjectTools(s, db)
 	registerDoTools(s, db)
 	registerEventTools(s, db)
 	registerScheduleTools(s, db, tr)

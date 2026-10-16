@@ -36,7 +36,7 @@ func TestTaskDeleteKeyAsksThenUndoAndRedo(t *testing.T) {
 
 	press(m, "d", "y")
 	assert.Empty(t, openTasks(t, m))
-	assert.Equal(t, []int64{id}, m.deletedTasks)
+	assert.Equal(t, []int64{id}, m.deleted["task"])
 	assert.Contains(t, m.status, "task deleted")
 
 	press(m, "ctrl+z")
@@ -55,12 +55,12 @@ func TestTaskDeleteFromPaletteAndRestore(t *testing.T) {
 	press(m, "y")
 	assert.Empty(t, openTasks(t, m))
 
-	runPalette(m, "restore deleted task")
+	runPalette(m, "restore task")
 	assert.Equal(t, "task restored", m.status)
 	list := openTasks(t, m)
 	require.Len(t, list, 1)
 	assert.Equal(t, id, list[0].ID)
-	assert.Empty(t, m.deletedTasks)
+	assert.Empty(t, m.deleted["task"])
 
 	press(m, "ctrl+z")
 	assert.Empty(t, openTasks(t, m), "restoring is undoable")
@@ -84,7 +84,7 @@ func TestTaskDeleteFromTaskRowInDetailPane(t *testing.T) {
 	assert.Contains(t, m.confirm.prompt, "call back")
 	press(m, "y")
 	assert.Empty(t, openTasks(t, m))
-	assert.Len(t, m.deletedTasks, 1)
+	assert.Len(t, m.deleted["task"], 1)
 	press(m, "ctrl+z")
 	assert.Len(t, openTasks(t, m), 1)
 }
@@ -109,12 +109,14 @@ func TestTaskDeleteIsGreyedOutInReadOnlyAndWithoutATask(t *testing.T) {
 		}
 	}
 	assert.NotEmpty(t, del.disabled, "delete task is greyed out")
-	assert.NotEmpty(t, rest.disabled, "restore deleted task is greyed out")
+	assert.NotEmpty(t, rest.disabled, "restore task is greyed out")
 
-	// People view: no task is selected, so the action does not apply.
+	// People view: no task is selected, so d deletes the person and not a task.
 	m2, _ := newTestModel(t)
 	press(m2, "d")
-	assert.NotEqual(t, modeConfirm, m2.mode)
+	require.Equal(t, modeConfirm, m2.mode)
+	assert.Contains(t, m2.confirm.prompt, "archive")
+	assert.False(t, m2.actionByID("task-delete").enabled(m2))
 }
 
 func TestDeleteTagFromPaletteIsUndoable(t *testing.T) {

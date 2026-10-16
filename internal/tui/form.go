@@ -24,6 +24,8 @@ const (
 	rkTag
 	rkTask
 	rkNote
+	rkOrg  // the organization of a person
+	rkDeal // a deal of a person
 )
 
 // tierNames maps priority_tier (index) to a name. Index 0 clears the tier.
@@ -172,6 +174,16 @@ func (m *Model) personRows(p *model.Person) []formRow {
 	}
 	add(field("title", "title", title))
 	add(field("company", "company", company))
+	if p != nil {
+		// The organization is a link, shown as a row that opens the organization (link from either side).
+		r := formRow{kind: rkOrg, label: "organization", empty: true}
+		if p.OrgID != nil {
+			if o, err := m.orr.FindByID(m.ctx, *p.OrgID); err == nil {
+				r.value, r.id, r.empty = o.Name, o.ID, false
+			}
+		}
+		add(r)
+	}
 	add(field("location", "location", location))
 	bd := ""
 	if p != nil {
@@ -258,6 +270,19 @@ func (m *Model) personRows(p *model.Person) []formRow {
 		}
 	} else {
 		add(formRow{kind: rkTask, label: "task", empty: true, head: taskHead})
+	}
+	if pid != 0 {
+		deals, _ := m.dlr.FindAll(m.ctx, model.DealFilters{PersonID: &pid})
+		for i, d := range deals {
+			r := formRow{kind: rkDeal, label: "deal", value: d.Title, id: d.ID, suffix: "  " + d.Stage}
+			if d.Value != nil {
+				r.suffix += "  " + money(d.Value)
+			}
+			if i == 0 {
+				r.head = "Deals"
+			}
+			add(r)
+		}
 	}
 	var ints []*model.Interaction
 	if pid != 0 {
@@ -492,6 +517,8 @@ func (m *Model) startEdit() tea.Cmd {
 	switch {
 	case r.empty && addable(r.kind):
 		return m.addRow(r.kind)
+	case r.kind == rkOrg || r.kind == rkDeal:
+		return m.openLinkRow(r)
 	case r.kind == rkInfo:
 		m.setStatus("this row is read-only", true)
 	case r.kind == rkNote:
@@ -878,7 +905,10 @@ func (m *Model) askDelete() {
 	case rkTag:
 		what, do = "tag "+r.value, func() error { return m.hTagRemove(m.ctx, "person", pid, r.value) }
 	case rkTask:
-		m.askDeleteTask(r.id)
+		m.verbDelete(objectByKind("task"))
+		return
+	case rkOrg, rkDeal:
+		m.askUnlinkRow(r)
 		return
 	case rkNote:
 		m.askDeleteNote(r)

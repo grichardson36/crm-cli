@@ -245,7 +245,8 @@ func TestNoLegacyUndoRedoKeys(t *testing.T) {
 	press(m, "f")
 	assert.True(t, personByID(t, pr, 1).IsFavorite)
 	press(m, "U")
-	assert.True(t, personByID(t, pr, 1).IsFavorite, "U is not undo any more")
+	assert.True(t, personByID(t, pr, 1).IsFavorite, "U is Unlink now, not undo")
+	press(m, "esc") // U opened the unlink picker
 	m.Update(keyMsg("ctrl+r"))
 	assert.Nil(t, m.toast)
 	m.Update(keyMsg("ctrl+z"))

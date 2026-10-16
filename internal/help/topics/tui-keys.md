@@ -1,38 +1,34 @@
 # Terminal UI keys
 
-Every key in the terminal UI, grouped by task. The palette (`ctrl+k`) runs any of these by name. `?` inside lists the keys of the current view.
+Every key in the terminal UI. The palette (`ctrl+k`) runs any of these by name, as "Verb object" (Add organization). `?` inside lists the keys of the current view.
+
+## Standard keys (same in every object view)
+
+- `a` add (`+` also). `enter` edit (`e` also in Organizations and Deals). `d` delete, asks y/n. `u` restore. `L` link. `U` unlink. `space` mark. `ctrl+z` undo, `ctrl+y` redo.
+- The object is the one under the cursor: a person, a task, or in the Organizations and Deals views (palette) an organization or a deal. Restore brings back the object you deleted last in this session. In the Archived view `u` restores the archived person.
+- `L` and `U` ask which relation (organization, person, deal, task, tag), then pick or create in one step. See links.
 
 ## Moving
 
-- `j` / `k` or arrows: next and previous row. `g` / `G`: first and last. `ctrl+d` / `ctrl+u`: half page.
+- `j` / `k` or arrows: next and previous row. `g` / `G`: first and last. `ctrl+d` / `ctrl+u`: half page. `J` / `K`: scroll the detail pane.
 - `tab` or `l`: move into the detail form. `esc`, `h` or `tab`: back to the list.
-- `J` / `K`: scroll the detail pane.
-- `/`, `ctrl+k` or `:` opens the bar: find people, orgs, deals, tasks, notes, actions and settings. `#tag` filters the list by tag and `esc` clears it. `=` lists settings.
-- `o` toggles sort between name and recently updated. `r` reloads. `ctrl+z` undoes any data change, `ctrl+y` redoes it. Rebind keys: see `keys`.
+- `/`, `ctrl+k` or `:` opens the bar: find people, orgs, deals, tasks, notes, actions and settings. `#tag` filters by tag, `esc` clears it. `=` lists settings.
+- `o` toggles sort. `r` reloads. Rebind keys: see `keys`.
 
-## Contact keys
+## Person keys
 
-- `c` mark contacted now (resets the keep-in-touch clock). `s` snooze for N days.
-- `n` add a note of the last used type. `N` pick the type first.
-- `t` add a task: `title | optional due date`. `x` complete the selected task, `d` delete it (asks y/n).
-- `f` toggle favorite. `T` add a tag, `-name` removes it. `F` set the cadence. `p` set the priority tier.
-- `+` create a contact. `space` marks a row and `*` marks all visible. Then `c`, `f`, `T`, `F`, `p` and `#` apply to every marked person. Organizations and deals: palette "Organizations view" and "Deals view", then `+` add, `enter` edit, `d` delete, `s` deal stage (see orgs).
+- `c` mark contacted. `s` snooze. `n` add a note, `N` pick the type first. `t` add a task for the person: `title | optional due date`. `x` complete a task.
+- `f` favorite. `T` tag (`-name` removes). `F` cadence. `p` priority tier. `*` marks all visible, then `c`, `f`, `T`, `F`, `p`, `d` apply to every marked person.
+- `s` sets a deal stage in the Deals view. Organization and deal rows in the detail form: `enter` opens (or links when empty), `d` unlinks.
 
 ## Edit pane
 
-In the detail form: `enter` edits a row, `a` adds a row, `d` deletes the row (asks y/n), `y` copies the value, `o` opens a link, email or phone on this machine.
+In the detail form: `enter` edits a row, `a` adds a row, `d` deletes the row (asks y/n), `y` copies the value, `o` opens a link, email or phone. A note row: `t` changes the type.
 
-## Merge and archive
+## Merge, archive, notes, sync, home
 
-- Merge view: `enter` opens the compare. `m` cycles the lowest confidence shown. `D` dismisses a group and `u` undoes it.
-- Compare: three panes (person 1, person 2, final). `left`/`right` or `1`/`2` take a value, `space` flips a field or puts a list item in or out, `s` survivor, `p` pair, `r` panes under 110 columns, `enter` summary then merge, `m` merge, `esc` leave.
-- `M` merges the marked people. `#` archives (asks y/n).
-- Archived view: `u` restores. `X` purges after you type the name.
+- Merge view: `enter` compare, `m` level, `D` dismiss, `u` undo dismiss. `M` merges marked people. Compare: `left`/`right`, `space`, `s`, `p`, `r`, `enter`, `esc`.
+- Archived view: `u` restores, `X` purges after you type the name.
+- Sync view: `s` runs a source, `d` dry run. Inbox: `a` accepts, `p` attaches, `i` ignores. Home: `enter` opens the person.
 
-## Notes, Sync and Home
-
-- Note row in the detail form: `enter` edits the text, `t` changes the type, `d` deletes (asks y/n). "Restore last deleted note" is in the palette.
-- Sync view: `s` runs a sync for the selected source, `d` does a dry run. In the inbox: `a` accepts (creates a person), `p` attaches to an existing person, `i` ignores.
-- Home: `enter` on an item opens that person in People with the detail form focused.
-
-See also: tui, keys, duplicates, archive, notes, sync, orgs.
+See also: tui, keys, links, duplicates, archive, notes, sync, orgs.

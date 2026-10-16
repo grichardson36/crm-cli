@@ -11,13 +11,13 @@ crm org show 1 --with-people
 crm person edit 2 --org 1
 ```
 
-`person edit --org ID` links a person to an organization. `org show --with-people` lists the people linked to it.
+`person edit --org ID` links a person to an organization. So does `crm person link org 2 1` or `crm org link person 1 2`, see links. `org show --with-people` lists the people linked to it. `crm org delete 1` is a soft delete and `crm org restore 1` brings it back.
 
 ## In the terminal UI
 
 Organizations and deals are advanced views, not tabs. Open them from the palette (`ctrl+k`): "Organizations view", "Deals view".
 
-- `+` adds, `enter` or `e` edits, `d` deletes (asks y/n), `ctrl+z` undoes. "Restore deleted organization" and "Restore deleted deal" are in the palette.
+- The standard keys: `a` adds (`+` also), `enter` or `e` edits, `d` deletes (asks y/n), `u` restores, `L` links, `ctrl+z` undoes. "Restore organization" and "Restore deal" are in the palette.
 - An organization is one line: `name | domain | industry | notes`.
 - A deal is `title | value | stage | organization | person | notes`. The organization and person are an id or a name. `s` picks the stage.
 - Editing opens the same line filled in. A field you empty is cleared.
@@ -33,4 +33,4 @@ Relationship types: colleague, friend, manager, mentor, referred-by.
 
 `crm context ID` includes the organization and relationships in the meeting briefing.
 
-See also: people, tags, duplicates.
+See also: people, links, tags, duplicates.

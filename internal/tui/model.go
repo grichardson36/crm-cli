@@ -114,15 +114,15 @@ type Model struct {
 	spin spinner.Model
 	// deletedNotes is the session stack of deleted note ids for "Restore last deleted note".
 	deletedNotes []int64
-	// deletedTasks is the session stack of deleted task ids for "Restore deleted task".
-	deletedTasks []int64
-	// Organizations and Deals views: the session stacks of deleted ids, the record the open
-	// edit prompt applies to, and the records of the rows by id for the detail pane.
-	deletedOrgs  []int64
-	deletedDeals []int64
-	orgDealID    int64
-	orgs         map[int64]*model.Organization
-	deals        map[int64]*model.Deal
+	// deleted is the session stack of deleted ids per object kind, for the Restore verb.
+	deleted map[string][]int64
+	// links makes, lists and removes links between objects.
+	links *repo.LinkRepo
+	// lineID is the record the open one-line edit prompt applies to. orgs and deals are the
+	// records of the rows by id for the detail pane of the Organizations and Deals views.
+	lineID int64
+	orgs   map[int64]*model.Organization
+	deals  map[int64]*model.Deal
 	// Calendar view state, the zone times are shown in and the session stack of deleted events.
 	cal           calState
 	loc           *time.Location
@@ -241,6 +241,8 @@ func New(ctx context.Context, db *sql.DB) (*Model, error) {
 		orr:        repo.NewOrgRepo(db),
 		dlr:        repo.NewDealRepo(db),
 		tagr:       repo.NewTagRepo(db),
+		links:      repo.NewLinkRepo(db),
+		deleted:    map[string][]int64{},
 		dr:         repo.NewDupeRepo(db),
 		ntr:        repo.NewNoteTypeRepo(db),
 		er:         repo.NewEventRepo(db),
@@ -760,7 +762,7 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 	for i := range m.actions {
 		a := &m.actions[i]
-		if !a.hasKey(key) || !a.enabled(m) || (a.keyIf != nil && !a.keyIf(m)) {
+		if !a.hasKey(key) || !a.enabled(m) || (a.keyIf != nil && !a.keyIf(m)) || (a.keyFor != nil && !a.keyFor(m, key)) {
 			continue
 		}
 		return m, m.runAction(a)
@@ -902,6 +904,12 @@ func (m *Model) runPrompt(kind, value string) {
 	case "task-schedule":
 		m.runTaskSchedule(value)
 		return
+	case "task-new":
+		m.runTaskLine(0, value, "task-new")
+		return
+	case "task-edit":
+		m.saveTaskEdit(m.lineID, value)
+		return
 	case "notetype-add":
 		m.addNoteType(value)
 		return
@@ -974,22 +982,8 @@ func (m *Model) runPrompt(kind, value string) {
 			m.setStatus("no person selected", true)
 			return
 		}
-		title, due, _ := strings.Cut(value, "|")
-		env := m.quickEnvFor(pid)
-		env.DueOverride = m.normalizeDue(due)
-		_, err := m.runLineAsk("task "+strings.TrimSpace(title), env,
-			func() {
-				m.startInput("task", "task (add a due date after a | e.g. call back | 2026-12-01): ", value)
-				_ = m.input.Focus()
-			},
-			func(plan *quick.Plan) tea.Cmd {
-				m.setStatus("task added"+extras(plan), false)
-				return m.showToast("task added"+extras(plan), false)
-			})
-		if err != nil {
-			m.setStatus(err.Error(), true)
-			return
-		}
+		m.runTaskLine(pid, value, "task")
+		return
 	}
 	m.afterWrite()
 }
