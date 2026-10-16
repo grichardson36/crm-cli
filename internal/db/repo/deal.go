@@ -242,3 +242,36 @@ func (r *DealRepo) Pipeline(ctx context.Context) ([]*model.PipelineStage, error)
 	}
 	return stages, rows.Err()
 }
+
+// Restore brings an archived deal back.
+func (r *DealRepo) Restore(ctx context.Context, id int64) error {
+	result, err := r.db.ExecContext(ctx,
+		"UPDATE deals SET archived = 0, updated_at = datetime('now') WHERE id = ? AND archived = 1", id)
+	if err != nil {
+		return fmt.Errorf("restore deal %d: %w", id, err)
+	}
+	if rows, _ := result.RowsAffected(); rows == 0 {
+		return fmt.Errorf("archived deal %d: %w", id, model.ErrNotFound)
+	}
+	return nil
+}
+
+// Overwrite sets every editable field to the values of d, including empty ones. Undo and redo
+// use it so a field that was empty goes back to empty.
+func (r *DealRepo) Overwrite(ctx context.Context, id int64, d *model.Deal) error {
+	if !model.ValidDealStage(d.Stage) {
+		return fmt.Errorf("invalid deal stage %q: %w", d.Stage, model.ErrValidation)
+	}
+	result, err := r.db.ExecContext(ctx,
+		`UPDATE deals SET title = ?, value = ?, stage = ?, person_id = ?, org_id = ?, notes = ?, closed_at = ?,
+		        updated_at = datetime('now')
+		 WHERE id = ? AND archived = 0`,
+		d.Title, d.Value, d.Stage, d.PersonID, d.OrgID, d.Notes, d.ClosedAt, id)
+	if err != nil {
+		return fmt.Errorf("overwrite deal %d: %w", id, err)
+	}
+	if rows, _ := result.RowsAffected(); rows == 0 {
+		return fmt.Errorf("deal %d: %w", id, model.ErrNotFound)
+	}
+	return nil
+}

@@ -173,3 +173,26 @@ func TestDealPipeline(t *testing.T) {
 	assert.Equal(t, 2, stages[0].Count)
 	assert.Equal(t, 15000.0, stages[0].TotalValue)
 }
+
+func TestDealRestoreAndOverwrite(t *testing.T) {
+	dr, _ := setupDealTestDB(t)
+	ctx := context.Background()
+	v := 500.0
+	d, err := dr.Create(ctx, model.CreateDealInput{Title: "Site", Stage: "lead", Value: &v})
+	require.NoError(t, err)
+
+	require.ErrorIs(t, dr.Restore(ctx, d.ID), model.ErrNotFound, "only archived deals restore")
+	require.NoError(t, dr.Archive(ctx, d.ID))
+	require.NoError(t, dr.Restore(ctx, d.ID))
+	got, err := dr.FindByID(ctx, d.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "Site", got.Title)
+
+	require.NoError(t, dr.Overwrite(ctx, d.ID, &model.Deal{Title: "Site v2", Stage: "won"}))
+	got, err = dr.FindByID(ctx, d.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "Site v2", got.Title)
+	assert.Equal(t, "won", got.Stage)
+	assert.Nil(t, got.Value, "overwrite also empties fields")
+	require.ErrorIs(t, dr.Overwrite(ctx, d.ID, &model.Deal{Title: "x", Stage: "nope"}), model.ErrValidation)
+}

@@ -178,6 +178,10 @@ func (m *Model) emptyDetail() string {
 		return m.syncItemDetail(r)
 	case viewCalendar:
 		return m.calDetail()
+	case viewOrgs:
+		return m.orgDetail(r)
+	case viewDeals:
+		return m.dealDetail(r)
 	case viewMerge:
 		if m.cursor >= len(m.groups) {
 			return ""

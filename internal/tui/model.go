@@ -40,7 +40,15 @@ const (
 	numViews
 )
 
-var viewNames = [numViews]string{"Home", "People", "Due", "Tasks", "Birthdays", "Merge", "Archived", "Sync", "Calendar"}
+// The advanced views have no number key and are not in the view switcher, [ or ]. They open from
+// the palette ("Organizations view", "Deals view"). See orgdeal.go.
+const (
+	viewOrgs viewKind = numViews + iota
+	viewDeals
+	numAllViews
+)
+
+var viewNames = [numAllViews]string{"Home", "People", "Due", "Tasks", "Birthdays", "Merge", "Archived", "Sync", "Calendar", "Organizations", "Deals"}
 
 type mode int
 
@@ -66,6 +74,8 @@ const (
 type row struct {
 	personID int64
 	taskID   int64
+	orgID    int64
+	dealID   int64
 	title    string
 	sub      string
 	meta     string
@@ -86,6 +96,8 @@ type Model struct {
 	pr   *repo.PersonRepo
 	ir   *repo.InteractionRepo
 	tr   *repo.TaskRepo
+	orr  *repo.OrgRepo
+	dlr  *repo.DealRepo
 	tagr *repo.TagRepo
 	dr   *repo.DupeRepo
 	ntr  *repo.NoteTypeRepo
@@ -104,6 +116,13 @@ type Model struct {
 	deletedNotes []int64
 	// deletedTasks is the session stack of deleted task ids for "Restore deleted task".
 	deletedTasks []int64
+	// Organizations and Deals views: the session stacks of deleted ids, the record the open
+	// edit prompt applies to, and the records of the rows by id for the detail pane.
+	deletedOrgs  []int64
+	deletedDeals []int64
+	orgDealID    int64
+	orgs         map[int64]*model.Organization
+	deals        map[int64]*model.Deal
 	// Calendar view state, the zone times are shown in and the session stack of deleted events.
 	cal           calState
 	loc           *time.Location
@@ -219,6 +238,8 @@ func New(ctx context.Context, db *sql.DB) (*Model, error) {
 		pr:         repo.NewPersonRepo(db),
 		ir:         repo.NewInteractionRepo(db),
 		tr:         repo.NewTaskRepo(db),
+		orr:        repo.NewOrgRepo(db),
+		dlr:        repo.NewDealRepo(db),
 		tagr:       repo.NewTagRepo(db),
 		dr:         repo.NewDupeRepo(db),
 		ntr:        repo.NewNoteTypeRepo(db),
@@ -291,7 +312,7 @@ func (m *Model) afterWrite() {
 // rebuild recomputes rows for the current view. With keep it leaves the cursor on the same item,
 // or at the same position if that item is gone. Otherwise the cursor goes to the top.
 func (m *Model) rebuild(keep bool) error {
-	var keepPerson, keepTask int64
+	var keepPerson, keepTask, keepOrg, keepDeal int64
 	calKey := ""
 	if m.view == viewCalendar && m.cursor < len(m.rows) {
 		calKey = calRowKey(m.rows[m.cursor])
@@ -299,6 +320,7 @@ func (m *Model) rebuild(keep bool) error {
 	oldCursor := m.cursor
 	if keep && m.cursor < len(m.rows) {
 		keepPerson, keepTask = m.rows[m.cursor].personID, m.rows[m.cursor].taskID
+		keepOrg, keepDeal = m.rows[m.cursor].orgID, m.rows[m.cursor].dealID
 	}
 
 	var rows []row
@@ -372,6 +394,18 @@ func (m *Model) rebuild(keep bool) error {
 			}
 			rows = append(rows, r)
 		}
+	case viewOrgs:
+		or, err := m.orgRows()
+		if err != nil {
+			return err
+		}
+		rows = or
+	case viewDeals:
+		dr, err := m.dealRows()
+		if err != nil {
+			return err
+		}
+		rows = dr
 	case viewMerge:
 		groups, err := m.dr.Find(m.ctx, m.minLevel)
 		if err != nil {
@@ -403,6 +437,10 @@ func (m *Model) rebuild(keep bool) error {
 		m.cursor = oldCursor
 		for i, r := range rows {
 			if r.personID == keepPerson && r.taskID == keepTask && (keepPerson != 0 || keepTask != 0) {
+				m.cursor = i
+				break
+			}
+			if (keepOrg != 0 && r.orgID == keepOrg) || (keepDeal != 0 && r.dealID == keepDeal) {
 				m.cursor = i
 				break
 			}
@@ -722,7 +760,7 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 	for i := range m.actions {
 		a := &m.actions[i]
-		if !a.hasKey(key) || !a.enabled(m) {
+		if !a.hasKey(key) || !a.enabled(m) || (a.keyIf != nil && !a.keyIf(m)) {
 			continue
 		}
 		return m, m.runAction(a)
@@ -854,6 +892,10 @@ func (m *Model) runPrompt(kind, value string) {
 	}
 	if strings.HasPrefix(kind, "cal-") {
 		m.runCalPrompt(kind, value)
+		return
+	}
+	if strings.HasPrefix(kind, "org-") || strings.HasPrefix(kind, "deal-") {
+		m.runOrgDealPrompt(kind, value)
 		return
 	}
 	switch kind {

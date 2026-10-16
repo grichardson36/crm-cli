@@ -313,6 +313,9 @@ func (m *Model) refreshDetail(force bool) {
 	m.calTrack()
 	r, ok := m.selected()
 	key := fmt.Sprintf("%d/%d", r.personID, r.taskID)
+	if m.view == viewOrgs || m.view == viewDeals {
+		key += fmt.Sprintf("/%d/%d", r.orgID, r.dealID)
+	}
 	if m.view == viewMerge || m.view == viewSync || m.view == viewCalendar {
 		key += fmt.Sprintf("/%d", m.cursor)
 	}

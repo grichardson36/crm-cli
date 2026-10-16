@@ -16,7 +16,7 @@ Every key in the terminal UI, grouped by task. The palette (`ctrl+k`) runs any o
 - `n` add a note of the last used type. `N` pick the type first.
 - `t` add a task: `title | optional due date`. `x` complete the selected task, `d` delete it (asks y/n).
 - `f` toggle favorite. `T` add a tag, `-name` removes it. `F` set the cadence. `p` set the priority tier.
-- `+` create a contact. `space` marks a row and `*` marks all visible. Then `c`, `f`, `T`, `F`, `p` and `#` apply to every marked person.
+- `+` create a contact. `space` marks a row and `*` marks all visible. Then `c`, `f`, `T`, `F`, `p` and `#` apply to every marked person. Organizations and deals: palette "Organizations view" and "Deals view", then `+` add, `enter` edit, `d` delete, `s` deal stage (see orgs).
 
 ## Edit pane
 
@@ -35,4 +35,4 @@ In the detail form: `enter` edits a row, `a` adds a row, `d` deletes the row (as
 - Sync view: `s` runs a sync for the selected source, `d` does a dry run. In the inbox: `a` accepts (creates a person), `p` attaches to an existing person, `i` ignores.
 - Home: `enter` on an item opens that person in People with the detail form focused.
 
-See also: tui, keys, duplicates, archive, notes, sync.
+See also: tui, keys, duplicates, archive, notes, sync, orgs.

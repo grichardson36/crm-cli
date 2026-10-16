@@ -221,3 +221,32 @@ func (r *OrgRepo) FindPeople(ctx context.Context, orgID int64) ([]*model.Person,
 	}
 	return people, nil
 }
+
+// Restore brings an archived organization back.
+func (r *OrgRepo) Restore(ctx context.Context, id int64) error {
+	result, err := r.db.ExecContext(ctx,
+		"UPDATE organizations SET archived = 0, updated_at = datetime('now') WHERE id = ? AND archived = 1", id)
+	if err != nil {
+		return fmt.Errorf("restore organization %d: %w", id, err)
+	}
+	if rows, _ := result.RowsAffected(); rows == 0 {
+		return fmt.Errorf("archived organization %d: %w", id, model.ErrNotFound)
+	}
+	return nil
+}
+
+// Overwrite sets every editable field to the values of o, including empty ones. Undo and redo
+// use it so a field that was empty goes back to empty.
+func (r *OrgRepo) Overwrite(ctx context.Context, id int64, o *model.Organization) error {
+	result, err := r.db.ExecContext(ctx,
+		`UPDATE organizations SET name = ?, domain = ?, industry = ?, notes = ?, updated_at = datetime('now')
+		 WHERE id = ? AND archived = 0`,
+		o.Name, o.Domain, o.Industry, o.Notes, id)
+	if err != nil {
+		return fmt.Errorf("overwrite organization %d: %w", id, err)
+	}
+	if rows, _ := result.RowsAffected(); rows == 0 {
+		return fmt.Errorf("organization %d: %w", id, model.ErrNotFound)
+	}
+	return nil
+}

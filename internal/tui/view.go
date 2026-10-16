@@ -161,6 +161,10 @@ func (m *Model) countText() string {
 		return fmt.Sprintf("%d archived", len(m.rows))
 	case viewCalendar:
 		return m.calCountText()
+	case viewOrgs:
+		return fmt.Sprintf("%d organizations", len(m.rows))
+	case viewDeals:
+		return fmt.Sprintf("%d deals", len(m.rows))
 	case viewSync:
 		sources, inbox := 0, 0
 		for _, r := range m.rows {
@@ -213,6 +217,10 @@ func (m *Model) listView(w, h int) string {
 			return m.st.Dim.Render("No sync sources connected yet.")
 		case m.view == viewCalendar:
 			return m.st.Dim.Render("Nothing planned. + adds an event.")
+		case m.view == viewOrgs:
+			return m.st.Dim.Render("No organizations. + adds one.")
+		case m.view == viewDeals:
+			return m.st.Dim.Render("No deals. + adds one.")
 		}
 		return m.st.Dim.Render("Nothing here yet.")
 	}
@@ -287,6 +295,8 @@ var footShort = map[string]string{
 	"undo-dismiss": "undo", "merge-marked": "merge", "archive": "archive", "restore": "restore", "purge": "purge",
 	"home-open": "open", "sync-now": "sync", "sync-dry": "dry-run", "inbox-accept": "accept", "inbox-attach": "attach",
 	"inbox-ignore": "ignore", "cal-add": "add", "cal-open": "edit", "cal-delete": "delete", "cal-today": "today", "cal-prev": "prev", "cal-next": "next", "cal-agenda": "agenda", "cal-day": "day", "cal-week": "week", "cal-month": "month", "goto-view": "views", "note-retype": "type",
+	"org-add": "add", "org-edit": "edit", "org-delete": "delete",
+	"deal-add": "add", "deal-edit": "edit", "deal-delete": "delete", "deal-stage": "stage",
 	"cmp-left": "pick", "cmp-pick": "toggle", "cmp-survivor": "survivor", "cmp-pair": "pair", "cmp-view": "pane", "cmp-confirm": "merge", "cmp-back": "back",
 }
 
