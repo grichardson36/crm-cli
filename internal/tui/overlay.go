@@ -54,6 +54,10 @@ type overlay struct {
 	base   []overlayItem
 	search func(scope byte, q string) []overlayItem
 	recent func() []overlayItem
+	// create adds a last row "Create <typed text>" to a picker (pick-or-create). It returns false
+	// when the text cannot make an object. baseLen is the number of real items.
+	create  func(q string) (overlayItem, bool)
+	baseLen int
 }
 
 const overlayTop = 2 // title line, filter line
@@ -89,6 +93,12 @@ func (o *overlay) refilter() {
 	type scored struct{ idx, score, length int }
 	var list []scored
 	q := o.filter.Value()
+	if o.create != nil {
+		if o.baseLen == 0 {
+			o.baseLen = len(o.items)
+		}
+		o.items = o.items[:o.baseLen]
+	}
 	for i, it := range o.items {
 		s, ok := fuzzyScore(q, it.label+" "+it.hint+" "+it.id+" "+it.desc)
 		if !ok {
@@ -108,6 +118,12 @@ func (o *overlay) refilter() {
 	o.shown = o.shown[:0]
 	for _, s := range list {
 		o.shown = append(o.shown, s.idx)
+	}
+	if o.create != nil {
+		if it, ok := o.create(q); ok {
+			o.items = append(o.items, it)
+			o.shown = append(o.shown, len(o.items)-1)
+		}
 	}
 	o.cursor, o.offset = 0, 0
 }
@@ -433,7 +449,7 @@ func (m *Model) handleHelpKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // helpText is generated from the action registry so it matches the palette.
 func (m *Model) helpText() string {
-	order := []string{"Home", "Contact", "Calendar", "Booking", "Edit pane", "Bulk", "Sync", "Merge", "Compare", "Archive", "Organizations", "Deals", "Move", "Views", "App"}
+	order := []string{"Home", "Contact", "Tasks", "Link", "Calendar", "Booking", "Edit pane", "Bulk", "Sync", "Merge", "Compare", "Archive", "Organizations", "Deals", "Move", "Views", "App"}
 	var b strings.Builder
 	for _, g := range order {
 		b.WriteString(m.st.Head.Render(g) + "\n")

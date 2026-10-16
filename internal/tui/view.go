@@ -325,6 +325,9 @@ func (m *Model) footerSegs() []footSeg {
 	var segs []footSeg
 	for _, a := range acts {
 		hint, label := a.hint, footShort[a.id]
+		if a.footLabel != "" {
+			label = a.footLabel
+		}
 		if a.id == "down" {
 			hint = "j/k"
 		}

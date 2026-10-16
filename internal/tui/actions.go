@@ -55,6 +55,10 @@ type action struct {
 	when func(m *Model) bool
 	// keyIf limits the keys (not the palette entry) to a context, for an action that works from any view.
 	keyIf func(m *Model) bool
+	// keyFor limits one key at a time, for a verb whose keys mean different things in different views.
+	keyFor func(m *Model, key string) bool
+	// footLabel is the word in the footer. It falls back to footShort[id].
+	footLabel string
 	run   func(m *Model) tea.Cmd
 }
 
@@ -273,7 +277,8 @@ func buildActions() []action {
 				return m.input.Focus()
 			}},
 
-		// Contact actions.
+		// Contact actions. The verbs of every object (Add, Edit, Delete, Restore, Link, Unlink) are generated
+		// from the registry in objects.go and inserted after them.
 		{id: "contacted", title: "Mark contacted", group: "Contact", hint: "c", keys: []string{"c", "e"}, desc: "mark contacted now (resets the keep-in-touch clock)",
 			write: true, foot: 30, footIn: inBoth, when: whenPerson, run: func(m *Model) tea.Cmd { m.markContacted(); return nil }},
 		{id: "note", title: "Add note", group: "Contact", hint: "n", keys: []string{"n"}, desc: "add a note of the last used type (tab in the prompt changes the type)",
@@ -286,11 +291,6 @@ func buildActions() []action {
 			write: true, foot: 16, footIn: inDetail, footIf: whenNoteRow, when: whenNoteRow, run: func(m *Model) tea.Cmd { m.retypeNote(); return nil }},
 		{id: "note-restore", title: "Restore last deleted note", group: "Edit pane", desc: "bring back the note deleted last in this session",
 			write: true, when: whenDeletedNote, run: func(m *Model) tea.Cmd { m.restoreLastNote(); return nil }},
-		{id: "task", title: "Add task", group: "Contact", hint: "t", keys: []string{"t"}, desc: "add a task: title | optional due date",
-			write: true, foot: 50, footIn: inList, when: whenPerson, run: func(m *Model) tea.Cmd {
-				m.startPrompt("task", "task (add a due date after a | e.g. call back | 2026-12-01): ", "")
-				return m.input.Focus()
-			}},
 		{id: "snooze", title: "Snooze keep-in-touch", group: "Contact", hint: "s", keys: []string{"s"}, desc: "snooze keep-in-touch for N days",
 			write: true, when: whenPerson, run: func(m *Model) tea.Cmd {
 				m.startPrompt("snooze", "snooze days: ", "7")
@@ -303,10 +303,6 @@ func buildActions() []action {
 				m.startInput("tasktag", "tag task (-name removes): ", "")
 				return m.input.Focus()
 			}},
-		{id: "task-delete", title: "Delete task", group: "Contact", hint: "d", keys: []string{"d"}, desc: "delete the selected task (asks y/n). Tasks view, or a task row in the detail pane. ctrl+z undoes it",
-			write: true, foot: 46, footIn: inList, footIf: func(m *Model) bool { return m.view == viewTasks }, when: whenTaskTarget, run: func(m *Model) tea.Cmd { m.askDeleteTask(m.taskTarget()); return nil }},
-		{id: "task-restore", title: "Restore deleted task", group: "Contact", desc: "bring back the task deleted last in this session (ctrl+z does the same for the newest change; same as crm task restore)",
-			write: true, when: whenDeletedTask, run: func(m *Model) tea.Cmd { m.restoreLastTask(); return nil }},
 		{id: "tag", title: "Tag", group: "Contact", hint: "T", keys: []string{"T"}, desc: "add a tag (prefix with - to remove) on the person or all marked",
 			write: true, foot: 31, footIn: inList, footIf: whenMarks, when: whenPerson, run: func(m *Model) tea.Cmd {
 				m.startPrompt("tag", "tag (-name removes): ", "")
@@ -320,10 +316,8 @@ func buildActions() []action {
 			write: true, foot: 33, footIn: inList, footIf: whenMarks, when: whenPerson, run: func(m *Model) tea.Cmd { m.pickTier(m.targets()); return nil }},
 		{id: "done", title: "Complete task", group: "Contact", hint: "x", keys: []string{"x"}, desc: "complete the selected task (Tasks view, or a task row)",
 			write: true, run: func(m *Model) tea.Cmd { m.completeTask(); return nil }},
-		{id: "new", title: "New contact", group: "Contact", hint: "+", keys: []string{"+"}, desc: "create a contact: opens a blank form, saved when you enter a name",
-			write: true, foot: 45, footIn: inList, when: func(m *Model) bool { return m.view != viewCalendar && notAdvancedView(m) }, run: func(m *Model) tea.Cmd { return m.startCreate() }},
 		{id: "cal-add", title: "Calendar: add event", group: "Calendar", hint: "+", keys: []string{"+"}, desc: "add an event in the short syntax, for example Lunch @Sam fri 12:30 for 1h at Cafe Rio every week (in the Calendar view; from any view in the palette)",
-			write: true, keyIf: notAdvancedView, foot: 30, footIn: inList, footIf: whenCalendar, run: func(m *Model) tea.Cmd { return m.startCalAdd() }},
+			write: true, keyIf: whenCalendar, foot: 30, footIn: inList, footIf: whenCalendar, run: func(m *Model) tea.Cmd { return m.startCalAdd() }},
 
 		// Home.
 		{id: "home-open", title: "Open", group: "Home", hint: "enter", keys: []string{"enter"}, desc: "open the person (People view, detail pane) or the view the row stands for",
@@ -358,10 +352,6 @@ func buildActions() []action {
 			write: true, foot: 34, footIn: inList, footIf: func(m *Model) bool { return len(m.markedIDs()) >= 2 }, when: whenMarks, run: func(m *Model) tea.Cmd { m.openMarkedCompare(); return nil }},
 
 		// Archive.
-		{id: "archive", title: "Archive", group: "Archive", hint: "#", keys: []string{"#"}, desc: "archive the person or all marked (asks y/n, restore from the Archived view)",
-			write: true, foot: 35, footIn: inList, footIf: whenMarks, when: whenPerson, run: func(m *Model) tea.Cmd { m.askArchive(); return nil }},
-		{id: "restore", title: "Restore", group: "Archive", hint: "u", keys: []string{"u"}, desc: "restore the archived person or all marked",
-			write: true, foot: 20, footIn: inList, when: whenArchivedRows, run: func(m *Model) tea.Cmd { m.restoreTargets(); return nil }},
 		{id: "purge", title: "Purge forever", group: "Archive", hint: "X", keys: []string{"X"}, desc: "permanently delete the archived person after typing the name",
 			write: true, foot: 21, footIn: inList, when: whenArchivedRows, run: func(m *Model) tea.Cmd { return m.askPurge() }},
 
@@ -487,7 +477,19 @@ func buildActions() []action {
 		{id: "quit", inCompare: true, title: "Quit", group: "App", hint: "q", keys: []string{"q", "ctrl+c"}, desc: "quit",
 			run: func(m *Model) tea.Cmd { return tea.Quit }},
 	}
-	return append(acts, orgDealActions()...)
+	// The generated verbs come after the contact actions. Each key is limited to the views where it
+	// means that object (keyFor), so the order does not decide what a key does.
+	at := len(acts)
+	for i := range acts {
+		if acts[i].id == "home-open" {
+			at = i
+			break
+		}
+	}
+	out := append([]action{}, acts[:at]...)
+	out = append(out, objectActions()...)
+	out = append(out, acts[at:]...)
+	return append(out, advancedViewActions()...)
 }
 
 // step moves the cursor in the focused pane, or the row cursor of the compare screen.

@@ -20,10 +20,9 @@ import (
 // A deal is title | value | stage | organization | person | notes. An organization or person is
 // an id or a name. On an edit, a field you empty is cleared.
 
-const (
-	orgPrompt  = "organization (name | domain | industry | notes): "
-	dealPrompt = "deal (title | value | stage | organization | person | notes): "
-)
+// The prompts come from the object registry (objects.go): the label and the fields in order.
+func orgPrompt() string  { return orgDef().prompt() }
+func dealPrompt() string { return dealDef().prompt() }
 
 // nextView is the view after v in the number-key cycle. Advanced views are outside the cycle: ]
 // goes to Home from them and [ to the Calendar.
@@ -61,37 +60,17 @@ func (m *Model) selDeal() int64 {
 
 func whenOrgSel(m *Model) bool       { return m.selOrg() != 0 }
 func whenDealSel(m *Model) bool      { return m.selDeal() != 0 }
-func whenDeletedOrg(m *Model) bool   { return len(m.deletedOrgs) > 0 }
-func whenDeletedDeal(m *Model) bool  { return len(m.deletedDeals) > 0 }
 func whenOrgsView(m *Model) bool     { return m.view == viewOrgs && m.focus == focusList }
 func whenDealsView(m *Model) bool    { return m.view == viewDeals && m.focus == focusList }
 
-// orgDealActions are appended to the registry. Their keys only apply in their own view.
-func orgDealActions() []action {
+// advancedViewActions open the advanced views from the palette. Their verbs (Add, Edit, Delete,
+// Restore, Link) come from the object registry.
+func advancedViewActions() []action {
 	return []action{
-		{id: "view-orgs", title: "Organizations view", group: "Organizations", desc: "advanced view: companies and groups. + adds, enter edits, d deletes, u restores (same as crm org)",
+		{id: "view-orgs", title: "Organizations view", group: "Organizations", desc: "advanced view: companies and groups. a adds, enter edits, d deletes, u restores, L links (same as crm org)",
 			run: func(m *Model) tea.Cmd { m.switchView(viewOrgs); return nil }},
-		{id: "org-add", title: "Add organization", group: "Organizations", hint: "+", keys: []string{"+"}, desc: "add an organization: name | domain | industry | notes (same as crm org add). + in the Organizations view, or from the palette",
-			write: true, keyIf: whenOrgsView, foot: 45, footIn: inList, footIf: whenOrgsView, run: func(m *Model) tea.Cmd { return m.startOrgAdd() }},
-		{id: "org-edit", title: "Edit organization", group: "Organizations", hint: "enter", keys: []string{"enter", "e"}, desc: "edit the selected organization as one line, fields you empty are cleared (same as crm org edit). Also e",
-			write: true, foot: 20, footIn: inList, when: whenOrgSel, run: func(m *Model) tea.Cmd { return m.startOrgEdit(m.selOrg()) }},
-		{id: "org-delete", title: "Delete organization", group: "Organizations", hint: "d", keys: []string{"d"}, desc: "delete the selected organization (asks y/n, the same soft delete as crm org delete). ctrl+z undoes it",
-			write: true, foot: 46, footIn: inList, when: whenOrgSel, run: func(m *Model) tea.Cmd { m.askDeleteOrg(m.selOrg()); return nil }},
-		{id: "org-restore", title: "Restore deleted organization", group: "Organizations", desc: "bring back the organization deleted last in this session (ctrl+z does the same for the newest change)",
-			write: true, when: whenDeletedOrg, run: func(m *Model) tea.Cmd { m.restoreLastOrg(); return m.takePending() }},
-
-		{id: "view-deals", title: "Deals view", group: "Deals", desc: "advanced view: deals with stage and value. + adds, enter edits, s sets the stage, d deletes, u restores (same as crm deal)",
+		{id: "view-deals", title: "Deals view", group: "Deals", desc: "advanced view: deals with stage and value. a adds, enter edits, s sets the stage, d deletes, u restores, L links (same as crm deal)",
 			run: func(m *Model) tea.Cmd { m.switchView(viewDeals); return nil }},
-		{id: "deal-add", title: "Add deal", group: "Deals", hint: "+", keys: []string{"+"}, desc: "add a deal: title | value | stage | organization | person | notes (same as crm deal add). + in the Deals view, or from the palette",
-			write: true, keyIf: whenDealsView, foot: 45, footIn: inList, footIf: whenDealsView, run: func(m *Model) tea.Cmd { return m.startDealAdd() }},
-		{id: "deal-edit", title: "Edit deal", group: "Deals", hint: "enter", keys: []string{"enter", "e"}, desc: "edit the selected deal as one line, fields you empty are cleared (same as crm deal edit). Also e",
-			write: true, foot: 20, footIn: inList, when: whenDealSel, run: func(m *Model) tea.Cmd { return m.startDealEdit(m.selDeal()) }},
-		{id: "deal-stage", title: "Set deal stage", group: "Deals", hint: "s", keys: []string{"s"}, desc: "pick the stage of the selected deal: lead, prospect, proposal, negotiation, won, lost",
-			write: true, foot: 21, footIn: inList, when: whenDealSel, run: func(m *Model) tea.Cmd { m.pickDealStage(m.selDeal()); return nil }},
-		{id: "deal-delete", title: "Delete deal", group: "Deals", hint: "d", keys: []string{"d"}, desc: "delete the selected deal (asks y/n, the same soft delete as crm deal delete). ctrl+z undoes it",
-			write: true, foot: 46, footIn: inList, when: whenDealSel, run: func(m *Model) tea.Cmd { m.askDeleteDeal(m.selDeal()); return nil }},
-		{id: "deal-restore", title: "Restore deleted deal", group: "Deals", desc: "bring back the deal deleted last in this session (ctrl+z does the same for the newest change)",
-			write: true, when: whenDeletedDeal, run: func(m *Model) tea.Cmd { m.restoreLastDeal(); return m.takePending() }},
 	}
 }
 
@@ -230,8 +209,8 @@ func (m *Model) dealDetail(r row) string {
 // --- prompts ---
 
 func (m *Model) startOrgAdd() tea.Cmd {
-	m.orgDealID = 0
-	m.startInput("org-add", orgPrompt, "")
+	m.lineID = 0
+	m.startInput("org-add", orgPrompt(), "")
 	return m.input.Focus()
 }
 
@@ -241,8 +220,8 @@ func (m *Model) startOrgEdit(id int64) tea.Cmd {
 		m.setStatus(err.Error(), true)
 		return nil
 	}
-	m.orgDealID = id
-	m.startInput("org-edit", orgPrompt, orgLine(o))
+	m.lineID = id
+	m.startInput("org-edit", orgPrompt(), orgLine(o))
 	return m.input.Focus()
 }
 
@@ -251,8 +230,8 @@ func orgLine(o *model.Organization) string {
 }
 
 func (m *Model) startDealAdd() tea.Cmd {
-	m.orgDealID = 0
-	m.startInput("deal-add", dealPrompt, "")
+	m.lineID = 0
+	m.startInput("deal-add", dealPrompt(), "")
 	return m.input.Focus()
 }
 
@@ -262,7 +241,7 @@ func (m *Model) startDealEdit(id int64) tea.Cmd {
 		m.setStatus(err.Error(), true)
 		return nil
 	}
-	m.orgDealID = id
+	m.lineID = id
 	org, person := "", ""
 	if d.OrgID != nil {
 		org = m.orgName(*d.OrgID)
@@ -271,7 +250,7 @@ func (m *Model) startDealEdit(id int64) tea.Cmd {
 		person = m.personLabel(*d.PersonID)
 	}
 	line := strings.Join([]string{d.Title, plainNumber(d.Value), d.Stage, org, person, cleanCell(str(d.Notes))}, " | ")
-	m.startInput("deal-edit", dealPrompt, strings.TrimRight(line, " |"))
+	m.startInput("deal-edit", dealPrompt(), strings.TrimRight(line, " |"))
 	return m.input.Focus()
 }
 
@@ -291,16 +270,16 @@ func (m *Model) runOrgDealPrompt(kind, value string) {
 	case "org-add":
 		toast, err = m.saveOrgAdd(value)
 	case "org-edit":
-		toast, err = m.saveOrgEdit(m.orgDealID, value)
+		toast, err = m.saveOrgEdit(m.lineID, value)
 	case "deal-add":
 		toast, err = m.saveDealAdd(value)
 	case "deal-edit":
-		toast, err = m.saveDealEdit(m.orgDealID, value)
+		toast, err = m.saveDealEdit(m.lineID, value)
 	}
 	if err != nil {
-		prompt := orgPrompt
+		prompt := orgPrompt()
 		if strings.HasPrefix(kind, "deal-") {
-			prompt = dealPrompt
+			prompt = dealPrompt()
 		}
 		m.startInput(kind, prompt, value)
 		m.pendingCmd = tea.Batch(m.input.Focus(), m.showToast(err.Error(), true))
@@ -540,89 +519,11 @@ func (m *Model) pickDealStage(id int64) {
 	m.ov.digits = true
 }
 
-// --- delete and restore ---
-
-func (m *Model) askDeleteOrg(id int64) {
-	if id == 0 {
-		return
-	}
-	m.mode = modeConfirm
-	m.confirm = &confirmState{
-		prompt: fmt.Sprintf("delete organization %q? y/n", truncateLabel(m.orgName(id))),
-		yes: func() {
-			if err := m.hArchiveOrg(id); err != nil {
-				m.setStatus(err.Error(), true)
-				return
-			}
-			m.deletedOrgs = append(m.deletedOrgs, id)
-			m.afterWrite()
-			m.setStatus("organization deleted (ctrl+z undoes)", false)
-			m.pendingCmd = m.showToast("organization deleted · ctrl+z undoes", false)
-		},
-	}
-}
-
-func (m *Model) restoreLastOrg() {
-	for len(m.deletedOrgs) > 0 {
-		id := m.deletedOrgs[len(m.deletedOrgs)-1]
-		m.deletedOrgs = m.deletedOrgs[:len(m.deletedOrgs)-1]
-		if err := m.hRestoreOrg(id); err != nil {
-			continue // came back through ctrl+z
-		}
-		m.afterWrite()
-		if m.view == viewOrgs {
-			m.cursorOn(func(r row) bool { return r.orgID == id })
-		}
-		m.setStatus("organization restored", false)
-		m.pendingCmd = m.showToast("organization restored", false)
-		return
-	}
-	m.setStatus("no deleted organization to restore in this session", true)
-}
-
 func (m *Model) dealTitle(id int64) string {
 	if d, err := m.dlr.FindByID(m.ctx, id); err == nil {
 		return d.Title
 	}
 	return fmt.Sprintf("deal %d", id)
-}
-
-func (m *Model) askDeleteDeal(id int64) {
-	if id == 0 {
-		return
-	}
-	m.mode = modeConfirm
-	m.confirm = &confirmState{
-		prompt: fmt.Sprintf("delete deal %q? y/n", truncateLabel(m.dealTitle(id))),
-		yes: func() {
-			if err := m.hArchiveDeal(id); err != nil {
-				m.setStatus(err.Error(), true)
-				return
-			}
-			m.deletedDeals = append(m.deletedDeals, id)
-			m.afterWrite()
-			m.setStatus("deal deleted (ctrl+z undoes)", false)
-			m.pendingCmd = m.showToast("deal deleted · ctrl+z undoes", false)
-		},
-	}
-}
-
-func (m *Model) restoreLastDeal() {
-	for len(m.deletedDeals) > 0 {
-		id := m.deletedDeals[len(m.deletedDeals)-1]
-		m.deletedDeals = m.deletedDeals[:len(m.deletedDeals)-1]
-		if err := m.hRestoreDeal(id); err != nil {
-			continue
-		}
-		m.afterWrite()
-		if m.view == viewDeals {
-			m.cursorOn(func(r row) bool { return r.dealID == id })
-		}
-		m.setStatus("deal restored", false)
-		m.pendingCmd = m.showToast("deal restored", false)
-		return
-	}
-	m.setStatus("no deleted deal to restore in this session", true)
 }
 
 // --- recorded writes (undo and redo) ---
