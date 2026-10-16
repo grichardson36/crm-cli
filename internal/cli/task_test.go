@@ -97,3 +97,21 @@ func TestTaskAddInvalidPriority(t *testing.T) {
 	_, _, code := crm(t, dbPath, "task", "add", "Bad Task", "--priority", "urgent")
 	assert.Equal(t, 2, code)
 }
+
+func TestTaskDeleteAndRestore(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "crm.db")
+	crm(t, dbPath, "task", "add", "Gone for now", "-f", "json")
+
+	_, _, code := crm(t, dbPath, "task", "delete", "1")
+	assert.Equal(t, 0, code)
+	stdout, _, _ := crm(t, dbPath, "task", "list", "-f", "json")
+	assert.NotContains(t, stdout, "Gone for now")
+
+	_, _, code = crm(t, dbPath, "task", "restore", "1")
+	assert.Equal(t, 0, code)
+	stdout, _, _ = crm(t, dbPath, "task", "list", "-f", "json")
+	assert.Contains(t, stdout, "Gone for now")
+
+	_, _, code = crm(t, dbPath, "task", "restore", "1")
+	assert.Equal(t, 3, code, "a task that is not deleted is not found")
+}

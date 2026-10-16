@@ -110,7 +110,7 @@ func (m *Model) syncRows() ([]row, error) {
 func (m *Model) syncItemDetail(r row) string {
 	w := max(1, m.detail.Width)
 	line := func(s string) string { return runewidth.Truncate(s, w, "…") }
-	kv := func(k, v string) string { return dimStyle.Render(fit(k, labelWidth)) + line(v) + "\n" }
+	kv := func(k, v string) string { return m.st.Dim.Render(fit(k, labelWidth)) + line(v) + "\n" }
 	var b strings.Builder
 	it := r.sync
 	switch {
@@ -118,9 +118,9 @@ func (m *Model) syncItemDetail(r row) string {
 		return ""
 	case it.source != nil:
 		s := it.source
-		b.WriteString(nameStyle.Render(line(s.Source)) + "\n\n")
+		b.WriteString(m.st.Name.Render(line(s.Source)) + "\n\n")
 		if !s.Registered {
-			b.WriteString(errStyle.Render(line("not connected in this build, history only")) + "\n")
+			b.WriteString(m.st.Err.Render(line("not connected in this build, history only")) + "\n")
 		}
 		cursor := s.Cursor
 		if cursor == "" {
@@ -142,11 +142,11 @@ func (m *Model) syncItemDetail(r row) string {
 		}
 		b.WriteString(kv("cursor", cursor))
 		if s.Registered {
-			b.WriteString("\n" + dimStyle.Render(line("s syncs now, d previews without writing")))
+			b.WriteString("\n" + m.st.Dim.Render(line("s syncs now, d previews without writing")))
 		}
 	case it.entry != nil:
 		e := it.entry
-		b.WriteString(nameStyle.Render(line(cleanCell(e.Summary))) + "\n\n")
+		b.WriteString(m.st.Name.Render(line(cleanCell(e.Summary))) + "\n\n")
 		b.WriteString(kv("source", e.Source))
 		b.WriteString(kv("record", e.Kind))
 		b.WriteString(kv("external id", e.ExternalID))
@@ -156,7 +156,7 @@ func (m *Model) syncItemDetail(r row) string {
 			b.WriteString(kv("candidate", fmt.Sprintf("#%d %s", id, m.nameOf(id))))
 		}
 		b.WriteString(inboxPayloadLines(e.Payload, kv))
-		b.WriteString("\n" + dimStyle.Render(line("a creates a person, p attaches to one, i ignores")))
+		b.WriteString("\n" + m.st.Dim.Render(line("a creates a person, p attaches to one, i ignores")))
 	}
 	return strings.TrimRight(b.String(), "\n")
 }

@@ -216,6 +216,8 @@ type Task struct {
 	Recurrence  *string `json:"recurrence"`
 	PersonIDs   []int64 `json:"person_ids,omitempty"`
 	NextTaskID  *int64  `json:"next_task_id,omitempty"`
+	// Tags are filled by TaskRepo.FindByID and FindAll.
+	Tags []string `json:"tags,omitempty"`
 	ID          int64   `json:"id"`
 	UUID        string  `json:"uuid"`
 	Title       string  `json:"title"`
@@ -229,6 +231,32 @@ type Task struct {
 	Archived    bool    `json:"-"`
 	CreatedAt   string  `json:"created_at"`
 	UpdatedAt   string  `json:"updated_at"`
+
+	// Scheduling fields. DueAt stays the soft target; DeadlineAt is the date the scheduler plans against.
+	DurationMin     *int    `json:"duration_min"`
+	EarliestStart   *string `json:"earliest_start"`
+	DeadlineAt      *string `json:"deadline_at"`
+	DeadlineHard    bool    `json:"deadline_hard"`
+	MinChunkMin     *int    `json:"min_chunk_min"`
+	AutoSchedule    bool    `json:"auto_schedule"`
+	ScheduledStart  *string `json:"scheduled_start"`
+	ScheduledLocked bool    `json:"scheduled_locked"`
+	ScheduleName    string  `json:"schedule_name"`
+}
+
+// TaskSchedule holds the optional scheduling fields of a task for create and update. Nil means
+// unchanged. For numbers and text, 0 and the empty string clear the value.
+type TaskSchedule struct {
+	DurationMin    *int
+	EarliestStart  *string
+	DeadlineAt     *string
+	DeadlineHard   *bool
+	MinChunkMin    *int
+	AutoSchedule   *bool
+	ScheduledStart *string // setting a time by hand also locks it, unless ScheduledLocked says otherwise
+	// ScheduledLocked keeps the scheduler away from the placed time.
+	ScheduledLocked *bool
+	ScheduleName    *string
 }
 
 // CreateTaskInput holds fields for creating a task.
@@ -242,6 +270,9 @@ type CreateTaskInput struct {
 	// PersonIDs links the task to several people. PersonID is added to it.
 	PersonIDs  []int64
 	Recurrence *string
+	// Tags are applied to the new task.
+	Tags     []string
+	Schedule TaskSchedule
 }
 
 // UpdateTaskInput holds optional fields for updating a task.
@@ -253,6 +284,7 @@ type UpdateTaskInput struct {
 	DueAt       *string
 	Priority    *string
 	Recurrence  *string
+	Schedule    TaskSchedule
 }
 
 // TaskFilters holds optional filters for listing tasks.
@@ -262,6 +294,8 @@ type TaskFilters struct {
 	Overdue          bool
 	IncludeCompleted bool
 	Limit            int
+	// Tag keeps only tasks that carry this tag.
+	Tag *string
 }
 
 // Relationship represents a person-to-person link.
@@ -275,7 +309,20 @@ type Relationship struct {
 }
 
 // Valid entity types for tagging.
-var EntityTypes = []string{"person", "organization", "deal", "interaction"}
+var EntityTypes = []string{"person", "organization", "deal", "interaction", "event"}
+
+// TaggableTypes are the entities that can carry tags: the searchable ones and tasks.
+var TaggableTypes = []string{"person", "organization", "deal", "interaction", "event", "task"}
+
+// ValidTaggable checks if tags can be put on the given entity type.
+func ValidTaggable(t string) bool {
+	for _, et := range TaggableTypes {
+		if et == t {
+			return true
+		}
+	}
+	return false
+}
 
 // ValidEntityType checks if the given type is valid.
 func ValidEntityType(t string) bool {
@@ -327,7 +374,7 @@ func ValidDealStage(s string) bool {
 }
 
 // Priority levels
-var Priorities = []string{"low", "medium", "high"}
+var Priorities = []string{"low", "medium", "high", "asap"}
 
 // ValidPriority checks if the given priority is valid.
 func ValidPriority(p string) bool {

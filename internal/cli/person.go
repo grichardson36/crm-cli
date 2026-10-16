@@ -8,6 +8,7 @@ import (
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/format"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/shortsyntax"
 	"github.com/spf13/cobra"
 )
 
@@ -95,12 +96,14 @@ func registerPersonCommands(rootCmd *cobra.Command) {
 func personAddCmd() *cobra.Command {
 	var email, phone, title, company, location, notes, birthday, keepInTouch string
 	var orgID int64
-	var favorite bool
+	var favorite, dryRun, noSyntax bool
 
 	cmd := &cobra.Command{
 		Use:   "add <name>",
 		Short: "Add a new person",
-		Args:  cobra.ExactArgs(1),
+		Long: "Add a new person. The name can carry short syntax: #friend (tag), every 3m (keep in touch cadence), !high (priority tier).\n" +
+			"Flags win over the same value in the name. Use --dry-run to see what was read, --no-syntax to keep the name as typed. See 'crm help short-syntax'.",
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			db, err := openDB()
 			if err != nil {
@@ -108,7 +111,28 @@ func personAddCmd() *cobra.Command {
 			}
 			defer db.Close()
 
-			firstName, lastName := parseName(args[0])
+			in, err := parseInline(cmd.Context(), db, args[0], noSyntax, false, shortsyntax.KindDue, shortsyntax.KindDeadline, shortsyntax.KindDuration, shortsyntax.KindPerson, shortsyntax.KindRecurrence)
+			if err != nil {
+				return err
+			}
+			if in.Res.Title == "" {
+				return model.NewExitError(model.ErrValidation, "the name is empty once the short syntax is removed")
+			}
+			if !cmd.Flags().Changed("keep-in-touch") && in.Res.Cadence != "" {
+				keepInTouch = in.Res.Cadence
+			}
+			tier := in.Res.Tier()
+			if tier == 5 {
+				tier = 0 // "none" is no tier
+			}
+			if dryRun {
+				return printInlineDryRun(map[string]any{
+					"dry_run": true, "syntax": in.Res,
+					"person": map[string]any{"name": in.Res.Title, "keep_in_touch": keepInTouch, "priority_tier": tier, "tags": in.Res.Tags},
+				})
+			}
+
+			firstName, lastName := parseName(in.Res.Title)
 			input := model.CreatePersonInput{
 				FirstName: firstName,
 				LastName:  nilIfEmpty(lastName),
@@ -139,8 +163,17 @@ func personAddCmd() *cobra.Command {
 			if favorite {
 				extra.IsFavorite = &favorite
 			}
-			if extra.Birthday != nil || extra.KeepInTouch != nil || extra.IsFavorite != nil {
+			if tier > 0 {
+				extra.PriorityTier = &tier
+			}
+			if extra.Birthday != nil || extra.KeepInTouch != nil || extra.IsFavorite != nil || extra.PriorityTier != nil {
 				if person, err = r.Update(cmd.Context(), person.ID, extra); err != nil {
+					return err
+				}
+			}
+			tr := repo.NewTagRepo(db)
+			for _, tag := range in.Res.Tags {
+				if err := tr.Apply(cmd.Context(), "person", person.ID, tag); err != nil {
 					return err
 				}
 			}
@@ -160,6 +193,8 @@ func personAddCmd() *cobra.Command {
 	cmd.Flags().StringVar(&birthday, "birthday", "", "birthday as YYYY-MM-DD, or --MM-DD when the year is unknown")
 	cmd.Flags().StringVar(&keepInTouch, "keep-in-touch", "", "cadence: "+strings.Join(model.KeepInTouchCadences, ", "))
 	cmd.Flags().BoolVar(&favorite, "favorite", false, "mark as favorite")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print what was read from the name and what would be created, and write nothing")
+	cmd.Flags().BoolVar(&noSyntax, "no-syntax", false, "keep the name as typed: do not read #, every or ! tokens")
 
 	return cmd
 }

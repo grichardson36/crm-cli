@@ -56,7 +56,7 @@ func newTestModel(t *testing.T) (*Model, *repo.PersonRepo) {
 
 var specialKeys = map[string]tea.KeyType{
 	"enter": tea.KeyEnter, "esc": tea.KeyEsc, "tab": tea.KeyTab, "shift+tab": tea.KeyShiftTab,
-	"ctrl+d": tea.KeyCtrlD, "ctrl+k": tea.KeyCtrlK, "ctrl+u": tea.KeyCtrlU,
+	"ctrl+d": tea.KeyCtrlD, "ctrl+k": tea.KeyCtrlK, "ctrl+u": tea.KeyCtrlU, "ctrl+z": tea.KeyCtrlZ, "ctrl+y": tea.KeyCtrlY,
 	"left": tea.KeyLeft, "right": tea.KeyRight, "up": tea.KeyUp, "down": tea.KeyDown,
 }
 
@@ -167,31 +167,49 @@ func TestNavigation(t *testing.T) {
 	assert.Equal(t, 0, m.cursor, "stops at the top")
 }
 
-func TestSearchAndTagFilter(t *testing.T) {
+// barNames lists the labels of the bar rows of one kind.
+func barNames(m *Model, kind string) []string {
+	var out []string
+	for _, i := range m.ov.shown {
+		if it := m.ov.items[i]; it.kind == kind {
+			out = append(out, it.label)
+		}
+	}
+	return out
+}
+
+func TestSlashOpensTheBarAndFindsPeople(t *testing.T) {
 	m, _ := newTestModel(t)
 	press(m, "/")
-	assert.Equal(t, modeSearch, m.mode)
+	require.Equal(t, modeOverlay, m.mode)
+	require.True(t, m.ov.palette, "/ opens the same bar as ctrl+k")
 	typeText(m, "globex")
-	assert.Equal(t, []string{"Bob Baker"}, names(m))
+	assert.Equal(t, []string{"Bob Baker"}, barNames(m, kindPerson))
 	press(m, "enter")
 	assert.Equal(t, modeNormal, m.mode)
-	assert.Equal(t, []string{"Bob Baker"}, names(m), "filter stays after enter")
+	assert.Equal(t, int64(2), m.curPerson(), "enter opens the person")
+	assert.Len(t, m.rows, 3, "no filter is left behind")
+
+	// A secondary email is found too.
+	press(m, "/")
+	typeText(m, "home.org")
+	assert.Equal(t, []string{"Bob Baker"}, barNames(m, kindPerson))
+	press(m, "esc")
+
+	// #tag filters the list, esc clears the filter.
+	press(m, "/")
+	typeText(m, "#friend")
+	press(m, "enter")
+	assert.Equal(t, []string{"Bob Baker"}, names(m))
+	assert.Contains(t, m.View(), "filter: #friend")
 	press(m, "esc")
 	assert.Len(t, m.rows, 3, "esc clears the filter")
 
-	// Secondary email and tag searches.
+	// Nothing found offers to create.
 	press(m, "/")
-	typeText(m, "home.org")
-	assert.Equal(t, []string{"Bob Baker"}, names(m))
-	press(m, "esc")
-	press(m, "/")
-	typeText(m, "#friend")
-	assert.Equal(t, []string{"Bob Baker"}, names(m))
-	press(m, "esc")
-	press(m, "/")
-	typeText(m, "zzz")
-	assert.Empty(t, m.rows)
-	assert.Contains(t, m.View(), "No matches.")
+	typeText(m, "Qwerty Zxcvb")
+	assert.Empty(t, barNames(m, kindPerson))
+	assert.Equal(t, []string{`Create person "Qwerty Zxcvb"`, `Add note "Qwerty Zxcvb"`}, barNames(m, kindCreate))
 	press(m, "esc")
 	assert.Len(t, m.rows, 3)
 }
@@ -217,9 +235,11 @@ func TestViewsDueBirthdaysTasks(t *testing.T) {
 	press(m, "]", "]", "]")
 	assert.Equal(t, viewSync, m.view)
 	press(m, "]")
+	assert.Equal(t, viewCalendar, m.view)
+	press(m, "]")
 	assert.Equal(t, viewHome, m.view, "] wraps around")
 	press(m, "[")
-	assert.Equal(t, viewSync, m.view, "[ wraps back")
+	assert.Equal(t, viewCalendar, m.view, "[ wraps back")
 }
 
 func TestMarkContactedRemovesFromDue(t *testing.T) {
@@ -409,7 +429,7 @@ func TestReadOnlyBlocksWrites(t *testing.T) {
 	assert.Nil(t, p.LastContactedAt)
 	// Reading still works.
 	press(m, "/")
-	assert.Equal(t, modeSearch, m.mode)
+	assert.Equal(t, modeOverlay, m.mode)
 	press(m, "esc", "j")
 
 	// The detail pane is read-only too: enter, a and d are blocked, copy still works.
@@ -785,7 +805,7 @@ func TestPaletteFilterAndRun(t *testing.T) {
 	require.Equal(t, modeOverlay, m.mode)
 	assert.Len(t, m.ov.items, len(m.actions), "palette lists every action")
 	out := m.View()
-	assert.Contains(t, out, "Command palette")
+	assert.Contains(t, out, "Command bar")
 	assert.Contains(t, out, "Toggle favorite")
 
 	typeText(m, "favor")

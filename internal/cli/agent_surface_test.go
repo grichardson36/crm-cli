@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/jdanielnd/crm-cli/internal/agentdoc"
+	"github.com/jdanielnd/crm-cli/internal/help"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -75,7 +76,7 @@ func TestHelpTopicAndJSON(t *testing.T) {
 	assert.Equal(t, 0, code)
 	var list []map[string]string
 	jsonOut(t, stdout, &list)
-	assert.Len(t, list, 18)
+	assert.Len(t, list, len(help.Names()))
 	assert.Equal(t, "overview", list[0]["name"])
 }
 

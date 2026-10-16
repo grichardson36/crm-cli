@@ -35,19 +35,4 @@ crm person edit 1 --tier 1
 crm person edit 2 --location ""
 ```
 
-## Organizations and relationships
-
-```sh crm-example
-crm org add "Initech" --domain initech.com --industry Software
-crm org list
-crm org show 1 --with-people
-crm person edit 2 --org 1
-crm person relate 1 2 --type colleague --notes "Same team"
-crm person relationships 1
-```
-
-Relationship types: colleague, friend, manager, mentor, referred-by.
-
-## Related topics
-
-`contact-methods`, `keep-in-touch`, `tags`, `duplicates`, `archive`.
+See also: contact-methods, orgs (organizations, relationships), keep-in-touch, tags, duplicates, archive.

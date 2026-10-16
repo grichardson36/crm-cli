@@ -35,6 +35,7 @@ var externalEntityTables = map[string]string{
 	"deal":         "deals",
 	"interaction":  "interactions",
 	"task":         "tasks",
+	"event":        "events",
 }
 
 const externalIDColumns = "id, uuid, entity, local_id, local_uuid, source, external_id, etag, last_seen_at, created_at, updated_at"
@@ -66,6 +67,21 @@ func (r *ExternalIDRepo) Lookup(ctx context.Context, source, entity, externalID 
 	e, err := scanExternalID(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("external id %s/%s/%s: %w", source, entity, externalID, model.ErrNotFound)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("lookup external id: %w", err)
+	}
+	return e, nil
+}
+
+// LookupAny finds the mapping of an external id in any source, oldest first. It is how a
+// calendar UID is recognised no matter which feed or file brought it in.
+func (r *ExternalIDRepo) LookupAny(ctx context.Context, entity, externalID string) (*model.ExternalID, error) {
+	row := r.db.QueryRowContext(ctx,
+		"SELECT "+externalIDColumns+" FROM external_ids WHERE entity = ? AND external_id = ? ORDER BY id LIMIT 1", entity, externalID)
+	e, err := scanExternalID(row)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("external id %s/%s: %w", entity, externalID, model.ErrNotFound)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("lookup external id: %w", err)

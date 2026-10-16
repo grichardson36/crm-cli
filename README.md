@@ -198,6 +198,19 @@ crm status
 
 Shows contact/org counts, open deals with total value, task counts, overdue items, pipeline breakdown, and recent activity.
 
+### Quick input (short syntax)
+
+Type meaning inline. `#tag`, `@Name`, plain dates (`fri 3pm`), `by fri`, `~30m`, `!high`, `every 3m`. The same text works in the CLI, the TUI command bar (`ctrl+k`) and for agents.
+
+```bash
+crm do "n Sam called about the deal #deal remind fri"   # note, tag and a reminder in one line
+crm do "set Sam: company=Acme title=CTO" --dry-run
+crm task add "Send proposal mon 3pm by wed !high @Sam"
+crm person add "Sam Lee #friend every 3m"
+```
+
+See `crm help short-syntax`.
+
 ## Output Formats
 
 Every command supports `--format` / `-f`:
@@ -305,6 +318,7 @@ Then point the agent at [`AGENTS.md`](AGENTS.md) so it knows how to use the CRM 
 | `crm_stats` | CRM summary stats |
 | `crm_help` | Built-in help topics: list, read one, or search |
 | `crm_schema` | Machine-readable manifest of the CLI |
+| `crm_do` | Run one line of text: note, task, log, set, tag, snooze |
 
 This table lists the main tools. `crm schema -f json` lists every tool name. `AGENT.md` has workflow notes for Claude users.
 

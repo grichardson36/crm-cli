@@ -69,7 +69,7 @@ type Info struct {
 }
 
 // countTables are the entity tables counted by Inspect (archived rows excluded).
-var countTables = []string{"people", "organizations", "interactions", "deals", "tasks"}
+var countTables = []string{"people", "organizations", "interactions", "deals", "tasks", "events"}
 
 // Inspect opens the database read-only and summarizes it. It never creates or migrates.
 func Inspect(dbPath string) (*Info, error) {

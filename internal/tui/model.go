@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/jdanielnd/crm-cli/internal/integrations"
 	"os"
 	"strings"
 	"time"
@@ -13,10 +14,15 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/jdanielnd/crm-cli/internal/cal/tz"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/dedupe"
+	"github.com/jdanielnd/crm-cli/internal/keys"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/quick"
+	"github.com/jdanielnd/crm-cli/internal/shortsyntax"
 	crmsync "github.com/jdanielnd/crm-cli/internal/sync"
+	"github.com/jdanielnd/crm-cli/internal/theme"
 )
 
 type viewKind int
@@ -30,20 +36,22 @@ const (
 	viewMerge
 	viewArchived
 	viewSync
+	viewCalendar
 	numViews
 )
 
-var viewNames = [numViews]string{"Home", "People", "Due", "Tasks", "Birthdays", "Merge", "Archived", "Sync"}
+var viewNames = [numViews]string{"Home", "People", "Due", "Tasks", "Birthdays", "Merge", "Archived", "Sync", "Calendar"}
 
 type mode int
 
 const (
 	modeNormal  mode = iota
-	modeSearch       // footer input: search
 	modePrompt       // footer input: snooze, note, task, tag
 	modeEdit         // inline input on a detail row
 	modeConfirm      // y/n question in the footer
 	modeOverlay      // command palette or picker
+	modeCapture      // waiting for the key to bind to an action
+	modeNames        // list of names to settle before a line is saved
 )
 
 // focus says which pane receives movement keys.
@@ -68,6 +76,8 @@ type row struct {
 	jump int
 	// sync carries the Sync view data of the row.
 	sync *syncItem
+	// cal carries the Calendar view data of the row.
+	cal *calItem
 }
 
 // Model is the Bubble Tea model.
@@ -79,6 +89,7 @@ type Model struct {
 	tagr *repo.TagRepo
 	dr   *repo.DupeRepo
 	ntr  *repo.NoteTypeRepo
+	er   *repo.EventRepo
 	db   *sql.DB
 	now  func() time.Time
 
@@ -91,6 +102,12 @@ type Model struct {
 	spin spinner.Model
 	// deletedNotes is the session stack of deleted note ids for "Restore last deleted note".
 	deletedNotes []int64
+	// deletedTasks is the session stack of deleted task ids for "Restore deleted task".
+	deletedTasks []int64
+	// Calendar view state, the zone times are shown in and the session stack of deleted events.
+	cal           calState
+	loc           *time.Location
+	deletedEvents []int64
 
 	// clip copies text to the system clipboard (OSC52 by default). open launches a URL.
 	clip func(string)
@@ -150,6 +167,37 @@ type Model struct {
 
 	// noteType is the type used by the next note prompt (remembered between notes).
 	noteType string
+
+	// st holds every style of the active theme. Views draw only with it. See theme.go.
+	st        theme.Styles
+	themeName string // name of the active theme
+	darkBG    bool   // terminal has a dark background (resolves the auto theme)
+	// Command bar: caches for the quick package, the person the palette opened on, the changes of
+	// command lines run this session (newest last) for Undo, and the short syntax switch.
+	qix       *quick.Index
+	qtags     []string
+	qtypes    []string
+	cmdPerson int64
+	hist      []histEntry
+	redoStack []histEntry
+	grp       []histEntry
+	grpDepth  int
+	toast     *toast
+	toastSeq  int
+	noSyntax  bool
+
+	// Key bindings changed by the user (config.toml [keys]), the problems found while loading
+	// them, and the action being rebound while the next key press is captured.
+	keyOverrides keys.Overrides
+	keyProblems  []string
+	capture      *captureState
+
+	// names is the open list of unsettled names, and the choices remembered in this session.
+	names      *namesPanel
+	nameMemory map[string]int64
+
+	// recent are the bar items picked in this session, newest first.
+	recent []overlayItem
 }
 
 // New creates the model and loads data.
@@ -159,32 +207,37 @@ func New(ctx context.Context, db *sql.DB) (*Model, error) {
 	ri := textinput.New()
 	ri.CharLimit = 2000
 	ri.Prompt = ""
-	registry := crmsync.DefaultRegistry(os.Getenv)
+	registry := integrations.DefaultRegistry(os.Getenv)
 	m := &Model{
-		ctx:      ctx,
-		db:       db,
-		registry: registry,
-		runner:   crmsync.NewRunner(db, registry),
-		inbox:    crmsync.NewInbox(db),
-		spin:     spinner.New(spinner.WithSpinner(spinner.Dot)),
-		view:     viewHome,
-		pr:       repo.NewPersonRepo(db),
-		ir:       repo.NewInteractionRepo(db),
-		tr:       repo.NewTaskRepo(db),
-		tagr:     repo.NewTagRepo(db),
-		dr:       repo.NewDupeRepo(db),
-		ntr:      repo.NewNoteTypeRepo(db),
-		minLevel: dedupe.Medium,
-		noteType: "note",
-		now:      time.Now,
-		input:    in,
-		rowInput: ri,
-		detail:   viewport.New(0, 0),
-		helpVP:   viewport.New(0, 0),
-		marked:   map[int64]bool{},
-		actions:  buildActions(),
-		clip:     func(s string) { osc52Copy(os.Stdout, s) },
-		open:     openURL,
+		ctx:        ctx,
+		db:         db,
+		registry:   registry,
+		runner:     crmsync.NewRunner(db, registry),
+		inbox:      crmsync.NewInbox(db),
+		spin:       spinner.New(spinner.WithSpinner(spinner.Dot)),
+		view:       viewHome,
+		pr:         repo.NewPersonRepo(db),
+		ir:         repo.NewInteractionRepo(db),
+		tr:         repo.NewTaskRepo(db),
+		tagr:       repo.NewTagRepo(db),
+		dr:         repo.NewDupeRepo(db),
+		ntr:        repo.NewNoteTypeRepo(db),
+		er:         repo.NewEventRepo(db),
+		cal:        newCalState(),
+		loc:        tz.Device(),
+		minLevel:   dedupe.Medium,
+		noteType:   "note",
+		now:        time.Now,
+		input:      in,
+		rowInput:   ri,
+		detail:     viewport.New(0, 0),
+		helpVP:     viewport.New(0, 0),
+		marked:     map[int64]bool{},
+		nameMemory: map[string]int64{},
+		actions:    buildActions(),
+		clip:       func(s string) { osc52Copy(os.Stdout, s) },
+		open:       openURL,
+		st:         defaultStyles(),
 	}
 	if err := m.reload(); err != nil {
 		return nil, err
@@ -200,6 +253,8 @@ func Run(ctx context.Context, db *sql.DB, readOnly bool, env Env) error {
 	}
 	m.readOnly = readOnly
 	m.env = env
+	m.applyStartupTheme()
+	m.applyStartupKeys()
 	_, err = tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion(), tea.WithContext(ctx)).Run()
 	return err
 }
@@ -224,6 +279,7 @@ func (m *Model) reload() error {
 		return err
 	}
 	m.people = people
+	m.qix, m.qtags, m.qtypes = nil, nil, nil
 	return m.rebuild(true)
 }
 
@@ -236,6 +292,10 @@ func (m *Model) afterWrite() {
 // or at the same position if that item is gone. Otherwise the cursor goes to the top.
 func (m *Model) rebuild(keep bool) error {
 	var keepPerson, keepTask int64
+	calKey := ""
+	if m.view == viewCalendar && m.cursor < len(m.rows) {
+		calKey = calRowKey(m.rows[m.cursor])
+	}
 	oldCursor := m.cursor
 	if keep && m.cursor < len(m.rows) {
 		keepPerson, keepTask = m.rows[m.cursor].personID, m.rows[m.cursor].taskID
@@ -249,6 +309,11 @@ func (m *Model) rebuild(keep bool) error {
 			return err
 		}
 		rows = hr
+	case viewCalendar:
+		if err := m.calLoad(); err != nil {
+			return err
+		}
+		rows = m.calRows()
 	case viewSync:
 		sr, err := m.syncRows()
 		if err != nil {
@@ -299,6 +364,12 @@ func (m *Model) rebuild(keep bool) error {
 			if t.Recurrence != nil {
 				r.sub = "repeats " + *t.Recurrence
 			}
+			for _, tg := range t.Tags {
+				if r.sub != "" {
+					r.sub += " "
+				}
+				r.sub += "#" + tg
+			}
 			rows = append(rows, r)
 		}
 	case viewMerge:
@@ -338,6 +409,9 @@ func (m *Model) rebuild(keep bool) error {
 		}
 	} else {
 		m.offset = 0
+	}
+	if m.view == viewCalendar {
+		m.cursor = m.calCursor(calKey)
 	}
 	m.settle()
 	m.clamp()
@@ -402,12 +476,31 @@ func matches(p model.PersonSummary, terms []string) bool {
 	}
 	hay := strings.ToLower(strings.Join([]string{p.Name, p.Company, p.Title, p.Email, p.AllEmails, p.Location}, " "))
 	tags := strings.ToLower(p.Tags)
-	for _, t := range terms {
+	for i := 0; i < len(terms); i++ {
+		t := terms[i]
 		if strings.HasPrefix(t, "#") {
 			if len(t) > 1 && !strings.Contains(tags, t[1:]) {
 				return false
 			}
 			continue
+		}
+		// The short syntax tokens also filter: !high (priority tier) and every 3m (cadence).
+		if strings.HasPrefix(t, "!") && len(t) > 1 {
+			if pr, ok := shortsyntax.ParsePriority(t[1:]); ok {
+				if p.PriorityTier != shortsyntax.TierOf(pr) {
+					return false
+				}
+				continue
+			}
+		}
+		if t == "every" && i+1 < len(terms) {
+			if c, ok := shortsyntax.ParseCadence(terms[i+1]); ok {
+				if p.KeepInTouch != c {
+					return false
+				}
+				i++
+				continue
+			}
 		}
 		if !strings.Contains(hay, t) && !strings.Contains(tags, t) {
 			return false
@@ -559,10 +652,18 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.tv.vp.Width, m.tv.vp.Height = m.width, max(1, m.height-2)
 		}
 		m.clamp()
+		if m.view == viewCalendar {
+			m.report(m.rebuild(true))
+		}
 		m.refreshDetail(true)
 		return m, nil
 	case tea.MouseMsg:
 		return m.handleMouse(msg)
+	case toastExpireMsg:
+		if m.toast != nil && m.toast.seq == msg.seq {
+			m.toast = nil
+		}
+		return m, nil
 	case syncDoneMsg:
 		m.finishSync(msg)
 		return m, nil
@@ -577,6 +678,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.mode == modeOverlay {
 			return m.handleOverlayKey(msg)
 		}
+		if m.mode == modeCapture {
+			return m.handleCaptureKey(msg)
+		}
+		if m.mode == modeNames {
+			return m.handleNamesKey(msg)
+		}
 		if m.tv != nil {
 			return m.handleTextKey(msg)
 		}
@@ -584,8 +691,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.handleHelpKey(msg)
 		}
 		switch m.mode {
-		case modeSearch:
-			return m.handleSearchKey(msg)
 		case modePrompt:
 			return m.handlePromptKey(msg)
 		case modeEdit:
@@ -628,8 +733,9 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // runAction runs an action, enforcing read-only mode.
 func (m *Model) runAction(a *action) tea.Cmd {
 	if a.write && m.readOnly {
-		m.setStatus("read-only: "+strings.ToLower(a.title)+" is disabled", true)
-		return nil
+		msg := "read-only: " + strings.ToLower(a.title) + " is disabled"
+		m.setStatus(msg, true)
+		return m.showToast(msg, true)
 	}
 	return a.run(m)
 }
@@ -641,36 +747,6 @@ func (m *Model) actionByID(id string) *action {
 		}
 	}
 	return nil
-}
-
-func (m *Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "enter":
-		m.mode = modeNormal
-		m.input.Blur()
-		return m, nil
-	case "esc":
-		m.mode = modeNormal
-		m.input.Blur()
-		m.query = ""
-		m.cursor, m.offset = 0, 0
-		m.report(m.rebuild(false))
-		return m, nil
-	case "down", "ctrl+n":
-		m.move(1)
-		return m, nil
-	case "up", "ctrl+p":
-		m.move(-1)
-		return m, nil
-	}
-	var cmd tea.Cmd
-	m.input, cmd = m.input.Update(msg)
-	if v := m.input.Value(); v != m.query {
-		m.query = v
-		m.cursor, m.offset = 0, 0
-		m.report(m.rebuild(false))
-	}
-	return m, cmd
 }
 
 func (m *Model) startPrompt(kind, prompt, initial string) {
@@ -741,6 +817,7 @@ func (m *Model) handleConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m *Model) bulk(ids []int64, single, plural string, fn func(id int64) error) {
 	ok, failed := 0, 0
 	var first error
+	m.beginGroup()
 	for _, id := range ids {
 		if err := fn(id); err != nil {
 			failed++
@@ -750,6 +827,11 @@ func (m *Model) bulk(ids []int64, single, plural string, fn func(id int64) error
 			continue
 		}
 		ok++
+	}
+	if ok > 1 {
+		m.endGroup(fmt.Sprintf("%s: %d people", plural, ok))
+	} else {
+		m.endGroup("")
 	}
 	if m.focus == focusList {
 		m.marked = map[int64]bool{}
@@ -766,12 +848,26 @@ func (m *Model) bulk(ids []int64, single, plural string, fn func(id int64) error
 }
 
 func (m *Model) runPrompt(kind, value string) {
+	if strings.HasPrefix(kind, "book-") {
+		m.runBookPrompt(kind, value)
+		return
+	}
+	if strings.HasPrefix(kind, "cal-") {
+		m.runCalPrompt(kind, value)
+		return
+	}
 	switch kind {
+	case "task-schedule":
+		m.runTaskSchedule(value)
+		return
 	case "notetype-add":
 		m.addNoteType(value)
 		return
 	case "purge":
 		m.purgeCurrent(value)
+		return
+	case "tasktag":
+		m.tagTask(value)
 		return
 	case "help-search":
 		m.openHelpSearch(value)
@@ -792,7 +888,7 @@ func (m *Model) runPrompt(kind, value string) {
 		}
 		until := m.now().UTC().AddDate(0, 0, days).Format("2006-01-02 15:04:05")
 		m.bulk(ids, fmt.Sprintf("snoozed for %d days", days), "snoozed", func(id int64) error {
-			_, err := m.pr.Update(m.ctx, id, model.UpdatePersonInput{SnoozedUntil: &until})
+			_, err := m.hUpdatePerson(m.ctx, id, model.UpdatePersonInput{SnoozedUntil: &until})
 			return err
 		})
 		return
@@ -805,9 +901,9 @@ func (m *Model) runPrompt(kind, value string) {
 		}
 		m.bulk(ids, "tag "+map[bool]string{true: "removed", false: "added"}[remove], "tagged "+name, func(id int64) error {
 			if remove {
-				return m.tagr.Remove(m.ctx, "person", id, name)
+				return m.hTagRemove(m.ctx, "person", id, name)
 			}
-			return m.tagr.Apply(m.ctx, "person", id, name)
+			return m.hTagApply(m.ctx, "person", id, name)
 		})
 		return
 	case "note":
@@ -815,28 +911,43 @@ func (m *Model) runPrompt(kind, value string) {
 			m.setStatus("no person selected", true)
 			return
 		}
+		// The note goes through the same reader as the command bar: #tag tags the note, +Name
+		// links people, remind fri makes a reminder and every 3m sets the cadence.
 		typ := m.currentNoteType()
-		if _, err := m.ir.Create(m.ctx, model.CreateInteractionInput{Type: typ, Content: &value, PersonIDs: []int64{pid}}); err != nil {
+		env := m.quickEnvFor(pid)
+		env.NoteType = typ
+		_, err := m.runLineAsk("note "+value, env,
+			func() { m.startInput("note", typ+": ", value); _ = m.input.Focus() },
+			func(plan *quick.Plan) tea.Cmd {
+				m.noteType = typ
+				m.setStatus(typ+" added"+extras(plan), false)
+				return m.showToast(typ+" added"+extras(plan), false)
+			})
+		if err != nil {
 			m.setStatus(err.Error(), true)
 			return
 		}
-		m.noteType = typ
-		m.setStatus(typ+" added", false)
 	case "task":
 		if pid == 0 {
 			m.setStatus("no person selected", true)
 			return
 		}
 		title, due, _ := strings.Cut(value, "|")
-		in := model.CreateTaskInput{Title: strings.TrimSpace(title), Priority: "medium", PersonID: &pid}
-		if d := strings.TrimSpace(due); d != "" {
-			in.DueAt = &d
-		}
-		if _, err := m.tr.Create(m.ctx, in); err != nil {
+		env := m.quickEnvFor(pid)
+		env.DueOverride = m.normalizeDue(due)
+		_, err := m.runLineAsk("task "+strings.TrimSpace(title), env,
+			func() {
+				m.startInput("task", "task (add a due date after a | e.g. call back | 2026-12-01): ", value)
+				_ = m.input.Focus()
+			},
+			func(plan *quick.Plan) tea.Cmd {
+				m.setStatus("task added"+extras(plan), false)
+				return m.showToast("task added"+extras(plan), false)
+			})
+		if err != nil {
 			m.setStatus(err.Error(), true)
 			return
 		}
-		m.setStatus("task added", false)
 	}
 	m.afterWrite()
 }

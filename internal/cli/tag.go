@@ -65,8 +65,8 @@ func tagApplyCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(3),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			entityType := args[0]
-			if !model.ValidEntityType(entityType) {
-				return model.NewExitError(model.ErrValidation, "invalid entity type: %s (must be one of: %s)", entityType, strings.Join(model.EntityTypes, ", "))
+			if !model.ValidTaggable(entityType) {
+				return model.NewExitError(model.ErrValidation, "invalid entity type: %s (must be one of: %s)", entityType, strings.Join(model.TaggableTypes, ", "))
 			}
 			entityID, err := strconv.ParseInt(args[1], 10, 64)
 			if err != nil {
@@ -98,8 +98,8 @@ func tagRemoveCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(3),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			entityType := args[0]
-			if !model.ValidEntityType(entityType) {
-				return model.NewExitError(model.ErrValidation, "invalid entity type: %s (must be one of: %s)", entityType, strings.Join(model.EntityTypes, ", "))
+			if !model.ValidTaggable(entityType) {
+				return model.NewExitError(model.ErrValidation, "invalid entity type: %s (must be one of: %s)", entityType, strings.Join(model.TaggableTypes, ", "))
 			}
 			entityID, err := strconv.ParseInt(args[1], 10, 64)
 			if err != nil {
@@ -131,8 +131,8 @@ func tagShowCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			entityType := args[0]
-			if !model.ValidEntityType(entityType) {
-				return model.NewExitError(model.ErrValidation, "invalid entity type: %s (must be one of: %s)", entityType, strings.Join(model.EntityTypes, ", "))
+			if !model.ValidTaggable(entityType) {
+				return model.NewExitError(model.ErrValidation, "invalid entity type: %s (must be one of: %s)", entityType, strings.Join(model.TaggableTypes, ", "))
 			}
 			entityID, err := strconv.ParseInt(args[1], 10, 64)
 			if err != nil {

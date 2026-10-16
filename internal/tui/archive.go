@@ -24,7 +24,7 @@ func (m *Model) askArchive() {
 		prompt: fmt.Sprintf("archive %s? y/n", what),
 		yes: func() {
 			m.bulk(ids, "archived "+what+" (restore from the Archived view)", "archived", func(id int64) error {
-				return m.pr.Archive(m.ctx, id)
+				return m.hArchivePerson(m.ctx, id)
 			})
 		},
 	}
@@ -37,7 +37,7 @@ func (m *Model) restoreTargets() {
 		return
 	}
 	m.bulk(ids, "restored "+m.nameOf(ids[0]), "restored", func(id int64) error {
-		return m.pr.Restore(m.ctx, id)
+		return m.hRestorePerson(m.ctx, id)
 	})
 }
 

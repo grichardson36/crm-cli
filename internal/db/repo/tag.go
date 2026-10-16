@@ -13,7 +13,7 @@ import (
 // entityTables maps tagging entity types to the table that holds them.
 var entityTables = map[string]string{
 	"person": "people", "organization": "organizations",
-	"deal": "deals", "interaction": "interactions",
+	"deal": "deals", "interaction": "interactions", "event": "events", "task": "tasks",
 }
 
 // touchEntity bumps updated_at on a tagged entity. Table names come from entityTables only.
@@ -81,16 +81,12 @@ func (r *TagRepo) FindOrCreate(ctx context.Context, name string) (*model.Tag, er
 
 // Apply adds a tag to an entity. No-op if already applied.
 func (r *TagRepo) Apply(ctx context.Context, entityType string, entityID int64, tagName string) error {
-	if !model.ValidEntityType(entityType) {
+	if !model.ValidTaggable(entityType) {
 		return fmt.Errorf("invalid entity type %q: %w", entityType, model.ErrValidation)
 	}
 
 	// Verify entity exists. Table name is safe — entityType is validated above.
-	tableMap := map[string]string{
-		"person": "people", "organization": "organizations",
-		"deal": "deals", "interaction": "interactions",
-	}
-	table := tableMap[entityType]
+	table := entityTables[entityType]
 	var exists int
 	err := r.db.QueryRowContext(ctx,
 		fmt.Sprintf("SELECT 1 FROM %s WHERE id = ? AND archived = 0", table), entityID).Scan(&exists)
@@ -117,7 +113,7 @@ func (r *TagRepo) Apply(ctx context.Context, entityType string, entityID int64, 
 
 // Remove removes a tag from an entity.
 func (r *TagRepo) Remove(ctx context.Context, entityType string, entityID int64, tagName string) error {
-	if !model.ValidEntityType(entityType) {
+	if !model.ValidTaggable(entityType) {
 		return fmt.Errorf("invalid entity type %q: %w", entityType, model.ErrValidation)
 	}
 

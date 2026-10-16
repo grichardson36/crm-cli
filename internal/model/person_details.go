@@ -115,5 +115,7 @@ type PersonSummary struct {
 	Tags        string
 	IsFavorite  bool
 	KeepInTouch string
+	// PriorityTier is 1 (top) to 5 (none), 0 when unset.
+	PriorityTier int
 	UpdatedAt   string
 }
