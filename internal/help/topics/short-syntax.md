@@ -34,6 +34,6 @@ crm log add --type call 1 "Talked about the offsite #trip yesterday" --dry-run
 
 A name that matches nobody or several people is never guessed. The TUI lists them all on one screen before saving: `1`-`9` pick a person, `c` creates a contact, `x` keeps the text. Nothing is created by default. `crm do` exits 2 or 3 with the candidates in JSON, or take `--keep-unresolved` / `--link-new`.
 
-In the TUI, `ctrl+k` then `n Sam called #deal remind fri` previews the note. `tab` completes, `enter` runs, `alt+d` turns the chip at the cursor back into text, `ctrl+z` undoes.
+In the TUI, `/` or `ctrl+k` then `n Sam called #deal remind fri` previews the note. `tab` completes, `enter` runs, `alt+d` turns the chip at the cursor back into text, `ctrl+z` undoes.
 
 See also: tasks, notes, tags, tui, keys, agents.

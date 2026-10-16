@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"github.com/jdanielnd/crm-cli/internal/model"
 	"strings"
 	"testing"
 
@@ -172,4 +173,121 @@ func TestBarShowsKeysOnTheRight(t *testing.T) {
 	}
 	require.NotEmpty(t, row)
 	assert.Equal(t, "f", strings.TrimSpace(row[len(row)-3:]), "the key sits at the right edge: %q", row)
-}
+}
+func settingLabels(m *Model) []string { return barNames(m, kindSetting) }
+
+func TestBarFindsSettingsByTypingWithTheirCurrentValue(t *testing.T) {
+	m, _ := newTestModel(t)
+	m.themeName = "nord"
+	press(m, "/")
+	typeText(m, "theme")
+	labels := settingLabels(m)
+	require.NotEmpty(t, labels, shownKinds(m))
+	assert.Equal(t, "Theme: nord", labels[0], "the current theme is shown")
+	assert.Contains(t, barNames(m, kindAction), "Theme: choose", "the action is still listed after the setting")
+	assert.Contains(t, plain(m.View()), "Settings")
+	press(m, "enter")
+	require.Equal(t, modeOverlay, m.mode)
+	assert.Equal(t, "Theme", m.ov.title, "enter opens the theme chooser")
+	press(m, "esc")
+}
+
+func TestBarEqualsScopeListsEverySetting(t *testing.T) {
+	m, _ := newTestModel(t)
+	m.themeName = "nord"
+	press(m, "ctrl+k")
+	typeText(m, "=")
+	assert.Equal(t, map[string]int{kindSetting: len(m.settingList())}, kindsOf(m))
+	got := strings.Join(settingLabels(m), "\n")
+	for _, want := range []string{"Theme: ", "Keys: defaults", "Short syntax: on", "Read-only: off", "Database: ", "Doctor",
+		"Sync sources: 0", "Working hours: mon-fri 09:00-17:00", "Display zone: "} {
+		assert.Contains(t, got, want)
+	}
+	typeText(m, "hours")
+	assert.Len(t, settingLabels(m), 2, "working hours, and set working hours")
+}
+
+func TestBarSettingToggleRunsTheAction(t *testing.T) {
+	m, _ := newTestModel(t)
+	press(m, "/")
+	typeText(m, "short syntax")
+	assert.Equal(t, []string{"Short syntax: on"}, settingLabels(m))
+	press(m, "enter")
+	assert.True(t, m.noSyntax)
+	press(m, "/")
+	typeText(m, "=syntax")
+	assert.Equal(t, []string{"Short syntax: off"}, settingLabels(m))
+	press(m, "esc")
+}
+
+func TestBarSettingsFollowReadOnly(t *testing.T) {
+	m := toolsModel(t)
+	m.readOnly = true
+	press(m, "/")
+	typeText(m, "=read")
+	assert.Equal(t, []string{"Read-only: on"}, settingLabels(m))
+	press(m, "esc")
+
+	press(m, "/")
+	typeText(m, "=keys: reset")
+	require.Equal(t, []string{"Keys: reset"}, settingLabels(m))
+	press(m, "enter")
+	assert.Contains(t, m.status, "read-only")
+	assert.Equal(t, modeNormal, m.mode, "nothing opens")
+
+	// Looking is allowed.
+	press(m, "/")
+	typeText(m, "=doctor")
+	press(m, "enter")
+	assert.NotNil(t, m.tv)
+}
+
+func TestBarSettingsDoNotCrowdOutPeople(t *testing.T) {
+	m, _ := newTestModel(t)
+	press(m, "/")
+	typeText(m, "bob")
+	assert.Empty(t, settingLabels(m))
+	press(m, "esc")
+	press(m, "/")
+	typeText(m, "t")
+	assert.Empty(t, settingLabels(m), "one letter is not enough")
+	press(m, "esc")
+}
+
+func TestBarActionScopeListsNoRecords(t *testing.T) {
+	m, _ := newTestModel(t)
+	press(m, "/")
+	typeText(m, ">bob")
+	for _, i := range m.ov.shown {
+		assert.Contains(t, []string{kindAction, kindVerb}, m.ov.items[i].kind)
+	}
+}
+
+func TestBarOffersToShowAllPeopleWhenMany(t *testing.T) {
+	m, pr := newTestModel(t)
+	for i := 0; i < 5; i++ {
+		_, err := pr.Create(m.ctx, model.CreatePersonInput{FirstName: "Pat", LastName: sp("Smith" + string(rune('a'+i)))})
+		require.NoError(t, err)
+	}
+	require.NoError(t, m.reload())
+	press(m, "/")
+	typeText(m, "pat")
+	assert.Len(t, barNames(m, kindPerson), barHitCap)
+	assert.Equal(t, []string{`Show all 5 people matching "pat"`}, barNames(m, kindAll))
+	for i, idx := range m.ov.shown {
+		if m.ov.items[idx].kind == kindAll {
+			m.ov.cursor = i
+		}
+	}
+	press(m, "enter")
+	assert.Len(t, m.rows, 5, "the People list is filtered")
+	press(m, "esc")
+	assert.Len(t, m.rows, 8, "esc clears the filter")
+}
+
+func TestOldSearchPromptIsGone(t *testing.T) {
+	m, _ := newTestModel(t)
+	assert.Nil(t, m.actionByID("search"))
+	assert.True(t, m.actionByID("palette").hasKey("/"))
+	assert.NotContains(t, m.helpText(), "search people")
+}

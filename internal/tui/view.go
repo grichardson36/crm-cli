@@ -280,9 +280,9 @@ type footSeg struct {
 }
 
 var footShort = map[string]string{
-	"down": "move", "search": "search", "focus-detail": "edit", "mark": "mark", "contacted": "contacted",
+	"down": "move", "focus-detail": "edit", "mark": "mark", "contacted": "contacted",
 	"tag": "tag", "cadence": "cadence", "tier": "tier", "note": "note", "new": "new", "task": "task",
-	"help": "help", "palette": "menu", "edit": "edit", "add": "add", "delete": "delete", "copy": "copy",
+	"help": "help", "palette": "find", "edit": "edit", "add": "add", "delete": "delete", "copy": "copy",
 	"open": "open", "back": "back", "compare": "compare", "dupe-level": "level", "dismiss": "dismiss",
 	"undo-dismiss": "undo", "merge-marked": "merge", "archive": "archive", "restore": "restore", "purge": "purge",
 	"home-open": "open", "sync-now": "sync", "sync-dry": "dry-run", "inbox-accept": "accept", "inbox-attach": "attach",
@@ -334,7 +334,7 @@ func (m *Model) footerSegs() []footSeg {
 func (m *Model) footerView() string {
 	var status string
 	switch m.mode {
-	case modeSearch, modePrompt:
+	case modePrompt:
 		status = m.input.View()
 	case modeConfirm:
 		status = m.st.Err.Render(m.confirm.prompt)
@@ -382,8 +382,8 @@ func (m *Model) hintsLine() string {
 		return m.st.Dim.Render("y yes  n no")
 	case modeCapture:
 		return m.st.Dim.Render("any key binds, esc cancel")
-	case modeSearch, modePrompt:
-		if m.mode == modePrompt && m.promptKind == "note" {
+	case modePrompt:
+		if m.promptKind == "note" {
 			return m.st.Dim.Render("enter save  tab type  esc cancel")
 		}
 		if m.mode == modePrompt && (m.promptKind == "cal-add" || m.promptKind == "cal-edit") {

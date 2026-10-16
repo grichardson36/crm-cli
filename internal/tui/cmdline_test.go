@@ -628,7 +628,7 @@ func TestShortSyntaxToggle(t *testing.T) {
 	assert.False(t, m.noSyntax)
 }
 
-func TestPeopleSearchUnderstandsPriorityAndCadenceTokens(t *testing.T) {
+func TestPeopleScopeUnderstandsPriorityAndCadenceTokens(t *testing.T) {
 	m, pr := newTestModel(t)
 	ctx := context.Background()
 	tier := 2
@@ -636,27 +636,19 @@ func TestPeopleSearchUnderstandsPriorityAndCadenceTokens(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, m.reload())
 
-	press(m, "/")
-	typeText(m, "!high")
-	assert.Equal(t, []string{"Cara Cole"}, names(m))
-	press(m, "ctrl+u")
-	typeText(m, "!low")
-	assert.Empty(t, names(m))
-	press(m, "ctrl+u")
-	typeText(m, "every 1w")
-	assert.Equal(t, []string{"Bob Baker"}, names(m), "Bob is on 7 days")
-	press(m, "ctrl+u")
-	typeText(m, "#friend every 1w")
-	assert.Equal(t, []string{"Bob Baker"}, names(m))
-	press(m, "ctrl+u")
-	typeText(m, "#friend !high")
-	assert.Empty(t, names(m))
-	press(m, "ctrl+u")
-	typeText(m, "!top cole")
-	assert.Empty(t, names(m))
-	press(m, "ctrl+u")
-	typeText(m, "!high cole")
-	assert.Equal(t, []string{"Cara Cole"}, names(m))
+	find := func(q string) []string {
+		press(m, "/")
+		typeText(m, "@"+q)
+		defer press(m, "esc")
+		return barNames(m, kindPerson)
+	}
+	assert.Equal(t, []string{"Cara Cole"}, find("!high"))
+	assert.Empty(t, find("!low"))
+	assert.Equal(t, []string{"Bob Baker"}, find("every 1w"), "Bob is on 7 days")
+	assert.Equal(t, []string{"Bob Baker"}, find("#friend every 1w"))
+	assert.Empty(t, find("#friend !high"))
+	assert.Empty(t, find("!top cole"))
+	assert.Equal(t, []string{"Cara Cole"}, find("!high cole"))
 }
 
 func TestCommandBarActionsAreInTheRegistry(t *testing.T) {
@@ -764,6 +756,7 @@ func TestNotesDoNotReadBareDatesInTheBar(t *testing.T) {
 	typeText(m, "n said fri is fine remind next week")
 	assert.Contains(t, m.View(), "remind Mon 19 Oct")
 }
+
 // --- the names list ---
 
 func namesModel(t *testing.T) (*Model, *repo.PersonRepo) {
@@ -955,4 +948,4 @@ func TestNamesListFitsTheTerminal(t *testing.T) {
 		}
 		press(m, "esc", "esc")
 	}
-}
+}

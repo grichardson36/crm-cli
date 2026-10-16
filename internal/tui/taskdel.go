@@ -67,4 +67,3 @@ func (m *Model) hRestoreTask(ctx context.Context, id int64) error {
 		func() error { return m.tr.Restore(m.ctx, id) })
 	return nil
 }
-

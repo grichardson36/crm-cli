@@ -12,39 +12,42 @@ import (
 )
 
 // The unified bar (ctrl+k) is one box for three jobs: run an action, find a record, and type a
-// command. Without a prefix it lists matching actions and records in groups. A prefix narrows it:
-// > actions, @ people, # tags, ? help. A verb and a space (n, t, log, set, tag, snooze) switches
-// to the command line. An empty box lists the things used recently.
+// command. Without a prefix it lists matching actions, settings and records in groups. A prefix
+// narrows it: > actions, @ people, # tags, = settings, ? help. A verb and a space (n, t, log, set,
+// tag, snooze) switches to the command line. An empty box lists the things used recently. The
+// keys ctrl+k, : and / all open it.
 
 const (
-	kindAction = ""
-	kindRecent = "recent"
-	kindPerson = "person"
-	kindOrg    = "org"
-	kindDeal   = "deal"
-	kindTask   = "task"
-	kindNote   = "note"
-	kindTag    = "tag"
-	kindHelp   = "help"
-	kindVerb   = "verb"
-	kindCreate = "create"
+	kindAction  = ""
+	kindRecent  = "recent"
+	kindPerson  = "person"
+	kindOrg     = "org"
+	kindDeal    = "deal"
+	kindTask    = "task"
+	kindNote    = "note"
+	kindTag     = "tag"
+	kindHelp    = "help"
+	kindSetting = "setting"
+	kindAll     = "all" // "Show all N people matching": filters the People list
+	kindVerb    = "verb"
+	kindCreate  = "create"
 )
 
 // barRank orders the groups in the bar.
 var barRank = map[string]int{
-	kindRecent: 0, kindAction: 1, kindVerb: 1, kindPerson: 2, kindOrg: 3, kindDeal: 4, kindTask: 5, kindNote: 6,
-	kindTag: 7, kindHelp: 8, kindCreate: 9,
+	kindRecent: 0, kindSetting: 1, kindAction: 2, kindVerb: 2, kindPerson: 3, kindAll: 3, kindOrg: 4, kindDeal: 5, kindTask: 6, kindNote: 7,
+	kindTag: 8, kindHelp: 9, kindCreate: 10,
 }
 
 // barGroup is the label shown at the start of each group.
 var barGroup = map[string]string{
-	kindRecent: "Recent", kindAction: "Actions", kindVerb: "Actions", kindPerson: "People", kindOrg: "Orgs",
+	kindRecent: "Recent", kindAction: "Actions", kindVerb: "Actions", kindSetting: "Settings", kindPerson: "People", kindAll: "People", kindOrg: "Orgs",
 	kindDeal: "Deals", kindTask: "Tasks", kindNote: "Notes", kindTag: "Tags", kindHelp: "Help", kindCreate: "Create",
 }
 
 const (
 	barActionCap = 12 // actions shown while searching for something
-	barHitCap    = 4 // records shown per group
+	barHitCap    = 4  // records shown per group
 	barRecentCap = 5
 )
 
@@ -53,7 +56,7 @@ var verbAliases = map[string]string{"note": "n", "task": "t"}
 
 // barScope splits the box text into a scope prefix and the query.
 func barScope(raw string) (scope byte, q string) {
-	if raw != "" && strings.ContainsRune(">@#?", rune(raw[0])) {
+	if raw != "" && strings.ContainsRune(">@#?=", rune(raw[0])) {
 		return raw[0], strings.TrimSpace(raw[1:])
 	}
 	return 0, strings.TrimSpace(raw)
@@ -69,7 +72,7 @@ func (o *overlay) refilterBar() {
 	if scope == 0 || scope == '>' {
 		items = append(items, o.base...)
 	}
-	if o.search != nil && (q != "" || scope == '#' || scope == '?') {
+	if o.search != nil && scope != '>' && (q != "" || scope == '#' || scope == '?' || scope == '=') {
 		items = append(items, o.search(scope, q)...)
 	}
 	if scope == 0 && q != "" {
@@ -77,6 +80,7 @@ func (o *overlay) refilterBar() {
 	}
 
 	type scored struct{ idx, rank, score, length int }
+	weak := map[int]bool{} // actions that only match as scattered letters
 	var list []scored
 	for i, it := range items {
 		score := 0
@@ -88,9 +92,11 @@ func (o *overlay) refilterBar() {
 					continue
 				}
 				score = s
+				weak[i] = s >= 30
 			}
 			if it.disabled != "" {
 				score += 1000 // after every enabled action
+				weak[i] = true
 			}
 		case kindRecent:
 			score = i
@@ -127,7 +133,7 @@ func (o *overlay) refilterBar() {
 				if actions++; actions > barActionCap {
 					continue
 				}
-			case kindPerson, kindOrg, kindDeal, kindTask, kindNote:
+			case kindPerson, kindOrg, kindDeal, kindTask, kindNote, kindSetting:
 				if hits[it.kind]++; hits[it.kind] > barHitCap {
 					continue
 				}
@@ -142,7 +148,17 @@ func (o *overlay) refilterBar() {
 		)
 		o.shown = append(o.shown, len(o.items)-2, len(o.items)-1)
 	}
+	// The cursor starts on the first row that is a real match. An action that only matches as
+	// scattered letters does not take enter away from a person typed by name.
 	o.cursor, o.offset = 0, 0
+	if q != "" && scope == 0 {
+		for pos, idx := range o.shown {
+			if !weak[idx] {
+				o.cursor = pos
+				break
+			}
+		}
+	}
 }
 
 func verbItems() []overlayItem {
@@ -167,6 +183,8 @@ func (m *Model) barSearch(scope byte, q string) []overlayItem {
 			}
 		}
 		return out
+	case '=':
+		return m.settingItems(q)
 	case '?':
 		type hit struct {
 			it    overlayItem
@@ -185,6 +203,7 @@ func (m *Model) barSearch(scope byte, q string) []overlayItem {
 		return out
 	}
 	terms := strings.Fields(strings.ToLower(q))
+	people := 0
 	for _, p := range m.people {
 		if matches(p, terms) {
 			desc := p.Company
@@ -192,11 +211,16 @@ func (m *Model) barSearch(scope byte, q string) []overlayItem {
 				desc = p.Title
 			}
 			out = append(out, overlayItem{id: fmt.Sprintf("person:%d", p.ID), kind: kindPerson, label: p.Name, desc: desc, ref: p.ID})
+			people++
 		}
 	}
 	if scope == '@' {
 		return out
 	}
+	if people > barHitCap {
+		out = append(out, overlayItem{id: "people-all", kind: kindAll, label: fmt.Sprintf("Show all %d people matching %q", people, q), desc: "filter the People list (esc clears)", value: q})
+	}
+	out = append(out, m.settingItems(q)...)
 	if orgs, err := repo.NewOrgRepo(m.db).Search(m.ctx, q, barHitCap); err == nil {
 		for _, o := range orgs {
 			out = append(out, overlayItem{id: fmt.Sprintf("org:%d", o.ID), kind: kindOrg, label: o.Name, desc: "people at this organization", ref: o.ID, value: o.Name})
@@ -253,7 +277,7 @@ func (m *Model) pushRecent(it overlayItem) {
 	if it.kind == kindRecent {
 		it.kind = it.origin
 	}
-	if it.kind == kindCreate || it.kind == kindVerb || it.disabled != "" {
+	if it.kind == kindCreate || it.kind == kindVerb || it.kind == kindSetting || it.kind == kindAll || it.disabled != "" {
 		return
 	}
 	list := []overlayItem{it}
@@ -268,7 +292,7 @@ func (m *Model) pushRecent(it overlayItem) {
 	m.recent = list
 }
 
-// pickBar runs a record, tag, help, verb or create item from the bar. handled is false for
+// pickBar runs a record, tag, setting, help, verb or create item from the bar. handled is false for
 // actions, which the palette runs itself.
 func (m *Model) pickBar(it overlayItem) (handled bool, cmd tea.Cmd) {
 	kind := it.kind
@@ -283,6 +307,10 @@ func (m *Model) pickBar(it overlayItem) (handled bool, cmd tea.Cmd) {
 		m.showPeopleQuery(it.value)
 	case kindTag:
 		m.showPeopleQuery("#" + it.value)
+	case kindAll:
+		m.showPeopleQuery(it.value)
+	case kindSetting:
+		return true, m.runSetting(it)
 	case kindDeal, kindNote:
 		if it.ref == 0 {
 			m.setStatus("no person is linked to this "+kind, true)

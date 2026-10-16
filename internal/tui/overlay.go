@@ -217,7 +217,7 @@ func (m *Model) openViewSwitcher() tea.Cmd {
 
 // viewBlurbs say what each view is for.
 var viewBlurbs = [numViews]string{
-	"what needs attention today", "everyone, search with /", "people to reach out to", "open tasks",
+	"what needs attention today", "everyone, find with / or ctrl+k", "people to reach out to", "open tasks",
 	"upcoming birthdays", "probable duplicates", "archived people, restore or purge", "sources and the inbox",
 	"events, birthdays and due dates by day",
 }
@@ -323,6 +323,7 @@ func (m *Model) overlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	o.filter, cmd = o.filter.Update(msg)
 	if o.filter.Value() != before {
 		o.refilter()
+		o.move(0, page)
 	}
 	m.syncCmd()
 	return m, cmd
@@ -364,7 +365,7 @@ func (m *Model) overlayView() string {
 	var b strings.Builder
 	help := "   enter run  esc close  up/down choose"
 	if o.palette {
-		help = "   enter run  esc close   > actions  @ people  # tags  ? help"
+		help = "   enter run  esc close   > actions  @ people  # tags  = settings  ? help"
 	}
 	b.WriteString(lipgloss.NewStyle().MaxWidth(m.width).Render(m.st.Head.Render(o.title)+m.st.Dim.Render(help)) + "\n")
 	b.WriteString(o.filter.View() + "\n")
@@ -504,4 +505,4 @@ func (m *Model) barListView(o *overlay, end int) string {
 		}
 	}
 	return b.String()
-}
+}

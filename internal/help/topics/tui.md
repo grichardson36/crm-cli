@@ -7,7 +7,7 @@ crm tui
 crm tui --read-only
 ```
 
-`--read-only` disables every key that changes data. Press `?` inside for the full key list. The command bar (`ctrl+k`, also `:`) runs any action, finds people, orgs, deals, tasks and notes, and takes commands (`n Sam called`). Prefixes narrow it: `>` actions, `@` people, `#` tags, `?` help. An empty box lists what you used recently. A name with no match offers to create the person or add a note.
+`--read-only` disables every key that changes data. Press `?` inside for the full key list. The bar (`ctrl+k`, `:` or `/`) is the one box. Type to find a person, org, deal, task or note, run an action, check or change a setting (`theme`, `hours`, `zone`), or enter a command (`n Sam called`). Prefixes narrow it: `>` actions, `@` people, `#` tags, `=` settings, `?` help. An empty box lists what you used recently. A name with no match offers to create the person or add a note.
 
 ## Views
 
@@ -16,7 +16,7 @@ Jump with the number keys, cycle with `[` and `]`, or press `v` for the view swi
 | Key | View | Shows |
 |---|---|---|
 | 1 | Home | what needs attention: who is due, birthdays, tasks, recent notes, sync status |
-| 2 | People | everyone, searchable |
+| 2 | People | everyone |
 | 3 | Due | who you are due to contact (keep-in-touch) |
 | 4 | Tasks | open tasks |
 | 5 | Birthdays | upcoming birthdays |

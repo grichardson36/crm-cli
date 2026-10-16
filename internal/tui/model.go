@@ -46,7 +46,6 @@ type mode int
 
 const (
 	modeNormal  mode = iota
-	modeSearch       // footer input: search
 	modePrompt       // footer input: snooze, note, task, tag
 	modeEdit         // inline input on a detail row
 	modeConfirm      // y/n question in the footer
@@ -210,35 +209,35 @@ func New(ctx context.Context, db *sql.DB) (*Model, error) {
 	ri.Prompt = ""
 	registry := integrations.DefaultRegistry(os.Getenv)
 	m := &Model{
-		ctx:      ctx,
-		db:       db,
-		registry: registry,
-		runner:   crmsync.NewRunner(db, registry),
-		inbox:    crmsync.NewInbox(db),
-		spin:     spinner.New(spinner.WithSpinner(spinner.Dot)),
-		view:     viewHome,
-		pr:       repo.NewPersonRepo(db),
-		ir:       repo.NewInteractionRepo(db),
-		tr:       repo.NewTaskRepo(db),
-		tagr:     repo.NewTagRepo(db),
-		dr:       repo.NewDupeRepo(db),
-		ntr:      repo.NewNoteTypeRepo(db),
-		er:       repo.NewEventRepo(db),
-		cal:      newCalState(),
-		loc:      tz.Device(),
-		minLevel: dedupe.Medium,
-		noteType: "note",
-		now:      time.Now,
-		input:    in,
-		rowInput: ri,
-		detail:   viewport.New(0, 0),
-		helpVP:   viewport.New(0, 0),
-		marked:   map[int64]bool{},
+		ctx:        ctx,
+		db:         db,
+		registry:   registry,
+		runner:     crmsync.NewRunner(db, registry),
+		inbox:      crmsync.NewInbox(db),
+		spin:       spinner.New(spinner.WithSpinner(spinner.Dot)),
+		view:       viewHome,
+		pr:         repo.NewPersonRepo(db),
+		ir:         repo.NewInteractionRepo(db),
+		tr:         repo.NewTaskRepo(db),
+		tagr:       repo.NewTagRepo(db),
+		dr:         repo.NewDupeRepo(db),
+		ntr:        repo.NewNoteTypeRepo(db),
+		er:         repo.NewEventRepo(db),
+		cal:        newCalState(),
+		loc:        tz.Device(),
+		minLevel:   dedupe.Medium,
+		noteType:   "note",
+		now:        time.Now,
+		input:      in,
+		rowInput:   ri,
+		detail:     viewport.New(0, 0),
+		helpVP:     viewport.New(0, 0),
+		marked:     map[int64]bool{},
 		nameMemory: map[string]int64{},
-		actions:  buildActions(),
-		clip:     func(s string) { osc52Copy(os.Stdout, s) },
-		open:     openURL,
-		st:       defaultStyles(),
+		actions:    buildActions(),
+		clip:       func(s string) { osc52Copy(os.Stdout, s) },
+		open:       openURL,
+		st:         defaultStyles(),
 	}
 	if err := m.reload(); err != nil {
 		return nil, err
@@ -692,8 +691,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.handleHelpKey(msg)
 		}
 		switch m.mode {
-		case modeSearch:
-			return m.handleSearchKey(msg)
 		case modePrompt:
 			return m.handlePromptKey(msg)
 		case modeEdit:
@@ -750,36 +747,6 @@ func (m *Model) actionByID(id string) *action {
 		}
 	}
 	return nil
-}
-
-func (m *Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "enter":
-		m.mode = modeNormal
-		m.input.Blur()
-		return m, nil
-	case "esc":
-		m.mode = modeNormal
-		m.input.Blur()
-		m.query = ""
-		m.cursor, m.offset = 0, 0
-		m.report(m.rebuild(false))
-		return m, nil
-	case "down", "ctrl+n":
-		m.move(1)
-		return m, nil
-	case "up", "ctrl+p":
-		m.move(-1)
-		return m, nil
-	}
-	var cmd tea.Cmd
-	m.input, cmd = m.input.Update(msg)
-	if v := m.input.Value(); v != m.query {
-		m.query = v
-		m.cursor, m.offset = 0, 0
-		m.report(m.rebuild(false))
-	}
-	return m, cmd
 }
 
 func (m *Model) startPrompt(kind, prompt, initial string) {
@@ -969,7 +936,10 @@ func (m *Model) runPrompt(kind, value string) {
 		env := m.quickEnvFor(pid)
 		env.DueOverride = m.normalizeDue(due)
 		_, err := m.runLineAsk("task "+strings.TrimSpace(title), env,
-			func() { m.startInput("task", "task (add a due date after a | e.g. call back | 2026-12-01): ", value); _ = m.input.Focus() },
+			func() {
+				m.startInput("task", "task (add a due date after a | e.g. call back | 2026-12-01): ", value)
+				_ = m.input.Focus()
+			},
 			func(plan *quick.Plan) tea.Cmd {
 				m.setStatus("task added"+extras(plan), false)
 				return m.showToast("task added"+extras(plan), false)

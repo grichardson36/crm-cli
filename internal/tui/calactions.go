@@ -154,6 +154,7 @@ func (m *Model) calAttendees(names []string) ([]model.EventAttendee, error) {
 	}
 	return out, nil
 }
+
 // calPromptHint previews what the quick add line will create, or says what is wrong.
 func (m *Model) calPromptHint() (string, bool) {
 	q, err := m.parseQuick(m.input.Value())
@@ -705,7 +706,9 @@ func (m *Model) calSetZone(value string) {
 		return
 	}
 	m.loc = loc
-	m.calReload(m.calToday())
+	if m.view == viewCalendar {
+		m.calReload(m.calToday())
+	}
 	m.setStatus("showing times in "+tz.Name(loc), false)
 }
 

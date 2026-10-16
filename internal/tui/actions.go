@@ -235,15 +235,23 @@ func buildActions() []action {
 		{id: "book-links", title: "Booking: links and bookings", group: "Booking", desc: "list booking links and booked meetings (same as crm book list)",
 			run: func(m *Model) tea.Cmd { m.bookShowLinks(); return nil }},
 		{id: "book-add", title: "Booking: add link", group: "Booking", desc: "name | lengths | your email, such as Intro call | 30m,45m | me@example.com (same as crm book add, other settings use the CLI)",
-			write: true, run: func(m *Model) tea.Cmd { return m.startBookPrompt("book-add", "new link (name | lengths | email): ", "") }},
+			write: true, run: func(m *Model) tea.Cmd {
+				return m.startBookPrompt("book-add", "new link (name | lengths | email): ", "")
+			}},
 		{id: "book-offer", title: "Booking: offer times", group: "Booking", desc: "link | length | count | invitee zone: shows the next open times as text and copies it (same as crm book offer)",
-			run: func(m *Model) tea.Cmd { return m.startBookPrompt("book-offer", "offer (link | length | count | zone): ", "") }},
+			run: func(m *Model) tea.Cmd {
+				return m.startBookPrompt("book-offer", "offer (link | length | count | zone): ", "")
+			}},
 		{id: "book-export", title: "Booking: export web page", group: "Booking", desc: "link | folder: writes index.html with one mail button per open time (same as crm book export)",
 			run: func(m *Model) tea.Cmd { return m.startBookPrompt("book-export", "export (link | folder): ", "") }},
 		{id: "book-confirm", title: "Booking: confirm a time", group: "Booking", desc: "link | when | name | email | invite file: books the time, makes the event, links the contact (same as crm book confirm)",
-			write: true, run: func(m *Model) tea.Cmd { return m.startBookPrompt("book-confirm", "confirm (link | when | name | email | invite.ics): ", "") }},
+			write: true, run: func(m *Model) tea.Cmd {
+				return m.startBookPrompt("book-confirm", "confirm (link | when | name | email | invite.ics): ", "")
+			}},
 		{id: "book-cancel", title: "Booking: cancel", group: "Booking", desc: "booking id | cancellation file: cancels the booking and deletes its event (same as crm book cancel)",
-			write: true, run: func(m *Model) tea.Cmd { return m.startBookPrompt("book-cancel", "cancel (booking id | cancel.ics): ", "") }},
+			write: true, run: func(m *Model) tea.Cmd {
+				return m.startBookPrompt("book-cancel", "cancel (booking id | cancel.ics): ", "")
+			}},
 		{id: "book-pause", title: "Booking: pause link", group: "Booking", desc: "stop offering times from a link (same as crm book pause)",
 			write: true, run: func(m *Model) tea.Cmd { return m.startBookPrompt("book-pause", "pause link: ", "") }},
 		{id: "book-resume", title: "Booking: resume link", group: "Booking", desc: "offer times from a paused link again (same as crm book resume)",
@@ -408,19 +416,7 @@ func buildActions() []action {
 			run: func(m *Model) tea.Cmd { m.switchView((m.view + 1) % numViews); return nil }},
 		{id: "prev-view", title: "Previous view", group: "Views", hint: "[", keys: []string{"["}, desc: "previous view",
 			run: func(m *Model) tea.Cmd { m.switchView((m.view + numViews - 1) % numViews); return nil }},
-		{id: "search", title: "Search", group: "Views", hint: "/", keys: []string{"/"}, desc: "search people (name, company, email, location, tags). #tag filters by tag",
-			foot: 10, footIn: inList, footIf: func(m *Model) bool { return m.view != viewMerge && m.view != viewArchived }, run: func(m *Model) tea.Cmd {
-				m.focus = focusList
-				if m.view != viewPeople {
-					m.switchView(viewPeople)
-				}
-				m.mode = modeSearch
-				m.input.Prompt = "/"
-				m.input.SetValue(m.query)
-				m.input.CursorEnd()
-				return m.input.Focus()
-			}},
-		{id: "clear-search", title: "Clear search", group: "Views", hint: "esc", keys: []string{"esc"}, desc: "clear the search filter",
+		{id: "clear-search", title: "Clear search", group: "Views", hint: "esc", keys: []string{"esc"}, desc: "clear the People filter set from the bar (a tag, an organization or Show all)",
 			when: func(m *Model) bool { return m.focus == focusList && m.query != "" },
 			run: func(m *Model) tea.Cmd {
 				m.query = ""
@@ -449,7 +445,7 @@ func buildActions() []action {
 			}},
 
 		// App.
-		{id: "palette", inCompare: true, title: "Command palette", group: "App", hint: "ctrl+k", keys: []string{"ctrl+k", ":"}, desc: "search and run any action (also :). Type a command to use it as a command line: n Sam called #deal remind fri",
+		{id: "palette", inCompare: true, title: "Command palette", group: "App", hint: "ctrl+k", keys: []string{"ctrl+k", ":", "/"}, desc: "the one bar: type to find a person, org, deal, task, note, action or setting (also : and /). > actions, @ people, # tags, = settings, ? help. A command line works too: n Sam called #deal remind fri",
 			foot: 1, footIn: inBoth, run: func(m *Model) tea.Cmd { return m.openPalette() }},
 		{id: "undo", title: "Undo", group: "App", hint: "ctrl+z", keys: []string{"ctrl+z"}, desc: "undo the last data change of this session. A toast says what was undone",
 			write: true, run: func(m *Model) tea.Cmd { return m.undoLast() }},

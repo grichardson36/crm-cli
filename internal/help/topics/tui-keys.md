@@ -7,7 +7,7 @@ Every key in the terminal UI, grouped by task. The palette (`ctrl+k`) runs any o
 - `j` / `k` or arrows: next and previous row. `g` / `G`: first and last. `ctrl+d` / `ctrl+u`: half page.
 - `tab` or `l`: move into the detail form. `esc`, `h` or `tab`: back to the list.
 - `J` / `K`: scroll the detail pane.
-- `/` search by name, company, email, location and tags. `#tag` filters by tag. `esc` clears.
+- `/`, `ctrl+k` or `:` opens the bar: find people, orgs, deals, tasks, notes, actions and settings. `#tag` filters the list by tag and `esc` clears it. `=` lists settings.
 - `o` toggles sort between name and recently updated. `r` reloads. `ctrl+z` undoes any data change, `ctrl+y` redoes it. Rebind keys: see `keys`.
 
 ## Contact keys
