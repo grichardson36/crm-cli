@@ -116,3 +116,35 @@ func TestTaskDeleteIsGreyedOutInReadOnlyAndWithoutATask(t *testing.T) {
 	press(m2, "d")
 	assert.NotEqual(t, modeConfirm, m2.mode)
 }
+
+func TestDeleteTagFromPaletteIsUndoable(t *testing.T) {
+	m, _ := newTestModel(t) // Bob (2) carries #friend
+	runPalette(m, "delete tag")
+	require.Equal(t, modeOverlay, m.mode)
+	assert.Equal(t, "Delete tag", m.ov.title)
+	press(m, "enter")
+	require.Equal(t, modeConfirm, m.mode)
+	assert.Contains(t, m.confirm.prompt, "#friend")
+	assert.Contains(t, m.confirm.prompt, "1 records")
+	press(m, "y")
+	assert.False(t, m.hasTag(context.Background(), "person", 2, "friend"))
+
+	press(m, "ctrl+z")
+	assert.True(t, m.hasTag(context.Background(), "person", 2, "friend"))
+	press(m, "ctrl+y")
+	assert.False(t, m.hasTag(context.Background(), "person", 2, "friend"))
+}
+
+func TestDeleteTagIsGreyedOutInReadOnly(t *testing.T) {
+	m, _ := newTestModel(t)
+	m.readOnly = true
+	press(m, "ctrl+k")
+	typeText(m, "delete tag")
+	for _, i := range m.ov.shown {
+		if m.ov.items[i].id == "tag-delete" {
+			assert.NotEmpty(t, m.ov.items[i].disabled)
+			return
+		}
+	}
+	t.Fatal("Delete tag is not listed")
+}

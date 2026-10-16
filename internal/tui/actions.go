@@ -302,6 +302,8 @@ func buildActions() []action {
 				m.startPrompt("tag", "tag (-name removes): ", "")
 				return m.input.Focus()
 			}},
+		{id: "tag-delete", title: "Delete tag", group: "Contact", desc: "delete a tag from every record that has it (asks y/n, ctrl+z undoes; same as crm tag delete)",
+			write: true, run: func(m *Model) tea.Cmd { m.openTagDelete(); return nil }},
 		{id: "cadence", title: "Set keep-in-touch", group: "Contact", hint: "F", keys: []string{"F"}, desc: "pick a keep-in-touch cadence for the person or all marked",
 			write: true, foot: 32, footIn: inList, footIf: whenMarks, when: whenPerson, run: func(m *Model) tea.Cmd { m.pickCadence(m.targets()); return nil }},
 		{id: "tier", title: "Set priority tier", group: "Contact", hint: "p", keys: []string{"p"}, desc: "pick a priority tier for the person or all marked",
