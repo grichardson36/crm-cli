@@ -245,9 +245,18 @@ func TestPlusLinks(t *testing.T) {
 	assert.Equal(t, "Zoë Müller", p.Links[0].Name)
 
 	// Unknown and ambiguous links are problems and are marked bad.
-	p = Parse("n coffee @Nobody", env)
+	p = Parse("n coffee @Nobody_Here", env)
 	assert.Equal(t, []string{"not_found"}, problemCodes(p))
 	assert.True(t, p.Marks[len(p.Marks)-1].Bad)
+	// A single @word that is no contact's name stays plain text and asks nothing.
+	p = Parse("n coffee @Nobody", env)
+	assert.Empty(t, p.Problems, p.Preview)
+	assert.Empty(t, p.Names)
+	assert.Empty(t, p.Links)
+	assert.Contains(t, p.Preview, `"coffee @Nobody"`)
+	for _, m := range p.Marks {
+		assert.NotEqual(t, "person", m.Kind)
+	}
 	p = Parse("n coffee @Sam", env)
 	assert.Equal(t, []string{"ambiguous"}, problemCodes(p))
 }
@@ -979,7 +988,7 @@ func TestUnsettledNamesBecomeNameRefs(t *testing.T) {
 	assert.Equal(t, "@Sam", p.Input[ref.Start:ref.End])
 
 	// No match at all.
-	p = Parse("n coffee with @Nobody and @Sam", env)
+	p = Parse("n coffee with @Nobody_Here and @Sam", env)
 	require.Len(t, p.Names, 2)
 	assert.Empty(t, p.Names[0].Candidates)
 	assert.Equal(t, -1, p.Names[0].Default)
@@ -1080,4 +1089,27 @@ func TestOutputCarriesTheNames(t *testing.T) {
 	out := OutputOf(p, nil)
 	require.Len(t, out.Names, 1)
 	assert.Len(t, out.Names[0].Candidates, 2)
-}
+}
+func TestAtWordsThatNameNobodyStayPlainText(t *testing.T) {
+	f := newFixture(t)
+	env := f.env("Bob Baker")
+	for _, line := range []string{"n lunch @Qwerty", "n met @qwerty and @xyz", "t send @nothing by fri"} {
+		p := Parse(line, env)
+		assert.Empty(t, p.Problems, line)
+		assert.Empty(t, p.Names, line)
+		assert.True(t, p.Ready(), line)
+	}
+	// A prefix of a first or last name still opens the list, as does a capitalized multi-word name.
+	p := Parse("n lunch @Zo", env)
+	assert.Len(t, p.Names, 1, "Zo starts Zoe")
+	p = Parse("n lunch @Sam", env)
+	assert.Len(t, p.Names, 1, "Sam is a first name")
+	p = Parse("n lunch @Anna_Nobody", env)
+	assert.Len(t, p.Names, 1, "a capitalized two-word name asks")
+	p = Parse("n lunch @anna_nobody", env)
+	assert.Empty(t, p.Names, "lower case is plain text")
+	// An answer given in the list is still honored.
+	env.Choices = map[string]NameChoice{"@qwerty": {Action: "link", PersonID: f.ids["Mark Twain"], Name: "Mark Twain"}}
+	p = Parse("n lunch @Qwerty", env)
+	require.Len(t, p.Links, 1)
+}

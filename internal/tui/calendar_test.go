@@ -63,7 +63,7 @@ func TestCalendarQuickAddEditDelete(t *testing.T) {
 	m := calModel(t)
 	press(m, "+")
 	require.Equal(t, modePrompt, m.mode)
-	typeText(m, "Lunch with Sam | fri 12:30 1h")
+	typeText(m, "Lunch with Sam fri 12:30 for 1h")
 	assert.Contains(t, m.hintsLine(), "Fri 16 Oct 12:30-13:30", "the preview shows what will be created")
 	press(m, "enter")
 	assert.Contains(t, m.status, "event added")
@@ -82,8 +82,8 @@ func TestCalendarQuickAddEditDelete(t *testing.T) {
 	// Edit: the line is prefilled with the event.
 	press(m, "enter")
 	require.Equal(t, modePrompt, m.mode)
-	assert.Equal(t, "Lunch with Sam | 2026-10-16 12:30 1h", m.input.Value())
-	m.input.SetValue("Lunch with Sam and Pat | 2026-10-16 13:00 1h")
+	assert.Equal(t, "Lunch with Sam 2026-10-16 12:30 for 1h", m.input.Value())
+	m.input.SetValue("Lunch with Sam and Pat 2026-10-16 13:00 for 1h")
 	press(m, "enter")
 	assert.Contains(t, m.status, "event updated")
 	e, err := m.er.FindByID(context.Background(), list[0].EventID)
@@ -124,12 +124,11 @@ func TestCalendarQuickAddVariants(t *testing.T) {
 		wantErr bool
 	}{
 		{"Holiday", true, "2026-10-13", false},
-		{"Holiday | 2026-11-26", true, "2026-11-26", false},
-		{"Call | 3pm", false, "2026-10-13T20:00:00Z", false},
-		{"Standup | 2026-10-19 09:15 15m | weekdays", false, "2026-10-19T14:15:00Z", false},
-		{" | fri", false, "", true},
-		{"Bad | whenever", false, "", true},
-		{"Bad rule | fri 10:00 | now and then", false, "", true},
+		{"Holiday 2026-11-26", true, "2026-11-26", false},
+		{"Call 3pm", false, "2026-10-13T20:00:00Z", false},
+		{"Standup 2026-10-19 09:15 for 15m every weekday", false, "2026-10-19T14:15:00Z", false},
+		{" fri", false, "", true},
+		{"", false, "", true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.line, func(t *testing.T) {
@@ -148,8 +147,8 @@ func TestCalendarQuickAddVariants(t *testing.T) {
 		})
 	}
 	press(m, "+")
-	typeText(m, "Bad | whenever")
-	assert.Contains(t, m.hintsLine(), "cannot read")
+	typeText(m, "fri 12:30")
+	assert.Contains(t, m.hintsLine(), "type a title first")
 	press(m, "enter")
 	assert.NotEqual(t, "event added", m.status)
 }
@@ -281,7 +280,7 @@ func TestCalendarRepeatScopes(t *testing.T) {
 	require.Equal(t, modeOverlay, m.mode, "a repeat asks which instances")
 	press(m, "enter") // This event
 	require.Equal(t, modePrompt, m.mode)
-	m.input.SetValue("Standup (late) | 2026-10-14 11:00 15m")
+	m.input.SetValue("Standup (late) 2026-10-14 11:00 for 15m")
 	press(m, "enter")
 	assert.Contains(t, m.status, "updated")
 	got, _, err := m.er.List(context.Background(), model.EventFilters{From: utcT(2026, 10, 14, 0, 0), To: utcT(2026, 10, 15, 0, 0), Loc: m.loc})
@@ -553,4 +552,33 @@ func TestCalendarQuickAddReadsShortSyntax(t *testing.T) {
 	typeText(m, "Call @Nobody fri 9am")
 	press(m, "enter")
 	assert.Contains(t, m.status, "no person matches")
-}
+}
+func TestCalendarEditPromptUsesTheShortSyntaxAndTheOldFormatIsGone(t *testing.T) {
+	m := calModel(t)
+	addEvent(t, m, model.CreateEventInput{Title: "Lunch", Start: utcT(2026, 10, 16, 17, 30), End: utcT(2026, 10, 16, 18, 30)})
+	press(m, "d", "tab", "tab", "tab") // Fri 16 Oct
+	require.Equal(t, "Fri 16 Oct 2026", m.calCountText())
+	press(m, "enter")
+	require.Equal(t, modePrompt, m.mode)
+	assert.Equal(t, "Lunch 2026-10-16 12:30 for 1h", m.input.Value())
+	assert.NotContains(t, m.input.Prompt, "|")
+
+	// Place and length come from the same words as the add prompt.
+	m.input.SetValue("Lunch 2026-10-16 12:30 for 90m at Cafe Rio")
+	press(m, "enter")
+	assert.Contains(t, m.status, "event updated")
+	list, _, err := m.er.List(context.Background(), model.EventFilters{From: utcT(2026, 10, 16, 0, 0), To: utcT(2026, 10, 17, 0, 0), Loc: m.loc})
+	require.NoError(t, err)
+	require.Len(t, list, 1)
+	e, err := m.er.FindByID(context.Background(), list[0].EventID)
+	require.NoError(t, err)
+	assert.Equal(t, "Cafe Rio", str(e.Location))
+	assert.Equal(t, "2026-10-16T19:00:00Z", *e.EndUTC)
+
+	// Tags and attendees have their own actions: the edit line says so instead of dropping them.
+	press(m, "enter")
+	m.input.SetValue("Lunch #food")
+	press(m, "enter")
+	assert.True(t, m.statusIsErr)
+	assert.Contains(t, m.status, "Calendar: tag event")
+}

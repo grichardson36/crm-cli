@@ -194,7 +194,7 @@ func buildActions() []action {
 			}},
 		{id: "cal-delete", title: "Calendar: delete event", group: "Calendar", hint: "#", keys: []string{"#"}, desc: "delete the event (asks which instances for a repeat, then y/n)",
 			write: true, foot: 31, footIn: inList, when: whenCalEvent, run: func(m *Model) tea.Cmd { m.pendingCmd = nil; m.calDelete(); return m.pendingCmd }},
-		{id: "cal-edit", title: "Calendar: edit event", group: "Calendar", desc: "edit title, time and repeat of the event as one line (also enter)",
+		{id: "cal-edit", title: "Calendar: edit event", group: "Calendar", desc: "edit title, time, length, place and repeat of the event as one line of short syntax (also enter)",
 			write: true, when: whenCalEvent, run: func(m *Model) tea.Cmd { m.calEdit(); return m.pendingCmd }},
 		{id: "cal-restore", title: "Restore last deleted event", group: "Calendar", desc: "bring back the event deleted last in this session",
 			write: true, when: whenCalRestore, run: func(m *Model) tea.Cmd { m.calRestore(); return nil }},
@@ -320,7 +320,7 @@ func buildActions() []action {
 			write: true, run: func(m *Model) tea.Cmd { m.completeTask(); return nil }},
 		{id: "new", title: "New contact", group: "Contact", hint: "+", keys: []string{"+"}, desc: "create a contact: opens a blank form, saved when you enter a name",
 			write: true, foot: 45, footIn: inList, when: func(m *Model) bool { return m.view != viewCalendar }, run: func(m *Model) tea.Cmd { return m.startCreate() }},
-		{id: "cal-add", title: "Calendar: add event", group: "Calendar", hint: "+", keys: []string{"+"}, desc: "add an event: title | when | repeat, for example Lunch | fri 12:30 1h (in the Calendar view; from any view in the palette)",
+		{id: "cal-add", title: "Calendar: add event", group: "Calendar", hint: "+", keys: []string{"+"}, desc: "add an event in the short syntax, for example Lunch @Sam fri 12:30 for 1h at Cafe Rio every week (in the Calendar view; from any view in the palette)",
 			write: true, foot: 30, footIn: inList, footIf: whenCalendar, run: func(m *Model) tea.Cmd { return m.startCalAdd() }},
 
 		// Home.

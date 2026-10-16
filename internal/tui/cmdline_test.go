@@ -551,15 +551,16 @@ func TestNotePromptAppliesTokens(t *testing.T) {
 	assert.Equal(t, "note added", m.status)
 	assert.False(t, m.statusIsErr)
 
-	// An unknown @Name opens the names list and writes nothing until you answer.
+	// A capitalized two-word @Name that matches nobody opens the names list and writes nothing
+	// until you answer. A single unknown @word is plain text and saves at once (next test).
 	press(m, "n")
-	typeText(m, "hello @Nobody")
+	typeText(m, "hello @Nobody_Here")
 	press(m, "enter")
 	require.Equal(t, modeNames, m.mode)
 	assert.Len(t, allNotes(t, m), 2)
 	press(m, "esc")
 	assert.Equal(t, modePrompt, m.mode, "esc goes back to the prompt")
-	assert.Equal(t, "hello @Nobody", m.input.Value())
+	assert.Equal(t, "hello @Nobody_Here", m.input.Value())
 }
 
 func TestNotePromptKeepsTheChosenType(t *testing.T) {
@@ -855,10 +856,21 @@ func TestNamesListCreateMakesANewContactOnlyWhenAsked(t *testing.T) {
 	assert.Len(t, after, len(before)+1)
 }
 
+func TestUnknownAtWordSavesAsPlainTextWithoutTheNamesList(t *testing.T) {
+	m, _ := namesModel(t)
+	press(m, "n")
+	typeText(m, "hello @Qwerty")
+	press(m, "enter")
+	assert.Equal(t, modeNormal, m.mode, "no names list for an @word nobody has")
+	its := allNotes(t, m)
+	require.Len(t, its, 1)
+	assert.Equal(t, "hello @Qwerty", *its[0].Content)
+}
+
 func TestNamesListSeveralNamesAndApplyToAll(t *testing.T) {
 	m, _ := namesModel(t)
 	press(m, "n")
-	typeText(m, "@Bob then @Bob again and @Nobody")
+	typeText(m, "@Bob then @Bob again and @Nobody_Here")
 	press(m, "enter")
 	require.Equal(t, modeNames, m.mode)
 	require.Len(t, m.names.refs, 2, "the same name is one row")

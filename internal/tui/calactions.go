@@ -36,8 +36,7 @@ func whenCalRestore(m *Model) bool { return whenCalendar(m) && len(m.deletedEven
 
 // ---- add and edit ----
 
-// quickEvent is a parsed quick add line: "Lunch with @Sam fri 12:30 for 1h at Cafe Rio every week #food",
-// or the older "title | when | repeat".
+// quickEvent is a parsed quick add or edit line: "Lunch with @Sam fri 12:30 for 1h at Cafe Rio every week #food".
 type quickEvent struct {
 	title      string
 	start, end time.Time
@@ -49,45 +48,9 @@ type quickEvent struct {
 	people     []string // names after @, resolved when the event is saved
 }
 
-// parseQuick reads "title | when | repeat". The when part takes the same phrases as `crm cal add
-// --start` ("fri 12:30 1h", "2026-10-20", "3pm"); a bare time means that time on the selected day.
-// Without a when part the event is all-day on the selected day.
+// parseQuick reads a quick add or edit line with the shared short syntax. See parseQuickSyntax.
 func (m *Model) parseQuick(value string) (quickEvent, error) {
-	if !strings.Contains(value, "|") {
-		return m.parseQuickSyntax(value)
-	}
-	parts := strings.Split(value, "|")
-	q := quickEvent{title: strings.TrimSpace(parts[0])}
-	if q.title == "" {
-		return q, fmt.Errorf("type a title first")
-	}
-	day := m.calSelDate()
-	base := tz.Instant(day, m.loc)
-	if day.Equal(m.calToday()) {
-		base = m.now()
-	}
-	whenText := ""
-	if len(parts) > 1 {
-		whenText = strings.TrimSpace(parts[1])
-	}
-	if whenText == "" {
-		q.start, q.allDay = day, true
-	} else {
-		q.hasWhen = true
-		start, end, allDay, err := input.Span(input.SpanText{Start: whenText}, m.loc, base)
-		if err != nil {
-			return q, err
-		}
-		q.start, q.end, q.allDay = start, end, allDay
-	}
-	if len(parts) > 2 {
-		rule, err := input.Rule(input.RepeatText{Repeat: strings.TrimSpace(parts[2]), Changed: true}, "", q.allDay, m.loc, m.now())
-		if err != nil {
-			return q, err
-		}
-		q.rule = rule
-	}
-	return q, nil
+	return m.parseQuickSyntax(value)
 }
 
 // parseQuickSyntax reads a quick add line with the shared short syntax: the title with a date or
@@ -221,7 +184,7 @@ func (m *Model) calOccurrenceLabel(in *model.EventInstance) string {
 	return s.In(m.loc).Format("2 Jan 15:04")
 }
 
-// calEditPrompt opens the edit line prefilled with the event as "title | when".
+// calEdit opens the edit line prefilled with the event in the short syntax: "Lunch 2026-10-16 12:30 for 1h".
 func (m *Model) calEdit() {
 	in := m.calEventTarget()
 	if in == nil {
@@ -236,20 +199,20 @@ func (m *Model) calEdit() {
 			anchor = snapshot.Occurrence
 		}
 		m.cal.pending = &calPending{eventID: snapshot.SeriesID, scope: scope, anchor: anchor}
-		text := cleanCell(snapshot.Title) + " | "
+		text := cleanCell(snapshot.Title) + " "
 		if snapshot.AllDay {
 			s, _ := tz.ParseDate(snapshot.StartDate)
 			e, _ := tz.ParseDate(snapshot.EndDate)
 			text += s.Format(tz.DateLayout)
 			if days := e.Sub(s); days > 24*time.Hour {
-				text += " " + lengthText(days)
+				text += " for " + lengthText(days)
 			}
 		} else {
 			s, _ := tz.ParseInstant(snapshot.Start)
 			e, _ := tz.ParseInstant(snapshot.End)
-			text += s.In(m.loc).Format("2006-01-02 15:04") + " " + lengthText(e.Sub(s))
+			text += s.In(m.loc).Format("2006-01-02 15:04") + " for " + lengthText(e.Sub(s))
 		}
-		m.startInput("cal-edit", "edit (title | when | repeat): ", text)
+		m.startInput("cal-edit", "edit (title, date, for 1h, at place, every week): ", text)
 		m.pendingCmd = m.input.Focus()
 	})
 }
@@ -354,7 +317,15 @@ func (m *Model) calUpdate(value string) {
 		m.setStatus(err.Error(), true)
 		return
 	}
+	if len(q.tags) > 0 || len(q.people) > 0 {
+		m.setStatus("tags and attendees are not changed here: use Calendar: tag event or add attendee", true)
+		return
+	}
 	var up model.UpdateEventInput
+	if q.location != "" && q.location != str(cur.Location) {
+		loc := q.location
+		up.Location = &loc
+	}
 	if q.title != cur.Title {
 		t := q.title
 		up.Title = &t

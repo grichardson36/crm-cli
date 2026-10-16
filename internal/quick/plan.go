@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
@@ -443,12 +444,56 @@ func (b *builder) syntax(text string, off int, dates bool, skip ...shortsyntax.K
 		opts.KnownTags = b.env.Tags
 	}
 	res := shortsyntax.Parse(text, opts)
+	if plain := b.plainAtWords(res); len(plain) > 0 {
+		opts.Dismiss = append(opts.Dismiss, plain...)
+		res = shortsyntax.Parse(text, opts)
+	}
 	b.p.Syntax = &res
 	for _, sp := range res.Spans {
 		kind := string(sp.Kind)
 		b.p.Marks = append(b.p.Marks, Mark{Kind: kind, Start: off + sp.Start, End: off + sp.End, New: sp.New})
 	}
 	return res
+}
+
+// plainAtWords lists the @word tokens that name nobody and are not a capitalized multi-word name
+// such as @Sam_Lee. They stay plain text: no names list opens for them.
+func (b *builder) plainAtWords(res shortsyntax.Result) []string {
+	if b.env.Index == nil {
+		return nil
+	}
+	var out []string
+	for _, sp := range res.Spans {
+		if sp.Kind != shortsyntax.KindPerson {
+			continue
+		}
+		if m, _ := b.env.Index.ResolveLoose(sp.Value); len(m) > 0 {
+			continue
+		}
+		if capitalizedMultiWord(sp.Value) {
+			continue
+		}
+		if _, asked := b.env.Choices[strings.ToLower(sp.Text)]; asked {
+			continue
+		}
+		out = append(out, sp.Text)
+	}
+	return out
+}
+
+// capitalizedMultiWord is true for two or more words that each start with a capital letter.
+func capitalizedMultiWord(name string) bool {
+	words := strings.Fields(strings.ReplaceAll(name, "_", " "))
+	if len(words) < 2 {
+		return false
+	}
+	for _, w := range words {
+		r, _ := utf8.DecodeRuneInString(w)
+		if !unicode.IsUpper(r) {
+			return false
+		}
+	}
+	return true
 }
 
 // resolveLinks turns @Name tokens into people. A name that is settled (it matches exactly one

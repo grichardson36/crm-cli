@@ -51,10 +51,10 @@ func (m *Model) calFreeRun(value string) {
 		st, _ := tz.ParseInstant(s.Start)
 		en, _ := tz.ParseInstant(s.End)
 		ls, le := st.In(m.loc), en.In(m.loc)
-		items = append(items, overlayItem{id: s.Start, label: ls.Format("Mon 2 Jan  15:04") + "-" + le.Format("15:04"), value: ls.Format("2006-01-02 15:04") + " " + lengthText(length)})
+		items = append(items, overlayItem{id: s.Start, label: ls.Format("Mon 2 Jan  15:04") + "-" + le.Format("15:04"), value: ls.Format("2006-01-02 15:04") + " for " + lengthText(length)})
 	}
 	m.openPicker("Free "+lengthText(length)+" slots (pick one to add an event)", items, func(m *Model, it overlayItem) {
-		m.startInput("cal-add", "event (title | when | repeat): ", " | "+it.value)
+		m.startInput("cal-add", "event (Lunch @Sam fri 12:30 for 1h at Cafe Rio every week): ", " "+it.value)
 		m.input.SetCursor(0)
 		m.pendingCmd = m.input.Focus()
 	})

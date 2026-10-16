@@ -356,10 +356,16 @@ func TestDoUnsettledNamesCarryCandidatesInJSON(t *testing.T) {
 	assert.Len(t, ref["candidates"], 2)
 	assert.Equal(t, float64(-1), ref["default"])
 
-	_, _, code = crm(t, path, "do", "n coffee with @Nobody", "--person", "3")
-	assert.Equal(t, 3, code, "no match is not found")
+	_, _, code = crm(t, path, "do", "n coffee with @Nobody_Here", "--person", "3")
+	assert.Equal(t, 3, code, "a capitalized two-word name with no match is not found")
 	stdout, _, _ = crm(t, path, "log", "list", "-f", "json")
 	assert.Len(t, decodeList(t, stdout), 0, "nothing was written")
+
+	// A single @word that is nobody's name is plain text: no error.
+	_, _, code = crm(t, path, "do", "n coffee with @Nobody", "--person", "3")
+	assert.Equal(t, 0, code)
+	stdout, _, _ = crm(t, path, "log", "list", "-f", "json")
+	assert.Len(t, decodeList(t, stdout), 1)
 }
 
 func TestDoKeepUnresolvedAndLinkNew(t *testing.T) {

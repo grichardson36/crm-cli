@@ -31,7 +31,7 @@ func TestFindATimePicksASlotAndAddsAnEvent(t *testing.T) {
 
 	press(m, "enter")
 	require.Equal(t, modePrompt, m.mode, "the picked slot starts the add prompt")
-	assert.Equal(t, " | 2026-10-13 09:00 45m", m.input.Value())
+	assert.Equal(t, " 2026-10-13 09:00 for 45m", m.input.Value())
 	typeText(m, "Coffee")
 	press(m, "enter")
 	assert.Contains(t, m.status, "event added")
