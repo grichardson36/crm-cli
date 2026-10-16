@@ -25,7 +25,8 @@ type cmdMeta struct {
 	examples    []string // copy-pasteable command lines
 	fields      string   // JSON output fields, comma separated
 	target      string   // entity of the ID arguments, for the --dry-run preview
-	targetArgs  string   // which args are IDs: "first", "all" or "tag" (entity type, then ID)
+	target2     string   // entity of the second ID, for targetArgs "pair"
+	targetArgs  string   // which args are IDs: "first", "all", "pair" (two IDs) or "tag" (entity type, then ID)
 	noDryRun    bool     // do not add the generic --dry-run flag
 }
 
@@ -277,6 +278,9 @@ var commandMeta = map[string]cmdMeta{
 	"docs man":             {examples: []string{`crm docs man ./man-out`}},
 }
 
+// generatedMeta describes the commands built from the object list (link, unlink, restore).
+var generatedMeta = linkMeta()
+
 // applyMeta annotates every command from commandMeta, adds --dry-run to mutating commands that
 // lack it, and makes argument errors usage errors.
 func applyMeta(root *cobra.Command) {
@@ -286,6 +290,9 @@ func applyMeta(root *cobra.Command) {
 			c.Annotations = map[string]string{}
 		}
 		m, ok := commandMeta[path]
+		if !ok {
+			m, ok = generatedMeta[path]
+		}
 		if ok {
 			c.Annotations[schema.AnnMutates] = strconv.FormatBool(m.mutates)
 			c.Annotations[schema.AnnDestructive] = strconv.FormatBool(m.destructive)
@@ -461,6 +468,18 @@ func dryRunTargets(m cmdMeta, args []string) ([]recordRef, error) {
 				return nil, err
 			}
 			refs = append(refs, recordRef{m.target, id})
+		}
+	case "pair":
+		if len(args) >= 2 && m.target != "" && m.target2 != "" {
+			a, err := parse(args[0])
+			if err != nil {
+				return nil, err
+			}
+			b, err := parse(args[1])
+			if err != nil {
+				return nil, err
+			}
+			refs = append(refs, recordRef{m.target, a}, recordRef{m.target2, b})
 		}
 	case "tag":
 		if len(args) >= 2 {

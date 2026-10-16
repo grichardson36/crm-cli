@@ -65,6 +65,9 @@ func NewRootCmd() *cobra.Command {
 	registerSyncCommands(rootCmd)
 	registerDavCommands(rootCmd)
 
+	// link, unlink and restore for every object, built from the object list
+	addObjectVerbs(rootCmd)
+
 	// agent surface: help topics, manifest, discovery, setup, health, docs
 	help := helpCommand()
 	rootCmd.SetHelpCommand(help)
