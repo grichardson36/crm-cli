@@ -91,14 +91,14 @@ func linkActions() []action {
 		other := other
 		label := relationLabel(other)
 		out = append(out,
-			action{id: "link-" + cliNoun(other), title: "Link " + label, group: "Link", hint: "L",
+			action{id: "link-" + cliNoun(other), title: "Link " + label, group: "Link",
 				desc:  "link " + article(label) + " " + label + " to the selected object: pick one or create it from the text you type (same as crm <object> link " + cliNoun(other) + ")",
 				write: true, when: whenLinkable(other),
 				run: func(m *Model) tea.Cmd {
 					src, _ := m.cursorObject()
 					return m.startLink(src, other, false)
 				}},
-			action{id: "unlink-" + cliNoun(other), title: "Unlink " + label, group: "Link", hint: "U",
+			action{id: "unlink-" + cliNoun(other), title: "Unlink " + label, group: "Link",
 				desc:  "remove the link between the selected object and " + article(label) + " " + label + " (same as crm <object> unlink " + cliNoun(other) + ")",
 				write: true, when: whenLinkable(other),
 				run: func(m *Model) tea.Cmd {

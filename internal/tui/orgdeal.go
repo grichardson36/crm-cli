@@ -13,7 +13,7 @@ import (
 // Organizations and Deals: advanced views (BUSINESS.md: not in the default navigation). They open
 // from the palette. Add, edit, delete, restore and stage changes are palette actions with view
 // keys, every change goes on the undo stack, and a delete is the same soft delete as the CLI
-// (archived), so ctrl+z and "Restore deleted ..." bring it back.
+// (archived), so ctrl+z and the Restore verb (u) bring it back.
 //
 // Pattern: one line with | between fields, as the task and booking prompts do. Edit opens the
 // same line filled with the current values. An organization is name | domain | industry | notes.
@@ -175,7 +175,7 @@ func (m *Model) orgDetail(r row) string {
 			b.WriteString(cutTo(strings.TrimSpace(d.Title+"  "+d.Stage+"  "+money(d.Value)), max(1, m.detail.Width)) + "\n")
 		}
 	}
-	b.WriteString("\n" + m.st.Dim.Render("enter edits, d deletes, + adds"))
+	b.WriteString("\n" + m.st.Dim.Render("enter edits, d deletes, a adds, L links"))
 	return strings.TrimRight(b.String(), "\n")
 }
 
@@ -202,7 +202,7 @@ func (m *Model) dealDetail(r row) string {
 	if d.Notes != nil && *d.Notes != "" {
 		b.WriteString(m.detailLine("notes", cleanCell(*d.Notes)) + "\n")
 	}
-	b.WriteString("\n" + m.st.Dim.Render("enter edits, s sets the stage, d deletes, + adds"))
+	b.WriteString("\n" + m.st.Dim.Render("enter edits, s sets the stage, d deletes, a adds, L links"))
 	return strings.TrimRight(b.String(), "\n")
 }
 

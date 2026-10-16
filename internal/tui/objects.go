@@ -65,17 +65,17 @@ type objDef struct {
 	ids map[verb]string
 
 	// Hooks. id 0 means none.
-	selected  func(m *Model) int64                  // the object the cursor is on in this context
-	nameOf    func(m *Model, id int64) string       // label in prompts and toasts
-	add       func(m *Model) tea.Cmd                // start the Add form
-	edit      func(m *Model, id int64) tea.Cmd      // start the Edit form
-	archive   func(m *Model, id int64) error        // recorded soft delete
-	restore   func(m *Model, id int64) error        // recorded restore
-	showRow   func(m *Model, id int64)              // put the cursor on the object after a restore
-	deleteAsk func(m *Model)                        // replaces the single y/n delete (people delete many)
-	restoreIn func(m *Model) bool                   // Restore applies here (nil: the session stack is not empty)
-	restoreDo func(m *Model)                        // replaces the stack restore (people come from the Archived view)
-	items     func(m *Model) []overlayItem          // every live object, for the link picker
+	selected  func(m *Model) int64                       // the object the cursor is on in this context
+	nameOf    func(m *Model, id int64) string            // label in prompts and toasts
+	add       func(m *Model) tea.Cmd                     // start the Add form
+	edit      func(m *Model, id int64) tea.Cmd           // start the Edit form
+	archive   func(m *Model, id int64) error             // recorded soft delete
+	restore   func(m *Model, id int64) error             // recorded restore
+	showRow   func(m *Model, id int64)                   // put the cursor on the object after a restore
+	deleteAsk func(m *Model)                             // replaces the single y/n delete (people delete many)
+	restoreIn func(m *Model) bool                        // Restore applies here (nil: the session stack is not empty)
+	restoreDo func(m *Model)                             // replaces the stack restore (people come from the Archived view)
+	items     func(m *Model) []overlayItem               // every live object, for the link picker
 	create    func(m *Model, text string) (int64, error) // make an object from typed text, for the link picker
 	keyHere   func(m *Model, v verb, key string) bool    // limits the keys of a verb to the views that mean this object
 }
@@ -113,9 +113,9 @@ func objectByKind(kind string) *objDef {
 func orgDef() *objDef {
 	return &objDef{
 		kind: "organization", label: "organization", short: "org", group: "Organizations", view: viewOrgs,
-		fields: []string{"name", "domain", "industry", "notes"},
-		cols:   []string{"name", "industry", "domain"},
-		can:    map[verb]bool{vAdd: true, vEdit: true, vLink: true, vUnlink: true, vDelete: true, vRestore: true},
+		fields:   []string{"name", "domain", "industry", "notes"},
+		cols:     []string{"name", "industry", "domain"},
+		can:      map[verb]bool{vAdd: true, vEdit: true, vLink: true, vUnlink: true, vDelete: true, vRestore: true},
 		selected: func(m *Model) int64 { return m.selOrg() },
 		nameOf:   func(m *Model, id int64) string { return m.orgName(id) },
 		add:      func(m *Model) tea.Cmd { return m.startOrgAdd() },
@@ -149,9 +149,9 @@ func orgDef() *objDef {
 func dealDef() *objDef {
 	return &objDef{
 		kind: "deal", label: "deal", short: "deal", group: "Deals", view: viewDeals,
-		fields: []string{"title", "value", "stage", "organization", "person", "notes"},
-		cols:   []string{"title", "stage and organization", "value"},
-		can:    map[verb]bool{vAdd: true, vEdit: true, vLink: true, vUnlink: true, vDelete: true, vRestore: true},
+		fields:   []string{"title", "value", "stage", "organization", "person", "notes"},
+		cols:     []string{"title", "stage and organization", "value"},
+		can:      map[verb]bool{vAdd: true, vEdit: true, vLink: true, vUnlink: true, vDelete: true, vRestore: true},
 		selected: func(m *Model) int64 { return m.selDeal() },
 		nameOf:   func(m *Model, id int64) string { return m.dealTitle(id) },
 		add:      func(m *Model) tea.Cmd { return m.startDealAdd() },
@@ -185,10 +185,10 @@ func dealDef() *objDef {
 func taskDef() *objDef {
 	return &objDef{
 		kind: "task", label: "task", short: "task", group: "Tasks", view: viewTasks,
-		fields: []string{"title", "due"},
-		cols:   []string{"title", "repeat and tags", "due"},
-		can:    map[verb]bool{vAdd: true, vEdit: true, vLink: true, vUnlink: true, vDelete: true, vRestore: true, vMark: true},
-		ids:    map[verb]string{vAdd: "task", vDelete: "task-delete", vRestore: "task-restore"},
+		fields:   []string{"title", "due"},
+		cols:     []string{"title", "repeat and tags", "due"},
+		can:      map[verb]bool{vAdd: true, vEdit: true, vLink: true, vUnlink: true, vDelete: true, vRestore: true, vMark: true},
+		ids:      map[verb]string{vAdd: "task", vDelete: "task-delete", vRestore: "task-restore"},
 		selected: func(m *Model) int64 { return m.taskTarget() },
 		nameOf: func(m *Model, id int64) string {
 			if t, err := m.tr.FindByID(m.ctx, id); err == nil {
@@ -196,8 +196,8 @@ func taskDef() *objDef {
 			}
 			return fmt.Sprintf("task %d", id)
 		},
-		add: func(m *Model) tea.Cmd { return m.startTaskAdd() },
-		edit: func(m *Model, id int64) tea.Cmd { return m.startTaskEdit(id) },
+		add:     func(m *Model) tea.Cmd { return m.startTaskAdd() },
+		edit:    func(m *Model, id int64) tea.Cmd { return m.startTaskEdit(id) },
 		archive: func(m *Model, id int64) error { return m.hArchiveTask(m.ctx, id) },
 		restore: func(m *Model, id int64) error { return m.hRestoreTask(m.ctx, id) },
 		showRow: func(m *Model, id int64) {

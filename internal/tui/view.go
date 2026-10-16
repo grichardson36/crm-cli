@@ -208,7 +208,7 @@ func (m *Model) listView(w, h int) string {
 		case m.view == viewBirthdays:
 			return m.st.Dim.Render("No birthdays in the next 90 days.")
 		case m.view == viewTasks:
-			return m.st.Dim.Render("No open tasks. Press t on a person to add one.")
+			return m.st.Dim.Render("No open tasks. a adds one, or press t on a person.")
 		case m.view == viewMerge:
 			return m.st.Dim.Render("No duplicates at " + m.minLevel.String() + " confidence or above. m lowers the level.")
 		case m.view == viewArchived:
@@ -218,9 +218,9 @@ func (m *Model) listView(w, h int) string {
 		case m.view == viewCalendar:
 			return m.st.Dim.Render("Nothing planned. + adds an event.")
 		case m.view == viewOrgs:
-			return m.st.Dim.Render("No organizations. + adds one.")
+			return m.st.Dim.Render("No organizations. a adds one.")
 		case m.view == viewDeals:
-			return m.st.Dim.Render("No deals. + adds one.")
+			return m.st.Dim.Render("No deals. a adds one.")
 		}
 		return m.st.Dim.Render("Nothing here yet.")
 	}
