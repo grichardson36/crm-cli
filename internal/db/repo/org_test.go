@@ -168,3 +168,25 @@ func TestOrgFindPeople(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, people, 2)
 }
+
+func TestOrgRestoreAndOverwrite(t *testing.T) {
+	r, _ := setupOrgTestDB(t)
+	ctx := context.Background()
+	o, err := r.Create(ctx, model.CreateOrgInput{Name: "Acme", Domain: ptr("acme.com")})
+	require.NoError(t, err)
+
+	require.ErrorIs(t, r.Restore(ctx, o.ID), model.ErrNotFound, "only archived organizations restore")
+	require.NoError(t, r.Archive(ctx, o.ID))
+	require.NoError(t, r.Restore(ctx, o.ID))
+	got, err := r.FindByID(ctx, o.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "Acme", got.Name)
+
+	require.NoError(t, r.Overwrite(ctx, o.ID, &model.Organization{Name: "Acme Inc", Industry: ptr("Tools")}))
+	got, err = r.FindByID(ctx, o.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "Acme Inc", got.Name)
+	assert.Nil(t, got.Domain, "overwrite also empties fields")
+	assert.Equal(t, "Tools", *got.Industry)
+	require.ErrorIs(t, r.Overwrite(ctx, 999, got), model.ErrNotFound)
+}

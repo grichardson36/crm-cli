@@ -53,7 +53,9 @@ type action struct {
 
 	// when says if the action applies in the current context. nil means always.
 	when func(m *Model) bool
-	run  func(m *Model) tea.Cmd
+	// keyIf limits the keys (not the palette entry) to a context, for an action that works from any view.
+	keyIf func(m *Model) bool
+	run   func(m *Model) tea.Cmd
 }
 
 func (a *action) hasKey(k string) bool {
@@ -108,7 +110,7 @@ func buildActions() []action {
 		}
 	}
 
-	return []action{
+	acts := []action{
 		// Merge compare screen. These come first so their keys win while the screen is open.
 		{id: "cmp-left", title: "Use candidate 1", group: "Compare", hint: "←/→", keys: []string{"left", "h", "1"}, desc: "compare: the field takes the left person's value (a list item goes in). Also h and 1",
 			foot: 6, footIn: inBoth, inCompare: true, when: whenCmpEdit, run: func(m *Model) tea.Cmd { m.cmpTake(0); return nil }},
@@ -319,9 +321,9 @@ func buildActions() []action {
 		{id: "done", title: "Complete task", group: "Contact", hint: "x", keys: []string{"x"}, desc: "complete the selected task (Tasks view, or a task row)",
 			write: true, run: func(m *Model) tea.Cmd { m.completeTask(); return nil }},
 		{id: "new", title: "New contact", group: "Contact", hint: "+", keys: []string{"+"}, desc: "create a contact: opens a blank form, saved when you enter a name",
-			write: true, foot: 45, footIn: inList, when: func(m *Model) bool { return m.view != viewCalendar }, run: func(m *Model) tea.Cmd { return m.startCreate() }},
+			write: true, foot: 45, footIn: inList, when: func(m *Model) bool { return m.view != viewCalendar && notAdvancedView(m) }, run: func(m *Model) tea.Cmd { return m.startCreate() }},
 		{id: "cal-add", title: "Calendar: add event", group: "Calendar", hint: "+", keys: []string{"+"}, desc: "add an event in the short syntax, for example Lunch @Sam fri 12:30 for 1h at Cafe Rio every week (in the Calendar view; from any view in the palette)",
-			write: true, foot: 30, footIn: inList, footIf: whenCalendar, run: func(m *Model) tea.Cmd { return m.startCalAdd() }},
+			write: true, keyIf: notAdvancedView, foot: 30, footIn: inList, footIf: whenCalendar, run: func(m *Model) tea.Cmd { return m.startCalAdd() }},
 
 		// Home.
 		{id: "home-open", title: "Open", group: "Home", hint: "enter", keys: []string{"enter"}, desc: "open the person (People view, detail pane) or the view the row stands for",
@@ -413,9 +415,9 @@ func buildActions() []action {
 		{id: "goto-view", title: "Go to view", group: "Views", hint: "v", keys: []string{"v"}, desc: "list every view with its number key (1-9) and jump to one",
 			foot: 85, footIn: inList, run: func(m *Model) tea.Cmd { return m.openViewSwitcher() }},
 		{id: "next-view", title: "Next view", group: "Views", hint: "]", keys: []string{"]"}, desc: "next view",
-			run: func(m *Model) tea.Cmd { m.switchView((m.view + 1) % numViews); return nil }},
+			run: func(m *Model) tea.Cmd { m.switchView(nextView(m.view, 1)); return nil }},
 		{id: "prev-view", title: "Previous view", group: "Views", hint: "[", keys: []string{"["}, desc: "previous view",
-			run: func(m *Model) tea.Cmd { m.switchView((m.view + numViews - 1) % numViews); return nil }},
+			run: func(m *Model) tea.Cmd { m.switchView(nextView(m.view, -1)); return nil }},
 		{id: "clear-search", title: "Clear search", group: "Views", hint: "esc", keys: []string{"esc"}, desc: "clear the People filter set from the bar (a tag, an organization or Show all)",
 			when: func(m *Model) bool { return m.focus == focusList && m.query != "" },
 			run: func(m *Model) tea.Cmd {
@@ -485,6 +487,7 @@ func buildActions() []action {
 		{id: "quit", inCompare: true, title: "Quit", group: "App", hint: "q", keys: []string{"q", "ctrl+c"}, desc: "quit",
 			run: func(m *Model) tea.Cmd { return tea.Quit }},
 	}
+	return append(acts, orgDealActions()...)
 }
 
 // step moves the cursor in the focused pane, or the row cursor of the compare screen.
