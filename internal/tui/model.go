@@ -103,6 +103,8 @@ type Model struct {
 	spin spinner.Model
 	// deletedNotes is the session stack of deleted note ids for "Restore last deleted note".
 	deletedNotes []int64
+	// deletedTasks is the session stack of deleted task ids for "Restore deleted task".
+	deletedTasks []int64
 	// Calendar view state, the zone times are shown in and the session stack of deleted events.
 	cal           calState
 	loc           *time.Location

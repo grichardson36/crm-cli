@@ -875,7 +875,8 @@ func (m *Model) askDelete() {
 	case rkTag:
 		what, do = "tag "+r.value, func() error { return m.hTagRemove(m.ctx, "person", pid, r.value) }
 	case rkTask:
-		what, do = "task "+r.value, func() error { return m.hArchiveTask(m.ctx, r.id) }
+		m.askDeleteTask(r.id)
+		return
 	case rkNote:
 		m.askDeleteNote(r)
 		return

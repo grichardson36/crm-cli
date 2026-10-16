@@ -14,7 +14,7 @@ Every key in the terminal UI, grouped by task. The palette (`ctrl+k`) runs any o
 
 - `c` mark contacted now (resets the keep-in-touch clock). `s` snooze for N days.
 - `n` add a note of the last used type. `N` pick the type first.
-- `t` add a task: `title | optional due date`. `x` complete the selected task.
+- `t` add a task: `title | optional due date`. `x` complete the selected task, `d` delete it (asks y/n).
 - `f` toggle favorite. `T` add a tag, `-name` removes it. `F` set the cadence. `p` set the priority tier.
 - `+` create a contact. `space` marks a row and `*` marks all visible. Then `c`, `f`, `T`, `F`, `p` and `#` apply to every marked person.
 

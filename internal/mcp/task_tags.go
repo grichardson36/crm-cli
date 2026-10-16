@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	gomcp "github.com/mark3labs/mcp-go/mcp"
@@ -56,5 +57,34 @@ func registerTaskTagTools(s *server.MCPServer, db *sql.DB) {
 			gomcp.WithArray("tags", gomcp.Required(), gomcp.Description("Tag names"), gomcp.WithStringItems()),
 		),
 		handler(true),
+	)
+}
+
+// registerTaskDeleteTool adds crm_task_delete: a soft delete that restore reverses.
+func registerTaskDeleteTool(s *server.MCPServer, tr *repo.TaskRepo) {
+	s.AddTool(
+		gomcp.NewTool("crm_task_delete",
+			gomcp.WithDescription("Delete (archive) a task. It leaves lists and the calendar. Set restore to true to bring a deleted task back."),
+			gomcp.WithNumber("id", gomcp.Required(), gomcp.Description("Task ID")),
+			gomcp.WithBoolean("restore", gomcp.Description("Restore a deleted task instead")),
+		),
+		func(ctx context.Context, req gomcp.CallToolRequest) (*gomcp.CallToolResult, error) {
+			id, errResult := requireID(req, "id")
+			if errResult != nil {
+				return errResult, nil
+			}
+			verb := "deleted"
+			var err error
+			if req.GetBool("restore", false) {
+				err = tr.Restore(ctx, id)
+				verb = "restored"
+			} else {
+				err = tr.Archive(ctx, id)
+			}
+			if err != nil {
+				return mcpError(err)
+			}
+			return gomcp.NewToolResultText(fmt.Sprintf("Task #%d %s", id, verb)), nil
+		},
 	)
 }

@@ -24,7 +24,7 @@ crm task done 1
 crm task delete 1
 ```
 
-`task delete` archives the task. `task done` marks it completed. Both accept `--dry-run` to preview.
+`task delete` archives the task and `task restore 1` brings it back. `task done` marks it completed. Delete and done accept `--dry-run`. In the TUI: `d` deletes (asks y/n), `ctrl+z` undoes.
 
 ## Recurring tasks
 

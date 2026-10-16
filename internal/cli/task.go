@@ -104,6 +104,7 @@ func registerTaskCommands(rootCmd *cobra.Command) {
 	taskCmd.AddCommand(taskEditCmd())
 	taskCmd.AddCommand(taskDoneCmd())
 	taskCmd.AddCommand(taskDeleteCmd())
+	taskCmd.AddCommand(taskRestoreCmd())
 	taskCmd.AddCommand(taskTagCmd(false))
 	taskCmd.AddCommand(taskTagCmd(true))
 
@@ -432,6 +433,33 @@ func taskDeleteCmd() *cobra.Command {
 			}
 
 			fmt.Fprintf(os.Stderr, "Deleted task #%d\n", id)
+			return nil
+		},
+	}
+}
+
+func taskRestoreCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "restore <id>",
+		Short: "Restore a deleted task",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			id, err := strconv.ParseInt(args[0], 10, 64)
+			if err != nil {
+				return model.NewExitError(model.ErrValidation, "invalid task ID: %s", args[0])
+			}
+
+			db, err := openDB()
+			if err != nil {
+				return err
+			}
+			defer db.Close()
+
+			if err := repo.NewTaskRepo(db).Restore(cmd.Context(), id); err != nil {
+				return err
+			}
+
+			fmt.Fprintf(os.Stderr, "Restored task #%d\n", id)
 			return nil
 		},
 	}

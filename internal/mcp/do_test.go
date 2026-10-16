@@ -156,4 +156,20 @@ func TestDoToolNamesAndTheSettleFlags(t *testing.T) {
 	var found []map[string]any
 	callJSON(t, s, "crm_person_search", map[string]any{"query": "Priya"}, &found)
 	require.Len(t, found, 1)
-}
+}
+func TestTaskDeleteToolDeletesAndRestores(t *testing.T) {
+	s := setupTestServer(t)
+	var task map[string]any
+	callJSON(t, s, "crm_task_create", map[string]any{"title": "Temp"}, &task)
+	_, isErr := call(t, s, "crm_task_delete", map[string]any{"id": task["id"]})
+	assert.False(t, isErr)
+	var list []map[string]any
+	callJSON(t, s, "crm_task_list", map[string]any{}, &list)
+	assert.Empty(t, list)
+	_, isErr = call(t, s, "crm_task_delete", map[string]any{"id": task["id"], "restore": true})
+	assert.False(t, isErr)
+	callJSON(t, s, "crm_task_list", map[string]any{}, &list)
+	assert.Len(t, list, 1)
+	_, isErr = call(t, s, "crm_task_delete", map[string]any{"id": task["id"], "restore": true})
+	assert.True(t, isErr)
+}

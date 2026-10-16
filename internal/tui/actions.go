@@ -293,6 +293,10 @@ func buildActions() []action {
 				m.startInput("tasktag", "tag task (-name removes): ", "")
 				return m.input.Focus()
 			}},
+		{id: "task-delete", title: "Delete task", group: "Contact", hint: "d", keys: []string{"d"}, desc: "delete the selected task (asks y/n). Tasks view, or a task row in the detail pane. ctrl+z undoes it",
+			write: true, foot: 46, footIn: inList, footIf: func(m *Model) bool { return m.view == viewTasks }, when: whenTaskTarget, run: func(m *Model) tea.Cmd { m.askDeleteTask(m.taskTarget()); return nil }},
+		{id: "task-restore", title: "Restore deleted task", group: "Contact", desc: "bring back the task deleted last in this session (ctrl+z does the same for the newest change; same as crm task restore)",
+			write: true, when: whenDeletedTask, run: func(m *Model) tea.Cmd { m.restoreLastTask(); return nil }},
 		{id: "tag", title: "Tag", group: "Contact", hint: "T", keys: []string{"T"}, desc: "add a tag (prefix with - to remove) on the person or all marked",
 			write: true, foot: 31, footIn: inList, footIf: whenMarks, when: whenPerson, run: func(m *Model) tea.Cmd {
 				m.startPrompt("tag", "tag (-name removes): ", "")

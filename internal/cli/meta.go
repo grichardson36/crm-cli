@@ -121,6 +121,7 @@ var commandMeta = map[string]cmdMeta{
 		`crm task edit 1 --duration 90m --earliest-start 2026-11-02 --hard-deadline`, `crm task edit 1 --scheduled-start "2026-11-03 14:00" --dry-run`}},
 	"task done":   {mutates: true, fields: taskFields, target: "task", targetArgs: "first", examples: []string{`crm task done 1`}},
 	"task delete": {mutates: true, target: "task", targetArgs: "first", examples: []string{`crm task delete 1`}},
+	"task restore": {mutates: true, target: "task", targetArgs: "first", examples: []string{`crm task restore 1`}},
 
 	// calendar
 	"cal add": {mutates: true, noDryRun: true, fields: eventFields, examples: []string{
