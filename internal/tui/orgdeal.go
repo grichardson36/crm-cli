@@ -70,6 +70,8 @@ func advancedViewActions() []action {
 	return []action{
 		{id: "view-orgs", title: "Organizations view", group: "Organizations", desc: "advanced view: companies and groups. a adds, enter edits, d deletes, u restores, L links (same as crm org)",
 			run: func(m *Model) tea.Cmd { m.switchView(viewOrgs); return nil }},
+		{id: "view-convert", title: "Company review view", group: "Organizations", desc: "advanced view: turn the people's company text into organizations in passes. c creates, l links, e renames, s skips, A accepts exact matches, enter applies the batch (same as crm org convert)",
+			run: func(m *Model) tea.Cmd { m.switchView(viewConvert); return nil }},
 		{id: "view-deals", title: "Deals view", group: "Deals", desc: "advanced view: deals with stage and value. a adds, enter edits, s sets the stage, d deletes, u restores, L links (same as crm deal)",
 			run: func(m *Model) tea.Cmd { m.switchView(viewDeals); return nil }},
 	}

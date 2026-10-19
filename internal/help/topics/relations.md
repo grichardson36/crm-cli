@@ -33,4 +33,4 @@ crm person link person 1 2 --kind friend
 
 `crm person merge` moves every link to the survivor. Only exact duplicate links are dropped (a membership is a duplicate when organization, role, start and end all match, so CTO and Advisor at one organization both stay), and the old id and uuid are kept as an alias so old references resolve.
 
-See also: links, orgs, duplicates, dav, people.
+See also: links, orgs, convert, duplicates, dav, people.

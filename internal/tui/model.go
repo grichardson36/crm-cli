@@ -42,10 +42,11 @@ const (
 const (
 	viewOrgs viewKind = numViews + iota
 	viewDeals
+	viewConvert
 	numAllViews
 )
 
-var viewNames = [numAllViews]string{"Home", "People", "Due", "Tasks", "Birthdays", "Merge", "Archived", "Sync", "Organizations", "Deals"}
+var viewNames = [numAllViews]string{"Home", "People", "Due", "Tasks", "Birthdays", "Merge", "Archived", "Sync", "Organizations", "Deals", "Company review"}
 
 type mode int
 
@@ -81,6 +82,8 @@ type row struct {
 	skip bool
 	// akind is the object kind of a row in the Archived view.
 	akind string
+	// convKey is the group key of a row in the company review.
+	convKey string
 	// jump is a view number (view+1) that Enter opens for rows that stand for a whole view.
 	jump int
 	// sync carries the Sync view data of the row.
@@ -114,6 +117,11 @@ type Model struct {
 	deleted map[string][]int64
 	// links makes, lists and removes links between objects.
 	links *repo.LinkRepo
+	// Company review: the repository, the groups on screen, the stats and the decisions staged.
+	conv       *repo.ConvertRepo
+	convGroups []repo.ConvertGroup
+	convStats  repo.ConvertStats
+	convStaged map[string]repo.ConvertDecision
 	// draft is the link being made in the Link form.
 	draft *linkDraft
 	// lineID is the record the open one-line edit prompt applies to. orgs and deals are the
@@ -239,6 +247,8 @@ func New(ctx context.Context, db *sql.DB) (*Model, error) {
 		dlr:        repo.NewDealRepo(db),
 		tagr:       repo.NewTagRepo(db),
 		links:      repo.NewLinkRepo(db),
+		conv:       repo.NewConvertRepo(db),
+		convStaged: map[string]repo.ConvertDecision{},
 		deleted:    map[string][]int64{},
 		dr:         repo.NewDupeRepo(db),
 		ntr:        repo.NewNoteTypeRepo(db),
@@ -309,8 +319,10 @@ func (m *Model) afterWrite() {
 // or at the same position if that item is gone. Otherwise the cursor goes to the top.
 func (m *Model) rebuild(keep bool) error {
 	var keepPerson, keepTask, keepOrg, keepDeal int64
+	var keepConv string
 	oldCursor := m.cursor
 	if keep && m.cursor < len(m.rows) {
+		keepConv = m.rows[m.cursor].convKey
 		keepPerson, keepTask = m.rows[m.cursor].personID, m.rows[m.cursor].taskID
 		keepOrg, keepDeal = m.rows[m.cursor].orgID, m.rows[m.cursor].dealID
 	}
@@ -391,6 +403,12 @@ func (m *Model) rebuild(keep bool) error {
 			return err
 		}
 		rows = dr
+	case viewConvert:
+		cr, err := m.convRows()
+		if err != nil {
+			return err
+		}
+		rows = cr
 	case viewMerge:
 		groups, err := m.dr.Find(m.ctx, m.minLevel)
 		if err != nil {
@@ -417,7 +435,7 @@ func (m *Model) rebuild(keep bool) error {
 				m.cursor = i
 				break
 			}
-			if (keepOrg != 0 && r.orgID == keepOrg) || (keepDeal != 0 && r.dealID == keepDeal) {
+			if (keepOrg != 0 && r.orgID == keepOrg) || (keepDeal != 0 && r.dealID == keepDeal) || (keepConv != "" && r.convKey == keepConv) {
 				m.cursor = i
 				break
 			}
@@ -861,6 +879,10 @@ func (m *Model) bulk(ids []int64, single, plural string, fn func(id int64) error
 }
 
 func (m *Model) runPrompt(kind, value string) {
+	if kind == "convert-name" {
+		m.runConvertName(value)
+		return
+	}
 	if strings.HasPrefix(kind, "org-") || strings.HasPrefix(kind, "deal-") {
 		m.runOrgDealPrompt(kind, value)
 		return

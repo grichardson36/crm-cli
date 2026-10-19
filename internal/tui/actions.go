@@ -372,7 +372,7 @@ func buildActions() []action {
 			break
 		}
 	}
-	out := append([]action{}, acts[:at]...)
+	out := append(convertActions(), acts[:at]...)
 	out = append(out, objectActions()...)
 	out = append(out, acts[at:]...)
 	return append(out, advancedViewActions()...)

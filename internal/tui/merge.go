@@ -185,6 +185,8 @@ func (m *Model) emptyDetail() string {
 	switch m.view {
 	case viewSync:
 		return m.syncItemDetail(r)
+	case viewConvert:
+		return m.convDetail(r)
 	case viewOrgs:
 		return m.orgDetail(r)
 	case viewDeals:
