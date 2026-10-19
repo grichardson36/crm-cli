@@ -219,12 +219,20 @@ func TestViewsDueBirthdaysTasks(t *testing.T) {
 
 	press(m, "3")
 	assert.Equal(t, viewDue, m.view)
+	assert.Contains(t, m.View(), "Follow-up")
 	assert.Equal(t, []string{"Bob Baker"}, names(m))
 	assert.Contains(t, m.View(), "overdue")
 
 	press(m, "5")
-	assert.Equal(t, []string{"Bob Baker"}, names(m))
-	assert.Equal(t, "in 7d", m.rows[0].meta)
+	var birthdays []row
+	for _, r := range m.rows {
+		if !r.skip {
+			birthdays = append(birthdays, r)
+		}
+	}
+	require.Len(t, birthdays, 1)
+	assert.Equal(t, "Bob Baker", birthdays[0].title)
+	assert.Equal(t, "in 7d", birthdays[0].meta)
 
 	press(m, "4")
 	assert.Empty(t, m.rows)
@@ -238,6 +246,24 @@ func TestViewsDueBirthdaysTasks(t *testing.T) {
 	assert.Equal(t, viewHome, m.view, "] wraps around")
 	press(m, "[")
 	assert.Equal(t, viewSync, m.view, "[ wraps back")
+}
+
+func TestBirthdayViewGroupsUpcomingBirthdaysByMonth(t *testing.T) {
+	m, pr := newTestModel(t)
+	ctx := context.Background()
+	for _, birthday := range []string{"--10-20", "--11-02"} {
+		p, err := pr.Create(ctx, model.CreatePersonInput{FirstName: birthday})
+		require.NoError(t, err)
+		_, err = pr.Update(ctx, p.ID, model.UpdatePersonInput{Birthday: sp(birthday)})
+		require.NoError(t, err)
+	}
+	m.switchView(viewBirthdays)
+
+	assert.Equal(t, []string{"October", "Bob Baker", "--10-20", "November", "--11-02"}, []string{
+		m.rows[0].title, m.rows[1].title, m.rows[2].title, m.rows[3].title, m.rows[4].title,
+	})
+	assert.True(t, m.rows[0].skip)
+	assert.True(t, m.rows[3].skip)
 }
 
 func TestMarkContactedRemovesFromDue(t *testing.T) {

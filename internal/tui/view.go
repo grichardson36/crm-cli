@@ -195,6 +195,8 @@ func (m *Model) tabsView() string {
 func (m *Model) listView(w, h int) string {
 	if len(m.rows) == 0 {
 		switch {
+		case m.view == viewHome:
+			return m.st.Dim.Render("Nothing needs attention today.")
 		case m.view == viewPeople && m.query != "":
 			return m.st.Dim.Render("No matches.")
 		case m.view == viewDue:

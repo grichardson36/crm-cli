@@ -11,13 +11,13 @@ crm tui --read-only
 
 ## Views
 
-Jump with the number keys, cycle with `[` and `]`, or press `v` for the view switcher. The tab bar shows Home, People, Due and Tasks, with the rest under More.
+Jump with the number keys, cycle with `[` and `]`, or press `v` for the view switcher. The tab bar shows Home, People, Follow-up and Tasks, with the rest under More.
 
 | Key | View | Shows |
 |---|---|---|
-| 1 | Home | what needs attention: who is due, birthdays, tasks, recent notes, sync status |
+| 1 | Home | people due for follow-up and person-linked tasks due today |
 | 2 | People | everyone |
-| 3 | Due | who you are due to contact (keep-in-touch) |
+| 3 | Follow-up | who you are due to contact (keep-in-touch) |
 | 4 | Tasks | open tasks |
 | 5 | Birthdays | upcoming birthdays |
 | 6 | Merge | groups of probable duplicates |
