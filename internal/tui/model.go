@@ -79,6 +79,8 @@ type row struct {
 
 	// skip rows (section headings, the status line) are drawn but never selected.
 	skip bool
+	// akind is the object kind of a row in the Archived view.
+	akind string
 	// jump is a view number (view+1) that Enter opens for rows that stand for a whole view.
 	jump int
 	// sync carries the Sync view data of the row.
@@ -173,8 +175,11 @@ type Model struct {
 	dismissed [][]int64
 	cmp       *compareState
 
-	// Archived view: the archived people by id.
-	arch map[int64]*model.Person
+	// Archived view: the archived people by id, the other archived objects by kind and id, and the
+	// type filter ("" shows every kind).
+	arch      map[int64]*model.Person
+	archItems map[string]repo.ArchivedItem
+	archKind  string
 
 	// noteType is the type used by the next note prompt (remembered between notes).
 	noteType string
@@ -396,19 +401,11 @@ func (m *Model) rebuild(keep bool) error {
 			rows = append(rows, groupRow(g))
 		}
 	case viewArchived:
-		list, err := m.pr.FindAll(m.ctx, model.PersonFilters{Archived: true})
+		ar, err := m.archivedRows()
 		if err != nil {
 			return err
 		}
-		m.arch = map[int64]*model.Person{}
-		for _, p := range list {
-			m.arch[p.ID] = p
-			sub := cleanCell(str(p.Company))
-			if sub == "" {
-				sub = cleanCell(str(p.Title))
-			}
-			rows = append(rows, row{personID: p.ID, title: cleanCell(fullName(p)), sub: sub, meta: dateOnly(p.UpdatedAt)})
-		}
+		rows = ar
 	}
 	m.rows = rows
 

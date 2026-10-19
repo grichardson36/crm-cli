@@ -22,6 +22,15 @@ func whenArchivedRows(m *Model) bool {
 	return m.view == viewArchived && m.focus == focusList && len(m.rows) > 0
 }
 
+// whenArchivedPerson is true on an archived person (purge and mark apply to people only).
+func whenArchivedPerson(m *Model) bool {
+	if !whenArchivedRows(m) {
+		return false
+	}
+	r, ok := m.selected()
+	return ok && r.akind == "person"
+}
+
 // levelBadge is the short label shown in the list.
 func levelBadge(l dedupe.Level) string {
 	switch l {
@@ -214,6 +223,16 @@ func (m *Model) emptyDetail() string {
 		}
 		b.WriteString("\n" + m.st.Dim.Render("enter compares and merges, D dismisses"))
 	case viewArchived:
+		if r.akind != "" && r.akind != "person" {
+			it := m.archItems[fmt.Sprintf("%s:%d", r.akind, archivedRowID(r))]
+			b.WriteString(m.st.Name.Render(line(cleanCell(it.Name))) + m.st.Dim.Render("  archived "+dateOnly(it.UpdatedAt)) + "\n\n")
+			b.WriteString(m.st.Dim.Render(fit("type", labelWidth)) + it.Kind + "\n")
+			if it.Detail != "" {
+				b.WriteString(m.st.Dim.Render(fit("detail", labelWidth)) + line(cleanCell(it.Detail)) + "\n")
+			}
+			b.WriteString("\n" + m.st.Dim.Render("u restores, T filters by type"))
+			return b.String()
+		}
 		p := m.arch[r.personID]
 		if p == nil {
 			return m.st.Dim.Render("Nothing selected.")
@@ -231,7 +250,7 @@ func (m *Model) emptyDetail() string {
 		for _, ph := range p.Phones {
 			b.WriteString(m.st.Dim.Render(fit("phone", labelWidth)) + line(ph.PhoneNumber) + "\n")
 		}
-		b.WriteString("\n" + m.st.Dim.Render("u restores, X purges forever"))
+		b.WriteString("\n" + m.st.Dim.Render("u restores, X purges forever, T filters by type"))
 	default:
 		return m.st.Dim.Render("Nothing selected.")
 	}

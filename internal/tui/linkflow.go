@@ -67,6 +67,11 @@ func (m *Model) beginLinkDraft(src repo.Ref, other string, it overlayItem) tea.C
 		m.setStatus("an object cannot be linked to itself", true)
 		return nil
 	}
+	// A pair may be linked under several kinds (friend and colleague), so a kind relation asks its
+	// kind first. Link then keeps one link per kind. Edit link (E) changes an existing one.
+	if rel.Kinded {
+		return m.nextLinkStep()
+	}
 	existing := m.linksBetween(src, d.target)
 	if len(existing) == 0 {
 		return m.nextLinkStep()

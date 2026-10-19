@@ -154,6 +154,9 @@ func (m *Model) countText() string {
 	case viewMerge:
 		return fmt.Sprintf("%d groups, %s+", len(m.rows), m.minLevel)
 	case viewArchived:
+		if m.archKind != "" {
+			return fmt.Sprintf("%d archived %ss", len(m.rows), cliNoun(m.archKind))
+		}
 		return fmt.Sprintf("%d archived", len(m.rows))
 	case viewOrgs:
 		return fmt.Sprintf("%d organizations", len(m.rows))
@@ -206,7 +209,10 @@ func (m *Model) listView(w, h int) string {
 		case m.view == viewMerge:
 			return m.st.Dim.Render("No duplicates at " + m.minLevel.String() + " confidence or above. m lowers the level.")
 		case m.view == viewArchived:
-			return m.st.Dim.Render("Nothing archived. # archives the selected person.")
+			if m.archKind != "" {
+				return m.st.Dim.Render("No archived " + cliNoun(m.archKind) + "s. T changes the type filter.")
+			}
+			return m.st.Dim.Render("Nothing archived. d deletes the selected object, # archives the selected person.")
 		case m.view == viewSync:
 			return m.st.Dim.Render("No sync sources connected yet.")
 		case m.view == viewOrgs:
