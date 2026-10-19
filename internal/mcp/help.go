@@ -14,7 +14,12 @@ type Option func(*options)
 
 type options struct {
 	schema func() any
+	dataDir func() (string, error)
 }
+
+// WithDataDir supplies the per-device settings directory (the one with config.toml) for the modules
+// tools. The default is ~/.crm.
+func WithDataDir(f func() (string, error)) Option { return func(o *options) { o.dataDir = f } }
 
 // WithSchema supplies the function behind the crm_schema tool. The command tree lives in the cli
 // package, which imports this one, so the caller passes it in.

@@ -76,7 +76,7 @@ func syncModel(t *testing.T) *Model {
 func syncedModel(t *testing.T) *Model {
 	t.Helper()
 	m := syncModel(t)
-	pressRun(m, "8", "s")
+	pressRun(m, "9", "s")
 	require.Empty(t, m.busy)
 	require.Contains(t, m.status, "fake: ok")
 	return m
@@ -94,7 +94,7 @@ func inboxRows(m *Model) []row {
 
 func TestSyncViewEmptyStateWithoutAdapters(t *testing.T) {
 	m, _ := newTestModel(t)
-	press(m, "8")
+	press(m, "9")
 	assert.Equal(t, viewSync, m.view)
 	assert.Empty(t, m.rows)
 	assert.Contains(t, m.View(), "No sync sources connected yet.")
@@ -103,7 +103,7 @@ func TestSyncViewEmptyStateWithoutAdapters(t *testing.T) {
 
 func TestSyncViewListsSourcesAndRunsInTheBackground(t *testing.T) {
 	m := syncModel(t)
-	press(m, "8")
+	press(m, "9")
 	require.Equal(t, "fake", m.rows[m.cursor].title)
 	assert.Equal(t, "never run", m.rows[m.cursor].sub)
 	assert.Contains(t, m.View(), "never run")
@@ -148,7 +148,7 @@ func TestSyncViewListsSourcesAndRunsInTheBackground(t *testing.T) {
 
 func TestSyncDryRunWritesNothing(t *testing.T) {
 	m := syncModel(t)
-	pressRun(m, "8", "d")
+	pressRun(m, "9", "d")
 	assert.Equal(t, "dry run fake: ok, 0 created, 1 updated, 0 skipped, 2 in inbox, 0 errors (nothing written)", m.status)
 	assert.Empty(t, inboxRows(m))
 	run, err := m.runner.Overview(context.Background())
@@ -164,7 +164,7 @@ func TestSyncFailureShowsTheError(t *testing.T) {
 	fake, err := m.registry.Get("fake")
 	require.NoError(t, err)
 	fake.(*crmsync.FakeAdapter).FailAfter = 1
-	pressRun(m, "8", "s")
+	pressRun(m, "9", "s")
 	assert.True(t, m.statusIsErr)
 	assert.Contains(t, m.status, "simulated failure")
 }
@@ -318,7 +318,7 @@ func TestSyncViewFitsTerminals(t *testing.T) {
 	m := syncedModel(t)
 	for _, size := range [][2]int{{80, 24}, {60, 12}, {40, 10}, {120, 50}} {
 		m.Update(tea.WindowSizeMsg{Width: size[0], Height: size[1]})
-		press(m, "8")
+		press(m, "9")
 		for _, k := range []string{"j", "p"} {
 			press(m, k)
 			lines := strings.Split(m.View(), "\n")

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/modules"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -149,3 +150,19 @@ func TestOrgEditLineCarriesNativeFieldsAndOldLineStillWorks(t *testing.T) {
 	assert.Contains(t, joined, "size=51-200")
 	assert.Contains(t, joined, "website=https://globex.com")
 }
+
+// goDeals turns the Deals module on (it is off by default) and opens the view from the palette.
+func goDeals(m *Model) {
+	m.mods, _ = m.mods.With("deals", true)
+	m.patchModuleActions()
+	runPalette(m, "deals view")
+}
+
+func mustWith(t *testing.T, a modules.Arrangement, name string, on bool) modules.Arrangement {
+	t.Helper()
+	n, err := a.With(name, on)
+	require.NoError(t, err)
+	return n
+}
+
+func modelOrg(name string) model.CreateOrgInput { return model.CreateOrgInput{Name: name} }

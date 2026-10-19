@@ -38,6 +38,10 @@ type overlay struct {
 	offset  int
 	palette bool
 	digits  bool // a number key picks the item with that hint (view switcher)
+	// onKey sees every key first and returns true when it used it (the Modules screen). noFilter
+	// turns the filter line off.
+	onKey    func(m *Model, key string) bool
+	noFilter bool
 	onPick  func(m *Model, it overlayItem)
 	// onCursor runs when the cursor lands on a different item (live preview). onCancel runs when
 	// the overlay is closed without a pick. Both are optional.
@@ -156,6 +160,9 @@ func (m *Model) openPalette() tea.Cmd {
 	items := make([]overlayItem, 0, len(m.actions))
 	for i := range m.actions {
 		a := &m.actions[i]
+		if !m.moduleOn(a) {
+			continue // an off module is not in the palette
+		}
 		it := overlayItem{id: a.id, label: a.title, hint: a.hint, desc: a.desc}
 		switch {
 		case a.write && m.readOnly:
@@ -215,13 +222,16 @@ func (m *Model) openPalette() tea.Cmd {
 
 // openViewSwitcher lists every view with its number key.
 func (m *Model) openViewSwitcher() tea.Cmd {
-	items := make([]overlayItem, 0, numViews)
-	for v := viewKind(0); v < numViews; v++ {
-		it := overlayItem{id: "view-" + strings.ToLower(viewNames[v]), label: viewNames[v], hint: strconv.Itoa(int(v) + 1), value: strconv.Itoa(int(v))}
+	var items []overlayItem
+	for i, v := range m.visibleViews() {
+		it := overlayItem{id: viewActionID(v), label: viewNames[v], value: strconv.Itoa(int(v))}
+		if i < 9 {
+			it.hint = strconv.Itoa(i + 1)
+		}
 		if v == m.view {
 			it.desc = "current view"
 		} else {
-			it.desc = viewBlurbs[v]
+			it.desc = viewBlurb(v)
 		}
 		items = append(items, it)
 	}
@@ -233,11 +243,6 @@ func (m *Model) openViewSwitcher() tea.Cmd {
 	return nil
 }
 
-// viewBlurbs say what each view is for.
-var viewBlurbs = [numViews]string{
-	"what needs attention today", "everyone, find with / or ctrl+k", "people to reach out to", "open tasks",
-	"upcoming birthdays", "probable duplicates", "archived people, restore or purge", "sources and the inbox",
-}
 
 // openPicker shows a small list of choices. onPick runs after the overlay closes.
 func (m *Model) openPicker(title string, items []overlayItem, onPick func(m *Model, it overlayItem)) {
@@ -300,6 +305,9 @@ func (m *Model) previewCursor() {
 func (m *Model) overlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	o := m.ov
 	page := m.overlayPage()
+	if o.onKey != nil && o.onKey(m, msg.String()) {
+		return m, nil
+	}
 	if o.palette {
 		if mdl, c, ok := m.cmdKey(msg); ok {
 			return mdl, c
@@ -333,6 +341,9 @@ func (m *Model) overlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m, m.pickOverlay(i)
 			}
 		}
+		return m, nil
+	}
+	if o.noFilter {
 		return m, nil
 	}
 	var cmd tea.Cmd

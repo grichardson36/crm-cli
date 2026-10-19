@@ -66,7 +66,7 @@ func TestAddAndRestoreKeysAreTheSameInEveryObjectView(t *testing.T) {
 	assert.Len(t, openOrgs(t, m), 2, "u restores in the Organizations view")
 
 	// Deals.
-	runPalette(m, "deals view")
+	goDeals(m)
 	press(m, "a")
 	require.Equal(t, modePrompt, m.mode)
 	submit(m, "Site redesign")
@@ -105,7 +105,7 @@ func TestAddAndRestoreKeysAreTheSameInEveryObjectView(t *testing.T) {
 	require.Equal(t, modeConfirm, m.mode)
 	press(m, "y")
 	assert.Len(t, m.people, before)
-	press(m, "7") // Archived
+	press(m, "8") // Archived
 	press(m, "u")
 	assert.Len(t, m.people, before+1, "u restores in the Archived view")
 }
@@ -313,7 +313,7 @@ func TestEveryRelationLinksFromBothSides(t *testing.T) {
 	confirmLink(m)
 	assert.True(t, linked(person, deal), "person to deal, from the person")
 
-	runPalette(m, "deals view")
+	goDeals(m)
 	runPalette(m, "link organization")
 	typeText(m, "acme")
 	press(m, "enter")
@@ -371,7 +371,7 @@ func TestLinkIsBlockedInReadOnlyMode(t *testing.T) {
 
 func TestLinkActionsAreGreyedOutWithoutAnObjectToLinkFrom(t *testing.T) {
 	m, _ := newTestModel(t)
-	press(m, "7") // Archived view: nothing to link
+	press(m, "8") // Archived view: nothing to link
 	for _, id := range []string{"link", "unlink", "link-org", "unlink-tag"} {
 		assert.False(t, m.actionByID(id).enabled(m), id)
 	}

@@ -309,7 +309,7 @@ func TestDealPageAndNoteOnAnOrganization(t *testing.T) {
 	_, err = m.links.Link(ctx, repo.Ref{Kind: "deal", ID: d.ID}, personRef(2), model.LinkAttrs{Role: &role})
 	require.NoError(t, err)
 
-	runPalette(m, "deals view")
+	goDeals(m)
 	view := m.detail.View()
 	for _, want := range []string{"Site", "proposal", "Organizations", "Globex", "primary", "People", "Bob Baker", "champion"} {
 		assert.Contains(t, view, want)
@@ -342,7 +342,7 @@ func TestDealStageSetsAndClearsClosedAtInTheTUI(t *testing.T) {
 	ctx := context.Background()
 	d, err := m.dlr.Create(ctx, model.CreateDealInput{Title: "Site", Stage: "lead"})
 	require.NoError(t, err)
-	runPalette(m, "deals view")
+	goDeals(m)
 	press(m, "s", "5") // won
 	got, err := m.dlr.FindByID(ctx, d.ID)
 	require.NoError(t, err)
@@ -372,7 +372,7 @@ func TestArchivedViewListsEveryKindFiltersByTypeAndRestores(t *testing.T) {
 	require.NoError(t, repo.ArchiveObject(ctx, m.db, "task", task.ID))
 	require.NoError(t, repo.ArchiveObject(ctx, m.db, "person", 3))
 
-	press(m, "7") // Archived
+	press(m, "8") // Archived
 	require.Equal(t, viewArchived, m.view)
 	kinds := map[string]bool{}
 	for _, r := range m.rows {
@@ -431,7 +431,7 @@ func TestPurgeAppliesToArchivedPeopleOnly(t *testing.T) {
 	ctx := context.Background()
 	org, _ := m.orr.Create(ctx, model.CreateOrgInput{Name: "Acme"})
 	require.NoError(t, repo.ArchiveObject(ctx, m.db, "organization", org.ID))
-	press(m, "7")
+	press(m, "8")
 	require.Len(t, m.rows, 1)
 	assert.False(t, m.actionByID("purge").enabled(m), "an archived organization cannot be purged here")
 }
@@ -470,7 +470,7 @@ func TestDealMovedBetweenClosedStagesIsRestamped(t *testing.T) {
 	ctx := context.Background()
 	d, err := m.dlr.Create(ctx, model.CreateDealInput{Title: "Site", Stage: "lead"})
 	require.NoError(t, err)
-	runPalette(m, "deals view")
+	goDeals(m)
 	press(m, "s", "5") // won
 	_, err = m.db.Exec(`UPDATE deals SET closed_at = '2000-01-01 00:00:00' WHERE id = ?`, d.ID)
 	require.NoError(t, err)

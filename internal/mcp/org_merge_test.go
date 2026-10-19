@@ -4,6 +4,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jdanielnd/crm-cli/internal/db"
+	crmmcp "github.com/jdanielnd/crm-cli/internal/mcp"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -46,4 +49,43 @@ func TestOrgNativeFieldsThroughMCP(t *testing.T) {
 	assert.Equal(t, "51-200", o["size"])
 	assert.Equal(t, "https://acme.com", o["website"])
 	assert.Equal(t, "a.png", o["logo_path"])
+}
+
+func TestModulesTools(t *testing.T) {
+	d, err := db.Open(":memory:")
+	require.NoError(t, err)
+	t.Cleanup(func() { d.Close() })
+	dir := t.TempDir()
+	s := crmmcp.NewServer(d, "test", crmmcp.WithDataDir(func() (string, error) { return dir, nil }))
+	for _, name := range []string{"crm_modules_list", "crm_modules_set", "crm_modules_reset"} {
+		assert.Contains(t, toolNames(s.ListTools()), name)
+	}
+	var rows []map[string]any
+	callJSON(t, s, "crm_modules_list", map[string]any{}, &rows)
+	require.Len(t, rows, 10)
+	assert.Equal(t, "home", rows[0]["id"])
+	assert.Equal(t, false, rows[9]["on"])
+
+	callJSON(t, s, "crm_modules_set", map[string]any{"module": "deals", "on": true}, &rows)
+	callJSON(t, s, "crm_modules_set", map[string]any{"module": "organizations", "position": 2}, &rows)
+	callJSON(t, s, "crm_modules_set", map[string]any{"module": "birthdays", "on": false}, &rows)
+	byID := map[string]map[string]any{}
+	for _, r := range rows {
+		byID[r["id"].(string)] = r
+	}
+	assert.EqualValues(t, 2, byID["organizations"]["order"])
+	assert.Equal(t, false, byID["birthdays"]["on"])
+	assert.Equal(t, true, byID["deals"]["on"])
+
+	_, isErr := call(t, s, "crm_modules_set", map[string]any{"module": "nope", "on": true})
+	assert.True(t, isErr)
+	_, isErr = call(t, s, "crm_modules_set", map[string]any{"module": "people"})
+	assert.True(t, isErr, "give on or position")
+	callJSON(t, s, "crm_modules_set", map[string]any{"module": "home", "on": false}, &rows)
+	_, isErr = call(t, s, "crm_modules_set", map[string]any{"module": "people", "on": false})
+	assert.True(t, isErr, "Home or People stays on")
+
+	callJSON(t, s, "crm_modules_reset", map[string]any{}, &rows)
+	assert.Equal(t, true, rows[0]["on"])
+	assert.Equal(t, false, rows[9]["on"])
 }

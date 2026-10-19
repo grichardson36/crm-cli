@@ -11,7 +11,7 @@ crm tui --read-only
 
 ## Views
 
-Jump with the number keys, cycle with `[` and `]`, or press `v` for the view switcher. The tab bar shows Home, People, Follow-up and Tasks, with the rest under More.
+Every view is a module you can turn on or off and reorder (see modules). Jump with the number keys, cycle with `[` and `]`, or press `v` for the view list. Deals is off by default. The keys below are the default order.
 
 | Key | View | Shows |
 |---|---|---|
@@ -19,10 +19,11 @@ Jump with the number keys, cycle with `[` and `]`, or press `v` for the view swi
 | 2 | People | everyone |
 | 3 | Follow-up | who you are due to contact (keep-in-touch) |
 | 4 | Tasks | open tasks |
-| 5 | Birthdays | upcoming birthdays |
-| 6 | Merge | groups of probable duplicates |
-| 7 | Archived | archived people |
-| 8 | Sync | sync sources and the inbox of unmatched records |
+| 5 | Organizations | companies and groups |
+| 6 | Birthdays | upcoming birthdays |
+| 7 | Merge | groups of probable duplicates |
+| 8 | Archived | archived records |
+| 9 | Sync | sync sources and the inbox of unmatched records |
 
 ## Palette actions that mirror CLI commands
 

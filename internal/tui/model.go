@@ -16,6 +16,7 @@ import (
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/dedupe"
 	"github.com/jdanielnd/crm-cli/internal/keys"
+	"github.com/jdanielnd/crm-cli/internal/modules"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/jdanielnd/crm-cli/internal/quick"
 	"github.com/jdanielnd/crm-cli/internal/shortsyntax"
@@ -215,6 +216,8 @@ type Model struct {
 	// Key bindings changed by the user (config.toml [keys]), the problems found while loading
 	// them, and the action being rebound while the next key press is captured.
 	keyOverrides keys.Overrides
+	// mods is the module arrangement (modules.go): which views are on and in what order.
+	mods modules.Arrangement
 	keyProblems  []string
 	capture      *captureState
 
@@ -264,6 +267,7 @@ func New(ctx context.Context, db *sql.DB) (*Model, error) {
 		marked:     map[int64]bool{},
 		nameMemory: map[string]int64{},
 		actions:    buildActions(),
+		mods:       modules.Default(),
 		clip:       func(s string) { osc52Copy(os.Stdout, s) },
 		open:       openURL,
 		st:         defaultStyles(),
@@ -284,6 +288,7 @@ func Run(ctx context.Context, db *sql.DB, readOnly bool, env Env) error {
 	m.env = env
 	m.applyStartupTheme()
 	m.applyStartupKeys()
+	m.applyStartupModules()
 	_, err = tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion(), tea.WithContext(ctx)).Run()
 	return err
 }

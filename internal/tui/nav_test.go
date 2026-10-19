@@ -15,15 +15,15 @@ func TestViewSwitcherListsEveryViewWithItsKey(t *testing.T) {
 	press(m, "v")
 	require.Equal(t, modeOverlay, m.mode)
 	assert.Equal(t, "Go to view", m.ov.title)
-	require.Len(t, m.ov.items, int(numViews))
-	for i, it := range m.ov.items {
-		assert.Equal(t, viewNames[i], it.label)
-		assert.Equal(t, string(rune('1'+i)), it.hint)
+	require.Len(t, m.ov.items, 9, "Deals is off by default")
+	for i, v := range m.visibleViews() {
+		assert.Equal(t, viewNames[v], m.ov.items[i].label)
+		assert.Equal(t, string(rune('1'+i)), m.ov.items[i].hint)
 	}
-	assert.Equal(t, "current view", m.ov.items[viewPeople].desc)
+	assert.Equal(t, "current view", m.ov.items[1].desc)
 
 	// A number key picks at once.
-	press(m, "6")
+	press(m, "7")
 	assert.Equal(t, modeNormal, m.mode)
 	assert.Equal(t, viewMerge, m.view)
 
@@ -46,7 +46,7 @@ func TestGoToViewInPalette(t *testing.T) {
 	press(m, "enter")
 	require.Equal(t, modeOverlay, m.mode)
 	assert.Equal(t, "Go to view", m.ov.title)
-	press(m, "8")
+	press(m, "9")
 	assert.Equal(t, viewSync, m.view)
 }
 
@@ -67,15 +67,15 @@ func TestViewSwitcherReachableByMouseOnMore(t *testing.T) {
 	click(m, more.x0+1, 0)
 	require.Equal(t, modeOverlay, m.mode)
 	// Click the Birthdays line (view 5 is the fifth item under the two header lines).
-	click(m, 3, overlayTop+int(viewBirthdays))
+	click(m, 3, overlayTop+m.viewPosition(viewBirthdays)-1)
 	assert.Equal(t, viewBirthdays, m.view)
-	assert.Contains(t, strings.Split(m.View(), "\n")[0], "v Birthdays")
+	assert.Contains(t, strings.Split(m.View(), "\n")[0], "6 Birthdays")
 }
 
 func TestHelpAndFooterMentionNewKeys(t *testing.T) {
 	m, _ := newTestModel(t)
 	help := m.helpText()
-	for _, want := range []string{"list every view", "run the selected source", "would change, writes nothing", "create a person from the selected inbox", "attach the selected inbox", "dismiss the selected inbox", "first pending inbox record", "new type for the note", "bring back the note deleted", "open the person (People view"} {
+	for _, want := range []string{"list the views that are on", "run the selected source", "would change, writes nothing", "create a person from the selected inbox", "attach the selected inbox", "dismiss the selected inbox", "first pending inbox record", "new type for the note", "bring back the note deleted", "open the person (People view"} {
 		assert.Contains(t, help, want)
 	}
 	assert.Contains(t, m.hintsLine(), "help")
@@ -84,10 +84,10 @@ func TestHelpAndFooterMentionNewKeys(t *testing.T) {
 func TestTabBarNeverExceeds80Columns(t *testing.T) {
 	m, _ := newTestModel(t)
 	m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
-	for v := 1; v <= int(numViews); v++ {
-		press(m, string(rune('0'+v)))
+	for i := range m.visibleViews() {
+		press(m, string(rune('1'+i)))
 		bar := strings.Split(m.View(), "\n")[0]
-		assert.LessOrEqual(t, lipgloss.Width(bar), 80, "view %d", v)
+		assert.LessOrEqual(t, lipgloss.Width(bar), 80, "view %d", i+1)
 		assert.Contains(t, bar, "1 Home")
 		assert.Contains(t, bar, "2 People")
 		assert.Contains(t, bar, "3 Follow-up")

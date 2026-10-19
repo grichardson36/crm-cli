@@ -33,22 +33,25 @@ func TestOrgsAndDealsStayOutOfDefaultNavigation(t *testing.T) {
 	m, _ := newTestModel(t)
 	press(m, "v")
 	require.NotNil(t, m.ov)
+	var labels []string
 	for _, it := range m.ov.items {
-		assert.NotEqual(t, "Organizations", it.label)
-		assert.NotEqual(t, "Deals", it.label)
+		labels = append(labels, it.label)
 	}
+	assert.Contains(t, labels, "Organizations", "organizations are core and on by default")
+	assert.NotContains(t, labels, "Deals", "deals are advanced and off by default")
 	press(m, "esc")
-	for _, tab := range mainTabs {
-		assert.NotEqual(t, viewOrgs, tab)
-		assert.NotEqual(t, viewDeals, tab)
-	}
-	runPalette(m, "organizations view")
+	assert.Equal(t, 5, m.viewPosition(viewOrgs))
+	assert.Equal(t, 0, m.viewPosition(viewDeals))
+	press(m, "5")
 	assert.Equal(t, viewOrgs, m.view)
-	assert.Contains(t, m.View(), "v Organizations")
 	press(m, "]")
-	assert.Equal(t, viewHome, m.view, "] leaves the advanced view")
-	runPalette(m, "deals view")
-	assert.Equal(t, viewDeals, m.view)
+	assert.Equal(t, viewBirthdays, m.view)
+	// Deals opened from a link is outside the cycle: ] goes to the first view and [ to the last.
+	m.switchView(viewDeals)
+	assert.Contains(t, m.View(), "v Deals")
+	press(m, "]")
+	assert.Equal(t, viewHome, m.view, "] leaves a view that is off")
+	m.switchView(viewDeals)
 	press(m, "[")
 	assert.Equal(t, viewSync, m.view)
 }
@@ -81,7 +84,7 @@ func TestOrgAddEditDeleteRestoreWithUndo(t *testing.T) {
 	// Edit: enter opens the line with the current values, emptied fields are cleared.
 	press(m, "enter")
 	require.Equal(t, modePrompt, m.mode)
-	assert.Equal(t, "Initech | initech.com | Software | Makes TPS reports", m.input.Value())
+	assert.Equal(t, "Initech | initech.com | Software |  |  |  |  |  | Makes TPS reports", m.input.Value())
 	submit(m, "Initrode | | Software")
 	got := openOrgs(t, m)[0]
 	assert.Equal(t, "Initrode", got.Name)
@@ -140,7 +143,7 @@ func TestDealAddEditStageDeleteRestoreWithUndo(t *testing.T) {
 	m, _ := newTestModel(t)
 	org, err := m.orr.Create(context.Background(), model.CreateOrgInput{Name: "Globex"})
 	require.NoError(t, err)
-	runPalette(m, "deals view")
+	goDeals(m)
 	require.Equal(t, viewDeals, m.view)
 
 	press(m, "+")

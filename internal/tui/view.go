@@ -93,17 +93,8 @@ type tabSeg struct {
 	on     bool
 }
 
-// mainTabs are the views with their own tab. Every other view is reached through More or v.
-var mainTabs = []viewKind{viewHome, viewPeople, viewDue, viewTasks}
-
-func isMainTab(v viewKind) bool {
-	for _, t := range mainTabs {
-		if t == v {
-			return true
-		}
-	}
-	return false
-}
+// isMainTab reports whether the view has its own tab: it is a module that is on.
+func (m *Model) isMainTab(v viewKind) bool { return m.viewPosition(v) > 0 }
 
 // tabLayout places the tabs: the main views plus a "v More" entry. When the current view is not
 // a main view, the More entry shows its name. When the full labels do not fit the width, tabs
@@ -114,29 +105,69 @@ func (m *Model) tabLayout() []tabSeg {
 		seg         tabSeg
 	}
 	var items []item
-	for _, v := range mainTabs {
-		items = append(items, item{full: tabLabel(int(v), viewNames[v]), short: strconv.Itoa(int(v) + 1),
-			seg: tabSeg{view: v, on: v == m.view}})
+	for i, v := range m.visibleViews() {
+		full, short := viewNames[v], viewNames[v][:1]
+		if i < 9 {
+			full, short = tabLabel(i, viewNames[v]), strconv.Itoa(i+1)
+		}
+		items = append(items, item{full: full, short: short, seg: tabSeg{view: v, on: v == m.view}})
 	}
 	more := item{full: "v More", short: "v", seg: tabSeg{more: true, view: m.view}}
-	if !isMainTab(m.view) {
+	if !m.isMainTab(m.view) {
 		more.full = "v " + viewNames[m.view]
 		more.seg.on = true
 	}
 	items = append(items, more)
 
-	total := 0
-	for _, it := range items {
-		total += runewidth.StringWidth(it.full) + 2
+	// Level 0 shows every full label. Level 1 shortens the tabs after the fourth to their key, level 2
+	// every tab but the current one.
+	labelAt := func(level, i int, it item) string {
+		if (level == 2 || (level == 1 && i >= 4 && !it.seg.more)) && !it.seg.on {
+			return it.short
+		}
+		return it.full
 	}
-	compact := total > m.width
+	level := 0
+	for ; level < 2; level++ {
+		total := 0
+		for i, it := range items {
+			total += runewidth.StringWidth(labelAt(level, i, it)) + 2
+		}
+		need := total
+		if m.view == viewConvert { // the review's progress line must stay visible
+			need += runewidth.StringWidth(m.countText()) + 1
+		}
+		if need <= m.width {
+			break
+		}
+	}
+	// Still too wide at level 2 (a narrow terminal with many modules on): drop tabs from the end
+	// until it fits. The current tab and More stay, v and [ ] still reach every module.
+	labels := make([]string, len(items))
+	total := 0
+	for i, it := range items {
+		labels[i] = labelAt(level, i, it)
+		total += runewidth.StringWidth(labels[i]) + 2
+	}
+	for total > m.width {
+		drop := -1
+		for i := len(items) - 1; i >= 0; i-- {
+			if !items[i].seg.on && !items[i].seg.more {
+				drop = i
+				break
+			}
+		}
+		if drop < 0 {
+			break
+		}
+		total -= runewidth.StringWidth(labels[drop]) + 2
+		items = append(items[:drop], items[drop+1:]...)
+		labels = append(labels[:drop], labels[drop+1:]...)
+	}
 	var segs []tabSeg
 	x := 0
-	for _, it := range items {
-		label := it.full
-		if compact && !it.seg.on {
-			label = it.short
-		}
+	for i, it := range items {
+		label := labels[i]
 		w := runewidth.StringWidth(label) + 2
 		seg := it.seg
 		seg.label, seg.x0, seg.x1 = label, x, x+w

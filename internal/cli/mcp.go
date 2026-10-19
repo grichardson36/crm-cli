@@ -22,7 +22,7 @@ func registerMCPCommands(rootCmd *cobra.Command) {
 			}
 			defer db.Close()
 
-			s := crmmcp.NewServer(db, Version, crmmcp.WithSchema(func() any { return buildSchema(cmd.Root()) }))
+			s := crmmcp.NewServer(db, Version, crmmcp.WithDataDir(defaultDataDir), crmmcp.WithSchema(func() any { return buildSchema(cmd.Root()) }))
 			return server.ServeStdio(s)
 		},
 	})

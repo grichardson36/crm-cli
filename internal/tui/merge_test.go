@@ -44,7 +44,7 @@ func archivedIDs(t *testing.T, pr *repo.PersonRepo) map[int64]bool {
 
 func TestMergeViewListsGroupsHighFirstAndCyclesLevel(t *testing.T) {
 	m, _ := dupeModel(t)
-	press(m, "6")
+	press(m, "7")
 	assert.Equal(t, viewMerge, m.view)
 	require.Len(t, m.rows, 2)
 	assert.True(t, strings.HasPrefix(m.rows[0].title, "HIGH"), m.rows[0].title)
@@ -52,7 +52,7 @@ func TestMergeViewListsGroupsHighFirstAndCyclesLevel(t *testing.T) {
 	assert.True(t, strings.HasPrefix(m.rows[1].title, "MED"), m.rows[1].title)
 	out := m.View()
 	assert.Contains(t, out, "2 groups, medium+")
-	assert.Contains(t, out, "v Merge")
+	assert.Contains(t, out, "7 Merge")
 	assert.Contains(t, out, "email cara@initech.com", "the detail pane explains the group")
 
 	// m lowers the level, wraps to high, then back to medium.
@@ -76,14 +76,14 @@ func TestMergeViewListsGroupsHighFirstAndCyclesLevel(t *testing.T) {
 
 func TestMergeViewEmptyMessage(t *testing.T) {
 	m, _ := newTestModel(t)
-	press(m, "6")
+	press(m, "7")
 	assert.Empty(t, m.rows)
 	assert.Contains(t, m.View(), "No duplicates")
 }
 
 func TestDismissAndUndoDismiss(t *testing.T) {
 	m, _ := dupeModel(t)
-	press(m, "6", "j")
+	press(m, "7", "j")
 	assert.Contains(t, m.rows[m.cursor].title, "Bob")
 	press(m, "D")
 	require.Len(t, m.rows, 1)
@@ -153,7 +153,7 @@ func TestReadOnlyBlocksMergeArchiveAndNoteTypes(t *testing.T) {
 	m.marked = map[int64]bool{}
 
 	// Reading is fine: the compare screen opens, but merge, dismiss and undo are blocked.
-	press(m, "6", "enter")
+	press(m, "7", "enter")
 	require.NotNil(t, m.cmp)
 	for _, k := range []string{"m", "D"} {
 		m.setStatus("", false)
@@ -169,7 +169,7 @@ func TestReadOnlyBlocksMergeArchiveAndNoteTypes(t *testing.T) {
 	}
 	require.NoError(t, pr.Archive(context.Background(), 1))
 	require.NoError(t, m.reload())
-	press(m, "7")
+	press(m, "8")
 	require.Len(t, m.rows, 1)
 	for _, k := range []string{"u", "X"} {
 		m.setStatus("", false)
@@ -199,7 +199,7 @@ func TestArchiveRestoreFlow(t *testing.T) {
 	assert.Equal(t, []string{"Bob Baker", "Cara Cole"}, names(m))
 	assert.Contains(t, m.status, "archived Zed Adams")
 
-	press(m, "7")
+	press(m, "8")
 	assert.Equal(t, viewArchived, m.view)
 	require.Len(t, m.rows, 1)
 	assert.Equal(t, "Zed Adams", m.rows[0].title)
@@ -233,7 +233,7 @@ func TestArchiveMarkedAndRestoreMarked(t *testing.T) {
 	assert.Empty(t, m.rows)
 	assert.Empty(t, m.marked)
 
-	press(m, "7")
+	press(m, "8")
 	require.Len(t, m.rows, 3)
 	press(m, " ", " ")
 	assert.Len(t, m.markedIDs(), 2)
@@ -249,9 +249,9 @@ func TestArchivedPeopleStayOutOfOtherViews(t *testing.T) {
 	require.Equal(t, []string{"Bob Baker"}, names(m))
 	press(m, "#", "y")
 	assert.Empty(t, m.rows, "gone from Due")
-	press(m, "5")
-	assert.Empty(t, m.rows, "gone from Birthdays")
 	press(m, "6")
+	assert.Empty(t, m.rows, "gone from Birthdays")
+	press(m, "7")
 	require.Len(t, m.rows, 1, "gone from Merge")
 	assert.Contains(t, m.rows[0].title, "HIGH")
 	press(m, "2")
@@ -261,7 +261,7 @@ func TestArchivedPeopleStayOutOfOtherViews(t *testing.T) {
 
 func TestPurgeNeedsTheTypedName(t *testing.T) {
 	m, pr := newTestModel(t)
-	press(m, "#", "y", "7", "X")
+	press(m, "#", "y", "8", "X")
 	require.Equal(t, modePrompt, m.mode)
 	assert.Contains(t, m.View(), `type "Zed Adams" to delete forever`)
 
@@ -283,7 +283,7 @@ func TestPurgeNeedsTheTypedName(t *testing.T) {
 	assert.Empty(t, m.rows)
 
 	// Esc at the prompt purges nothing.
-	press(m, "2", "#", "y", "7", "X", "esc")
+	press(m, "2", "#", "y", "8", "X", "esc")
 	assert.Equal(t, modeNormal, m.mode)
 	assert.Len(t, archivedIDs(t, pr), 1)
 }
@@ -318,7 +318,7 @@ func TestNewActionsInPaletteWithCorrectGreying(t *testing.T) {
 	press(m, " ", " ") // two marks
 	assert.Equal(t, "", func() string { return state()["merge-marked"] }())
 
-	press(m, "6")
+	press(m, "7")
 	st = state()
 	assert.Equal(t, "", st["compare"])
 	assert.Equal(t, "", st["dupe-level"])
@@ -337,10 +337,10 @@ func TestNewActionsInPaletteWithCorrectGreying(t *testing.T) {
 	}
 	press(m, "esc")
 
-	press(m, "7")
+	press(m, "8")
 	st = state()
 	assert.Equal(t, "not here", st["restore"], "nothing archived yet")
-	press(m, "2", "#", "y", "7")
+	press(m, "2", "#", "y", "8")
 	st = state()
 	assert.Equal(t, "", st["restore"])
 	assert.Equal(t, "", st["purge"])
@@ -364,25 +364,24 @@ func TestTabBarFitsAndClicksWork(t *testing.T) {
 	m, _ := dupeModel(t)
 	for _, w := range []int{80, 100, 120} {
 		m.Update(tea.WindowSizeMsg{Width: w, Height: 30})
-		for v := 1; v <= int(numViews); v++ {
-			press(m, string(rune('0'+v)))
+		for i, v := range m.visibleViews() {
+			press(m, string(rune('1'+i)))
+			require.Equal(t, v, m.view)
 			line := strings.Split(m.View(), "\n")[0]
 			assert.LessOrEqual(t, lipgloss.Width(line), w, "tab bar at width %d view %d", w, v)
-			for _, name := range []string{"Home", "People", "Follow-up", "Tasks"} {
-				assert.Contains(t, line, name, "main tabs at width %d view %d", w, v)
-			}
-			if !isMainTab(viewKind(v - 1)) {
-				assert.Contains(t, line, "v "+viewNames[v-1], "More shows the hidden current view at width %d", w)
-			} else {
-				assert.Contains(t, line, "v More")
-			}
+			assert.Contains(t, line, viewNames[v], "the current tab keeps its name at width %d", w)
+			assert.Contains(t, line, "v More")
 		}
+		// A view that is off but opened from a link shows its name in the More slot.
+		m.switchView(viewDeals)
+		assert.Contains(t, strings.Split(m.View(), "\n")[0], "v Deals")
 	}
 
 	// Click each tab at 80 columns. The More tab opens the view switcher.
 	m.Update(tea.WindowSizeMsg{Width: 80, Height: 30})
 	press(m, "1")
-	for _, seg := range m.tabLayout() {
+	for i := range m.tabLayout() {
+		seg := m.tabLayout()[i] // the layout changes with the current tab
 		click(m, seg.x0+1, 0)
 		if seg.more {
 			assert.Equal(t, modeOverlay, m.mode, "More opens the switcher")
@@ -408,9 +407,9 @@ func TestTabBarFitsAndClicksWork(t *testing.T) {
 
 func TestNumberAndBracketKeysCoverEveryView(t *testing.T) {
 	m, _ := newTestModel(t)
-	for v := 1; v <= int(numViews); v++ {
-		press(m, string(rune('0'+v)))
-		assert.Equal(t, viewKind(v-1), m.view)
+	for i, v := range m.visibleViews() {
+		press(m, string(rune('1'+i)))
+		assert.Equal(t, v, m.view)
 	}
 	assert.Equal(t, viewSync, m.view)
 	press(m, "]")
@@ -430,13 +429,13 @@ func TestCompareAndNewViewsFitTerminals(t *testing.T) {
 				assert.LessOrEqual(t, lipgloss.Width(l), size[0], "%v %s: %q", size, what, l)
 			}
 		}
-		press(m, "6")
+		press(m, "7")
 		check("merge list")
 		press(m, "enter")
 		check("compare")
 		press(m, "j", "j", "j", "tab", "s")
 		check("compare after keys")
-		press(m, "esc", "7")
+		press(m, "esc", "8")
 		check("archived")
 		press(m, "2")
 	}

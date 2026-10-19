@@ -5,7 +5,7 @@ Every key in the terminal UI. The palette (`ctrl+k`) runs any of these by name, 
 ## Standard keys (same in every object view)
 
 - `a` add (`+` also). `enter` edit (`e` also in Organizations and Deals). `d` delete, asks y/n. `u` restore. `L` link. `U` unlink. `space` mark. `ctrl+z` undo, `ctrl+y` redo.
-- The object is the one under the cursor: a person, a task, or in the Organizations and Deals views (palette) an organization or a deal. Restore brings back the object you deleted last in this session. In the Archived view `u` restores the archived object, `t` filters by type.
+- The object is the one under the cursor: a person, a task, or in the Organizations and Deals views an organization or a deal. Restore brings back the object you deleted last in this session. In the Archived view `u` restores the archived object, `t` filters by type.
 - `L` and `U` ask which relation (organization, person, deal, task, tag), then pick or create in one step, then the kind or the role/dates line. `E` edits a linked row. See links.
 
 ## Moving

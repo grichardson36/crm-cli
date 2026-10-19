@@ -142,6 +142,7 @@ func (m *Model) applyKeys(o keys.Overrides) []string {
 	m.keyOverrides = o
 	m.actions = buildActions()
 	m.keyProblems = applyKeyOverrides(m.actions, o)
+	m.patchModuleActions()
 	return m.keyProblems
 }
 

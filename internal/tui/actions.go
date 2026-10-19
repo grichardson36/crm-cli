@@ -12,6 +12,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/modules"
 )
 
 func abs(n int) int {
@@ -54,6 +55,10 @@ type action struct {
 	when func(m *Model) bool
 	// keyIf limits the keys (not the palette entry) to a context, for an action that works from any view.
 	keyIf func(m *Model) bool
+	// module is the module a view action belongs to (modules.go). An off module hides the action
+	// from the palette. isView marks the action that opens the view and takes the module's number key.
+	module string
+	isView bool
 	// keyFor limits one key at a time, for a verb whose keys mean different things in different views.
 	keyFor func(m *Model, key string) bool
 	// footLabel is the word in the footer. It falls back to footShort[id].
@@ -105,17 +110,20 @@ func whenMarkable(m *Model) bool {
 // buildActions returns the full action registry in key-resolution order.
 func buildActions() []action {
 	viewAction := func(v viewKind) action {
-		id := "view-" + strings.ToLower(viewNames[v])
+		id := viewActionID(v)
 		desc := "show " + strings.ToLower(viewNames[v])
 		if v == viewDue {
-			id = "view-due" // Preserve existing key-customization entries and palette searches.
 			desc += "; people due to reach out"
 		}
-		return action{
-			id: id, title: viewNames[v] + " view", group: "Views",
-			hint: strconv.Itoa(int(v) + 1), keys: []string{strconv.Itoa(int(v) + 1)}, desc: desc,
+		mod, _ := moduleOf(v)
+		a := action{
+			id: id, title: viewNames[v] + " view", group: "Views", module: mod, isView: true, desc: desc,
 			run: func(m *Model) tea.Cmd { m.switchView(v); return nil },
 		}
+		if pos := modules.Default().Position(mod); pos >= 1 && pos <= 9 { // the number key of the default arrangement
+			a.hint, a.keys = strconv.Itoa(pos), []string{strconv.Itoa(pos)}
+		}
+		return a
 	}
 	addKind := func(id, title, what string, k rowKind) action {
 		return action{
@@ -227,7 +235,7 @@ func buildActions() []action {
 			run: func(m *Model) tea.Cmd { m.openInbox(); return nil }},
 
 		// Merge view and manual merge.
-		{id: "find-dupes", title: "Find duplicates", group: "Merge", desc: "show groups of probable duplicate people (Merge view, also 5)",
+		{id: "find-dupes", title: "Find duplicates", group: "Merge", desc: "show groups of probable duplicate people (Merge view)", module: "merge",
 			run: func(m *Model) tea.Cmd { m.switchView(viewMerge); return nil }},
 		{id: "compare", title: "Compare group", group: "Merge", hint: "enter", keys: []string{"enter"}, desc: "open the side by side compare for the selected group",
 			foot: 20, footIn: inList, when: whenMergeRows, run: func(m *Model) tea.Cmd { m.openGroupCompare(); return nil }},
@@ -293,13 +301,13 @@ func buildActions() []action {
 			run: func(m *Model) tea.Cmd { m.detail.LineUp(3); return nil }},
 
 		// Views and search.
-		viewAction(viewHome), viewAction(viewPeople), viewAction(viewDue), viewAction(viewTasks), viewAction(viewBirthdays), viewAction(viewMerge), viewAction(viewArchived), viewAction(viewSync),
-		{id: "goto-view", title: "Go to view", group: "Views", hint: "v", keys: []string{"v"}, desc: "list every view with its number key (1-9) and jump to one",
+		viewAction(viewHome), viewAction(viewPeople), viewAction(viewDue), viewAction(viewTasks), viewAction(viewOrgs), viewAction(viewBirthdays), viewAction(viewMerge), viewAction(viewArchived), viewAction(viewSync), viewAction(viewDeals),
+		{id: "goto-view", title: "Go to view", group: "Views", hint: "v", keys: []string{"v"}, desc: "list the views that are on with their number key (1-9) and jump to one. Turn views on or off with Modules",
 			foot: 85, footIn: inList, run: func(m *Model) tea.Cmd { return m.openViewSwitcher() }},
 		{id: "next-view", title: "Next view", group: "Views", hint: "]", keys: []string{"]"}, desc: "next view",
-			run: func(m *Model) tea.Cmd { m.switchView(nextView(m.view, 1)); return nil }},
+			run: func(m *Model) tea.Cmd { m.switchView(m.nextView(m.view, 1)); return nil }},
 		{id: "prev-view", title: "Previous view", group: "Views", hint: "[", keys: []string{"["}, desc: "previous view",
-			run: func(m *Model) tea.Cmd { m.switchView(nextView(m.view, -1)); return nil }},
+			run: func(m *Model) tea.Cmd { m.switchView(m.nextView(m.view, -1)); return nil }},
 		{id: "clear-search", title: "Clear search", group: "Views", hint: "esc", keys: []string{"esc"}, desc: "clear the People filter set from the bar (a tag, an organization or Show all)",
 			when: func(m *Model) bool { return m.focus == focusList && m.query != "" },
 			run: func(m *Model) tea.Cmd {
@@ -382,7 +390,7 @@ func buildActions() []action {
 	out = append(out, objectActions()...)
 	out = append(out, acts[at:]...)
 	out = append(out, orgMergeActions()...)
-	return append(out, advancedViewActions()...)
+	return append(out, moduleActions()...)
 }
 
 // step moves the cursor in the focused pane, or the row cursor of the compare screen.

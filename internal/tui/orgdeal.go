@@ -26,19 +26,6 @@ import (
 func orgPrompt() string  { return orgDef().prompt() }
 func dealPrompt() string { return dealDef().prompt() }
 
-// nextView is the view after v in the number-key cycle. Advanced views are outside the cycle: ]
-// goes to Home from them and [ to Sync.
-func nextView(v viewKind, dir int) viewKind {
-	if v >= numViews {
-		if dir > 0 {
-			return viewHome
-		}
-		return numViews - 1
-	}
-	return (v + viewKind(numViews) + viewKind(dir)) % numViews
-}
-
-func notAdvancedView(m *Model) bool { return m.view < numViews }
 
 func (m *Model) selOrg() int64 {
 	if m.view != viewOrgs {
@@ -65,16 +52,6 @@ func whenDealSel(m *Model) bool      { return m.selDeal() != 0 }
 func whenOrgsView(m *Model) bool     { return m.view == viewOrgs && m.focus == focusList }
 func whenDealsView(m *Model) bool    { return m.view == viewDeals && m.focus == focusList }
 
-// advancedViewActions open the advanced views from the palette. Their verbs (Add, Edit, Delete,
-// Restore, Link) come from the object registry.
-func advancedViewActions() []action {
-	return []action{
-		{id: "view-orgs", title: "Organizations view", group: "Organizations", desc: "advanced view: companies and groups. a adds, enter edits, d deletes, u restores, L links (same as crm org)",
-			run: func(m *Model) tea.Cmd { m.switchView(viewOrgs); return nil }},
-		{id: "view-deals", title: "Deals view", group: "Deals", desc: "advanced view: deals with stage and value. a adds, enter edits, s sets the stage, d deletes, u restores, L links (same as crm deal)",
-			run: func(m *Model) tea.Cmd { m.switchView(viewDeals); return nil }},
-	}
-}
 
 // --- rows and detail ---
 

@@ -223,7 +223,7 @@ func TestViewsDueBirthdaysTasks(t *testing.T) {
 	assert.Equal(t, []string{"Bob Baker"}, names(m))
 	assert.Contains(t, m.View(), "overdue")
 
-	press(m, "5")
+	press(m, "6")
 	var birthdays []row
 	for _, r := range m.rows {
 		if !r.skip {
@@ -238,6 +238,8 @@ func TestViewsDueBirthdaysTasks(t *testing.T) {
 	assert.Empty(t, m.rows)
 	assert.Contains(t, m.View(), "No open tasks")
 
+	press(m, "]")
+	assert.Equal(t, viewOrgs, m.view, "Organizations follows Tasks")
 	press(m, "]")
 	assert.Equal(t, viewBirthdays, m.view)
 	press(m, "]", "]", "]")
@@ -827,7 +829,13 @@ func TestPaletteFilterAndRun(t *testing.T) {
 	m, pr := newTestModel(t)
 	press(m, "ctrl+k")
 	require.Equal(t, modeOverlay, m.mode)
-	assert.Len(t, m.ov.items, len(m.actions), "palette lists every action")
+	on := 0
+	for i := range m.actions {
+		if m.moduleOn(&m.actions[i]) {
+			on++
+		}
+	}
+	assert.Len(t, m.ov.items, on, "palette lists every action of a module that is on")
 	out := m.View()
 	assert.Contains(t, out, "Command bar")
 	assert.Contains(t, out, "Toggle favorite")
@@ -894,6 +902,9 @@ func TestRegistryHasUniqueIDsAndEveryActionIsInThePalette(t *testing.T) {
 	seen := map[string]bool{}
 	for _, a := range m.actions {
 		assert.False(t, seen[a.id], "duplicate id %s", a.id)
+		if !m.moduleOn(&a) {
+			continue // an off module is not in the palette
+		}
 		seen[a.id] = true
 		assert.NotEmpty(t, a.title, a.id)
 		assert.NotNil(t, a.run, a.id)
