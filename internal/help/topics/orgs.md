@@ -20,7 +20,7 @@ Organizations and deals are advanced views, not tabs. Open them from the palette
 - The standard keys: `a` adds (`+` also), `enter` or `e` edits, `d` deletes (asks y/n), `u` restores, `L` links, `ctrl+z` undoes. "Restore organization" and "Restore deal" are in the palette.
 - An organization is one line: `name | domain | industry | notes`. Its page lists members, parent and child organizations, deals, tasks and notes. `enter` on a linked row opens it, `n` adds a note.
 - A deal is `title | value | stage | organization | person | notes`. The organization (primary) and person are an id or a name. `s` picks the stage, a deal gets a close date each time it moves into won or lost.
-- Editing opens the same line filled in. A field you empty is cleared.
+- Editing opens the same line filled in. A field you empty is cleared. `space` marks rows and `M` merges them, see org-merge.
 
 ## Relationships between people
 
@@ -33,4 +33,6 @@ crm person relationships 1
 
 `crm context ID` includes the organizations and relationships in the meeting briefing.
 
-See also: people, links, relations, convert, tags, duplicates.
+`crm org add` refuses a name or domain that matches a live organization (`--allow-duplicate` overrides), `crm org merge` folds duplicates, see org-merge.
+
+See also: people, links, relations, convert, org-merge, tags, duplicates.

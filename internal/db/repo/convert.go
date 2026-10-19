@@ -582,6 +582,42 @@ func ExactDecisions(groups []ConvertGroup) []ConvertDecision {
 	return out
 }
 
+type createTarget struct {
+	org    *model.Organization // an existing organization with this name (or the given domain)
+	domain *string             // the domain a new organization gets
+}
+
+// createTarget decides what a create decision does. An organization with the same normalized name,
+// or with the domain the decision gave, is reused. The group's own email domain is only a default:
+// it is left off when another organization already has it.
+func (r *ConvertRepo) createTarget(ctx context.Context, name, given, auto string) (createTarget, error) {
+	var t createTarget
+	var givenPtr *string
+	if dom := normalizeDomain(given); dom != "" {
+		givenPtr = &dom
+	}
+	dup, _, err := r.orgs.FindDuplicate(ctx, name, givenPtr)
+	if err != nil {
+		return t, err
+	}
+	if dup != nil {
+		t.org = dup
+		return t, nil
+	}
+	if givenPtr != nil {
+		t.domain = givenPtr
+	} else if auto != "" {
+		other, _, err := r.orgs.FindDuplicate(ctx, "", &auto)
+		if err != nil {
+			return t, err
+		}
+		if other == nil {
+			t.domain = &auto
+		}
+	}
+	return t, nil
+}
+
 // ConvertChange is what one Apply did, exactly enough to undo and redo it as one step.
 type ConvertChange struct {
 	OrgsCreated []int64          `json:"orgs_created,omitempty"`
@@ -646,20 +682,21 @@ func (r *ConvertRepo) Apply(ctx context.Context, decisions []ConvertDecision) (C
 			if name == "" {
 				name = g.Display
 			}
-			in := model.CreateOrgInput{Name: name}
-			if dom := normalizeDomain(d.Domain); dom != "" {
-				in.Domain = &dom
-			} else if g.Domain != "" {
-				dom := g.Domain
-				in.Domain = &dom
-			}
-			o, err := r.orgs.Create(ctx, in)
+			existing, err := r.createTarget(ctx, name, d.Domain, g.Domain)
 			if err != nil {
 				return fail(err)
 			}
-			orgID = o.ID
-			ch.OrgsCreated = append(ch.OrgsCreated, o.ID)
-			ch.Created = append(ch.Created, o.Name)
+			if existing.org != nil {
+				orgID = existing.org.ID // already there: link to it, never a second organization
+			} else {
+				o, err := r.orgs.Create(ctx, model.CreateOrgInput{Name: name, Domain: existing.domain})
+				if err != nil {
+					return fail(err)
+				}
+				orgID = o.ID
+				ch.OrgsCreated = append(ch.OrgsCreated, o.ID)
+				ch.Created = append(ch.Created, o.Name)
+			}
 		} else if _, err := r.orgs.FindByID(ctx, orgID); err != nil {
 			return fail(fmt.Errorf("organization %d for %q: %w", orgID, d.Key, err))
 		}
@@ -806,6 +843,7 @@ func (r *ConvertRepo) Plan(ctx context.Context, decisions []ConvertDecision) ([]
 		byKey[g.Key] = g
 	}
 	out := make([]ConvertPlanRow, 0, len(decisions))
+	planned := map[string]string{}
 	for _, d := range decisions {
 		row := ConvertPlanRow{Key: d.Key, Action: d.Action, OrgID: d.OrgID}
 		g, ok := byKey[d.Key]
@@ -823,9 +861,23 @@ func (r *ConvertRepo) Plan(ctx context.Context, decisions []ConvertDecision) ([]
 				if row.OrgName == "" {
 					row.OrgName = g.Display
 				}
-				row.Domain = normalizeDomain(d.Domain)
-				if row.Domain == "" {
-					row.Domain = g.Domain
+				t, err := r.createTarget(ctx, row.OrgName, d.Domain, g.Domain)
+				if err != nil {
+					return nil, err
+				}
+				nk := NormalizeCompany(row.OrgName)
+				switch {
+				case t.org != nil:
+					row.OrgID, row.OrgName = t.org.ID, t.org.Name
+					row.Note = "uses the existing organization, none is created"
+				case planned[nk] != "":
+					row.OrgName = planned[nk]
+					row.Note = "same name as an earlier create in this batch, it is linked, not created again"
+				default:
+					planned[nk] = row.OrgName
+					if t.domain != nil {
+						row.Domain = *t.domain
+					}
 				}
 			} else if o, err := r.orgs.FindByID(ctx, d.OrgID); err != nil {
 				return nil, fmt.Errorf("organization %d for %q: %w", d.OrgID, d.Key, err)

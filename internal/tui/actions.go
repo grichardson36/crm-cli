@@ -381,6 +381,7 @@ func buildActions() []action {
 	out := append(convertActions(), acts[:at]...)
 	out = append(out, objectActions()...)
 	out = append(out, acts[at:]...)
+	out = append(out, orgMergeActions()...)
 	return append(out, advancedViewActions()...)
 }
 

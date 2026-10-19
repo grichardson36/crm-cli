@@ -102,6 +102,9 @@ var commandMeta = map[string]cmdMeta{
 		`crm org convert --limit 20 -f json`, `crm org convert --stats`,
 		`crm org convert --accept-exact --apply`, `crm org convert --create acme="Acme Corp" --skip mystery --apply`}},
 
+	"org merge": {mutates: true, noDryRun: true, fields: "keep_id,keep_name,drop_ids,drop_names,dry_run,fields,lost,moved", examples: []string{
+		`crm org merge 1 2 3 -f json`, `crm org merge 1 2 3 --apply`}},
+
 	// deals
 	"deal add":      {mutates: true, fields: dealFields, examples: []string{`crm deal add "Website Redesign" --value 15000 --person 1 --stage proposal`}},
 	"deal list":     {fields: dealFields, examples: []string{`crm deal list --open -f json`}},

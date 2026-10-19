@@ -152,6 +152,8 @@ type Model struct {
 	query       string
 	sortRecent  bool
 	marked      map[int64]bool
+	// orgCreateAnyway lets the next organization create skip the duplicate check (the user chose Create anyway).
+	orgCreateAnyway bool
 	detail      viewport.Model
 	detailKey   string
 	input       textinput.Model

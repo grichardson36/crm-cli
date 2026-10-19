@@ -113,6 +113,8 @@ type CreateOrgInput struct {
 	Domain   *string
 	Industry *string
 	Notes    *string
+	// AllowDuplicate skips the check for a live organization with the same normalized name or domain.
+	AllowDuplicate bool
 }
 
 // UpdateOrgInput holds optional fields for updating an organization.

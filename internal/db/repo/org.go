@@ -39,7 +39,20 @@ func scanOrg(row interface{ Scan(...any) error }) (*model.Organization, error) {
 func (r *OrgRepo) DB() *sql.DB { return r.db }
 
 // Create inserts a new organization.
+//
+// Unless input.AllowDuplicate is set it refuses when a live organization has the same normalized
+// name (case, punctuation, and/&, a leading "the" and trailing Inc, LLC and the like ignored, the
+// same as NormalizeCompany) or the same normalized domain, and returns a *DuplicateOrgError.
 func (r *OrgRepo) Create(ctx context.Context, input model.CreateOrgInput) (*model.Organization, error) {
+	if !input.AllowDuplicate {
+		dup, reason, err := r.FindDuplicate(ctx, input.Name, input.Domain)
+		if err != nil {
+			return nil, err
+		}
+		if dup != nil {
+			return nil, &DuplicateOrgError{Existing: dup, Reason: reason}
+		}
+	}
 	id := uuid.New().String()
 	result, err := r.db.ExecContext(ctx,
 		`INSERT INTO organizations (uuid, name, domain, industry, notes)
@@ -269,4 +282,57 @@ func (r *OrgRepo) touchMembers(ctx context.Context, orgID int64) error {
 		return fmt.Errorf("touch members of organization %d: %w", orgID, err)
 	}
 	return nil
+}
+
+// DuplicateOrgError says a new organization would duplicate a live one. It is a conflict (exit code 4).
+type DuplicateOrgError struct {
+	Existing *model.Organization
+	// Reason is "name" or "domain".
+	Reason string
+}
+
+func (e *DuplicateOrgError) Error() string {
+	return fmt.Sprintf("organization %q already exists with the same %s (id %d): use it, or pass --allow-duplicate (allow_duplicate in MCP) to create another", e.Existing.Name, e.Reason, e.Existing.ID)
+}
+
+// Unwrap makes the error a model.ErrConflict.
+func (e *DuplicateOrgError) Unwrap() error { return model.ErrConflict }
+
+// FindDuplicate returns a live organization whose normalized name or normalized domain equals the
+// given ones, with the reason ("name" or "domain"). The name wins when both match different
+// organizations. It returns nil when there is none.
+func (r *OrgRepo) FindDuplicate(ctx context.Context, name string, domain *string) (*model.Organization, string, error) {
+	key := NormalizeCompany(name)
+	dom := ""
+	if domain != nil {
+		dom = normalizeDomain(*domain)
+	}
+	if key == "" && dom == "" {
+		return nil, "", nil
+	}
+	rows, err := r.db.QueryContext(ctx, fmt.Sprintf("SELECT %s FROM organizations WHERE archived = 0 ORDER BY id", orgColumns))
+	if err != nil {
+		return nil, "", fmt.Errorf("check duplicate organization: %w", err)
+	}
+	defer rows.Close()
+	var byDomain *model.Organization
+	for rows.Next() {
+		o, err := scanOrg(rows)
+		if err != nil {
+			return nil, "", err
+		}
+		if key != "" && NormalizeCompany(o.Name) == key {
+			return o, "name", nil
+		}
+		if dom != "" && byDomain == nil && o.Domain != nil && normalizeDomain(*o.Domain) == dom {
+			byDomain = o
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, "", err
+	}
+	if byDomain != nil {
+		return byDomain, "domain", nil
+	}
+	return nil, "", nil
 }

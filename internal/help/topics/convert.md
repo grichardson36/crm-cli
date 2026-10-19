@@ -26,6 +26,6 @@ A converted group is gone from the next pass and the `org-review` tag is removed
 
 ## MCP and the terminal UI
 
-MCP: `crm_org_convert_list` and `crm_org_convert_apply` (decisions, `accept_exact`, `dry_run`). In the terminal UI open "Company review view" from the palette, or press `C` in the Organizations view. `c` create, `l` link, `e` rename then create, `s` skip, `x` clear, `A` accept all exact matches, `enter` applies everything staged. Each apply is one undo step.
+MCP: `crm_org_convert_list` and `crm_org_convert_apply` (decisions, `accept_exact`, `dry_run`). In the terminal UI open "Company review" from the palette, or press `C` in the Organizations view. `c` create, `l` link, `e` rename then create, `s` skip, `x` clear, `A` accept all exact matches, `enter` applies everything staged. Each apply is one undo step. A create whose name matches an existing organization links that one instead of making a second.
 
 See also: orgs, relations, links, duplicates, dav.

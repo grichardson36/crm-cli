@@ -29,6 +29,8 @@ type linkDraft struct {
 	addNew   bool
 	existing *model.LinkedObject
 	prompted bool
+	// allowDup: the user chose Create anyway for a new organization that matched an existing one.
+	allowDup bool
 }
 
 func (d *linkDraft) targetName(m *Model) string {
@@ -55,6 +57,19 @@ func (m *Model) beginLinkDraft(src repo.Ref, other string, it overlayItem) tea.C
 		return nil
 	}
 	d := &linkDraft{src: src, other: other, rel: rel, target: repo.Ref{Kind: other, ID: it.ref}}
+	if it.id == "create" && other == "organization" && !m.orgCreateAnyway {
+		if dup, reason, err := m.orr.FindDuplicate(m.ctx, it.value, nil); err == nil && dup != nil {
+			m.askOrgDuplicate(dup, reason, func(o *model.Organization) {
+				m.pendingCmd = m.beginLinkDraft(src, other, overlayItem{id: "pick", ref: o.ID, value: o.Name})
+			}, func() {
+				m.orgCreateAnyway = true
+				defer func() { m.orgCreateAnyway = false }()
+				m.pendingCmd = m.beginLinkDraft(src, other, it)
+			})
+			return nil
+		}
+	}
+	d.allowDup = m.orgCreateAnyway
 	if it.id == "create" {
 		d.create, d.target.ID = it.value, 0
 	}
@@ -298,7 +313,9 @@ func (m *Model) finishLink(d *linkDraft) tea.Cmd {
 	name := m.refName(src)
 	if d.target.ID == 0 {
 		o := objectByKind(d.other)
+		m.orgCreateAnyway = d.allowDup
 		id, err := o.create(m, d.create)
+		m.orgCreateAnyway = false
 		if err != nil {
 			m.endGroup("")
 			m.setStatus(err.Error(), true)

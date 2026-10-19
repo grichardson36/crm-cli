@@ -45,18 +45,19 @@ func registerObjectTools(s *server.MCPServer, db *sql.DB) {
 
 	s.AddTool(
 		gomcp.NewTool("crm_org_create",
-			gomcp.WithDescription("Create an organization"),
+			gomcp.WithDescription("Create an organization. Refuses a duplicate (same name ignoring case, punctuation, and/&, the, Inc/LLC, or same domain) unless allow_duplicate is true"),
 			gomcp.WithString("name", gomcp.Required(), gomcp.Description("Organization name")),
 			gomcp.WithString("domain", gomcp.Description("Domain name")),
 			gomcp.WithString("industry", gomcp.Description("Industry")),
 			gomcp.WithString("notes", gomcp.Description("Notes")),
+			gomcp.WithBoolean("allow_duplicate", gomcp.Description("Create even when a live organization has the same normalized name or domain (otherwise this is refused with a conflict naming the existing one)")),
 		),
 		func(ctx context.Context, req gomcp.CallToolRequest) (*gomcp.CallToolResult, error) {
 			name := strings.TrimSpace(req.GetString("name", ""))
 			if name == "" {
 				return gomcp.NewToolResultError("validation error: name is required"), nil
 			}
-			o, err := or.Create(ctx, model.CreateOrgInput{Name: name, Domain: optString(req, "domain"), Industry: optString(req, "industry"), Notes: optString(req, "notes")})
+			o, err := or.Create(ctx, model.CreateOrgInput{Name: name, Domain: optString(req, "domain"), Industry: optString(req, "industry"), Notes: optString(req, "notes"), AllowDuplicate: req.GetBool("allow_duplicate", false)})
 			if err != nil {
 				return mcpError(err)
 			}

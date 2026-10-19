@@ -13,8 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Company review: `crm org convert` groups people by normalized company text, suggests the matching organization and applies per-group decisions in one batch with one undo step (create, link, skip, accept exact matches). MCP `crm_org_convert_list` / `crm_org_convert_apply`, terminal UI "Company review view". Nothing is created without a decision, `people.company` stays.
 - Terminal UI: the Link form asks the kind and a role | from | to | primary | notes line, `E` edits a link, organizations and deals open as record pages, the Archived view lists every object kind with a type filter.
 
+- Organization duplicate guard and merge: `crm org add` refuses a live organization with the same normalized name or domain unless `--allow-duplicate` (MCP `allow_duplicate`, the terminal UI asks use, create anyway or cancel). `crm org merge SURVIVOR DUPLICATE...` (preview, `--apply` writes), MCP `crm_org_merge`, and `M` on marked rows in the Organizations view merge organizations with memberships, parent links, deals, tasks, notes and tags re-pointed and one undo step. The company review links an existing organization instead of creating a duplicate.
+
 ### Changed
 
+- The palette has one "Company review" entry (the generated "Company review view" is gone).
 - Breaking: `people.org_id`, `deals.person_id`, `deals.org_id`, `tasks.person_id`, `tasks.deal_id` and the tables `relationships`, `task_people`, `interaction_people` are gone. JSON: `person_id`/`org_id` on deals and tasks become `person_ids`, `org_ids`, `deal_ids` (a deal keeps `org_id` for its primary organization). Back up before upgrading, the data moves in one migration.
 - A deal gets `closed_at` re-stamped to now on every move into won or lost (including won to lost) and loses it when it reopens. A phone ORG edit moves the primary membership to the organization of that name.
 

@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -70,8 +71,6 @@ func advancedViewActions() []action {
 	return []action{
 		{id: "view-orgs", title: "Organizations view", group: "Organizations", desc: "advanced view: companies and groups. a adds, enter edits, d deletes, u restores, L links (same as crm org)",
 			run: func(m *Model) tea.Cmd { m.switchView(viewOrgs); return nil }},
-		{id: "view-convert", title: "Company review view", group: "Organizations", desc: "advanced view: turn the people's company text into organizations in passes. c creates, l links, e renames, s skips, A accepts exact matches, enter applies the batch (same as crm org convert)",
-			run: func(m *Model) tea.Cmd { m.switchView(viewConvert); return nil }},
 		{id: "view-deals", title: "Deals view", group: "Deals", desc: "advanced view: deals with stage and value. a adds, enter edits, s sets the stage, d deletes, u restores, L links (same as crm deal)",
 			run: func(m *Model) tea.Cmd { m.switchView(viewDeals); return nil }},
 	}
@@ -227,6 +226,9 @@ func (m *Model) runOrgDealPrompt(kind, value string) {
 	case "deal-edit":
 		toast, err = m.saveDealEdit(m.lineID, value)
 	}
+	if errors.Is(err, errPromptOpened) {
+		return
+	}
 	if err != nil {
 		prompt := orgPrompt()
 		if strings.HasPrefix(kind, "deal-") {
@@ -266,14 +268,37 @@ func (m *Model) saveOrgAdd(line string) (string, error) {
 	if f[0] == "" {
 		return "", fmt.Errorf("an organization needs a name")
 	}
-	o, err := m.hCreateOrg(model.CreateOrgInput{Name: f[0], Domain: optional(f[1]), Industry: optional(f[2]), Notes: optional(f[3])})
+	in := model.CreateOrgInput{Name: f[0], Domain: optional(f[1]), Industry: optional(f[2]), Notes: optional(f[3])}
+	show := func(o *model.Organization) {
+		if m.view == viewOrgs {
+			m.afterWrite()
+			m.cursorOn(func(r row) bool { return r.orgID == o.ID })
+		}
+	}
+	if dup, reason, err := m.orr.FindDuplicate(m.ctx, in.Name, in.Domain); err != nil {
+		return "", err
+	} else if dup != nil {
+		m.askOrgDuplicate(dup, reason, func(o *model.Organization) {
+			show(o)
+			m.setStatus("using the existing organization "+o.Name, false)
+		}, func() {
+			in.AllowDuplicate = true
+			o, err := m.hCreateOrg(in)
+			if err != nil {
+				m.setStatus(err.Error(), true)
+				return
+			}
+			show(o)
+			m.afterWrite()
+			m.setStatus("organization added: "+o.Name+" (ctrl+z undoes)", false)
+		})
+		return "", errPromptOpened
+	}
+	o, err := m.hCreateOrg(in)
 	if err != nil {
 		return "", err
 	}
-	if m.view == viewOrgs {
-		m.afterWrite()
-		m.cursorOn(func(r row) bool { return r.orgID == o.ID })
-	}
+	show(o)
 	return "organization added: " + o.Name + " (ctrl+z undoes)", nil
 }
 

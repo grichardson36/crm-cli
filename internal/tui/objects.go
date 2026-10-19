@@ -136,7 +136,7 @@ func orgDef() *objDef {
 			return out
 		},
 		create: func(m *Model, text string) (int64, error) {
-			o, err := m.hCreateOrg(model.CreateOrgInput{Name: text})
+			o, err := m.hCreateOrg(model.CreateOrgInput{Name: text, AllowDuplicate: m.orgCreateAnyway})
 			if err != nil {
 				return 0, err
 			}

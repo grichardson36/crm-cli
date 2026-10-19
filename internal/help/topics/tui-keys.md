@@ -28,7 +28,7 @@ In the detail form: `enter` edits a row, `a` adds a row, `d` deletes the row (as
 ## Merge, archive, notes, sync, home
 
 - Merge view: `enter` compare, `m` level, `D` dismiss, `u` undo dismiss. `M` merges marked people. Compare: `left`/`right`, `space`, `s`, `p`, `r`, `enter`, `esc`.
-- Company review (palette, or C in Organizations): c create, l link, e rename, s skip, x clear, A accept exact matches, enter applies the staged batch. See convert.
+- In the Organizations view `space` marks a row and `M` merges the marked organizations (see orgs). Company review (palette "Company review", or C in Organizations): c create, l link, e rename, s skip, x clear, A accept exact matches, enter applies the staged batch. See convert.
 - Archived view lists people, organizations, deals and tasks: `T` filters by type, `u` restores, `X` purges a person after you type the name.
 - Sync view: `s` runs a source, `d` dry run. Inbox: `a` accepts, `p` attaches, `i` ignores. Home: `enter` opens the person.
 

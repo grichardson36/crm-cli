@@ -233,6 +233,9 @@ func (m *Model) listView(w, h int) string {
 		cursorStyle = m.st.Off
 	}
 	anyMarks := len(m.marked) > 0
+	isMarked := func(r row) bool {
+		return (r.personID != 0 && m.marked[r.personID]) || (m.view == viewOrgs && r.orgID != 0 && m.marked[r.orgID])
+	}
 	var b strings.Builder
 	end := m.offset + h
 	if end > len(m.rows) {
@@ -251,7 +254,7 @@ func (m *Model) listView(w, h int) string {
 			continue
 		}
 		if anyMarks {
-			if m.marked[r.personID] && r.personID != 0 {
+			if isMarked(r) {
 				title = "✓ " + title
 			} else {
 				title = "  " + title

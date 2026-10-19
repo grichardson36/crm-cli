@@ -61,12 +61,14 @@ func registerOrgCommands(rootCmd *cobra.Command) {
 	orgCmd.AddCommand(orgEditCmd())
 	orgCmd.AddCommand(orgDeleteCmd())
 	orgCmd.AddCommand(orgConvertCmd())
+	orgCmd.AddCommand(orgMergeCmd())
 
 	rootCmd.AddCommand(orgCmd)
 }
 
 func orgAddCmd() *cobra.Command {
 	var domain, industry, notes string
+	var allowDup bool
 
 	cmd := &cobra.Command{
 		Use:   "add <name>",
@@ -80,10 +82,11 @@ func orgAddCmd() *cobra.Command {
 			defer db.Close()
 
 			input := model.CreateOrgInput{
-				Name:     args[0],
-				Domain:   nilIfEmpty(domain),
-				Industry: nilIfEmpty(industry),
-				Notes:    nilIfEmpty(notes),
+				Name:           args[0],
+				Domain:         nilIfEmpty(domain),
+				Industry:       nilIfEmpty(industry),
+				Notes:          nilIfEmpty(notes),
+				AllowDuplicate: allowDup,
 			}
 
 			r := repo.NewOrgRepo(db)
@@ -100,6 +103,7 @@ func orgAddCmd() *cobra.Command {
 	cmd.Flags().StringVar(&domain, "domain", "", "domain name")
 	cmd.Flags().StringVar(&industry, "industry", "", "industry")
 	cmd.Flags().StringVar(&notes, "notes", "", "notes")
+	cmd.Flags().BoolVar(&allowDup, "allow-duplicate", false, "create even when an organization with the same name (case, punctuation, Inc/LLC ignored) or domain exists")
 
 	return cmd
 }
