@@ -203,6 +203,8 @@ func NewServer(db *sql.DB, version string, opts ...Option) *server.MCPServer {
 			gomcp.WithString("direction", gomcp.Description("Direction: inbound or outbound")),
 			gomcp.WithString("occurred_at", gomcp.Description("When it occurred (ISO 8601)")),
 			gomcp.WithArray("person_ids", gomcp.Description("Array of person IDs to link this interaction to")),
+			gomcp.WithArray("org_ids", gomcp.Description("Array of organization IDs to attach it to"), gomcp.WithNumberItems()),
+			gomcp.WithArray("deal_ids", gomcp.Description("Array of deal IDs to attach it to"), gomcp.WithNumberItems()),
 		),
 		interactionLogHandler(ir),
 	)
@@ -217,8 +219,10 @@ func NewServer(db *sql.DB, version string, opts ...Option) *server.MCPServer {
 
 	s.AddTool(
 		gomcp.NewTool("crm_interaction_list",
-			gomcp.WithDescription("List interactions, optionally filtered by person"),
+			gomcp.WithDescription("List interactions, optionally filtered by person, organization or deal"),
 			gomcp.WithNumber("person_id", gomcp.Description("Filter by person ID")),
+			gomcp.WithNumber("org_id", gomcp.Description("Filter by organization ID")),
+			gomcp.WithNumber("deal_id", gomcp.Description("Filter by deal ID")),
 			gomcp.WithString("type", gomcp.Description("Filter by type")),
 			gomcp.WithNumber("limit", gomcp.Description("Max results (default 20)")),
 		),
@@ -239,10 +243,10 @@ func NewServer(db *sql.DB, version string, opts ...Option) *server.MCPServer {
 	// Context
 	s.AddTool(
 		gomcp.NewTool("crm_context",
-			gomcp.WithDescription("Full context briefing for a person: profile, org, interactions, deals, tasks, relationships, tags"),
+			gomcp.WithDescription("Full context briefing for a person: profile, organizations, interactions, deals, tasks, related people, tags, links"),
 			gomcp.WithNumber("person_id", gomcp.Required(), gomcp.Description("Person ID")),
 		),
-		contextHandler(pr, or, ir, dr, tr, repo.NewRelationshipRepo(db), tagr),
+		contextHandler(pr, or, ir, dr, tr, repo.NewLinkRepo(db), tagr),
 	)
 
 	// Deal tools
@@ -253,7 +257,7 @@ func NewServer(db *sql.DB, version string, opts ...Option) *server.MCPServer {
 			gomcp.WithNumber("value", gomcp.Description("Deal value")),
 			gomcp.WithString("stage", gomcp.Description("Stage: lead, prospect, proposal, negotiation, won, lost (default: lead)")),
 			gomcp.WithNumber("person_id", gomcp.Description("Associated person ID")),
-			gomcp.WithNumber("org_id", gomcp.Description("Associated organization ID")),
+			gomcp.WithNumber("org_id", gomcp.Description("Associated organization ID (becomes the primary one)")),
 			gomcp.WithString("notes", gomcp.Description("Notes")),
 		),
 		dealCreateHandler(dr),
@@ -267,7 +271,9 @@ func NewServer(db *sql.DB, version string, opts ...Option) *server.MCPServer {
 			gomcp.WithNumber("value", gomcp.Description("Deal value")),
 			gomcp.WithString("stage", gomcp.Description("Stage: lead, prospect, proposal, negotiation, won, lost")),
 			gomcp.WithString("notes", gomcp.Description("Notes")),
-			gomcp.WithString("closed_at", gomcp.Description("Date the deal was closed")),
+			gomcp.WithString("closed_at", gomcp.Description("Close date. It is set by itself when the stage becomes won or lost and cleared when it reopens. Empty clears it")),
+			gomcp.WithNumber("person_id", gomcp.Description("Also link this person")),
+			gomcp.WithNumber("org_id", gomcp.Description("Also link this organization as the primary one")),
 		),
 		dealUpdateHandler(dr),
 	)
@@ -283,10 +289,25 @@ func NewServer(db *sql.DB, version string, opts ...Option) *server.MCPServer {
 			gomcp.WithString("due", gomcp.Description("Due date (ISO 8601)")),
 			gomcp.WithString("priority", gomcp.Description("Priority: low, medium, high (default: medium)")),
 			gomcp.WithArray("person_ids", gomcp.Description("Link the task to several people"), gomcp.WithNumberItems()),
+			gomcp.WithArray("org_ids", gomcp.Description("Link the task to organizations"), gomcp.WithNumberItems()),
+			gomcp.WithArray("deal_ids", gomcp.Description("Link the task to deals"), gomcp.WithNumberItems()),
 			gomcp.WithString("recurrence", gomcp.Description("Repeat when completed, e.g. \"7 days\", \"1 mon\", weekly. Needs a due date")),
 			gomcp.WithArray("tags", gomcp.Description("Tags to put on the task"), gomcp.WithStringItems()),
 		),
 		taskCreateHandler(tr),
+	)
+
+	s.AddTool(
+		gomcp.NewTool("crm_task_update",
+			gomcp.WithDescription("Update a task. A field you leave out is unchanged. due=\"\" clears the due date (not allowed on a recurring task unless recurrence is cleared too)"),
+			gomcp.WithNumber("id", gomcp.Required(), gomcp.Description("Task ID")),
+			gomcp.WithString("title", gomcp.Description("Title")),
+			gomcp.WithString("description", gomcp.Description("Description")),
+			gomcp.WithString("due", gomcp.Description("Due date (ISO 8601). Empty clears it")),
+			gomcp.WithString("priority", gomcp.Description("Priority: low, medium, high")),
+			gomcp.WithString("recurrence", gomcp.Description("Repeat rule. Empty clears it")),
+		),
+		taskUpdateHandler(tr),
 	)
 
 	s.AddTool(
@@ -301,6 +322,8 @@ func NewServer(db *sql.DB, version string, opts ...Option) *server.MCPServer {
 		gomcp.NewTool("crm_task_list",
 			gomcp.WithDescription("List open tasks"),
 			gomcp.WithNumber("person_id", gomcp.Description("Filter by person ID")),
+			gomcp.WithNumber("org_id", gomcp.Description("Filter by organization ID")),
+			gomcp.WithNumber("deal_id", gomcp.Description("Filter by deal ID")),
 			gomcp.WithBoolean("overdue", gomcp.Description("Show only overdue tasks")),
 			gomcp.WithBoolean("include_completed", gomcp.Description("Include completed tasks")),
 			gomcp.WithString("tag", gomcp.Description("Only tasks with this tag")),
@@ -320,14 +343,14 @@ func NewServer(db *sql.DB, version string, opts ...Option) *server.MCPServer {
 		tagApplyHandler(tagr),
 	)
 
-	// Relationships
-	rr := repo.NewRelationshipRepo(db)
+	// Relationships. crm_person_link with other=person is the general form, this one stays for older callers.
+	rr := repo.NewLinkRepo(db)
 	s.AddTool(
 		gomcp.NewTool("crm_person_relate",
-			gomcp.WithDescription("Create a relationship between two people"),
+			gomcp.WithDescription("Deprecated, use crm_person_link with other=person and kind. Create a relationship between two people"),
 			gomcp.WithNumber("person_id", gomcp.Required(), gomcp.Description("Person ID")),
 			gomcp.WithNumber("related_person_id", gomcp.Required(), gomcp.Description("Related person ID")),
-			gomcp.WithString("type", gomcp.Required(), gomcp.Description("Relationship type: colleague, friend, manager, mentor, referred-by")),
+			gomcp.WithString("type", gomcp.Required(), gomcp.Description("Relationship kind: related, spouse, sibling, friend, colleague, parent, manager, mentor, referred-by, or one you added")),
 			gomcp.WithString("notes", gomcp.Description("Optional notes about the relationship")),
 		),
 		relateHandler(rr),
@@ -341,6 +364,7 @@ func NewServer(db *sql.DB, version string, opts ...Option) *server.MCPServer {
 		statsHandler(db),
 	)
 
+	registerRelationTools(s, db)
 	registerDedupeTools(s, db)
 	registerLogEditTools(s, ir)
 	registerSyncTools(s, db)
@@ -622,6 +646,9 @@ func orgGetHandler(or *repo.OrgRepo) server.ToolHandlerFunc {
 		if err != nil {
 			return mcpError(err)
 		}
+		if org.Links, err = repo.NewLinkRepo(or.DB()).All(ctx, repo.Ref{Kind: "organization", ID: id}); err != nil {
+			return mcpError(err)
+		}
 		return jsonResult(org)
 	}
 }
@@ -659,6 +686,8 @@ func interactionLogHandler(ir *repo.InteractionRepo) server.ToolHandlerFunc {
 				}
 			}
 		}
+		input.OrgIDs = idList(args, "org_ids")
+		input.DealIDs = idList(args, "deal_ids")
 
 		interaction, err := ir.Create(ctx, input)
 		if err != nil {
@@ -675,6 +704,12 @@ func interactionListHandler(ir *repo.InteractionRepo) server.ToolHandlerFunc {
 		}
 		if pid := int64(req.GetInt("person_id", 0)); pid > 0 {
 			filters.PersonID = &pid
+		}
+		if oid := int64(req.GetInt("org_id", 0)); oid > 0 {
+			filters.OrgID = &oid
+		}
+		if did := int64(req.GetInt("deal_id", 0)); did > 0 {
+			filters.DealID = &did
 		}
 		if t := req.GetString("type", ""); t != "" {
 			filters.Type = &t
@@ -737,7 +772,7 @@ func searchHandler(pr *repo.PersonRepo, or *repo.OrgRepo, ir *repo.InteractionRe
 
 // --- Context handler ---
 
-func contextHandler(pr *repo.PersonRepo, or *repo.OrgRepo, ir *repo.InteractionRepo, dr *repo.DealRepo, tr *repo.TaskRepo, rr *repo.RelationshipRepo, tagr *repo.TagRepo) server.ToolHandlerFunc {
+func contextHandler(pr *repo.PersonRepo, or *repo.OrgRepo, ir *repo.InteractionRepo, dr *repo.DealRepo, tr *repo.TaskRepo, lr *repo.LinkRepo, tagr *repo.TagRepo) server.ToolHandlerFunc {
 	return func(ctx context.Context, req gomcp.CallToolRequest) (*gomcp.CallToolResult, error) {
 		id, errResult := requireID(req, "person_id")
 		if errResult != nil {
@@ -753,12 +788,22 @@ func contextHandler(pr *repo.PersonRepo, or *repo.OrgRepo, ir *repo.InteractionR
 
 		result := map[string]any{"person": person}
 
-		if person.OrgID != nil {
-			org, err := or.FindByID(ctx, *person.OrgID)
-			if err != nil {
-				return mcpError(err)
+		orgs, err := lr.Linked(ctx, repo.Ref{Kind: "person", ID: person.ID}, "organization")
+		if err != nil {
+			return mcpError(err)
+		}
+		if len(orgs) > 0 {
+			result["organizations"] = orgs
+			for _, o := range orgs {
+				if o.Primary {
+					org, err := or.FindByID(ctx, o.ID)
+					if err != nil {
+						return mcpError(err)
+					}
+					result["organization"] = org
+					break
+				}
 			}
-			result["organization"] = org
 		}
 
 		interactions, err := ir.FindAll(ctx, model.InteractionFilters{PersonID: &person.ID, Limit: 10})
@@ -785,7 +830,7 @@ func contextHandler(pr *repo.PersonRepo, or *repo.OrgRepo, ir *repo.InteractionR
 			result["tasks"] = tasks
 		}
 
-		rels, err := rr.FindForPerson(ctx, person.ID)
+		rels, err := lr.Linked(ctx, repo.Ref{Kind: "person", ID: person.ID}, "person")
 		if err != nil {
 			return mcpError(err)
 		}
@@ -858,6 +903,12 @@ func dealUpdateHandler(dr *repo.DealRepo) server.ToolHandlerFunc {
 		if s, ok := argString(args, "closed_at"); ok {
 			input.ClosedAt = &s
 		}
+		if pid, ok := argInt64(args, "person_id"); ok {
+			input.PersonID = &pid
+		}
+		if oid, ok := argInt64(args, "org_id"); ok {
+			input.OrgID = &oid
+		}
 
 		deal, err := dr.Update(ctx, id, input)
 		if err != nil {
@@ -885,13 +936,9 @@ func taskCreateHandler(tr *repo.TaskRepo) server.ToolHandlerFunc {
 		if did, ok := argInt64(args, "deal_id"); ok {
 			input.DealID = &did
 		}
-		if raw, ok := args["person_ids"].([]any); ok {
-			for _, v := range raw {
-				if f, ok := v.(float64); ok && f == math.Trunc(f) && f > 0 {
-					input.PersonIDs = append(input.PersonIDs, int64(f))
-				}
-			}
-		}
+		input.PersonIDs = idList(args, "person_ids")
+		input.OrgIDs = idList(args, "org_ids")
+		input.DealIDs = idList(args, "deal_ids")
 		if rec, ok := argString(args, "recurrence"); ok && rec != "" {
 			input.Recurrence = &rec
 		}
@@ -922,6 +969,12 @@ func taskListHandler(tr *repo.TaskRepo) server.ToolHandlerFunc {
 		if pid := int64(req.GetInt("person_id", 0)); pid > 0 {
 			filters.PersonID = &pid
 		}
+		if oid := int64(req.GetInt("org_id", 0)); oid > 0 {
+			filters.OrgID = &oid
+		}
+		if did := int64(req.GetInt("deal_id", 0)); did > 0 {
+			filters.DealID = &did
+		}
 		if tag := req.GetString("tag", ""); tag != "" {
 			filters.Tag = &tag
 		}
@@ -932,6 +985,37 @@ func taskListHandler(tr *repo.TaskRepo) server.ToolHandlerFunc {
 		}
 		return jsonResult(tasks)
 	}
+}
+
+func taskUpdateHandler(tr *repo.TaskRepo) server.ToolHandlerFunc {
+	return func(ctx context.Context, req gomcp.CallToolRequest) (*gomcp.CallToolResult, error) {
+		id, errResult := requireID(req, "id")
+		if errResult != nil {
+			return errResult, nil
+		}
+		in := model.UpdateTaskInput{
+			Title: optString(req, "title"), Description: optString(req, "description"), DueAt: optString(req, "due"),
+			Priority: optString(req, "priority"), Recurrence: optString(req, "recurrence"),
+		}
+		task, err := tr.Update(ctx, id, in)
+		if err != nil {
+			return mcpError(err)
+		}
+		return jsonResult(task)
+	}
+}
+
+// idList reads an array of positive whole numbers from the arguments.
+func idList(args map[string]any, key string) []int64 {
+	var out []int64
+	if raw, ok := args[key].([]any); ok {
+		for _, v := range raw {
+			if f, ok := v.(float64); ok && f == math.Trunc(f) && f > 0 {
+				out = append(out, int64(f))
+			}
+		}
+	}
+	return out
 }
 
 func taskCompleteHandler(tr *repo.TaskRepo) server.ToolHandlerFunc {
@@ -1074,7 +1158,7 @@ func tagApplyHandler(tagr *repo.TagRepo) server.ToolHandlerFunc {
 
 // --- Relationship handler ---
 
-func relateHandler(rr *repo.RelationshipRepo) server.ToolHandlerFunc {
+func relateHandler(rr *repo.LinkRepo) server.ToolHandlerFunc {
 	return func(ctx context.Context, req gomcp.CallToolRequest) (*gomcp.CallToolResult, error) {
 		personID, errResult := requireID(req, "person_id")
 		if errResult != nil {
@@ -1092,11 +1176,11 @@ func relateHandler(rr *repo.RelationshipRepo) server.ToolHandlerFunc {
 			notesPtr = &notes
 		}
 
-		rel, err := rr.Create(ctx, personID, relatedID, relType, notesPtr)
+		res, err := rr.Link(ctx, repo.Ref{Kind: "person", ID: personID}, repo.Ref{Kind: "person", ID: relatedID}, model.LinkAttrs{Kind: &relType, Notes: notesPtr})
 		if err != nil {
 			return mcpError(err)
 		}
-		return jsonResult(rel)
+		return jsonResult(map[string]any{"link_id": res.LinkID, "person_id": personID, "related_person_id": relatedID, "type": relType, "changed": res.Changed})
 	}
 }
 

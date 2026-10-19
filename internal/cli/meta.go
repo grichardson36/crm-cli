@@ -31,11 +31,11 @@ type cmdMeta struct {
 }
 
 const (
-	personFields = "id,uuid,first_name,last_name,name,email,phone,title,company,location,notes,summary,org_id,birthday,keep_in_touch,last_contacted_at,is_favorite,priority_tier,emails,phones,handles,created_at,updated_at"
-	orgFields    = "id,uuid,name,domain,industry,notes,summary,created_at,updated_at"
-	dealFields   = "id,uuid,title,stage,value,person_id,org_id,notes,closed_at,created_at,updated_at"
-	taskFields   = "id,uuid,title,priority,completed,description,person_id,person_ids,deal_id,due_at,recurrence,tags,completed_at,created_at,updated_at"
-	logFields    = "id,uuid,type,subject,content,direction,occurred_at,person_ids,created_at,updated_at"
+	personFields = "id,uuid,first_name,last_name,name,email,phone,title,company,location,notes,summary,birthday,keep_in_touch,last_contacted_at,is_favorite,priority_tier,emails,phones,handles,links,created_at,updated_at"
+	orgFields    = "id,uuid,name,domain,industry,notes,summary,links,created_at,updated_at"
+	dealFields   = "id,uuid,title,stage,value,person_ids,org_ids,org_id,notes,closed_at,links,created_at,updated_at"
+	taskFields   = "id,uuid,title,priority,completed,description,person_ids,org_ids,deal_ids,due_at,recurrence,tags,completed_at,links,created_at,updated_at"
+	logFields    = "id,uuid,type,subject,content,direction,occurred_at,person_ids,org_ids,deal_ids,created_at,updated_at"
 	tagFields    = "id,name"
 	syncFields   = "source,status,created,updated,skipped,inbox,errors,dry_run,note,run_id,since,next_cursor"
 )
@@ -74,8 +74,16 @@ var commandMeta = map[string]cmdMeta{
 		`crm person contacted 1`, `crm person contacted 1 --at 2026-10-01`}},
 	"person relate": {mutates: true, target: "person", targetArgs: "first", examples: []string{
 		`crm person relate 1 2 --type colleague --notes "Met at ReactConf"`}},
-	"person relationships": {target: "person", examples: []string{`crm person relationships 1 -f json`}},
+	"person relationships": {target: "person", fields: "id,person_id,related_person_id,name,type,notes", examples: []string{`crm person relationships 1 -f json`}},
 	"person unrelate":      {mutates: true, examples: []string{`crm person unrelate 1`}},
+
+	// link kinds and roles
+	"relation-kind":      {examples: []string{`crm relation-kind list`}},
+	"relation-kind list": {fields: relationKindFields, examples: []string{`crm relation-kind list -f json`, `crm relation-kind list --type org`}},
+	"relation-kind add": {mutates: true, noDryRun: true, fields: relationKindFields, examples: []string{
+		`crm relation-kind add neighbor`, `crm relation-kind add godparent --inverse godchild`, `crm relation-kind add partner --type org`}},
+	"relation-kind rm": {mutates: true, noDryRun: true, examples: []string{`crm relation-kind rm neighbor`}},
+	"roles":            {fields: "role", examples: []string{`crm roles -f json`, `crm roles --relation deal_person`}},
 
 	// keep in touch
 	"due": {fields: "person_id,id,name,keep_in_touch,last_seen,due_at,days_overdue", examples: []string{
@@ -151,7 +159,7 @@ var commandMeta = map[string]cmdMeta{
 
 	// search and views
 	"search":  {fields: "type,id,name,detail", examples: []string{`crm search jane -f json`, `crm search roadmap --type interaction -f json`}},
-	"context": {fields: "person,organization,recent_interactions,deals,tasks,relationships,tags", examples: []string{`crm context 1 -f json`, `crm context "Jane Smith" -f json`}},
+	"context": {fields: "person,organization,organizations,recent_interactions,deals,tasks,relationships,tags", examples: []string{`crm context 1 -f json`, `crm context "Jane Smith" -f json`}},
 	"status":  {fields: "contacts,organizations,open_deals,deal_value,open_tasks,overdue_tasks,interactions_7days,last_sync,device_id", examples: []string{`crm status -f json`}},
 
 	// import, sync, backup

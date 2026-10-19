@@ -82,5 +82,5 @@ func TestPersonRelateInvalidType(t *testing.T) {
 
 	_, stderr, code := crm(t, dbPath, "person", "relate", "1", "2", "--type", "enemy")
 	assert.Equal(t, 2, code)
-	assert.Contains(t, stderr, "invalid relationship type")
+	assert.Contains(t, stderr, "unknown person link kind")
 }

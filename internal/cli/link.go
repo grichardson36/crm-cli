@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"database/sql"
 	"fmt"
 	"os"
 	"strconv"
@@ -36,9 +37,10 @@ var linkColumns = []format.ColumnDef{
 	{Header: "To", Field: "to"},
 	{Header: "To ID", Field: "to_id"},
 	{Header: "Changed", Field: "changed"},
+	{Header: "Link ID", Field: "link_id"},
 }
 
-const linkFields = "action,from,from_id,to,to_id,changed,replaced_id"
+const linkFields = "action,from,from_id,to,to_id,changed,created,updated,link_id,relation,demoted,removed"
 
 // linkMeta describes the generated commands for `crm schema`, --help and --dry-run.
 func linkMeta() map[string]cmdMeta {
@@ -48,9 +50,9 @@ func linkMeta() map[string]cmdMeta {
 		for _, other := range model.RelatedKinds(kind) {
 			on := objectNoun[other]
 			meta[noun+" link "+on] = cmdMeta{mutates: true, fields: linkFields, target: kind, target2: other, targetArgs: "pair",
-				examples: []string{fmt.Sprintf("crm %s link %s 1 1", noun, on)}}
+				examples: linkExamples(kind, other, false)}
 			meta[noun+" unlink "+on] = cmdMeta{mutates: true, fields: linkFields, target: kind, target2: other, targetArgs: "pair",
-				examples: []string{fmt.Sprintf("crm %s unlink %s 1 1", noun, on)}}
+				examples: linkExamples(kind, other, true)}
 		}
 		meta[noun+" link tag"] = cmdMeta{mutates: true, fields: tagFields, target: kind, targetArgs: "first",
 			examples: []string{fmt.Sprintf("crm %s link tag 1 vip", noun)}}
@@ -62,6 +64,35 @@ func linkMeta() map[string]cmdMeta {
 		}
 	}
 	return meta
+}
+
+// linkExamples are the copy-pasteable lines of a generated link command.
+func linkExamples(kind, other string, remove bool) []string {
+	noun, on := objectNoun[kind], objectNoun[other]
+	rel, _ := model.RelationBetween(kind, other)
+	if remove {
+		out := []string{fmt.Sprintf("crm %s unlink %s 1 1", noun, on)}
+		if rel.Kinded {
+			out = append(out, fmt.Sprintf("crm %s unlink %s 1 2 --kind friend", noun, on))
+		}
+		if !rel.Unique && !rel.Activity() {
+			out = append(out, fmt.Sprintf("crm %s unlink %s 1 1 --id 4", noun, on))
+		}
+		return out
+	}
+	out := []string{fmt.Sprintf("crm %s link %s 1 1", noun, on)}
+	switch rel.Name {
+	case "membership":
+		out = append(out, fmt.Sprintf("crm %s link %s 1 1 --role CTO --from 2019-03 --primary", noun, on),
+			fmt.Sprintf("crm %s link %s 1 1 --role Advisor --from 2023 --new", noun, on))
+	case "person_relation", "org_relation":
+		out = append(out, fmt.Sprintf("crm %s link %s 1 2 --kind parent", noun, on))
+	case "deal_person":
+		out = append(out, fmt.Sprintf("crm %s link %s 1 1 --role champion", noun, on))
+	case "deal_org":
+		out = append(out, fmt.Sprintf("crm %s link %s 1 1 --primary", noun, on))
+	}
+	return out
 }
 
 // addObjectVerbs attaches link, unlink and restore to every object command, once.
@@ -109,13 +140,19 @@ func parseObjectID(what, s string) (int64, error) {
 	return id, nil
 }
 
-// relationCmd is `crm <kind> link|unlink <other> <id> <other id>`.
+// relationCmd is `crm <kind> link|unlink <other> <id> <other id>`. The flags come from the relation
+// registry: a membership takes --role --from --to --primary --notes, a person or organization
+// relation takes --kind, a deal link takes --role. See `crm help relations`.
 func relationCmd(kind, other string, remove bool) *cobra.Command {
+	rel, _ := model.RelationBetween(kind, other)
 	verb, short := "link", fmt.Sprintf("Link a %s to a %s", objectNoun[kind], objectNoun[other])
 	if remove {
 		verb, short = "unlink", fmt.Sprintf("Remove the link between a %s and a %s", objectNoun[kind], objectNoun[other])
 	}
-	return &cobra.Command{
+	var role, from, to, kindName, notes string
+	var primary, addNew bool
+	var linkID int64
+	cmd := &cobra.Command{
 		Use:   fmt.Sprintf("%s <%s_id> <%s_id>", objectNoun[other], objectNoun[kind], objectNoun[other]),
 		Short: short,
 		Args:  cobra.ExactArgs(2),
@@ -138,31 +175,156 @@ func relationCmd(kind, other string, remove bool) *cobra.Command {
 			a, b := repo.Ref{Kind: kind, ID: aid}, repo.Ref{Kind: other, ID: bid}
 			row := map[string]any{"action": verb, "from": kind, "from_id": aid, "to": other, "to_id": bid, "changed": true}
 			if remove {
-				if err := lr.Unlink(cmd.Context(), a, b); err != nil {
-					return err
-				}
-				fmt.Fprintf(os.Stderr, "Unlinked %s #%d from %s #%d\n", kind, aid, other, bid)
-			} else {
-				res, err := lr.Link(cmd.Context(), a, b)
+				removed, err := lr.Unlink(cmd.Context(), a, b, repo.UnlinkOptions{LinkID: linkID, Kind: kindName})
 				if err != nil {
 					return err
 				}
-				row["changed"] = res.Changed
-				if res.Replaced != nil {
-					row["replaced_id"] = res.Replaced.ID
+				ids := make([]int64, len(removed))
+				for i, rec := range removed {
+					ids[i] = rec.ID
 				}
-				switch {
-				case !res.Changed:
-					fmt.Fprintf(os.Stderr, "%s #%d is already linked to %s #%d\n", capitalize(kind), aid, other, bid)
-				case res.Replaced != nil:
-					fmt.Fprintf(os.Stderr, "Linked %s #%d to %s #%d (replaced %s #%d)\n", kind, aid, other, bid, other, res.Replaced.ID)
-				default:
-					fmt.Fprintf(os.Stderr, "Linked %s #%d to %s #%d\n", kind, aid, other, bid)
-				}
+				row["removed"], row["link_id"], row["relation"] = ids, ids[0], rel.Name
+				fmt.Fprintf(os.Stderr, "Unlinked %s #%d from %s #%d (%d link(s))\n", kind, aid, other, bid, len(removed))
+				return format.Output(os.Stdout, resolveFormat(), []map[string]any{row}, linkColumns, flagQuiet)
+			}
+			attrs := model.LinkAttrs{}
+			flags := cmd.Flags()
+			if flags.Changed("role") {
+				attrs.Role = &role
+			}
+			if flags.Changed("from") {
+				attrs.StartedOn = &from
+			}
+			if flags.Changed("to") {
+				attrs.EndedOn = &to
+			}
+			if flags.Changed("primary") {
+				attrs.Primary = &primary
+			}
+			if flags.Changed("kind") {
+				attrs.Kind = &kindName
+			}
+			if flags.Changed("notes") {
+				attrs.Notes = &notes
+			}
+			link := lr.Link
+			if addNew {
+				link = lr.LinkNew
+			}
+			res, err := link(cmd.Context(), a, b, attrs)
+			if err != nil {
+				return err
+			}
+			row["changed"], row["created"], row["updated"] = res.Changed, res.Created, res.Updated
+			row["link_id"], row["relation"] = res.LinkID, res.Relation
+			if len(res.Demoted) > 0 {
+				row["demoted"] = res.Demoted
+			}
+			switch {
+			case !res.Changed:
+				fmt.Fprintf(os.Stderr, "%s #%d is already linked to %s #%d\n", capitalize(kind), aid, other, bid)
+			case res.Updated && !res.Created:
+				fmt.Fprintf(os.Stderr, "Updated the link of %s #%d and %s #%d\n", kind, aid, other, bid)
+			default:
+				fmt.Fprintf(os.Stderr, "Linked %s #%d to %s #%d\n", kind, aid, other, bid)
 			}
 			return format.Output(os.Stdout, resolveFormat(), []map[string]any{row}, linkColumns, flagQuiet)
 		},
 	}
+	f := cmd.Flags()
+	if remove {
+		f.Int64Var(&linkID, "id", 0, "remove only this link (link_id from `crm "+objectNoun[kind]+" show`) when the pair is linked more than once")
+		if rel.Kinded {
+			f.StringVar(&kindName, "kind", "", "remove only the link of this kind")
+		}
+		return cmd
+	}
+	for _, key := range rel.Attrs {
+		switch key {
+		case model.AttrRole:
+			f.StringVar(&role, "role", "", "free-text role, for example CTO or champion (empty clears)")
+		case model.AttrFrom:
+			f.StringVar(&from, "from", "", "start date: YYYY, YYYY-MM, YYYY-MM-DD or today (empty clears)")
+		case model.AttrTo:
+			f.StringVar(&to, "to", "", "end date, same forms. Leave out for a current link (empty clears)")
+		case model.AttrPrimary:
+			f.BoolVar(&primary, "primary", false, "make this the primary link (--primary=false clears it)")
+		case model.AttrKind:
+			f.StringVar(&kindName, "kind", "", "link kind, see `crm relation-kind list` (default "+defaultKind(rel)+"). Naming the inverse reverses the ends")
+		case model.AttrNotes:
+			f.StringVar(&notes, "notes", "", "notes on the link")
+		}
+	}
+	if !rel.Unique {
+		f.BoolVar(&addNew, "new", false, "add another link for a pair that is already linked, for example a second stay")
+	}
+	return cmd
+}
+
+func defaultKind(rel model.Relation) string {
+	if rel.A == "person" {
+		return model.DefaultPersonKind
+	}
+	return model.DefaultOrgKind
+}
+
+// linkLine is one link as text: label, name, role, dates and flags.
+func linkLine(li model.LinkedObject) string {
+	var parts []string
+	if li.Label != "" {
+		parts = append(parts, li.Label)
+	}
+	if li.Role != nil && *li.Role != "" {
+		parts = append(parts, *li.Role)
+	}
+	switch {
+	case li.StartedOn != nil && li.EndedOn != nil:
+		parts = append(parts, *li.StartedOn+" to "+*li.EndedOn)
+	case li.StartedOn != nil:
+		parts = append(parts, "since "+*li.StartedOn)
+	case li.EndedOn != nil:
+		parts = append(parts, "until "+*li.EndedOn)
+	}
+	if li.Primary {
+		parts = append(parts, "primary")
+	}
+	if !li.Current {
+		parts = append(parts, "past")
+	}
+	line := fmt.Sprintf("%s #%d %s", li.Kind, li.ID, li.Name)
+	if len(parts) > 0 {
+		line += " (" + strings.Join(parts, ", ") + ")"
+	}
+	return line + fmt.Sprintf(" [link %d]", li.LinkID)
+}
+
+// printLinks writes the links block of a show command in table format. Other formats carry the
+// links in the JSON/CSV record.
+func printLinks(items []model.LinkedObject) {
+	if resolveFormat() != format.FormatTable || len(items) == 0 || flagQuiet {
+		return
+	}
+	fmt.Fprintln(os.Stdout, "\nLinks:")
+	for _, li := range items {
+		fmt.Fprintln(os.Stdout, "  "+linkLine(li))
+	}
+}
+
+// showWithLinks prints one object record with its links.
+func showWithLinks(cmd *cobra.Command, db *sql.DB, ref repo.Ref, data map[string]any, cols []format.ColumnDef) error {
+	items, err := repo.NewLinkRepo(db).All(cmd.Context(), ref)
+	if err != nil {
+		return err
+	}
+	if items == nil {
+		items = []model.LinkedObject{}
+	}
+	data["links"] = items
+	if err := format.Output(os.Stdout, resolveFormat(), []map[string]any{data}, cols, flagQuiet); err != nil {
+		return err
+	}
+	printLinks(items)
+	return nil
 }
 
 func capitalize(s string) string {

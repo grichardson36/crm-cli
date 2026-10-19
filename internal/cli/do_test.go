@@ -180,7 +180,7 @@ func TestTaskAddInlineSyntax(t *testing.T) {
 	created := decodeList(t, stdout)[0]
 	assert.Equal(t, "Call back", created["title"])
 	assert.Equal(t, "2026-12-24 15:00", created["due_at"])
-	assert.Equal(t, float64(3), created["person_id"])
+	assert.Equal(t, []any{float64(3)}, created["person_ids"])
 	assert.Contains(t, stderr, "the deadline", "by is ignored when a due date is given")
 
 	// With no other due date, by sets it.
@@ -196,7 +196,7 @@ func TestTaskAddFlagsWinOverInlineSyntax(t *testing.T) {
 	created := decodeList(t, stdout)[0]
 	assert.Equal(t, "2027-01-05", created["due_at"])
 	assert.Equal(t, "low", created["priority"])
-	assert.Equal(t, float64(1), created["person_id"])
+	assert.Equal(t, []any{float64(1)}, created["person_ids"])
 	assert.Equal(t, "Call back", created["title"], "tokens are still removed from the title")
 }
 

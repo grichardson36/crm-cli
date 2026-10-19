@@ -137,17 +137,31 @@ func registerObjectTools(s *server.MCPServer, db *sql.DB) {
 		}
 		for _, remove := range []bool{false, true} {
 			remove := remove
-			verb, desc := "link", fmt.Sprintf("Link a %s to another object. Linking what is linked changes nothing. A %s with a single value for that link (person to org, deal to org or person, task to deal) is moved to the new object", noun, noun)
+			verb, desc := "link", fmt.Sprintf("Link a %s to another object, with the link's attributes. Linking what is linked changes nothing, and attributes you pass change on the existing link. A person and organization can be linked more than once (new=true) for a second stay", noun)
 			if remove {
-				verb, desc = "unlink", fmt.Sprintf("Remove the link between a %s and another object", noun)
+				verb, desc = "unlink", fmt.Sprintf("Remove the link between a %s and another object. A removed link is hidden, not erased", noun)
+			}
+			opts := []gomcp.ToolOption{
+				gomcp.WithDescription(desc + ". The same link can be made from the other object's tool. Attributes: " + attrHelp(kind)),
+				gomcp.WithNumber("id", gomcp.Required(), gomcp.Description(fmt.Sprintf("%s ID", noun))),
+				gomcp.WithString("other", gomcp.Required(), gomcp.Enum(enum...), gomcp.Description("Kind of the other object")),
+				gomcp.WithNumber("other_id", gomcp.Required(), gomcp.Description("ID of the other object")),
+				gomcp.WithString("kind", gomcp.Description("Relation kind for person-person and org-org links (see crm_relation_kind_list). Default: related for people, parent for organizations. Naming the inverse (child) reverses the two ends")),
+			}
+			if !remove {
+				opts = append(opts,
+					gomcp.WithString("role", gomcp.Description("Free-text role, for example CTO or champion. Empty clears it")),
+					gomcp.WithString("from", gomcp.Description("Start date: YYYY, YYYY-MM, YYYY-MM-DD or today. Empty clears it")),
+					gomcp.WithString("to", gomcp.Description("End date, same forms. Empty means current")),
+					gomcp.WithBoolean("primary", gomcp.Description("Make this the primary organization of the person or deal")),
+					gomcp.WithString("notes", gomcp.Description("Notes on the link")),
+					gomcp.WithBoolean("new", gomcp.Description("Add another link even when the pair is already linked (memberships only)")),
+				)
+			} else {
+				opts = append(opts, gomcp.WithNumber("link_id", gomcp.Description("Remove only this link when the pair is linked more than once")))
 			}
 			s.AddTool(
-				gomcp.NewTool(fmt.Sprintf("crm_%s_%s", noun, verb),
-					gomcp.WithDescription(desc+". The same link can be made from the other object's tool"),
-					gomcp.WithNumber("id", gomcp.Required(), gomcp.Description(fmt.Sprintf("%s ID", noun))),
-					gomcp.WithString("other", gomcp.Required(), gomcp.Enum(enum...), gomcp.Description("Kind of the other object")),
-					gomcp.WithNumber("other_id", gomcp.Required(), gomcp.Description("ID of the other object")),
-				),
+				gomcp.NewTool(fmt.Sprintf("crm_%s_%s", noun, verb), opts...),
 				func(ctx context.Context, req gomcp.CallToolRequest) (*gomcp.CallToolResult, error) {
 					id, errResult := requireID(req, "id")
 					if errResult != nil {
@@ -164,24 +178,62 @@ func registerObjectTools(s *server.MCPServer, db *sql.DB) {
 					a, b := repo.Ref{Kind: kind, ID: id}, repo.Ref{Kind: other, ID: otherID}
 					out := map[string]any{"action": verb, "from": kind, "from_id": id, "to": other, "to_id": otherID, "changed": true}
 					if remove {
-						if err := links.Unlink(ctx, a, b); err != nil {
+						uo := repo.UnlinkOptions{Kind: req.GetString("kind", "")}
+						if lid := int64(req.GetInt("link_id", 0)); lid > 0 {
+							uo.LinkID = lid
+						}
+						removed, err := links.Unlink(ctx, a, b, uo)
+						if err != nil {
 							return mcpError(err)
 						}
+						out["removed"] = removed
 						return jsonResult(out)
 					}
-					res, err := links.Link(ctx, a, b)
+					attrs := LinkAttrsFromRequest(req)
+					link := links.Link
+					if req.GetBool("new", false) {
+						link = links.LinkNew
+					}
+					res, err := link(ctx, a, b, attrs)
 					if err != nil {
 						return mcpError(err)
 					}
-					out["changed"] = res.Changed
-					if res.Replaced != nil {
-						out["replaced_id"] = res.Replaced.ID
+					out["changed"], out["created"], out["updated"] = res.Changed, res.Created, res.Updated
+					out["link_id"], out["relation"] = res.LinkID, res.Relation
+					if len(res.Demoted) > 0 {
+						out["demoted"] = res.Demoted
 					}
 					return jsonResult(out)
 				},
 			)
 		}
 	}
+}
+
+// attrHelp names the attributes the links of a kind carry, for tool descriptions.
+func attrHelp(kind string) string {
+	var parts []string
+	for _, rel := range model.RelationsOf(kind) {
+		if rel.Activity() && rel.A == "interaction" {
+			continue
+		}
+		parts = append(parts, fmt.Sprintf("%s-%s: %s", rel.A, rel.B, strings.Join(rel.Attrs, ", ")))
+	}
+	return strings.Join(parts, "; ")
+}
+
+// LinkAttrsFromRequest reads the link attributes an MCP call carries. A value you leave out is not
+// given. An empty string clears.
+func LinkAttrsFromRequest(req gomcp.CallToolRequest) model.LinkAttrs {
+	a := model.LinkAttrs{
+		Role: optString(req, "role"), StartedOn: optString(req, "from"), EndedOn: optString(req, "to"),
+		Kind: optString(req, "kind"), Notes: optString(req, "notes"),
+	}
+	if _, ok := req.GetArguments()["primary"]; ok {
+		v := req.GetBool("primary", false)
+		a.Primary = &v
+	}
+	return a
 }
 
 // kindOfNoun turns a tool word (org) or a kind (organization) into an object kind.

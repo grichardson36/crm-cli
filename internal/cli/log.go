@@ -17,6 +17,7 @@ var interactionColumns = []format.ColumnDef{
 	{Header: "Type", Field: "type"},
 	{Header: "Subject", Field: "subject"},
 	{Header: "People", Field: "person_ids"},
+	{Header: "Orgs", Field: "org_ids"},
 	{Header: "Date", Field: "occurred_at"},
 	{Header: "Direction", Field: "direction"},
 }
@@ -28,6 +29,8 @@ func interactionToMap(i *model.Interaction) map[string]any {
 		"type":        i.Type,
 		"occurred_at": i.OccurredAt,
 		"person_ids":  i.PersonIDs,
+		"org_ids":     nonNilIDs(i.OrgIDs),
+		"deal_ids":    nonNilIDs(i.DealIDs),
 		"created_at":  i.CreatedAt,
 		"updated_at":  i.UpdatedAt,
 	}
@@ -72,6 +75,7 @@ func registerLogCommands(rootCmd *cobra.Command) {
 
 func logTypeCmd(interactionType string) *cobra.Command {
 	var subject, content, direction, at string
+	var orgIDs, dealIDs []int64
 
 	cmd := &cobra.Command{
 		Use:   fmt.Sprintf("%s <person_id> [person_id...]", interactionType),
@@ -103,6 +107,8 @@ func logTypeCmd(interactionType string) *cobra.Command {
 				Content:   nilIfEmpty(content),
 				Direction: nilIfEmpty(direction),
 				PersonIDs: personIDs,
+				OrgIDs:    orgIDs,
+				DealIDs:   dealIDs,
 			}
 			if at != "" {
 				input.OccurredAt = &at
@@ -123,12 +129,14 @@ func logTypeCmd(interactionType string) *cobra.Command {
 	cmd.Flags().StringVar(&content, "content", "", "content/body")
 	cmd.Flags().StringVar(&direction, "direction", "", "direction: inbound or outbound")
 	cmd.Flags().StringVar(&at, "at", "", "when the interaction occurred (ISO 8601)")
+	cmd.Flags().Int64SliceVar(&orgIDs, "org", nil, "also attach it to this organization (repeatable)")
+	cmd.Flags().Int64SliceVar(&dealIDs, "deal", nil, "also attach it to this deal (repeatable)")
 
 	return cmd
 }
 
 func logListCmd() *cobra.Command {
-	var personID int64
+	var personID, orgID, dealID int64
 	var iType string
 	var limit int
 
@@ -146,6 +154,12 @@ func logListCmd() *cobra.Command {
 			if cmd.Flags().Changed("person") {
 				filters.PersonID = &personID
 			}
+			if cmd.Flags().Changed("org") {
+				filters.OrgID = &orgID
+			}
+			if cmd.Flags().Changed("deal") {
+				filters.DealID = &dealID
+			}
 			if iType != "" {
 				filters.Type = &iType
 			}
@@ -161,6 +175,8 @@ func logListCmd() *cobra.Command {
 	}
 
 	cmd.Flags().Int64Var(&personID, "person", 0, "filter by person ID")
+	cmd.Flags().Int64Var(&orgID, "org", 0, "filter by organization ID")
+	cmd.Flags().Int64Var(&dealID, "deal", 0, "filter by deal ID")
 	cmd.Flags().StringVar(&iType, "type", "", "filter by interaction type")
 	cmd.Flags().IntVar(&limit, "limit", 0, "max results")
 

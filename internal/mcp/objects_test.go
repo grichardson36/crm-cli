@@ -87,8 +87,8 @@ func TestLinkToolsWorkFromEitherSide(t *testing.T) {
 		assert.True(t, isErr, "not linked any more")
 	}
 
-	_, isErr := call(t, s, "crm_org_link", map[string]any{"id": org["id"], "other": "task", "other_id": task["id"]})
-	assert.True(t, isErr, "an organization has no link to a task")
+	_, isErr := call(t, s, "crm_deal_link", map[string]any{"id": deal["id"], "other": "deal", "other_id": deal["id"]})
+	assert.True(t, isErr, "a deal has no link to a deal")
 
 	var tagged map[string]any
 	text, isErr := call(t, s, "crm_tag_apply", map[string]any{"entity_type": "deal", "entity_id": deal["id"], "tag": "hot"})

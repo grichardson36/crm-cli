@@ -166,7 +166,7 @@ func orgShowCmd() *cobra.Command {
 				data["people"] = peopleToMaps(people)
 			}
 
-			return format.Output(os.Stdout, resolveFormat(), []map[string]any{data}, orgColumns, flagQuiet)
+			return showWithLinks(cmd, db, repo.Ref{Kind: "organization", ID: id}, data, orgColumns)
 		},
 	}
 

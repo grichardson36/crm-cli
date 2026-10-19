@@ -40,23 +40,39 @@ func noteTypesToMaps(types []*model.NoteType) []map[string]any {
 func logAddCmd() *cobra.Command {
 	var typeName, subject, content, direction, at string
 	var dryRun, noSyntax bool
+	var orgIDs, dealIDs, personFlags []int64
 
 	cmd := &cobra.Command{
-		Use:   "add --type <type> <person_id> [text...]",
+		Use:   "add --type <type> <person_id> [text...]  |  add --type <type> --org <id> [--person <id>] [text...]",
 		Short: "Log an interaction of any defined type",
-		Long: "Log an interaction of any active type from 'crm log types'. Text after the person ID becomes the content.\n" +
+		Long: "Log an interaction of any active type from 'crm log types'. Text after the person ID becomes the content. With --org or --deal the note attaches to those and every argument is text (people come from --person or @Name).\n" +
 			"The text can carry short syntax: #tag (tags the interaction), yesterday or fri 3pm (when it happened), @Name (more people), every 3m (keep in touch cadence of the person).\n" +
 			"Flags win over the same value in the text. Use --dry-run to see what was read, --no-syntax to keep the text as typed. See 'crm help short-syntax'.",
-		Args: cobra.MinimumNArgs(1),
+		Args: cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if typeName == "" {
 				return model.NewExitError(model.ErrValidation, "--type is required (see 'crm log types')")
 			}
-			personID, err := parsePersonID(args[0])
-			if err != nil {
-				return err
+			var personID int64
+			var firstPeople []int64
+			textArgs := args
+			if len(orgIDs)+len(dealIDs) > 0 {
+				firstPeople = personFlags
+				if len(personFlags) > 0 {
+					personID = personFlags[0]
+				}
+			} else {
+				if len(args) == 0 {
+					return model.NewExitError(model.ErrUsage, "give a person ID, or --org / --deal to attach the note to those")
+				}
+				var err error
+				if personID, err = parsePersonID(args[0]); err != nil {
+					return err
+				}
+				firstPeople = append([]int64{personID}, personFlags...)
+				textArgs = args[1:]
 			}
-			text := strings.Join(args[1:], " ")
+			text := strings.Join(textArgs, " ")
 			if text != "" && content != "" {
 				return model.NewExitError(model.ErrValidation, "give the text as arguments or --content, not both")
 			}
@@ -85,7 +101,9 @@ func logAddCmd() *cobra.Command {
 				Subject:   nilIfEmpty(subject),
 				Content:   nilIfEmpty(text),
 				Direction: nilIfEmpty(direction),
-				PersonIDs: []int64{personID},
+				PersonIDs: firstPeople,
+				OrgIDs:    orgIDs,
+				DealIDs:   dealIDs,
 			}
 			var tags []string
 			var cadence string
@@ -95,7 +113,11 @@ func logAddCmd() *cobra.Command {
 					return err
 				}
 				for _, id := range more {
-					if id != personID {
+					seen := false
+					for _, have := range input.PersonIDs {
+						seen = seen || have == id
+					}
+					if !seen {
 						input.PersonIDs = append(input.PersonIDs, id)
 					}
 				}
@@ -129,7 +151,7 @@ func logAddCmd() *cobra.Command {
 					return err
 				}
 			}
-			if cadence != "" {
+			if cadence != "" && personID != 0 {
 				if _, err := repo.NewPersonRepo(db).Update(cmd.Context(), personID, model.UpdatePersonInput{KeepInTouch: &cadence}); err != nil {
 					return err
 				}
@@ -145,6 +167,9 @@ func logAddCmd() *cobra.Command {
 	cmd.Flags().StringVar(&at, "at", "", "when the interaction occurred (ISO 8601)")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print what was read from the text and what would be created, and write nothing")
 	cmd.Flags().BoolVar(&noSyntax, "no-syntax", false, "keep the text as typed: do not read #, @ or date words")
+	cmd.Flags().Int64SliceVar(&orgIDs, "org", nil, "attach the note to this organization (repeatable)")
+	cmd.Flags().Int64SliceVar(&dealIDs, "deal", nil, "attach the note to this deal (repeatable)")
+	cmd.Flags().Int64SliceVar(&personFlags, "person", nil, "attach the note to this person (repeatable, needed with --org / --deal)")
 	return cmd
 }
 

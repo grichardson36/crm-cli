@@ -20,7 +20,7 @@ var taskColumns = []format.ColumnDef{
 	{Header: "Due", Field: "due_at"},
 	{Header: "Priority", Field: "priority"},
 	{Header: "Done", Field: "completed"},
-	{Header: "Person", Field: "person_id"},
+	{Header: "People", Field: "person_ids"},
 	{Header: "Repeats", Field: "recurrence"},
 	{Header: "Tags", Field: "tags"},
 }
@@ -38,20 +38,20 @@ func taskToMap(t *model.Task) map[string]any {
 	if t.Description != nil {
 		m["description"] = *t.Description
 	}
-	if t.PersonID != nil {
-		m["person_id"] = *t.PersonID
-	}
 	if len(t.PersonIDs) > 0 {
 		m["person_ids"] = t.PersonIDs
+	}
+	if len(t.OrgIDs) > 0 {
+		m["org_ids"] = t.OrgIDs
+	}
+	if len(t.DealIDs) > 0 {
+		m["deal_ids"] = t.DealIDs
 	}
 	if t.Recurrence != nil {
 		m["recurrence"] = *t.Recurrence
 	}
 	if len(t.Tags) > 0 {
 		m["tags"] = t.Tags
-	}
-	if t.DealID != nil {
-		m["deal_id"] = *t.DealID
 	}
 	if t.DueAt != nil {
 		m["due_at"] = *t.DueAt
@@ -91,8 +91,7 @@ func registerTaskCommands(rootCmd *cobra.Command) {
 
 func taskAddCmd() *cobra.Command {
 	var description, due, priority, recurrence string
-	var personIDs []int64
-	var dealID int64
+	var personIDs, orgIDs, dealIDs []int64
 	var dryRun, noSyntax bool
 	var tagFlags []string
 
@@ -147,9 +146,7 @@ func taskAddCmd() *cobra.Command {
 				input.PersonID = &ids[0]
 				input.PersonIDs = ids[1:]
 			}
-			if cmd.Flags().Changed("deal") {
-				input.DealID = &dealID
-			}
+			input.OrgIDs, input.DealIDs = orgIDs, dealIDs
 			input.Recurrence = nilIfEmpty(recurrence)
 			if !cmd.Flags().Changed("recurrence") {
 				input.Recurrence = nilIfEmpty(tf.Recurrence)
@@ -169,7 +166,7 @@ func taskAddCmd() *cobra.Command {
 					"dry_run": true, "syntax": in.Res,
 					"task": map[string]any{
 						"title": input.Title, "description": input.Description, "due_at": input.DueAt, "priority": input.Priority,
-						"person_ids": ids, "deal_id": input.DealID, "recurrence": input.Recurrence, "tags": input.Tags,
+						"person_ids": ids, "org_ids": input.OrgIDs, "deal_ids": input.DealIDs, "recurrence": input.Recurrence, "tags": input.Tags,
 					},
 				})
 			}
@@ -189,7 +186,8 @@ func taskAddCmd() *cobra.Command {
 	cmd.Flags().StringVar(&due, "due", "", "due date (ISO 8601)")
 	cmd.Flags().StringVar(&priority, "priority", "medium", "priority: "+strings.Join(model.Priorities, ", "))
 	cmd.Flags().Int64SliceVar(&personIDs, "person", nil, "associated person ID (repeatable)")
-	cmd.Flags().Int64Var(&dealID, "deal", 0, "associated deal ID")
+	cmd.Flags().Int64SliceVar(&orgIDs, "org", nil, "associated organization ID (repeatable)")
+	cmd.Flags().Int64SliceVar(&dealIDs, "deal", nil, "associated deal ID (repeatable)")
 	cmd.Flags().StringVar(&recurrence, "recurrence", "", "repeat after completion, e.g. \"7 days\", \"1 mon\", weekly (needs --due)")
 	cmd.Flags().StringSliceVar(&tagFlags, "tag", nil, "tag the task (repeatable); #tag in the title does the same")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print what was read from the title and what would be created, and write nothing")
@@ -199,7 +197,7 @@ func taskAddCmd() *cobra.Command {
 }
 
 func taskListCmd() *cobra.Command {
-	var personID, dealID int64
+	var personID, orgID, dealID int64
 	var overdue, all bool
 	var tag string
 	var limit int
@@ -223,6 +221,9 @@ func taskListCmd() *cobra.Command {
 			if cmd.Flags().Changed("person") {
 				filters.PersonID = &personID
 			}
+			if cmd.Flags().Changed("org") {
+				filters.OrgID = &orgID
+			}
 			if cmd.Flags().Changed("deal") {
 				filters.DealID = &dealID
 			}
@@ -238,6 +239,7 @@ func taskListCmd() *cobra.Command {
 	}
 
 	cmd.Flags().Int64Var(&personID, "person", 0, "filter by person ID")
+	cmd.Flags().Int64Var(&orgID, "org", 0, "filter by organization ID")
 	cmd.Flags().Int64Var(&dealID, "deal", 0, "filter by deal ID")
 	cmd.Flags().StringVar(&tag, "tag", "", "only tasks with this tag")
 	cmd.Flags().BoolVar(&overdue, "overdue", false, "show only overdue tasks")
@@ -270,8 +272,7 @@ func taskShowCmd() *cobra.Command {
 				return err
 			}
 
-			data := []map[string]any{taskToMap(task)}
-			return format.Output(os.Stdout, resolveFormat(), data, taskColumns, flagQuiet)
+			return showWithLinks(cmd, db, repo.Ref{Kind: "task", ID: id}, taskToMap(task), taskColumns)
 		},
 	}
 }
@@ -279,6 +280,7 @@ func taskShowCmd() *cobra.Command {
 func taskEditCmd() *cobra.Command {
 	var title, description, due, priority, recurrence string
 	var personID, dealID int64
+	var clearDue bool
 
 	cmd := &cobra.Command{
 		Use:   "edit <id>",
@@ -305,6 +307,10 @@ func taskEditCmd() *cobra.Command {
 			}
 			if cmd.Flags().Changed("due") {
 				input.DueAt = &due
+			}
+			if clearDue {
+				empty := ""
+				input.DueAt = &empty
 			}
 			if cmd.Flags().Changed("priority") {
 				if !model.ValidPriority(priority) {
@@ -335,10 +341,11 @@ func taskEditCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&title, "title", "", "task title")
 	cmd.Flags().StringVar(&description, "description", "", "task description")
-	cmd.Flags().StringVar(&due, "due", "", "due date (ISO 8601)")
+	cmd.Flags().StringVar(&due, "due", "", "due date (ISO 8601). --due \"\" clears it")
+	cmd.Flags().BoolVar(&clearDue, "clear-due", false, "remove the due date (not for a recurring task unless --recurrence \"\" too)")
 	cmd.Flags().StringVar(&priority, "priority", "", "priority: "+strings.Join(model.Priorities, ", "))
-	cmd.Flags().Int64Var(&personID, "person", 0, "add an associated person ID")
-	cmd.Flags().Int64Var(&dealID, "deal", 0, "associated deal ID")
+	cmd.Flags().Int64Var(&personID, "person", 0, "also link this person")
+	cmd.Flags().Int64Var(&dealID, "deal", 0, "also link this deal")
 	cmd.Flags().StringVar(&recurrence, "recurrence", "", "repeat after completion (empty clears)")
 
 	return cmd

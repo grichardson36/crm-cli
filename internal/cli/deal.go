@@ -17,8 +17,9 @@ var dealColumns = []format.ColumnDef{
 	{Header: "Title", Field: "title"},
 	{Header: "Value", Field: "value"},
 	{Header: "Stage", Field: "stage"},
-	{Header: "Person", Field: "person_id"},
+	{Header: "People", Field: "person_ids"},
 	{Header: "Org", Field: "org_id"},
+	{Header: "Closed", Field: "closed_at"},
 }
 
 var pipelineColumns = []format.ColumnDef{
@@ -39,9 +40,8 @@ func dealToMap(d *model.Deal) map[string]any {
 	if d.Value != nil {
 		m["value"] = *d.Value
 	}
-	if d.PersonID != nil {
-		m["person_id"] = *d.PersonID
-	}
+	m["person_ids"] = nonNilIDs(d.PersonIDs)
+	m["org_ids"] = nonNilIDs(d.OrgIDs)
 	if d.OrgID != nil {
 		m["org_id"] = *d.OrgID
 	}
@@ -52,6 +52,14 @@ func dealToMap(d *model.Deal) map[string]any {
 		m["closed_at"] = *d.ClosedAt
 	}
 	return m
+}
+
+// nonNilIDs makes sure a list prints as [] in JSON, never null.
+func nonNilIDs(ids []int64) []int64 {
+	if ids == nil {
+		return []int64{}
+	}
+	return ids
 }
 
 func dealsToMaps(deals []*model.Deal) []map[string]any {
@@ -127,8 +135,8 @@ func dealAddCmd() *cobra.Command {
 	cmd.Flags().Float64Var(&value, "value", 0, "deal value")
 	cmd.Flags().StringVar(&stage, "stage", "lead", "deal stage: "+strings.Join(model.DealStages, ", "))
 	cmd.Flags().StringVar(&notes, "notes", "", "notes")
-	cmd.Flags().Int64Var(&personID, "person", 0, "associated person ID")
-	cmd.Flags().Int64Var(&orgID, "org", 0, "associated organization ID")
+	cmd.Flags().Int64Var(&personID, "person", 0, "link this person (more with: crm deal link person)")
+	cmd.Flags().Int64Var(&orgID, "org", 0, "link this organization as the primary one (more with: crm deal link org)")
 
 	return cmd
 }
@@ -202,8 +210,7 @@ func dealShowCmd() *cobra.Command {
 				return err
 			}
 
-			data := []map[string]any{dealToMap(deal)}
-			return format.Output(os.Stdout, resolveFormat(), data, dealColumns, flagQuiet)
+			return showWithLinks(cmd, db, repo.Ref{Kind: "deal", ID: id}, dealToMap(deal), dealColumns)
 		},
 	}
 }
@@ -270,9 +277,9 @@ func dealEditCmd() *cobra.Command {
 	cmd.Flags().Float64Var(&value, "value", 0, "deal value")
 	cmd.Flags().StringVar(&stage, "stage", "", "deal stage: "+strings.Join(model.DealStages, ", "))
 	cmd.Flags().StringVar(&notes, "notes", "", "notes")
-	cmd.Flags().Int64Var(&personID, "person", 0, "associated person ID")
-	cmd.Flags().Int64Var(&orgID, "org", 0, "associated organization ID")
-	cmd.Flags().StringVar(&closedAt, "closed-at", "", "date the deal was closed")
+	cmd.Flags().Int64Var(&personID, "person", 0, "also link this person")
+	cmd.Flags().Int64Var(&orgID, "org", 0, "also link this organization as the primary one")
+	cmd.Flags().StringVar(&closedAt, "closed-at", "", "close date. It is set when the stage becomes won or lost and cleared when it reopens. Empty clears it")
 
 	return cmd
 }

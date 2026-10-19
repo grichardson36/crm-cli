@@ -14,6 +14,7 @@ func linkSeed(t *testing.T) string {
 	dbPath := filepath.Join(t.TempDir(), "crm.db")
 	for _, s := range [][]string{
 		{"person", "add", "Jane Smith"},
+		{"person", "add", "Bob Jones"},
 		{"org", "add", "Acme Corp"},
 		{"org", "add", "Globex"},
 		{"deal", "add", "Website"},
@@ -35,6 +36,8 @@ func TestLinkAndUnlinkFromEitherSide(t *testing.T) {
 		{"deal", "1", "person", "1"},
 		{"task", "1", "deal", "1"},
 		{"task", "1", "person", "1"},
+		{"task", "1", "org", "1"},
+		{"person", "1", "person", "2"},
 	}
 	for _, c := range cases {
 		stdout, stderr, code := crm(t, dbPath, c.aKind, "link", c.bKind, c.aID, c.bID, "-f", "json")
@@ -44,8 +47,9 @@ func TestLinkAndUnlinkFromEitherSide(t *testing.T) {
 		assert.Equal(t, true, rows[0]["changed"])
 
 		// The other side links the same pair: nothing changes.
-		stdout, _, code = crm(t, dbPath, c.bKind, "link", c.aKind, c.bID, c.aID, "-f", "json")
-		require.Equal(t, 0, code)
+		var stderr2 string
+		stdout, stderr2, code = crm(t, dbPath, c.bKind, "link", c.aKind, c.bID, c.aID, "-f", "json")
+		require.Equal(t, 0, code, "%s link %s from the other side: %s", c.bKind, c.aKind, stderr2)
 		require.NoError(t, json.Unmarshal([]byte(stdout), &rows))
 		assert.Equal(t, false, rows[0]["changed"], "%s and %s are one stored link", c.aKind, c.bKind)
 
@@ -56,31 +60,6 @@ func TestLinkAndUnlinkFromEitherSide(t *testing.T) {
 		assert.Equal(t, 3, code, "unlinking twice is not found")
 		assert.Contains(t, stderr, "not linked")
 	}
-}
-
-func TestLinkShowsOnTheRecords(t *testing.T) {
-	dbPath := linkSeed(t)
-	_, _, code := crm(t, dbPath, "org", "link", "person", "1", "1")
-	require.Equal(t, 0, code)
-	stdout, _, _ := crm(t, dbPath, "person", "show", "1", "-f", "json")
-	var data []map[string]any
-	require.NoError(t, json.Unmarshal([]byte(stdout), &data))
-	assert.EqualValues(t, 1, data[0]["org_id"])
-
-	// A second organization replaces the first.
-	_, stderr, code := crm(t, dbPath, "person", "link", "org", "1", "2")
-	require.Equal(t, 0, code)
-	assert.Contains(t, stderr, "replaced")
-	stdout, _, _ = crm(t, dbPath, "person", "show", "1", "-f", "json")
-	require.NoError(t, json.Unmarshal([]byte(stdout), &data))
-	assert.EqualValues(t, 2, data[0]["org_id"])
-
-	_, _, code = crm(t, dbPath, "person", "unlink", "org", "1", "2")
-	require.Equal(t, 0, code)
-	stdout, _, _ = crm(t, dbPath, "person", "show", "1", "-f", "json")
-	var after []map[string]any
-	require.NoError(t, json.Unmarshal([]byte(stdout), &after))
-	assert.Nil(t, after[0]["org_id"])
 }
 
 func TestLinkRefusesBadInput(t *testing.T) {

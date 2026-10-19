@@ -17,7 +17,7 @@ func registerContextCommand(rootCmd *cobra.Command) {
 	cmd := &cobra.Command{
 		Use:   "context <person_id_or_name>",
 		Short: "Full context briefing for a person",
-		Long:  "Returns person profile, organization, recent interactions, open deals, open tasks, relationships, and tags.",
+		Long:  "Returns person profile, organizations, recent interactions, open deals, open tasks, relationships, and tags.",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			db, err := openDB()
@@ -56,15 +56,26 @@ func registerContextCommand(rootCmd *cobra.Command) {
 			}
 			result["person"] = personToMap(person)
 
-			// Organization
+			// Organizations: the primary one as before, all of them with role and dates
 			var org *model.Organization
-			if person.OrgID != nil {
-				or := repo.NewOrgRepo(db)
-				org, err = or.FindByID(ctx, *person.OrgID)
-				if err != nil {
-					return err
+			lr := repo.NewLinkRepo(db)
+			memberships, err := lr.Linked(ctx, repo.Ref{Kind: "person", ID: person.ID}, "organization")
+			if err != nil {
+				return err
+			}
+			if len(memberships) > 0 {
+				result["organizations"] = memberships
+			}
+			for _, ms := range memberships {
+				if ms.Primary {
+					or := repo.NewOrgRepo(db)
+					org, err = or.FindByID(ctx, ms.ID)
+					if err != nil {
+						return err
+					}
+					result["organization"] = orgToMap(org)
+					break
 				}
-				result["organization"] = orgToMap(org)
 			}
 
 			// Recent interactions
@@ -97,9 +108,8 @@ func registerContextCommand(rootCmd *cobra.Command) {
 				result["tasks"] = tasksToMaps(tasks)
 			}
 
-			// Relationships
-			rr := repo.NewRelationshipRepo(db)
-			rels, err := rr.FindForPerson(ctx, person.ID)
+			// Related people, with the kind of each link
+			rels, err := lr.Linked(ctx, repo.Ref{Kind: "person", ID: person.ID}, "person")
 			if err != nil {
 				return err
 			}
@@ -107,10 +117,11 @@ func registerContextCommand(rootCmd *cobra.Command) {
 				relMaps := make([]map[string]any, len(rels))
 				for i, rel := range rels {
 					relMaps[i] = map[string]any{
-						"id":                rel.ID,
-						"person_id":         rel.PersonID,
-						"related_person_id": rel.RelatedPersonID,
-						"type":              rel.Type,
+						"id":                rel.LinkID,
+						"person_id":         person.ID,
+						"related_person_id": rel.ID,
+						"name":              rel.Name,
+						"type":              rel.Label,
 					}
 					if rel.Notes != nil {
 						relMaps[i]["notes"] = *rel.Notes
@@ -164,8 +175,8 @@ func registerContextCommand(rootCmd *cobra.Command) {
 			if person.Location != nil {
 				fmt.Fprintf(w, "  Location: %s\n", *person.Location)
 			}
-			if org != nil {
-				fmt.Fprintf(w, "  Organization: %s (#%d)\n", org.Name, org.ID)
+			for _, ms := range memberships {
+				fmt.Fprintf(w, "  Organization: %s\n", linkLine(ms))
 			}
 			if person.Summary != nil {
 				fmt.Fprintf(w, "  Summary: %s\n", *person.Summary)
@@ -215,15 +226,11 @@ func registerContextCommand(rootCmd *cobra.Command) {
 			if len(rels) > 0 {
 				fmt.Fprintf(w, "\nRelationships (%d):\n", len(rels))
 				for _, rel := range rels {
-					otherID := rel.RelatedPersonID
-					if otherID == person.ID {
-						otherID = rel.PersonID
-					}
 					note := ""
 					if rel.Notes != nil {
 						note = " — " + *rel.Notes
 					}
-					fmt.Fprintf(w, "  Person #%d (%s)%s\n", otherID, rel.Type, note)
+					fmt.Fprintf(w, "  Person #%d %s (%s)%s\n", rel.ID, rel.Name, rel.Label, note)
 				}
 			}
 

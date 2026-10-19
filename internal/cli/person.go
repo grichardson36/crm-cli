@@ -58,9 +58,6 @@ func personToMap(p *model.Person) map[string]any {
 	if p.Summary != nil {
 		m["summary"] = *p.Summary
 	}
-	if p.OrgID != nil {
-		m["org_id"] = *p.OrgID
-	}
 	addDetailFields(m, p)
 	return m
 }

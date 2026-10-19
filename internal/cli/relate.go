@@ -4,13 +4,15 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	"strings"
 
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/format"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/spf13/cobra"
 )
+
+// person relate, relationships and unrelate are the older names of `crm person link person`,
+// `crm person show` (links) and `crm person unlink person`. They call the same core.
 
 var relationshipColumns = []format.ColumnDef{
 	{Header: "ID", Field: "id"},
@@ -31,40 +33,34 @@ func personRelateCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "relate <person_id> <related_person_id>",
-		Short: "Create a relationship between two people",
+		Short: "Create a relationship between two people (same as: person link person)",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			personID, err := strconv.ParseInt(args[0], 10, 64)
+			personID, err := parsePersonID(args[0])
 			if err != nil {
-				return model.NewExitError(model.ErrValidation, "invalid person ID: %s", args[0])
+				return err
 			}
-			relatedID, err := strconv.ParseInt(args[1], 10, 64)
+			relatedID, err := parsePersonID(args[1])
 			if err != nil {
-				return model.NewExitError(model.ErrValidation, "invalid related person ID: %s", args[1])
+				return err
 			}
-
-			if !model.ValidRelationshipType(relType) {
-				return model.NewExitError(model.ErrValidation, "invalid relationship type: %s (must be one of: %s)", relType, strings.Join(model.RelationshipTypes, ", "))
-			}
-
 			db, err := openDB()
 			if err != nil {
 				return err
 			}
 			defer db.Close()
 
-			r := repo.NewRelationshipRepo(db)
-			rel, err := r.Create(cmd.Context(), personID, relatedID, relType, nilIfEmpty(notes))
+			attrs := model.LinkAttrs{Kind: &relType, Notes: nilIfEmpty(notes)}
+			res, err := repo.NewLinkRepo(db).Link(cmd.Context(), repo.Ref{Kind: "person", ID: personID}, repo.Ref{Kind: "person", ID: relatedID}, attrs)
 			if err != nil {
 				return err
 			}
-
-			fmt.Fprintf(os.Stderr, "Related person #%d to person #%d as %q\n", rel.PersonID, rel.RelatedPersonID, rel.Type)
+			fmt.Fprintf(os.Stderr, "Related person #%d to person #%d as %q (link %d)\n", personID, relatedID, relType, res.LinkID)
 			return nil
 		},
 	}
 
-	cmd.Flags().StringVar(&relType, "type", "colleague", "relationship type: "+strings.Join(model.RelationshipTypes, ", "))
+	cmd.Flags().StringVar(&relType, "type", model.DefaultPersonKind, "relationship kind, see `crm relation-kind list`")
 	cmd.Flags().StringVar(&notes, "notes", "", "notes about the relationship")
 
 	return cmd
@@ -74,7 +70,7 @@ func personRelationshipsCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:     "relationships <person_id>",
 		Aliases: []string{"rels"},
-		Short:   "List relationships for a person",
+		Short:   "List the people related to a person, with the kind of each link",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			personID, err := strconv.ParseInt(args[0], 10, 64)
@@ -88,23 +84,21 @@ func personRelationshipsCmd() *cobra.Command {
 			}
 			defer db.Close()
 
-			r := repo.NewRelationshipRepo(db)
-			rels, err := r.FindForPerson(cmd.Context(), personID)
+			items, err := repo.NewLinkRepo(db).Linked(cmd.Context(), repo.Ref{Kind: "person", ID: personID}, "person")
 			if err != nil {
 				return err
 			}
-
-			data := make([]map[string]any, len(rels))
-			for i, rel := range rels {
+			data := make([]map[string]any, len(items))
+			for i, li := range items {
 				m := map[string]any{
-					"id":                rel.ID,
-					"person_id":         rel.PersonID,
-					"related_person_id": rel.RelatedPersonID,
-					"type":              rel.Type,
-					"created_at":        rel.CreatedAt,
+					"id":                li.LinkID,
+					"person_id":         personID,
+					"related_person_id": li.ID,
+					"name":              li.Name,
+					"type":              li.Label,
 				}
-				if rel.Notes != nil {
-					m["notes"] = *rel.Notes
+				if li.Notes != nil {
+					m["notes"] = *li.Notes
 				}
 				data[i] = m
 			}
@@ -115,8 +109,8 @@ func personRelationshipsCmd() *cobra.Command {
 
 func personUnrelateCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "unrelate <relationship_id>",
-		Short: "Remove a relationship",
+		Use:   "unrelate <link_id>",
+		Short: "Remove a relationship by its link id (same as: person unlink person --id)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			id, err := strconv.ParseInt(args[0], 10, 64)
@@ -130,11 +124,14 @@ func personUnrelateCmd() *cobra.Command {
 			}
 			defer db.Close()
 
-			r := repo.NewRelationshipRepo(db)
-			if err := r.Delete(cmd.Context(), id); err != nil {
+			lr := repo.NewLinkRepo(db)
+			rec, err := lr.Get(cmd.Context(), "person_relation", id)
+			if err != nil || rec.Deleted {
+				return model.NewExitError(model.ErrNotFound, "relationship %d not found", id)
+			}
+			if _, err := lr.Unlink(cmd.Context(), repo.Ref{Kind: "person", ID: rec.A}, repo.Ref{Kind: "person", ID: rec.B}, repo.UnlinkOptions{LinkID: id}); err != nil {
 				return err
 			}
-
 			fmt.Fprintf(os.Stderr, "Removed relationship #%d\n", id)
 			return nil
 		},

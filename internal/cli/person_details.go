@@ -73,6 +73,9 @@ func addDetailFields(m map[string]any, p *model.Person) {
 	if p.PriorityTier != nil {
 		m["priority_tier"] = *p.PriorityTier
 	}
+	if len(p.Links) > 0 {
+		m["links"] = p.Links
+	}
 	if len(p.Emails) > 0 {
 		m["emails"] = p.Emails
 		parts := make([]string, len(p.Emails))
@@ -114,7 +117,11 @@ func outputPersonDetail(cmd *cobra.Command, r *repo.PersonRepo, id int64) error 
 			delete(m, k)
 		}
 	}
-	return format.Output(os.Stdout, resolveFormat(), []map[string]any{m}, personShowColumns, flagQuiet)
+	if err := format.Output(os.Stdout, resolveFormat(), []map[string]any{m}, personShowColumns, flagQuiet); err != nil {
+		return err
+	}
+	printLinks(person.Links)
+	return nil
 }
 
 func parsePersonID(arg string) (int64, error) {
