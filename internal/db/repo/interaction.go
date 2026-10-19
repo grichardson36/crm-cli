@@ -76,13 +76,13 @@ func (r *InteractionRepo) Create(ctx context.Context, input model.CreateInteract
 		return nil, fmt.Errorf("last insert id: %w", err)
 	}
 
-	// Link to people
-	for _, personID := range input.PersonIDs {
-		_, err := tx.ExecContext(ctx,
-			"INSERT INTO interaction_people (interaction_id, person_id) VALUES (?, ?)",
-			rowID, personID)
-		if err != nil {
-			return nil, fmt.Errorf("link interaction %d to person %d: %w", rowID, personID, err)
+	// Link to people, organizations and deals
+	for _, g := range []struct {
+		kind string
+		ids  []int64
+	}{{"person", input.PersonIDs}, {"organization", input.OrgIDs}, {"deal", input.DealIDs}} {
+		if err := addTargets(ctx, tx, "interaction", rowID, g.kind, g.ids); err != nil {
+			return nil, err
 		}
 	}
 
@@ -193,11 +193,9 @@ func (r *InteractionRepo) FindByID(ctx context.Context, id int64) (*model.Intera
 		return nil, fmt.Errorf("find interaction %d: %w", id, err)
 	}
 
-	personIDs, err := r.getPersonIDs(ctx, id)
-	if err != nil {
+	if err := r.loadTargets(ctx, i); err != nil {
 		return nil, err
 	}
-	i.PersonIDs = personIDs
 
 	return i, nil
 }
@@ -207,20 +205,18 @@ func (r *InteractionRepo) FindAll(ctx context.Context, filters model.Interaction
 	query := fmt.Sprintf("SELECT %s FROM interactions WHERE archived = 0", interactionColumns)
 	var args []any
 
-	if filters.PersonID != nil {
-		query = fmt.Sprintf(
-			"SELECT i.%s FROM interactions i JOIN interaction_people ip ON ip.interaction_id = i.id WHERE i.archived = 0 AND ip.person_id = ?",
-			strings.ReplaceAll(interactionColumns, ", ", ", i."),
-		)
-		args = append(args, *filters.PersonID)
+	for _, f := range []struct {
+		kind string
+		id   *int64
+	}{{"person", filters.PersonID}, {"organization", filters.OrgID}, {"deal", filters.DealID}} {
+		if f.id != nil {
+			query += " AND id IN (SELECT source_id FROM activity_target WHERE source_kind = 'interaction' AND target_kind = '" + f.kind + "' AND target_id = ? AND deleted_at IS NULL)"
+			args = append(args, *f.id)
+		}
 	}
 
 	if filters.Type != nil {
-		if filters.PersonID != nil {
-			query += " AND i.type = ?"
-		} else {
-			query += " AND type = ?"
-		}
+		query += " AND type = ?"
 		args = append(args, *filters.Type)
 	}
 
@@ -253,8 +249,8 @@ func (r *InteractionRepo) FindAll(ctx context.Context, filters model.Interaction
 	}
 	rows.Close()
 
-	// Batch-fetch person IDs for all interactions
-	if err := r.loadPersonIDs(ctx, interactions); err != nil {
+	// Batch-fetch the linked people, organizations and deals
+	if err := r.loadTargets(ctx, interactions...); err != nil {
 		return nil, err
 	}
 
@@ -292,74 +288,28 @@ func (r *InteractionRepo) Search(ctx context.Context, query string, limit int) (
 	}
 	rows.Close()
 
-	// Batch-fetch person IDs for all interactions
-	if err := r.loadPersonIDs(ctx, interactions); err != nil {
+	if err := r.loadTargets(ctx, interactions...); err != nil {
 		return nil, err
 	}
 
 	return interactions, nil
 }
 
-// loadPersonIDs batch-loads person IDs for a slice of interactions in a single query.
-func (r *InteractionRepo) loadPersonIDs(ctx context.Context, interactions []*model.Interaction) error {
-	if len(interactions) == 0 {
-		return nil
-	}
-
+// loadTargets batch-loads the linked people, organizations and deals of interactions.
+func (r *InteractionRepo) loadTargets(ctx context.Context, interactions ...*model.Interaction) error {
 	ids := make([]int64, len(interactions))
 	for i, inter := range interactions {
 		ids[i] = inter.ID
 	}
-
-	placeholders := strings.Repeat("?,", len(ids))
-	placeholders = placeholders[:len(placeholders)-1]
-
-	args := make([]any, len(ids))
-	for i, id := range ids {
-		args[i] = id
-	}
-
-	rows, err := r.db.QueryContext(ctx,
-		fmt.Sprintf("SELECT interaction_id, person_id FROM interaction_people WHERE interaction_id IN (%s)", placeholders),
-		args...)
+	m, err := loadTargets(ctx, r.db, "interaction", ids)
 	if err != nil {
-		return fmt.Errorf("batch get person IDs: %w", err)
+		return err
 	}
-	defer rows.Close()
-
-	personIDMap := make(map[int64][]int64)
-	for rows.Next() {
-		var iID, pID int64
-		if err := rows.Scan(&iID, &pID); err != nil {
-			return fmt.Errorf("scan person ID: %w", err)
-		}
-		personIDMap[iID] = append(personIDMap[iID], pID)
-	}
-	if err := rows.Err(); err != nil {
-		return fmt.Errorf("iterate person IDs: %w", err)
-	}
-
 	for _, inter := range interactions {
-		inter.PersonIDs = personIDMap[inter.ID]
+		inter.PersonIDs, inter.OrgIDs, inter.DealIDs = nil, nil, nil
+		if x := m[inter.ID]; x != nil {
+			inter.PersonIDs, inter.OrgIDs, inter.DealIDs = x.People, x.Orgs, x.Deals
+		}
 	}
 	return nil
-}
-
-func (r *InteractionRepo) getPersonIDs(ctx context.Context, interactionID int64) ([]int64, error) {
-	rows, err := r.db.QueryContext(ctx,
-		"SELECT person_id FROM interaction_people WHERE interaction_id = ?", interactionID)
-	if err != nil {
-		return nil, fmt.Errorf("get person IDs for interaction %d: %w", interactionID, err)
-	}
-	defer rows.Close()
-
-	var ids []int64
-	for rows.Next() {
-		var id int64
-		if err := rows.Scan(&id); err != nil {
-			return nil, fmt.Errorf("scan person ID: %w", err)
-		}
-		ids = append(ids, id)
-	}
-	return ids, rows.Err()
 }

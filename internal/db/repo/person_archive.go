@@ -41,7 +41,7 @@ func (r *PersonRepo) Restore(ctx context.Context, id int64) error {
 // Purge permanently deletes an already archived person and their dependent rows in
 // one transaction. A tombstone is recorded for every deleted synced row.
 //
-// Dependents: contact methods, relationships, task and interaction links, taggings and
+// Dependents: contact methods, memberships, person links, task and interaction links, taggings and
 // custom fields are deleted. Interactions and tasks linked only to this person are
 // deleted too. Deals and tasks shared with others keep existing and lose the person link.
 func (r *PersonRepo) Purge(ctx context.Context, id int64) error {
@@ -86,7 +86,8 @@ func (r *PersonRepo) Purge(ctx context.Context, id int64) error {
 	}
 
 	// Interactions linked only to this person.
-	soleInteractions := `id IN (SELECT interaction_id FROM interaction_people GROUP BY interaction_id HAVING COUNT(*) = 1 AND MAX(person_id) = ?)`
+	soleInteractions := `id IN (SELECT source_id FROM activity_target WHERE source_kind = 'interaction' AND deleted_at IS NULL
+		GROUP BY source_id HAVING COUNT(*) = 1 AND MIN(target_kind) = 'person' AND MAX(target_id) = ?)`
 	if err := tombstone("interactions", soleInteractions, id); err != nil {
 		return err
 	}
@@ -98,18 +99,26 @@ func (r *PersonRepo) Purge(ctx context.Context, id int64) error {
 	}
 
 	// Tasks owned only by this person.
-	soleTasks := `(person_id = ? OR id IN (SELECT task_id FROM task_people WHERE person_id = ?))
-		AND NOT EXISTS (SELECT 1 FROM task_people tp WHERE tp.task_id = tasks.id AND tp.person_id != ?)`
-	if err := tombstone("tasks", soleTasks, id, id, id); err != nil {
+	soleTasks := `id IN (SELECT source_id FROM activity_target WHERE source_kind = 'task' AND target_kind = 'person' AND target_id = ?)
+		AND NOT EXISTS (SELECT 1 FROM activity_target a WHERE a.source_kind = 'task' AND a.source_id = tasks.id
+		                AND NOT (a.target_kind = 'person' AND a.target_id = ?))`
+	if err := tombstone("tasks", soleTasks, id, id); err != nil {
 		return err
 	}
-	if err := exec("DELETE FROM tasks WHERE "+soleTasks, id, id, id); err != nil {
+	if err := exec("DELETE FROM tasks WHERE "+soleTasks, id, id); err != nil {
 		return err
 	}
-	if err := exec("UPDATE tasks SET person_id = NULL, updated_at = datetime('now') WHERE person_id = ?", id); err != nil {
+	// Links of the person are deleted with it (foreign keys and triggers). Record them first.
+	if err := tombstone("membership", "person_id = ?", id); err != nil {
 		return err
 	}
-	if err := exec("UPDATE deals SET person_id = NULL, updated_at = datetime('now') WHERE person_id = ?", id); err != nil {
+	if err := tombstone("person_relation", "a_id = ? OR b_id = ?", id, id); err != nil {
+		return err
+	}
+	if err := tombstone("deal_person", "person_id = ?", id); err != nil {
+		return err
+	}
+	if err := tombstone("activity_target", "target_kind = 'person' AND target_id = ?", id); err != nil {
 		return err
 	}
 
@@ -128,8 +137,8 @@ func (r *PersonRepo) Purge(ctx context.Context, id int64) error {
 	if err := exec("DELETE FROM field_versions WHERE entity = 'person' AND local_id = ?", id); err != nil {
 		return err
 	}
-	// Cascades: person_emails, person_phones, person_handles, task_people,
-	// interaction_people and relationships.
+	// Cascades: person_emails, person_phones, person_handles, membership, person_relation,
+	// deal_person; a trigger removes the activity_target rows and merge aliases.
 	if err := tombstone("people", "id = ?", id); err != nil {
 		return err
 	}

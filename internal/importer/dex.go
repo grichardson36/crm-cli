@@ -40,6 +40,10 @@ type DexReport struct {
 	NotesSkipped     int `json:"notes_skipped"`
 	NoteLinks        int `json:"note_links"`
 	NoteLinksMissing int `json:"note_links_missing"`
+	// RelatedLinks are person links made from the Dex related contacts column. RelatedUnresolved
+	// are names in that column that matched nobody (or several people), so no link was made.
+	RelatedLinks      int `json:"related_links"`
+	RelatedUnresolved int `json:"related_unresolved"`
 }
 
 var (
@@ -148,6 +152,7 @@ func ImportDex(ctx context.Context, db *sql.DB, contactsPath, notesPath string, 
 		skip[strings.ToLower(strings.TrimSpace(name))] = true
 	}
 	byDexID := map[string]int64{}
+	related := map[int64]string{} // new person -> Dex related contacts text
 	extIDs := repo.NewExternalIDRepo(tx)
 
 	for _, row := range contacts.rows {
@@ -172,7 +177,13 @@ func ImportDex(ctx context.Context, db *sql.DB, contactsPath, notesPath string, 
 			return nil, fmt.Errorf("contact %s: %w", dexID, err)
 		}
 		byDexID[dexID] = pid
+		if r := contacts.get(row, "dex_related_contacts"); r != "" {
+			related[pid] = r
+		}
 		rep.ContactsImported++
+	}
+	if err := linkRelated(ctx, tx, related, byDexID, rep); err != nil {
+		return nil, err
 	}
 
 	if notes != nil {
@@ -185,6 +196,59 @@ func ImportDex(ctx context.Context, db *sql.DB, contactsPath, notesPath string, 
 		return rep, nil
 	}
 	return rep, tx.Commit()
+}
+
+// linkRelated turns the Dex related contacts column into mutual "related" person links. Each item
+// is a Dex id or a full name. A name must match exactly one person, otherwise it is counted as
+// unresolved and left to the custom field. Links already there are kept as they are.
+func linkRelated(ctx context.Context, tx *sql.Tx, related map[int64]string, byDexID map[string]int64, rep *DexReport) error {
+	var kindID int64
+	if err := tx.QueryRowContext(ctx, `SELECT id FROM relation_kind WHERE object_type = 'person' AND name = ? AND deleted_at IS NULL`, model.DefaultPersonKind).Scan(&kindID); err != nil {
+		return fmt.Errorf("related kind: %w", err)
+	}
+	for pid, text := range related {
+		for _, item := range strings.Split(text, ",") {
+			item = strings.TrimSpace(item)
+			if item == "" {
+				continue
+			}
+			other, ok := byDexID[item]
+			if !ok {
+				rows, err := tx.QueryContext(ctx, `SELECT id FROM people WHERE archived = 0 AND id <> ?
+					AND lower(trim(first_name || ' ' || COALESCE(last_name, ''))) = lower(?)`, pid, item)
+				if err != nil {
+					return err
+				}
+				var ids []int64
+				for rows.Next() {
+					var id int64
+					if err := rows.Scan(&id); err != nil {
+						rows.Close()
+						return err
+					}
+					ids = append(ids, id)
+				}
+				rows.Close()
+				if len(ids) != 1 {
+					rep.RelatedUnresolved++
+					continue
+				}
+				other = ids[0]
+			}
+			if other == pid {
+				continue
+			}
+			a, b := min(pid, other), max(pid, other)
+			res, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO person_relation (uuid, a_id, b_id, kind_id) VALUES (?, ?, ?, ?)`, uuid.NewString(), a, b, kindID)
+			if err != nil {
+				return err
+			}
+			if n, _ := res.RowsAffected(); n > 0 {
+				rep.RelatedLinks++
+			}
+		}
+	}
+	return nil
 }
 
 func nullable(s string) any {
@@ -442,7 +506,7 @@ func insertNotes(ctx context.Context, tx *sql.Tx, t *table, byDexID map[string]i
 				rep.NoteLinksMissing++
 				continue
 			}
-			if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO interaction_people (interaction_id, person_id) VALUES (?, ?)`, iid, pid); err != nil {
+			if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO activity_target (uuid, source_kind, source_id, target_kind, target_id) VALUES (?, 'interaction', ?, 'person', ?)`, uuid.New().String(), iid, pid); err != nil {
 				return err
 			}
 			rep.NoteLinks++

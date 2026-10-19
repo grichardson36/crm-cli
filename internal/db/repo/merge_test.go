@@ -34,6 +34,24 @@ func count(t *testing.T, d *sql.DB, q string, args ...any) int {
 	return n
 }
 
+// addTask inserts a task about a person through activity_target.
+func addTask(t *testing.T, d *sql.DB, uuid string, personID int64) {
+	t.Helper()
+	res, err := d.Exec(`INSERT INTO tasks (uuid, title) VALUES (?, 'Call')`, uuid)
+	require.NoError(t, err)
+	id, _ := res.LastInsertId()
+	mustExec(t, d, `INSERT INTO activity_target (uuid, source_kind, source_id, target_kind, target_id) VALUES (?, 'task', ?, 'person', ?)`, "at-"+uuid, id, personID)
+}
+
+// addDeal inserts a deal with a person link.
+func addDeal(t *testing.T, d *sql.DB, uuid string, personID int64, updatedAt string) {
+	t.Helper()
+	res, err := d.Exec(`INSERT INTO deals (uuid, title, updated_at) VALUES (?, 'Deal', ?)`, uuid, updatedAt)
+	require.NoError(t, err)
+	id, _ := res.LastInsertId()
+	mustExec(t, d, `INSERT INTO deal_person (uuid, deal_id, person_id) VALUES (?, ?, ?)`, "dp-"+uuid, id, personID)
+}
+
 func TestMerge_CombinesListsAndMovesRecords(t *testing.T) {
 	d, pr := openMergeDB(t)
 	ctx := context.Background()
@@ -54,19 +72,21 @@ func TestMerge_CombinesListsAndMovesRecords(t *testing.T) {
 	require.NoError(t, tags.Apply(ctx, "person", drop.ID, "friend"))
 	mustExec(t, d, `INSERT INTO custom_fields (entity_type, entity_id, field_name, field_value) VALUES ('person', ?, 'pet', 'cat'), ('person', ?, 'pet', 'dog'), ('person', ?, 'car', 'vw')`, keep.ID, drop.ID, drop.ID)
 	mustExec(t, d, `INSERT INTO interactions (uuid, type) VALUES ('i1', 'call'), ('i2', 'call')`)
-	mustExec(t, d, `INSERT INTO interaction_people (interaction_id, person_id) VALUES (1, ?), (1, ?), (2, ?)`, keep.ID, drop.ID, drop.ID)
-	mustExec(t, d, `INSERT INTO tasks (uuid, title, person_id) VALUES ('t1', 'Call', ?)`, drop.ID)
-	mustExec(t, d, `INSERT INTO task_people (task_id, person_id) VALUES (1, ?)`, drop.ID)
-	mustExec(t, d, `INSERT INTO deals (uuid, title, person_id) VALUES ('d1', 'Deal', ?)`, drop.ID)
+	mustExec(t, d, `INSERT INTO activity_target (uuid, source_kind, source_id, target_kind, target_id) VALUES
+		('a1', 'interaction', 1, 'person', ?), ('a2', 'interaction', 1, 'person', ?), ('a3', 'interaction', 2, 'person', ?)`, keep.ID, drop.ID, drop.ID)
+	addTask(t, d, "t1", drop.ID)
+	addDeal(t, d, "d1", drop.ID, "2000-01-01 00:00:00")
 	other, err := pr.Create(ctx, model.CreatePersonInput{FirstName: "Other"})
 	require.NoError(t, err)
-	mustExec(t, d, `INSERT INTO relationships (person_id, related_person_id, type) VALUES (?, ?, 'friend'), (?, ?, 'friend'), (?, ?, 'colleague'), (?, ?, 'friend')`,
-		drop.ID, other.ID, // moves
-		keep.ID, other.ID, // duplicate of the first once moved
+	mustExec(t, d, `INSERT INTO person_relation (uuid, a_id, b_id, kind_id) VALUES
+		('r1', ?, ?, (SELECT id FROM relation_kind WHERE name = 'friend')),
+		('r2', ?, ?, (SELECT id FROM relation_kind WHERE name = 'friend')),
+		('r3', ?, ?, (SELECT id FROM relation_kind WHERE name = 'colleague'))`,
+		keep.ID, other.ID, // the survivor already has this one
+		drop.ID, other.ID, // duplicate of it once moved
 		keep.ID, drop.ID, // becomes a self link
-		other.ID, drop.ID, // duplicate again (other->keep not present) moves
 	)
-	before := count(t, d, `SELECT COUNT(*) FROM relationships`)
+	before := count(t, d, `SELECT COUNT(*) FROM person_relation`)
 
 	res, err := pr.Merge(ctx, keep.ID, []int64{drop.ID}, nil)
 	require.NoError(t, err)
@@ -103,14 +123,16 @@ func TestMerge_CombinesListsAndMovesRecords(t *testing.T) {
 	}())
 
 	// Records move.
-	assert.Equal(t, 2, count(t, d, `SELECT COUNT(*) FROM interaction_people WHERE person_id=?`, keep.ID))
-	assert.Equal(t, 1, count(t, d, `SELECT COUNT(*) FROM tasks WHERE person_id=?`, keep.ID))
-	assert.Equal(t, 1, count(t, d, `SELECT COUNT(*) FROM task_people WHERE person_id=?`, keep.ID))
-	assert.Equal(t, 1, count(t, d, `SELECT COUNT(*) FROM deals WHERE person_id=?`, keep.ID))
-	assert.Equal(t, 0, count(t, d, `SELECT COUNT(*) FROM relationships WHERE person_id = related_person_id`), "no self links")
-	assert.Equal(t, before, count(t, d, `SELECT COUNT(*) FROM relationships`), "relationship rows are kept, never deleted")
-	assert.Equal(t, 1, count(t, d, `SELECT COUNT(*) FROM relationships WHERE person_id=? AND related_person_id=? AND type='friend'`, keep.ID, other.ID))
-	assert.Equal(t, 1, count(t, d, `SELECT COUNT(*) FROM relationships WHERE person_id=? AND related_person_id=? AND type='friend'`, other.ID, keep.ID))
+	live := func(table, where string, args ...any) int {
+		return count(t, d, `SELECT COUNT(*) FROM `+table+` WHERE deleted_at IS NULL AND `+where, args...)
+	}
+	assert.Equal(t, 2, live("activity_target", "source_kind = 'interaction' AND target_kind = 'person' AND target_id = ?", keep.ID))
+	assert.Equal(t, 1, live("activity_target", "source_kind = 'task' AND target_kind = 'person' AND target_id = ?", keep.ID))
+	assert.Equal(t, 1, live("deal_person", "person_id = ?", keep.ID))
+	assert.Equal(t, before, count(t, d, `SELECT COUNT(*) FROM person_relation`), "link rows are kept, duplicates are soft deleted")
+	assert.Equal(t, 1, live("person_relation", "1 = 1"), "one friend link is left: the duplicate and the self link are dropped")
+	assert.Equal(t, 1, live("person_relation", "a_id = ? AND b_id = ?", keep.ID, other.ID))
+	assert.Equal(t, 1, count(t, d, `SELECT COUNT(*) FROM merge_alias WHERE kind = 'person' AND old_id = ? AND survivor_id = ?`, drop.ID, keep.ID))
 
 	// The dropped person is archived, points at the survivor and keeps its original fields.
 	var archived int
@@ -217,7 +239,7 @@ func TestMerge_RollsBackOnFailure(t *testing.T) {
 	ctx := context.Background()
 	keep, _ := pr.Create(ctx, model.CreatePersonInput{FirstName: "Keep", Title: ptr("T")})
 	drop, _ := pr.Create(ctx, model.CreatePersonInput{FirstName: "Drop", Company: ptr("Acme"), Email: ptr("d@x.com")})
-	mustExec(t, d, `INSERT INTO tasks (uuid, title, person_id) VALUES ('t1', 'Call', ?)`, drop.ID)
+	addTask(t, d, "t1", drop.ID)
 
 	// Make the final archive step fail after earlier steps have written.
 	mustExec(t, d, `CREATE TRIGGER fail_archive BEFORE UPDATE OF archived ON people WHEN NEW.archived = 1 BEGIN SELECT RAISE(ABORT, 'boom'); END`)
@@ -229,7 +251,8 @@ func TestMerge_RollsBackOnFailure(t *testing.T) {
 	assert.Nil(t, got.Company, "scalar update rolled back")
 	assert.Nil(t, got.Email, "primary email rolled back")
 	assert.Equal(t, 0, count(t, d, `SELECT COUNT(*) FROM person_emails WHERE person_id=?`, keep.ID))
-	assert.Equal(t, 1, count(t, d, `SELECT COUNT(*) FROM tasks WHERE person_id=?`, drop.ID), "task move rolled back")
+	assert.Equal(t, 1, count(t, d, `SELECT COUNT(*) FROM activity_target WHERE source_kind = 'task' AND target_id = ?`, drop.ID), "task move rolled back")
+	assert.Equal(t, 0, count(t, d, `SELECT COUNT(*) FROM merge_alias`), "alias rolled back")
 	assert.Equal(t, 0, count(t, d, `SELECT COUNT(*) FROM people WHERE archived=1`))
 }
 
@@ -238,7 +261,7 @@ func TestMerge_DryRunChangesNothing(t *testing.T) {
 	ctx := context.Background()
 	keep, _ := pr.Create(ctx, model.CreatePersonInput{FirstName: "Keep"})
 	drop, _ := pr.Create(ctx, model.CreatePersonInput{FirstName: "Drop", Company: ptr("Acme"), Email: ptr("d@x.com")})
-	mustExec(t, d, `INSERT INTO tasks (uuid, title, person_id) VALUES ('t1', 'Call', ?)`, drop.ID)
+	addTask(t, d, "t1", drop.ID)
 
 	res, err := pr.MergeDryRun(ctx, keep.ID, []int64{drop.ID}, nil)
 	require.NoError(t, err)
@@ -248,7 +271,8 @@ func TestMerge_DryRunChangesNothing(t *testing.T) {
 
 	got, _ := pr.FindByID(ctx, keep.ID)
 	assert.Nil(t, got.Company)
-	assert.Equal(t, 1, count(t, d, `SELECT COUNT(*) FROM tasks WHERE person_id=?`, drop.ID))
+	assert.Equal(t, 1, count(t, d, `SELECT COUNT(*) FROM activity_target WHERE source_kind = 'task' AND target_id = ?`, drop.ID))
+	assert.Equal(t, 0, count(t, d, `SELECT COUNT(*) FROM merge_alias`))
 	_, err = pr.FindByID(ctx, drop.ID)
 	assert.NoError(t, err, "dropped person is still active")
 }
@@ -281,8 +305,9 @@ func TestMerge_UpdatesTimestamps(t *testing.T) {
 	keep, _ := pr.Create(ctx, model.CreatePersonInput{FirstName: "Keep"})
 	drop, _ := pr.Create(ctx, model.CreatePersonInput{FirstName: "Drop"})
 	mustExec(t, d, `UPDATE people SET updated_at = '2000-01-01 00:00:00'`)
-	mustExec(t, d, `INSERT INTO tasks (uuid, title, person_id, updated_at) VALUES ('t1', 'Call', ?, '2000-01-01 00:00:00')`, drop.ID)
-	mustExec(t, d, `INSERT INTO deals (uuid, title, person_id, updated_at) VALUES ('d1', 'Deal', ?, '2000-01-01 00:00:00')`, drop.ID)
+	addTask(t, d, "t1", drop.ID)
+	addDeal(t, d, "d1", drop.ID, "2000-01-01 00:00:00")
+	mustExec(t, d, `UPDATE tasks SET updated_at = '2000-01-01 00:00:00'`)
 
 	_, err := pr.Merge(ctx, keep.ID, []int64{drop.ID}, nil)
 	require.NoError(t, err)

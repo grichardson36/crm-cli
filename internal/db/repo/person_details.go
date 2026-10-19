@@ -42,7 +42,10 @@ func (r *PersonRepo) LoadDetails(ctx context.Context, p *model.Person) error {
 	if p.Phones, err = r.Phones(ctx, p.ID); err != nil {
 		return err
 	}
-	p.Handles, err = r.Handles(ctx, p.ID)
+	if p.Handles, err = r.Handles(ctx, p.ID); err != nil {
+		return err
+	}
+	p.Links, err = NewLinkRepo(r.db).All(ctx, Ref{Kind: "person", ID: p.ID})
 	return err
 }
 
@@ -304,7 +307,7 @@ func (r *PersonRepo) Due(ctx context.Context, withinDays, limit int) ([]model.Du
 		 FROM keep_in_touch_status k
 		 WHERE k.due_at <= datetime('now', '+' || ? || ' days')
 		   AND (k.keep_in_touch_snoozed_until IS NULL OR k.keep_in_touch_snoozed_until <= datetime('now'))
-		 ORDER BY k.due_at ASC LIMIT ?`, withinDays, limit)
+		 ORDER BY k.due_at ASC, k.person_id ASC LIMIT ?`, withinDays, limit)
 	if err != nil {
 		return nil, fmt.Errorf("list due contacts: %w", err)
 	}

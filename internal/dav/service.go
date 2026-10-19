@@ -103,6 +103,10 @@ func (s *Service) visible(ctx context.Context, davID string) (*repo.DavTarget, e
 	return t, nil
 }
 
+// loadPerson reads a person as the phone sees them. The vCard ORG is the person's primary
+// organization when there is one (E4), so Company is replaced by its name for rendering. The
+// stored people.company text is used when the person has no primary membership, and TITLE stays
+// people.title.
 func (s *Service) loadPerson(ctx context.Context, id int64) (*model.Person, error) {
 	p, err := s.People.FindByID(ctx, id)
 	if err != nil {
@@ -110,6 +114,11 @@ func (s *Service) loadPerson(ctx context.Context, id int64) (*model.Person, erro
 	}
 	if err := s.People.LoadDetails(ctx, p); err != nil {
 		return nil, err
+	}
+	if org, err := repo.PrimaryOrgName(ctx, s.DB, id); err != nil {
+		return nil, err
+	} else if org != "" {
+		p.Company = &org
 	}
 	return p, nil
 }
@@ -488,8 +497,18 @@ func (s *Service) mergeInto(ctx context.Context, p *model.Person, st *model.DavS
 		return at
 	}
 
-	// Scalars.
+	// Scalars. With a primary organization the CRM owns ORG: the phone cannot rename an organization
+	// from a contact, so its ORG change is not applied (the next GET puts the organization back).
 	decisions := mergeScalars(base.scalars(), crmView.scalars(), dev.scalars(), changedAt, now, mode)
+	if org, err := repo.PrimaryOrgName(ctx, s.DB, p.ID); err != nil {
+		return nil, err
+	} else if org != "" {
+		for i := range decisions {
+			if decisions[i].Field == fieldCompany {
+				decisions[i].Take, decisions[i].Conflict = false, false
+			}
+		}
+	}
 	var in model.UpdatePersonInput
 	for _, d := range decisions {
 		if d.Take {

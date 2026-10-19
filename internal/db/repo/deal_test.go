@@ -49,7 +49,7 @@ func TestDealCreate_WithValue(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, &value, deal.Value)
-	assert.Equal(t, &p.ID, deal.PersonID)
+	assert.Equal(t, []int64{p.ID}, deal.PersonIDs)
 }
 
 func TestDealCreate_InvalidStage(t *testing.T) {

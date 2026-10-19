@@ -36,7 +36,7 @@ func TestMigration007_TasksCanBeTaggedAndOldTagsSurvive(t *testing.T) {
 	require.Error(t, err)
 	require.NoError(t, raw.Close())
 
-	d, err := db.Open(path)
+	d, err := db.OpenUpTo(path, 7)
 	require.NoError(t, err)
 	defer d.Close()
 

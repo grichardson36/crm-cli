@@ -159,7 +159,7 @@ func TestNoteWithSelectedPerson(t *testing.T) {
 	require.Len(t, tasks, 1)
 	assert.Equal(t, "Follow up: called about the deal", tasks[0].Title)
 	assert.Equal(t, "2026-10-16", *tasks[0].DueAt)
-	assert.Equal(t, f.ids["Bob Baker"], *tasks[0].PersonID)
+	assert.Equal(t, []int64{f.ids["Bob Baker"]}, tasks[0].PersonIDs)
 }
 
 func TestNoteLeadingName(t *testing.T) {
@@ -315,7 +315,7 @@ func TestTask(t *testing.T) {
 	assert.Equal(t, "call back", task.Title)
 	assert.Equal(t, "2026-10-16 15:00", *task.DueAt)
 	assert.Equal(t, "high", task.Priority)
-	assert.Equal(t, f.ids["Bob Baker"], *task.PersonID)
+	assert.Equal(t, []int64{f.ids["Bob Baker"]}, task.PersonIDs)
 	assert.Nil(t, task.Description)
 }
 
@@ -341,7 +341,7 @@ func TestTaskWithoutPersonIsAllowed(t *testing.T) {
 	res, err := Apply(context.Background(), f.repos, p)
 	require.NoError(t, err)
 	task, _ := f.repos.Tasks.FindByID(context.Background(), res.Changes[0].ID)
-	assert.Nil(t, task.PersonID)
+	assert.Empty(t, task.PersonIDs)
 	assert.Equal(t, "medium", task.Priority)
 	assert.Equal(t, "2026-10-16", *task.DueAt)
 }

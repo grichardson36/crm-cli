@@ -58,7 +58,7 @@ func openAtV2(t *testing.T) string {
 
 func TestMigration004_UpgradeFromV2(t *testing.T) {
 	path := openAtV2(t)
-	d, err := db.Open(path)
+	d, err := db.OpenUpTo(path, 7)
 	require.NoError(t, err)
 	defer d.Close()
 
@@ -176,7 +176,8 @@ func TestMigration004_CountsAsContact(t *testing.T) {
 		`INSERT INTO interactions (uuid, type, occurred_at) VALUES ('i2', 'journal', '2026-03-01 00:00:00')`,
 		`INSERT INTO interactions (uuid, type, occurred_at) VALUES ('i3', 'note', '2026-04-01 00:00:00')`,
 		`INSERT INTO interactions (uuid, type, occurred_at) VALUES ('i4', 'unlisted', '2026-02-15 00:00:00')`,
-		`INSERT INTO interaction_people (interaction_id, person_id) VALUES (1, 1), (2, 1), (3, 1), (4, 1)`,
+		`INSERT INTO activity_target (uuid, source_kind, source_id, target_kind, target_id) VALUES
+			('a1', 'interaction', 1, 'person', 1), ('a2', 'interaction', 2, 'person', 1), ('a3', 'interaction', 3, 'person', 1), ('a4', 'interaction', 4, 'person', 1)`,
 	}
 	for _, s := range stmts {
 		_, err = d.Exec(s)
@@ -189,7 +190,7 @@ func TestMigration004_CountsAsContact(t *testing.T) {
 
 func TestMigration004_Down(t *testing.T) {
 	path := openAtV2(t)
-	d, err := db.Open(path)
+	d, err := db.OpenUpTo(path, 7)
 	require.NoError(t, err)
 	defer d.Close()
 

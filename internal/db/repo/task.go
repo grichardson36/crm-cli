@@ -22,42 +22,46 @@ func NewTaskRepo(db *sql.DB) *TaskRepo {
 	return &TaskRepo{db: db}
 }
 
-const taskColumns = `id, uuid, title, description, person_id, deal_id, due_at, priority,
+const taskColumns = `id, uuid, title, description, due_at, priority,
 	completed, completed_at, archived, created_at, updated_at, recurrence`
 
 func scanTask(row interface{ Scan(...any) error }) (*model.Task, error) {
 	var t model.Task
 	err := row.Scan(
-		&t.ID, &t.UUID, &t.Title, &t.Description, &t.PersonID, &t.DealID,
+		&t.ID, &t.UUID, &t.Title, &t.Description,
 		&t.DueAt, &t.Priority, &t.Completed, &t.CompletedAt,
 		&t.Archived, &t.CreatedAt, &t.UpdatedAt, &t.Recurrence,
 	)
 	return &t, err
 }
 
-// loadPeople fills t.PersonIDs from task_people.
-func (r *TaskRepo) loadPeople(ctx context.Context, t *model.Task) error {
-	rows, err := r.db.QueryContext(ctx, `SELECT person_id FROM task_people WHERE task_id = ? ORDER BY person_id`, t.ID)
+// loadTargets fills the linked people, organizations and deals of tasks.
+func (r *TaskRepo) loadTargets(ctx context.Context, tasks ...*model.Task) error {
+	ids := make([]int64, len(tasks))
+	for i, t := range tasks {
+		ids[i] = t.ID
+	}
+	m, err := loadTargets(ctx, r.db, "task", ids)
 	if err != nil {
-		return fmt.Errorf("load task people: %w", err)
+		return err
 	}
-	defer rows.Close()
-	t.PersonIDs = nil
-	for rows.Next() {
-		var id int64
-		if err := rows.Scan(&id); err != nil {
-			return err
+	for _, t := range tasks {
+		t.PersonIDs, t.OrgIDs, t.DealIDs = nil, nil, nil
+		if x := m[t.ID]; x != nil {
+			t.PersonIDs, t.OrgIDs, t.DealIDs = x.People, x.Orgs, x.Deals
 		}
-		t.PersonIDs = append(t.PersonIDs, id)
 	}
-	return rows.Err()
+	return nil
 }
 
-// linkPeople links a task to people, ignoring ones already linked.
-func (r *TaskRepo) linkPeople(ctx context.Context, taskID int64, ids []int64) error {
-	for _, pid := range ids {
-		if _, err := r.db.ExecContext(ctx, `INSERT OR IGNORE INTO task_people (task_id, person_id) VALUES (?, ?)`, taskID, pid); err != nil {
-			return fmt.Errorf("link person %d to task %d: %w", pid, taskID, err)
+// linkTargets links a task to people, organizations and deals, skipping ones already linked.
+func (r *TaskRepo) linkTargets(ctx context.Context, taskID int64, people, orgs, deals []int64) error {
+	for _, g := range []struct {
+		kind string
+		ids  []int64
+	}{{"person", people}, {"organization", orgs}, {"deal", deals}} {
+		if err := addTargets(ctx, r.db, "task", taskID, g.kind, g.ids); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -78,9 +82,9 @@ func (r *TaskRepo) Create(ctx context.Context, input model.CreateTaskInput) (*mo
 		}
 	}
 
-	cols := []string{"uuid", "title", "description", "person_id", "deal_id", "due_at", "priority", "recurrence"}
+	cols := []string{"uuid", "title", "description", "due_at", "priority", "recurrence"}
 	id := uuid.New().String()
-	vals := []any{id, input.Title, input.Description, input.PersonID, input.DealID, input.DueAt, input.Priority, input.Recurrence}
+	vals := []any{id, input.Title, input.Description, input.DueAt, input.Priority, input.Recurrence}
 	ph := strings.TrimSuffix(strings.Repeat("?, ", len(cols)), ", ")
 	result, err := r.db.ExecContext(ctx,
 		"INSERT INTO tasks ("+strings.Join(cols, ", ")+") VALUES ("+ph+")", vals...)
@@ -89,11 +93,15 @@ func (r *TaskRepo) Create(ctx context.Context, input model.CreateTaskInput) (*mo
 	}
 
 	taskID, _ := result.LastInsertId()
-	people := input.PersonIDs
+	people := append([]int64(nil), input.PersonIDs...)
 	if input.PersonID != nil {
 		people = append(people, *input.PersonID)
 	}
-	if err := r.linkPeople(ctx, taskID, people); err != nil {
+	deals := append([]int64(nil), input.DealIDs...)
+	if input.DealID != nil {
+		deals = append(deals, *input.DealID)
+	}
+	if err := r.linkTargets(ctx, taskID, people, input.OrgIDs, deals); err != nil {
 		return nil, err
 	}
 	if len(input.Tags) > 0 {
@@ -117,7 +125,7 @@ func (r *TaskRepo) FindByID(ctx context.Context, id int64) (*model.Task, error) 
 		}
 		return nil, fmt.Errorf("find task %d: %w", id, err)
 	}
-	if err := r.loadPeople(ctx, t); err != nil {
+	if err := r.loadTargets(ctx, t); err != nil {
 		return nil, err
 	}
 	if err := r.loadTags(ctx, t); err != nil {
@@ -152,11 +160,15 @@ func (r *TaskRepo) FindAll(ctx context.Context, filters model.TaskFilters) ([]*m
 	var args []any
 
 	if filters.PersonID != nil {
-		query += " AND (person_id = ? OR id IN (SELECT task_id FROM task_people WHERE person_id = ?))"
-		args = append(args, *filters.PersonID, *filters.PersonID)
+		query += " AND id IN (SELECT source_id FROM activity_target WHERE source_kind = 'task' AND target_kind = 'person' AND target_id = ? AND deleted_at IS NULL)"
+		args = append(args, *filters.PersonID)
+	}
+	if filters.OrgID != nil {
+		query += " AND id IN (SELECT source_id FROM activity_target WHERE source_kind = 'task' AND target_kind = 'organization' AND target_id = ? AND deleted_at IS NULL)"
+		args = append(args, *filters.OrgID)
 	}
 	if filters.DealID != nil {
-		query += " AND deal_id = ?"
+		query += " AND id IN (SELECT source_id FROM activity_target WHERE source_kind = 'task' AND target_kind = 'deal' AND target_id = ? AND deleted_at IS NULL)"
 		args = append(args, *filters.DealID)
 	}
 	if filters.Tag != nil {
@@ -195,10 +207,10 @@ func (r *TaskRepo) FindAll(ctx context.Context, filters model.TaskFilters) ([]*m
 		return nil, err
 	}
 	rows.Close()
+	if err := r.loadTargets(ctx, tasks...); err != nil {
+		return nil, err
+	}
 	for _, t := range tasks {
-		if err := r.loadPeople(ctx, t); err != nil {
-			return nil, err
-		}
 		if err := r.loadTags(ctx, t); err != nil {
 			return nil, err
 		}
@@ -242,11 +254,11 @@ func (r *TaskRepo) Complete(ctx context.Context, id int64) (*model.Task, error) 
 		next, err := r.Create(ctx, model.CreateTaskInput{
 			Title:       done.Title,
 			Description: done.Description,
-			PersonID:    done.PersonID,
-			DealID:      done.DealID,
 			DueAt:       &nextDue,
 			Priority:    done.Priority,
 			PersonIDs:   done.PersonIDs,
+			OrgIDs:      done.OrgIDs,
+			DealIDs:     done.DealIDs,
 			Recurrence:  done.Recurrence,
 		})
 		if err != nil {
@@ -270,17 +282,20 @@ func (r *TaskRepo) Update(ctx context.Context, id int64, input model.UpdateTaskI
 		setClauses = append(setClauses, "description = ?")
 		args = append(args, *input.Description)
 	}
-	if input.PersonID != nil {
-		setClauses = append(setClauses, "person_id = ?")
-		args = append(args, *input.PersonID)
-	}
-	if input.DealID != nil {
-		setClauses = append(setClauses, "deal_id = ?")
-		args = append(args, *input.DealID)
-	}
 	if input.DueAt != nil {
-		setClauses = append(setClauses, "due_at = ?")
-		args = append(args, *input.DueAt)
+		if *input.DueAt == "" {
+			cur, err := r.FindByID(ctx, id)
+			if err != nil {
+				return nil, err
+			}
+			if cur.Recurrence != nil && (input.Recurrence == nil || *input.Recurrence != "") {
+				return nil, fmt.Errorf("a recurring task needs a due date, clear the recurrence too: %w", model.ErrValidation)
+			}
+			setClauses = append(setClauses, "due_at = NULL")
+		} else {
+			setClauses = append(setClauses, "due_at = ?")
+			args = append(args, *input.DueAt)
+		}
 	}
 	if input.Priority != nil {
 		if !model.ValidPriority(*input.Priority) {
@@ -302,11 +317,14 @@ func (r *TaskRepo) Update(ctx context.Context, id int64, input model.UpdateTaskI
 		}
 	}
 
-	if len(setClauses) == 0 {
+	if len(setClauses) == 0 && input.PersonID == nil && input.DealID == nil {
 		return r.FindByID(ctx, id)
 	}
 
 	before, _ := r.FindByID(ctx, id)
+	if len(setClauses) == 0 {
+		setClauses = append(setClauses, "title = title")
+	}
 	setClauses = append(setClauses, "updated_at = datetime('now')")
 	args = append(args, id)
 
@@ -320,10 +338,15 @@ func (r *TaskRepo) Update(ctx context.Context, id int64, input model.UpdateTaskI
 	if rows == 0 {
 		return nil, fmt.Errorf("task %d: %w", id, model.ErrNotFound)
 	}
+	var addPeople, addDeals []int64
 	if input.PersonID != nil {
-		if err := r.linkPeople(ctx, id, []int64{*input.PersonID}); err != nil {
-			return nil, err
-		}
+		addPeople = []int64{*input.PersonID}
+	}
+	if input.DealID != nil {
+		addDeals = []int64{*input.DealID}
+	}
+	if err := r.linkTargets(ctx, id, addPeople, nil, addDeals); err != nil {
+		return nil, err
 	}
 
 	after, err := r.FindByID(ctx, id)

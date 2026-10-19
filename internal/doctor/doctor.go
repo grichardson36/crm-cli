@@ -98,6 +98,7 @@ func Run(ctx context.Context, opt Options) Report {
 		defer ro.Close()
 		add(checkIntegrity(ro))
 		add(checkSchema(ro))
+		add(checkLinks(ctx, ro))
 	}
 
 	add(checkWAL(dbPath))
@@ -170,6 +171,25 @@ func checkSchema(d *sql.DB) Check {
 	default:
 		return Check{Name: "schema", Status: Fail, Message: fmt.Sprintf("schema version %d is newer than this build (%d)", v, latest), Fix: "install a newer crm binary: see INSTALL.md"}
 	}
+}
+
+// checkLinks reports links that point at nothing: activity rows whose task, note or target is gone,
+// merge aliases without a survivor, and foreign key violations.
+func checkLinks(ctx context.Context, d *sql.DB) Check {
+	v, err := db.SchemaVersion(d)
+	if err != nil || v < 8 {
+		return Check{Name: "links", Status: OK, Message: "links are checked after the upgrade to schema 8"}
+	}
+	p, err := repo.CheckLinks(ctx, d)
+	if err != nil {
+		return Check{Name: "links", Status: Fail, Message: err.Error(), Fix: "restore the latest backup"}
+	}
+	if p.Total() > 0 {
+		return Check{Name: "links", Status: Fail,
+			Message: fmt.Sprintf("%d activity links and %d merge aliases point at nothing, %d foreign key violations", p.ActivityOrphans, p.AliasOrphans, p.ForeignKeys),
+			Fix:     "restore the latest backup, or delete the orphan rows from activity_target and merge_alias"}
+	}
+	return Check{Name: "links", Status: OK, Message: "no orphan links"}
 }
 
 func checkWAL(dbPath string) Check {

@@ -43,10 +43,6 @@ func intVal(p *int) string {
 
 // personFieldValues flattens the scalar fields that field_versions tracks into comparable strings.
 func personFieldValues(p *model.Person) map[string]string {
-	orgID := "\x00"
-	if p.OrgID != nil {
-		orgID = "i:" + strconv.FormatInt(*p.OrgID, 10)
-	}
 	return map[string]string{
 		"first_name":                  "s:" + p.FirstName,
 		"last_name":                   strVal(p.LastName),
@@ -57,7 +53,6 @@ func personFieldValues(p *model.Person) map[string]string {
 		"location":                    strVal(p.Location),
 		"notes":                       strVal(p.Notes),
 		"summary":                     strVal(p.Summary),
-		"org_id":                      orgID,
 		"birthday":                    intVal(p.BirthdayMonth) + "/" + intVal(p.BirthdayDay) + "/" + intVal(p.BirthdayYear),
 		"keep_in_touch":               strVal(p.KeepInTouch),
 		"keep_in_touch_snoozed_until": strVal(p.KeepInTouchSnoozedUntil),

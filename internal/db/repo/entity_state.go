@@ -37,7 +37,7 @@ func (r *TaskRepo) FindByUUID(ctx context.Context, id string) (*model.Task, erro
 		}
 		return nil, fmt.Errorf("find task %s: %w", id, err)
 	}
-	if err := r.loadPeople(ctx, t); err != nil {
+	if err := r.loadTargets(ctx, t); err != nil {
 		return nil, err
 	}
 	return t, nil

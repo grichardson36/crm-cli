@@ -17,7 +17,7 @@ type MergeResult struct {
 	Fields  []MergeFieldChange `json:"fields"`
 	// Added counts attribute rows copied to the survivor: emails, phones, handles, tags, custom_fields.
 	Added map[string]int `json:"added"`
-	// Moved counts records re-pointed to the survivor: interactions, tasks, task_people, deals, relationships.
+	// Moved counts records re-pointed to the survivor: interactions, tasks, deals (deal links), relationships (person links), memberships, duplicates_dropped, aliases.
 	Moved map[string]int `json:"moved"`
 	// Removed counts survivor rows deleted because MergeOptions.Exclude named them. Absent when none.
 	Removed map[string]int `json:"removed,omitempty"`

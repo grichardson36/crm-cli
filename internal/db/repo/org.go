@@ -35,6 +35,9 @@ func scanOrg(row interface{ Scan(...any) error }) (*model.Organization, error) {
 	return &o, nil
 }
 
+// DB returns the database the repository works on.
+func (r *OrgRepo) DB() *sql.DB { return r.db }
+
 // Create inserts a new organization.
 func (r *OrgRepo) Create(ctx context.Context, input model.CreateOrgInput) (*model.Organization, error) {
 	id := uuid.New().String()
@@ -136,6 +139,11 @@ func (r *OrgRepo) Update(ctx context.Context, id int64, input model.UpdateOrgInp
 	if err != nil {
 		return nil, fmt.Errorf("update organization %d: %w", id, err)
 	}
+	if input.Name != nil {
+		if err := r.touchMembers(ctx, id); err != nil {
+			return nil, err
+		}
+	}
 
 	rows, err := result.RowsAffected()
 	if err != nil {
@@ -199,10 +207,11 @@ func (r *OrgRepo) Search(ctx context.Context, query string, limit int) ([]*model
 	return orgs, nil
 }
 
-// FindPeople returns all people belonging to an organization.
+// FindPeople returns the people with a live membership in an organization, current or past.
 func (r *OrgRepo) FindPeople(ctx context.Context, orgID int64) ([]*model.Person, error) {
 	rows, err := r.db.QueryContext(ctx,
-		fmt.Sprintf("SELECT %s FROM people WHERE org_id = ? AND archived = 0 ORDER BY first_name", personColumns), orgID)
+		fmt.Sprintf(`SELECT %s FROM people WHERE archived = 0
+			AND id IN (SELECT person_id FROM membership WHERE org_id = ? AND deleted_at IS NULL) ORDER BY first_name`, personColumns), orgID)
 	if err != nil {
 		return nil, fmt.Errorf("find people for org %d: %w", orgID, err)
 	}
@@ -247,6 +256,17 @@ func (r *OrgRepo) Overwrite(ctx context.Context, id int64, o *model.Organization
 	}
 	if rows, _ := result.RowsAffected(); rows == 0 {
 		return fmt.Errorf("organization %d: %w", id, model.ErrNotFound)
+	}
+	return r.touchMembers(ctx, id)
+}
+
+// touchMembers bumps updated_at of the people whose primary organization this is. The phone shows
+// the organization name as the vCard ORG, so a rename must reach their contacts.
+func (r *OrgRepo) touchMembers(ctx context.Context, orgID int64) error {
+	_, err := r.db.ExecContext(ctx, `UPDATE people SET updated_at = datetime('now') WHERE id IN
+		(SELECT person_id FROM membership WHERE org_id = ? AND is_primary = 1 AND deleted_at IS NULL)`, orgID)
+	if err != nil {
+		return fmt.Errorf("touch members of organization %d: %w", orgID, err)
 	}
 	return nil
 }

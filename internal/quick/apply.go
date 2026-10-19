@@ -462,10 +462,6 @@ func InverseUpdate(before *model.Person, in model.UpdatePersonInput) model.Updat
 	inv.Location = str(in.Location != nil, strOf(before.Location))
 	inv.Notes = str(in.Notes != nil, strOf(before.Notes))
 	inv.Summary = str(in.Summary != nil, strOf(before.Summary))
-	if in.OrgID != nil && before.OrgID != nil {
-		v := *before.OrgID
-		inv.OrgID = &v
-	}
 	if def, ok := lookupField("birthday"); ok {
 		inv.Birthday = str(in.Birthday != nil, def.get(before))
 	}

@@ -193,7 +193,7 @@ func TestPersonArchiveRestorePurge(t *testing.T) {
 	tr := repo.NewTaskRepo(d)
 	dr := repo.NewDealRepo(d)
 	tagr := repo.NewTagRepo(d)
-	rr := repo.NewRelationshipRepo(d)
+	lr := repo.NewLinkRepo(d)
 	ctx := context.Background()
 
 	keep, _ := pr.Create(ctx, model.CreatePersonInput{FirstName: "Keep", Email: ptr("keep@x.com")})
@@ -214,7 +214,8 @@ func TestPersonArchiveRestorePurge(t *testing.T) {
 	deal, err := dr.Create(ctx, model.CreateDealInput{Title: "Deal", Stage: "lead", PersonID: &gone.ID})
 	require.NoError(t, err)
 	require.NoError(t, tagr.Apply(ctx, "person", gone.ID, "vip"))
-	_, err = rr.Create(ctx, gone.ID, keep.ID, "friend", nil)
+	friend := "friend"
+	_, err = lr.Link(ctx, repo.Ref{Kind: "person", ID: gone.ID}, repo.Ref{Kind: "person", ID: keep.ID}, model.LinkAttrs{Kind: &friend})
 	require.NoError(t, err)
 
 	t.Run("purge refuses an active person", func(t *testing.T) {
@@ -257,13 +258,16 @@ func TestPersonArchiveRestorePurge(t *testing.T) {
 		assert.Equal(t, 0, count(`SELECT COUNT(*) FROM person_emails WHERE person_id = ?`, gone.ID))
 		assert.Equal(t, 0, count(`SELECT COUNT(*) FROM person_phones WHERE person_id = ?`, gone.ID))
 		assert.Equal(t, 0, count(`SELECT COUNT(*) FROM person_handles WHERE person_id = ?`, gone.ID))
-		assert.Equal(t, 0, count(`SELECT COUNT(*) FROM relationships`))
+		assert.Equal(t, 0, count(`SELECT COUNT(*) FROM person_relation`))
+		assert.Equal(t, 0, count(`SELECT COUNT(*) FROM activity_target WHERE target_kind = 'person' AND target_id = ?`, gone.ID))
 		assert.Equal(t, 0, count(`SELECT COUNT(*) FROM taggings`))
 		assert.Equal(t, 0, count(`SELECT COUNT(*) FROM interactions WHERE id = ?`, solo.ID), "solo interaction removed")
 		assert.Equal(t, 1, count(`SELECT COUNT(*) FROM interactions WHERE id = ?`, shared.ID), "shared interaction kept")
 		assert.Equal(t, 0, count(`SELECT COUNT(*) FROM tasks WHERE id = ?`, soloTask.ID))
-		assert.Equal(t, 1, count(`SELECT COUNT(*) FROM tasks WHERE id = ? AND person_id IS NULL`, sharedTask.ID))
-		assert.Equal(t, 1, count(`SELECT COUNT(*) FROM deals WHERE id = ? AND person_id IS NULL`, deal.ID))
+		assert.Equal(t, 1, count(`SELECT COUNT(*) FROM tasks WHERE id = ?`, sharedTask.ID), "shared task kept")
+		assert.Equal(t, 0, count(`SELECT COUNT(*) FROM activity_target WHERE source_kind = 'task' AND source_id = ? AND target_id = ?`, sharedTask.ID, gone.ID))
+		assert.Equal(t, 1, count(`SELECT COUNT(*) FROM deals WHERE id = ?`, deal.ID))
+		assert.Equal(t, 0, count(`SELECT COUNT(*) FROM deal_person WHERE deal_id = ?`, deal.ID))
 		assert.Equal(t, 1, count(`SELECT COUNT(*) FROM people WHERE id = ?`, keep.ID))
 		assert.Equal(t, 0, count(`SELECT COUNT(*) FROM interactions_fts WHERE interactions_fts MATCH 'solo'`))
 
@@ -287,7 +291,7 @@ func TestEveryWriteBumpsUpdatedAt(t *testing.T) {
 		dr                                   *repo.DealRepo
 		tr                                   *repo.TaskRepo
 		tagr                                 *repo.TagRepo
-		rr                                   *repo.RelationshipRepo
+		lr                                   *repo.LinkRepo
 		nr                                   *repo.NoteTypeRepo
 		person, other, org, deal, task, note int64
 	}
@@ -354,18 +358,19 @@ func TestEveryWriteBumpsUpdatedAt(t *testing.T) {
 			return f.tagr.Delete(ctx, "vip")
 		}},
 		{"relationship create", "people", func(f *fx) int64 { return f.other }, func(f *fx) error {
-			_, err := f.rr.Create(ctx, f.person, f.other, "friend", nil)
+			_, err := f.lr.Link(ctx, repo.Ref{Kind: "person", ID: f.person}, repo.Ref{Kind: "person", ID: f.other}, model.LinkAttrs{Kind: ptr("friend")})
 			return err
 		}},
 		{"relationship delete", "people", func(f *fx) int64 { return f.other }, func(f *fx) error {
-			rel, err := f.rr.Create(ctx, f.person, f.other, "friend", nil)
+			_, err := f.lr.Link(ctx, repo.Ref{Kind: "person", ID: f.person}, repo.Ref{Kind: "person", ID: f.other}, model.LinkAttrs{Kind: ptr("friend")})
 			if err != nil {
 				return err
 			}
 			if _, err := f.d.Exec(`UPDATE people SET updated_at = ?`, old); err != nil {
 				return err
 			}
-			return f.rr.Delete(ctx, rel.ID)
+			_, err = f.lr.Unlink(ctx, repo.Ref{Kind: "person", ID: f.person}, repo.Ref{Kind: "person", ID: f.other})
+			return err
 		}},
 		{"org update", "organizations", func(f *fx) int64 { return f.org }, func(f *fx) error {
 			_, err := f.or.Update(ctx, f.org, model.UpdateOrgInput{Industry: ptr("Tech")})
@@ -410,7 +415,7 @@ func TestEveryWriteBumpsUpdatedAt(t *testing.T) {
 			d := openRaw(t)
 			f := &fx{
 				d: d, pr: repo.NewPersonRepo(d), or: repo.NewOrgRepo(d), dr: repo.NewDealRepo(d),
-				tr: repo.NewTaskRepo(d), tagr: repo.NewTagRepo(d), rr: repo.NewRelationshipRepo(d),
+				tr: repo.NewTaskRepo(d), tagr: repo.NewTagRepo(d), lr: repo.NewLinkRepo(d),
 				nr: repo.NewNoteTypeRepo(d),
 			}
 			p, err := f.pr.Create(ctx, model.CreatePersonInput{FirstName: "Jane", Email: ptr("jane@x.com"), Phone: ptr("+15550001")})

@@ -322,7 +322,7 @@ func TestInteractions(t *testing.T) {
 	assert.Equal(t, 1, res.Created)
 	assert.Equal(t, 1, res.Inbox)
 	var pid int64
-	require.NoError(t, e.db.QueryRow(`SELECT person_id FROM interaction_people`).Scan(&pid))
+	require.NoError(t, e.db.QueryRow(`SELECT target_id FROM activity_target WHERE source_kind = 'interaction' AND target_kind = 'person'`).Scan(&pid))
 	assert.Equal(t, jane.ID, pid)
 
 	// Redelivery is skipped by external id.

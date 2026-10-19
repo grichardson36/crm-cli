@@ -21,15 +21,79 @@ func NewDealRepo(db *sql.DB) *DealRepo {
 	return &DealRepo{db: db}
 }
 
+const dealColumns = `id, uuid, title, value, stage, notes, closed_at, archived, created_at, updated_at`
+
 func scanDeal(row interface{ Scan(...any) error }) (*model.Deal, error) {
 	var d model.Deal
 	err := row.Scan(
 		&d.ID, &d.UUID, &d.Title, &d.Value, &d.Stage,
-		&d.PersonID, &d.OrgID, &d.Notes, &d.ClosedAt,
+		&d.Notes, &d.ClosedAt,
 		&d.Archived, &d.CreatedAt, &d.UpdatedAt,
 	)
 	return &d, err
 }
+
+// loadLinks fills the linked people and organizations of deals. Archived people and organizations
+// are hidden. OrgID is the primary organization.
+func (r *DealRepo) loadLinks(ctx context.Context, deals ...*model.Deal) error {
+	for _, d := range deals {
+		d.PersonIDs, d.OrgIDs, d.OrgID = nil, nil, nil
+		rows, err := r.db.QueryContext(ctx, `SELECT p.id FROM deal_person dp JOIN people p ON p.id = dp.person_id
+			WHERE dp.deal_id = ? AND dp.deleted_at IS NULL AND p.archived = 0 ORDER BY p.id`, d.ID)
+		if err != nil {
+			return fmt.Errorf("load deal people: %w", err)
+		}
+		for rows.Next() {
+			var id int64
+			if err := rows.Scan(&id); err != nil {
+				rows.Close()
+				return err
+			}
+			d.PersonIDs = append(d.PersonIDs, id)
+		}
+		rows.Close()
+		rows, err = r.db.QueryContext(ctx, `SELECT o.id, dorg.is_primary FROM deal_org dorg JOIN organizations o ON o.id = dorg.org_id
+			WHERE dorg.deal_id = ? AND dorg.deleted_at IS NULL AND o.archived = 0 ORDER BY dorg.is_primary DESC, o.id`, d.ID)
+		if err != nil {
+			return fmt.Errorf("load deal organizations: %w", err)
+		}
+		for rows.Next() {
+			var id int64
+			var primary int
+			if err := rows.Scan(&id, &primary); err != nil {
+				rows.Close()
+				return err
+			}
+			d.OrgIDs = append(d.OrgIDs, id)
+			if primary == 1 {
+				oid := id
+				d.OrgID = &oid
+			}
+		}
+		rows.Close()
+	}
+	return nil
+}
+
+// linkInput links the person and organization of a create or update call. The organization
+// becomes the deal's primary one.
+func (r *DealRepo) linkInput(ctx context.Context, dealID int64, personID, orgID *int64) error {
+	lr := NewLinkRepo(r.db)
+	if personID != nil {
+		if _, err := lr.Link(ctx, Ref{"deal", dealID}, Ref{"person", *personID}, model.LinkAttrs{}); err != nil {
+			return err
+		}
+	}
+	if orgID != nil {
+		yes := true
+		if _, err := lr.Link(ctx, Ref{"deal", dealID}, Ref{"organization", *orgID}, model.LinkAttrs{Primary: &yes}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func closedStage(stage string) bool { return stage == "won" || stage == "lost" }
 
 // Create inserts a new deal.
 func (r *DealRepo) Create(ctx context.Context, input model.CreateDealInput) (*model.Deal, error) {
@@ -38,38 +102,41 @@ func (r *DealRepo) Create(ctx context.Context, input model.CreateDealInput) (*mo
 	}
 
 	id := uuid.New().String()
+	// closed_at is set when a deal starts out won or lost (patterns/one-verb-set).
 	result, err := r.db.ExecContext(ctx,
-		`INSERT INTO deals (uuid, title, value, stage, person_id, org_id, notes)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		id, input.Title, input.Value, input.Stage, input.PersonID, input.OrgID, input.Notes)
+		`INSERT INTO deals (uuid, title, value, stage, notes, closed_at)
+		 VALUES (?, ?, ?, ?, ?, CASE WHEN ? IN ('won', 'lost') THEN datetime('now') END)`,
+		id, input.Title, input.Value, input.Stage, input.Notes, input.Stage)
 	if err != nil {
 		return nil, fmt.Errorf("create deal: %w", err)
 	}
 
 	dealID, _ := result.LastInsertId()
+	if err := r.linkInput(ctx, dealID, input.PersonID, input.OrgID); err != nil {
+		return nil, err
+	}
 	return r.FindByID(ctx, dealID)
 }
 
 // FindByID returns a deal by ID.
 func (r *DealRepo) FindByID(ctx context.Context, id int64) (*model.Deal, error) {
 	d, err := scanDeal(r.db.QueryRowContext(ctx,
-		`SELECT id, uuid, title, value, stage, person_id, org_id, notes, closed_at,
-		        archived, created_at, updated_at
-		 FROM deals WHERE id = ? AND archived = 0`, id))
+		`SELECT `+dealColumns+` FROM deals WHERE id = ? AND archived = 0`, id))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("deal %d: %w", id, model.ErrNotFound)
 		}
 		return nil, fmt.Errorf("find deal %d: %w", id, err)
 	}
+	if err := r.loadLinks(ctx, d); err != nil {
+		return nil, err
+	}
 	return d, nil
 }
 
 // FindAll returns deals with optional filters.
 func (r *DealRepo) FindAll(ctx context.Context, filters model.DealFilters) ([]*model.Deal, error) {
-	query := `SELECT id, uuid, title, value, stage, person_id, org_id, notes, closed_at,
-	                 archived, created_at, updated_at
-	          FROM deals WHERE archived = 0`
+	query := `SELECT ` + dealColumns + ` FROM deals WHERE archived = 0`
 	var args []any
 
 	if filters.Stage != nil {
@@ -77,11 +144,11 @@ func (r *DealRepo) FindAll(ctx context.Context, filters model.DealFilters) ([]*m
 		args = append(args, *filters.Stage)
 	}
 	if filters.PersonID != nil {
-		query += " AND person_id = ?"
+		query += " AND id IN (SELECT deal_id FROM deal_person WHERE person_id = ? AND deleted_at IS NULL)"
 		args = append(args, *filters.PersonID)
 	}
 	if filters.OrgID != nil {
-		query += " AND org_id = ?"
+		query += " AND id IN (SELECT deal_id FROM deal_org WHERE org_id = ? AND deleted_at IS NULL)"
 		args = append(args, *filters.OrgID)
 	}
 	if filters.ExcludeClosed {
@@ -109,7 +176,14 @@ func (r *DealRepo) FindAll(ctx context.Context, filters model.DealFilters) ([]*m
 		}
 		deals = append(deals, d)
 	}
-	return deals, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
+	if err := r.loadLinks(ctx, deals...); err != nil {
+		return nil, err
+	}
+	return deals, nil
 }
 
 // Update modifies a deal.
@@ -131,14 +205,15 @@ func (r *DealRepo) Update(ctx context.Context, id int64, input model.UpdateDealI
 		}
 		setClauses = append(setClauses, "stage = ?")
 		args = append(args, *input.Stage)
-	}
-	if input.PersonID != nil {
-		setClauses = append(setClauses, "person_id = ?")
-		args = append(args, *input.PersonID)
-	}
-	if input.OrgID != nil {
-		setClauses = append(setClauses, "org_id = ?")
-		args = append(args, *input.OrgID)
+		// closed_at follows the stage: set when it becomes won or lost, cleared when it reopens.
+		// A deal that moves between won and lost keeps its first close time.
+		if input.ClosedAt == nil {
+			if closedStage(*input.Stage) {
+				setClauses = append(setClauses, "closed_at = COALESCE(closed_at, datetime('now'))")
+			} else {
+				setClauses = append(setClauses, "closed_at = NULL")
+			}
+		}
 	}
 	if input.Notes != nil {
 		setClauses = append(setClauses, "notes = ?")
@@ -146,10 +221,13 @@ func (r *DealRepo) Update(ctx context.Context, id int64, input model.UpdateDealI
 	}
 	if input.ClosedAt != nil {
 		setClauses = append(setClauses, "closed_at = ?")
-		args = append(args, *input.ClosedAt)
+		args = append(args, nullIfEmpty(*input.ClosedAt))
 	}
 
 	if len(setClauses) == 0 {
+		if err := r.linkInput(ctx, id, input.PersonID, input.OrgID); err != nil {
+			return nil, err
+		}
 		return r.FindByID(ctx, id)
 	}
 
@@ -165,6 +243,9 @@ func (r *DealRepo) Update(ctx context.Context, id int64, input model.UpdateDealI
 	rows, _ := result.RowsAffected()
 	if rows == 0 {
 		return nil, fmt.Errorf("deal %d: %w", id, model.ErrNotFound)
+	}
+	if err := r.linkInput(ctx, id, input.PersonID, input.OrgID); err != nil {
+		return nil, err
 	}
 
 	return r.FindByID(ctx, id)
@@ -192,8 +273,7 @@ func (r *DealRepo) Search(ctx context.Context, query string, limit int) ([]*mode
 
 	ftsQuery := `"` + strings.ReplaceAll(query, `"`, `""`) + `"` + "*"
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT id, uuid, title, value, stage, person_id, org_id, notes, closed_at,
-		        archived, created_at, updated_at
+		`SELECT `+dealColumns+`
 		 FROM deals WHERE archived = 0 AND id IN (SELECT rowid FROM deals_fts WHERE deals_fts MATCH ?)
 		 ORDER BY updated_at DESC LIMIT ?`,
 		ftsQuery, limit)
@@ -210,7 +290,14 @@ func (r *DealRepo) Search(ctx context.Context, query string, limit int) ([]*mode
 		}
 		deals = append(deals, d)
 	}
-	return deals, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
+	if err := r.loadLinks(ctx, deals...); err != nil {
+		return nil, err
+	}
+	return deals, nil
 }
 
 // Pipeline returns a summary of deals grouped by stage.
@@ -263,10 +350,10 @@ func (r *DealRepo) Overwrite(ctx context.Context, id int64, d *model.Deal) error
 		return fmt.Errorf("invalid deal stage %q: %w", d.Stage, model.ErrValidation)
 	}
 	result, err := r.db.ExecContext(ctx,
-		`UPDATE deals SET title = ?, value = ?, stage = ?, person_id = ?, org_id = ?, notes = ?, closed_at = ?,
+		`UPDATE deals SET title = ?, value = ?, stage = ?, notes = ?, closed_at = ?,
 		        updated_at = datetime('now')
 		 WHERE id = ? AND archived = 0`,
-		d.Title, d.Value, d.Stage, d.PersonID, d.OrgID, d.Notes, d.ClosedAt, id)
+		d.Title, d.Value, d.Stage, d.Notes, d.ClosedAt, id)
 	if err != nil {
 		return fmt.Errorf("overwrite deal %d: %w", id, err)
 	}

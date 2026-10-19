@@ -18,7 +18,7 @@ func TestOpen_InMemory(t *testing.T) {
 	defer d.Close()
 
 	// Verify tables exist
-	tables := []string{"people", "organizations", "interactions", "deals", "tasks", "tags", "taggings", "custom_fields", "relationships"}
+	tables := []string{"people", "organizations", "interactions", "deals", "tasks", "tags", "taggings", "custom_fields", "membership", "person_relation", "relation_kind"}
 	for _, table := range tables {
 		var name string
 		err := d.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name=?", table).Scan(&name)
@@ -62,7 +62,7 @@ func TestOpen_MigrationVersion(t *testing.T) {
 
 	var version int
 	_ = d.QueryRow("PRAGMA user_version").Scan(&version)
-	assert.Equal(t, 7, version)
+	assert.Equal(t, 8, version)
 }
 
 func TestMigration002_BackfillsFromV1(t *testing.T) {
@@ -86,7 +86,7 @@ func TestMigration002_BackfillsFromV1(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, raw.Close())
 
-	d, err := db.Open(path)
+	d, err := db.OpenUpTo(path, 7)
 	require.NoError(t, err)
 	defer d.Close()
 
@@ -117,7 +117,7 @@ func TestMigration002_KeepInTouchView(t *testing.T) {
 	require.NoError(t, err)
 	_, err = d.Exec(`INSERT INTO interactions (uuid, type, occurred_at) VALUES ('i2', 'note', '2026-03-01 09:00:00')`)
 	require.NoError(t, err)
-	_, err = d.Exec(`INSERT INTO interaction_people (interaction_id, person_id) VALUES (1, 1), (2, 1)`)
+	_, err = d.Exec(`INSERT INTO activity_target (uuid, source_kind, source_id, target_kind, target_id) VALUES ('a1', 'interaction', 1, 'person', 1), ('a2', 'interaction', 2, 'person', 1)`)
 	require.NoError(t, err)
 
 	var count int

@@ -25,7 +25,6 @@ var mergeUnits = []mergeUnit{
 	{"location", []string{"location"}},
 	{"notes", []string{"notes"}},
 	{"summary", []string{"summary"}},
-	{"org_id", []string{"org_id"}},
 	{"birthday", []string{"birthday_month", "birthday_day", "birthday_year"}},
 	{"keep_in_touch", []string{"keep_in_touch"}},
 	{"keep_in_touch_snoozed_until", []string{"keep_in_touch_snoozed_until"}},
@@ -123,7 +122,7 @@ func (r *PersonRepo) merge(ctx context.Context, keepID int64, dropIDs []int64, c
 			KeepID: keepID, DropIDs: dropIDs, DryRun: dryRun,
 			Fields: []model.MergeFieldChange{},
 			Added:  map[string]int{"emails": 0, "phones": 0, "handles": 0, "tags": 0, "custom_fields": 0},
-			Moved:  map[string]int{"interactions": 0, "tasks": 0, "task_people": 0, "deals": 0, "relationships": 0},
+			Moved:  map[string]int{"interactions": 0, "tasks": 0, "deals": 0, "relationships": 0, "memberships": 0, "duplicates_dropped": 0, "aliases": 0},
 		},
 	}
 	if err := m.run(); err != nil {
@@ -212,10 +211,7 @@ func (m *merger) run() error {
 	if err := m.copyLists(); err != nil {
 		return err
 	}
-	if err := m.repoint(); err != nil {
-		return err
-	}
-	if err := m.relationships(); err != nil {
+	if err := m.links(); err != nil {
 		return err
 	}
 	return m.archive()
@@ -650,106 +646,6 @@ func lowerArgs(in []string) []any {
 		out[i] = strings.ToLower(strings.TrimSpace(s))
 	}
 	return out
-}
-
-// repoint moves interactions, task links, tasks and deals to the survivor.
-func (m *merger) repoint() error {
-	for _, d := range m.dropIDs {
-		if _, err := m.exec(`UPDATE interactions SET updated_at = datetime('now')
-			WHERE id IN (SELECT interaction_id FROM interaction_people WHERE person_id = ?)`, d); err != nil {
-			return fmt.Errorf("touch interactions: %w", err)
-		}
-		n, err := m.exec(`UPDATE OR IGNORE interaction_people SET person_id = ? WHERE person_id = ?`, m.keepID, d)
-		if err != nil {
-			return fmt.Errorf("move interactions: %w", err)
-		}
-		m.res.Moved["interactions"] += n
-
-		if _, err := m.exec(`UPDATE tasks SET updated_at = datetime('now')
-			WHERE id IN (SELECT task_id FROM task_people WHERE person_id = ?)`, d); err != nil {
-			return fmt.Errorf("touch tasks: %w", err)
-		}
-		n, err = m.exec(`UPDATE OR IGNORE task_people SET person_id = ? WHERE person_id = ?`, m.keepID, d)
-		if err != nil {
-			return fmt.Errorf("move task links: %w", err)
-		}
-		m.res.Moved["task_people"] += n
-		n, err = m.exec(`UPDATE tasks SET person_id = ?, updated_at = datetime('now') WHERE person_id = ?`, m.keepID, d)
-		if err != nil {
-			return fmt.Errorf("move tasks: %w", err)
-		}
-		m.res.Moved["tasks"] += n
-		n, err = m.exec(`UPDATE deals SET person_id = ?, updated_at = datetime('now') WHERE person_id = ?`, m.keepID, d)
-		if err != nil {
-			return fmt.Errorf("move deals: %w", err)
-		}
-		m.res.Moved["deals"] += n
-	}
-	return nil
-}
-
-// relationships re-points links that involve a dropped person. Self links and duplicates are left
-// on the dropped person.
-func (m *merger) relationships() error {
-	drop := map[int64]bool{}
-	for _, d := range m.dropIDs {
-		drop[d] = true
-	}
-	type rel struct {
-		id, a, b int64
-		typ      string
-	}
-	var rels []rel
-	for _, d := range m.dropIDs {
-		rows, err := m.tx.QueryContext(m.ctx,
-			"SELECT id, person_id, related_person_id, type FROM relationships WHERE person_id = ? OR related_person_id = ?", d, d)
-		if err != nil {
-			return fmt.Errorf("list relationships: %w", err)
-		}
-		for rows.Next() {
-			var r rel
-			if err := rows.Scan(&r.id, &r.a, &r.b, &r.typ); err != nil {
-				_ = rows.Close()
-				return err
-			}
-			rels = append(rels, r)
-		}
-		if err := rows.Err(); err != nil {
-			_ = rows.Close()
-			return err
-		}
-		_ = rows.Close()
-	}
-	seen := map[int64]bool{}
-	for _, r := range rels {
-		if seen[r.id] {
-			continue
-		}
-		seen[r.id] = true
-		a, b := r.a, r.b
-		if drop[a] {
-			a = m.keepID
-		}
-		if drop[b] {
-			b = m.keepID
-		}
-		if a == b {
-			continue
-		}
-		var exists int
-		if err := m.tx.QueryRowContext(m.ctx,
-			"SELECT COUNT(*) FROM relationships WHERE person_id = ? AND related_person_id = ? AND type = ?", a, b, r.typ).Scan(&exists); err != nil {
-			return err
-		}
-		if exists > 0 {
-			continue
-		}
-		if _, err := m.exec("UPDATE relationships SET person_id = ?, related_person_id = ? WHERE id = ?", a, b, r.id); err != nil {
-			return fmt.Errorf("move relationship: %w", err)
-		}
-		m.res.Moved["relationships"]++
-	}
-	return nil
 }
 
 // CustomFields lists a person's custom field names and values, ordered by name.

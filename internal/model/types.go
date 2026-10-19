@@ -13,7 +13,6 @@ type Person struct {
 	Location  *string `json:"location"`
 	Notes     *string `json:"notes"`
 	Summary   *string `json:"summary"`
-	OrgID     *int64  `json:"org_id"`
 	CreatedAt string  `json:"created_at"`
 	UpdatedAt string  `json:"updated_at"`
 
@@ -30,9 +29,11 @@ type Person struct {
 	Emails  []PersonEmail  `json:"emails,omitempty"`
 	Phones  []PersonPhone  `json:"phones,omitempty"`
 	Handles []PersonHandle `json:"handles,omitempty"`
+	// Links are filled by the show commands (LinkRepo.All): organizations, related people, deals, tasks.
+	Links []LinkedObject `json:"links,omitempty"`
 }
 
-// CreatePersonInput holds fields for creating a person.
+// CreatePersonInput holds fields for creating a person. OrgID makes that organization the primary one.
 type CreatePersonInput struct {
 	FirstName string
 	LastName  *string
@@ -102,6 +103,8 @@ type Organization struct {
 	Summary   *string `json:"summary"`
 	CreatedAt string  `json:"created_at"`
 	UpdatedAt string  `json:"updated_at"`
+	// Links are filled by the show commands: members, parent and child organizations, deals, tasks.
+	Links []LinkedObject `json:"links,omitempty"`
 }
 
 // CreateOrgInput holds fields for creating an organization.
@@ -131,6 +134,8 @@ type Interaction struct {
 	Direction  *string `json:"direction"`
 	OccurredAt string  `json:"occurred_at"`
 	PersonIDs  []int64 `json:"person_ids"`
+	OrgIDs     []int64 `json:"org_ids"`
+	DealIDs    []int64 `json:"deal_ids"`
 	CreatedAt  string  `json:"created_at"`
 	UpdatedAt  string  `json:"updated_at"`
 }
@@ -143,29 +148,36 @@ type CreateInteractionInput struct {
 	Direction  *string
 	OccurredAt *string
 	PersonIDs  []int64
+	OrgIDs     []int64
+	DealIDs    []int64
 }
 
 // InteractionFilters holds optional filters for listing interactions.
 type InteractionFilters struct {
 	PersonID *int64
+	OrgID    *int64
+	DealID   *int64
 	Type     *string
 	Limit    int
 }
 
 // Deal represents a sales opportunity.
 type Deal struct {
-	ID        int64    `json:"id"`
-	UUID      string   `json:"uuid"`
-	Title     string   `json:"title"`
-	Value     *float64 `json:"value"`
-	Stage     string   `json:"stage"`
-	PersonID  *int64   `json:"person_id"`
-	OrgID     *int64   `json:"org_id"`
-	Notes     *string  `json:"notes"`
-	ClosedAt  *string  `json:"closed_at"`
-	Archived  bool     `json:"-"`
-	CreatedAt string   `json:"created_at"`
-	UpdatedAt string   `json:"updated_at"`
+	ID    int64    `json:"id"`
+	UUID  string   `json:"uuid"`
+	Title string   `json:"title"`
+	Value *float64 `json:"value"`
+	Stage string   `json:"stage"`
+	// PersonIDs and OrgIDs are the linked people and organizations. OrgID is the primary organization.
+	PersonIDs []int64        `json:"person_ids"`
+	OrgIDs    []int64        `json:"org_ids"`
+	OrgID     *int64         `json:"org_id"`
+	Notes     *string        `json:"notes"`
+	ClosedAt  *string        `json:"closed_at"`
+	Archived  bool           `json:"-"`
+	CreatedAt string         `json:"created_at"`
+	UpdatedAt string         `json:"updated_at"`
+	Links     []LinkedObject `json:"links,omitempty"`
 }
 
 // CreateDealInput holds fields for creating a deal.
@@ -213,24 +225,25 @@ type Tag struct {
 
 // Task represents a follow-up or to-do item.
 type Task struct {
-	Recurrence  *string `json:"recurrence"`
-	PersonIDs   []int64 `json:"person_ids,omitempty"`
-	NextTaskID  *int64  `json:"next_task_id,omitempty"`
+	Recurrence *string        `json:"recurrence"`
+	PersonIDs  []int64        `json:"person_ids,omitempty"`
+	OrgIDs     []int64        `json:"org_ids,omitempty"`
+	DealIDs    []int64        `json:"deal_ids,omitempty"`
+	Links      []LinkedObject `json:"links,omitempty"`
+	NextTaskID *int64         `json:"next_task_id,omitempty"`
 	// Tags are filled by TaskRepo.FindByID and FindAll.
-	Tags []string `json:"tags,omitempty"`
-	ID          int64   `json:"id"`
-	UUID        string  `json:"uuid"`
-	Title       string  `json:"title"`
-	Description *string `json:"description"`
-	PersonID    *int64  `json:"person_id"`
-	DealID      *int64  `json:"deal_id"`
-	DueAt       *string `json:"due_at"`
-	Priority    string  `json:"priority"`
-	Completed   bool    `json:"completed"`
-	CompletedAt *string `json:"completed_at"`
-	Archived    bool    `json:"-"`
-	CreatedAt   string  `json:"created_at"`
-	UpdatedAt   string  `json:"updated_at"`
+	Tags        []string `json:"tags,omitempty"`
+	ID          int64    `json:"id"`
+	UUID        string   `json:"uuid"`
+	Title       string   `json:"title"`
+	Description *string  `json:"description"`
+	DueAt       *string  `json:"due_at"`
+	Priority    string   `json:"priority"`
+	Completed   bool     `json:"completed"`
+	CompletedAt *string  `json:"completed_at"`
+	Archived    bool     `json:"-"`
+	CreatedAt   string   `json:"created_at"`
+	UpdatedAt   string   `json:"updated_at"`
 }
 
 // CreateTaskInput holds fields for creating a task.
@@ -241,8 +254,10 @@ type CreateTaskInput struct {
 	DealID      *int64
 	DueAt       *string
 	Priority    string
-	// PersonIDs links the task to several people. PersonID is added to it.
+	// PersonIDs links the task to several people. PersonID is added to it. OrgIDs and DealIDs link it too.
 	PersonIDs  []int64
+	OrgIDs     []int64
+	DealIDs    []int64
 	Recurrence *string
 	// Tags are applied to the new task.
 	Tags []string
@@ -254,30 +269,22 @@ type UpdateTaskInput struct {
 	Description *string
 	PersonID    *int64
 	DealID      *int64
-	DueAt       *string
-	Priority    *string
-	Recurrence  *string
+	// DueAt "" clears the due date.
+	DueAt      *string
+	Priority   *string
+	Recurrence *string
 }
 
 // TaskFilters holds optional filters for listing tasks.
 type TaskFilters struct {
 	PersonID         *int64
+	OrgID            *int64
 	DealID           *int64
 	Overdue          bool
 	IncludeCompleted bool
 	Limit            int
 	// Tag keeps only tasks that carry this tag.
 	Tag *string
-}
-
-// Relationship represents a person-to-person link.
-type Relationship struct {
-	ID              int64   `json:"id"`
-	PersonID        int64   `json:"person_id"`
-	RelatedPersonID int64   `json:"related_person_id"`
-	Type            string  `json:"type"`
-	Notes           *string `json:"notes"`
-	CreatedAt       string  `json:"created_at"`
 }
 
 // Valid entity types for tagging.
@@ -352,19 +359,6 @@ var Priorities = []string{"low", "medium", "high"}
 func ValidPriority(p string) bool {
 	for _, pr := range Priorities {
 		if pr == p {
-			return true
-		}
-	}
-	return false
-}
-
-// Relationship types
-var RelationshipTypes = []string{"colleague", "friend", "manager", "mentor", "referred-by"}
-
-// ValidRelationshipType checks if the given type is valid.
-func ValidRelationshipType(t string) bool {
-	for _, rt := range RelationshipTypes {
-		if rt == t {
 			return true
 		}
 	}

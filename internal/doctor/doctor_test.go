@@ -40,7 +40,7 @@ func TestHealthyDatabase(t *testing.T) {
 	rep := doctor.Run(context.Background(), doctor.Options{DBPath: path, Version: "1.2.3", MCPTools: 41, FreeBytes: plenty})
 	c := byName(rep)
 	assert.True(t, rep.OK)
-	for _, name := range []string{"binary", "data_dir", "database", "integrity", "schema", "wal", "backups", "disk_space", "cloud_folder", "sync", "mcp"} {
+	for _, name := range []string{"binary", "data_dir", "database", "integrity", "schema", "links", "wal", "backups", "disk_space", "cloud_folder", "sync", "mcp"} {
 		require.Contains(t, c, name)
 		assert.Equal(t, doctor.OK, c[name].Status, "%s: %s", name, c[name].Message)
 		assert.Empty(t, c[name].Fix)
@@ -153,4 +153,22 @@ func TestLargeWALWarns(t *testing.T) {
 	f.Close()
 	rep := doctor.Run(context.Background(), doctor.Options{DBPath: path, FreeBytes: plenty})
 	assert.Equal(t, doctor.Warn, byName(rep)["wal"].Status)
+}
+
+func TestOrphanLinksFail(t *testing.T) {
+	path := newDB(t, t.TempDir())
+	d, err := db.Open(path)
+	require.NoError(t, err)
+	// The triggers refuse orphans, so remove them to simulate damage from outside the program.
+	_, err = d.Exec(`DROP TRIGGER trg_activity_target_bi`)
+	require.NoError(t, err)
+	_, err = d.Exec(`INSERT INTO activity_target (uuid, source_kind, source_id, target_kind, target_id) VALUES ('a', 'task', 5, 'person', 9)`)
+	require.NoError(t, err)
+	require.NoError(t, d.Close())
+
+	rep := doctor.Run(context.Background(), doctor.Options{DBPath: path, FreeBytes: plenty})
+	c := byName(rep)["links"]
+	assert.Equal(t, doctor.Fail, c.Status)
+	assert.Contains(t, c.Message, "1 activity links")
+	assert.False(t, rep.OK)
 }

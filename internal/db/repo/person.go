@@ -21,14 +21,14 @@ func NewPersonRepo(db *sql.DB) *PersonRepo {
 	return &PersonRepo{db: db}
 }
 
-var personColumns = "id, uuid, first_name, last_name, email, phone, title, company, location, notes, summary, org_id, created_at, updated_at, birthday_month, birthday_day, birthday_year, keep_in_touch, keep_in_touch_snoozed_until, last_contacted_at, is_favorite, priority_tier"
+var personColumns = "id, uuid, first_name, last_name, email, phone, title, company, location, notes, summary, created_at, updated_at, birthday_month, birthday_day, birthday_year, keep_in_touch, keep_in_touch_snoozed_until, last_contacted_at, is_favorite, priority_tier"
 
 func scanPerson(row interface{ Scan(...any) error }) (*model.Person, error) {
 	var p model.Person
 	err := row.Scan(
 		&p.ID, &p.UUID, &p.FirstName, &p.LastName,
 		&p.Email, &p.Phone, &p.Title, &p.Company,
-		&p.Location, &p.Notes, &p.Summary, &p.OrgID,
+		&p.Location, &p.Notes, &p.Summary,
 		&p.CreatedAt, &p.UpdatedAt,
 		&p.BirthdayMonth, &p.BirthdayDay, &p.BirthdayYear,
 		&p.KeepInTouch, &p.KeepInTouchSnoozedUntil, &p.LastContactedAt,
@@ -49,10 +49,10 @@ func (r *PersonRepo) Create(ctx context.Context, input model.CreatePersonInput) 
 
 	id := uuid.New().String()
 	result, err := r.db.ExecContext(ctx,
-		`INSERT INTO people (uuid, first_name, last_name, email, phone, title, company, location, notes, org_id)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO people (uuid, first_name, last_name, email, phone, title, company, location, notes)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		id, input.FirstName, input.LastName, input.Email, input.Phone,
-		input.Title, input.Company, input.Location, input.Notes, input.OrgID,
+		input.Title, input.Company, input.Location, input.Notes,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("insert person: %w", err)
@@ -66,8 +66,22 @@ func (r *PersonRepo) Create(ctx context.Context, input model.CreatePersonInput) 
 	if err := r.syncPrimary(ctx, rowID, input.Email, input.Phone); err != nil {
 		return nil, err
 	}
+	if err := r.setPrimaryOrg(ctx, rowID, input.OrgID); err != nil {
+		return nil, err
+	}
 
 	return r.FindByID(ctx, rowID)
+}
+
+// setPrimaryOrg makes the organization the person's primary one, adding the membership if the
+// person has none there. A nil or zero id changes nothing.
+func (r *PersonRepo) setPrimaryOrg(ctx context.Context, personID int64, orgID *int64) error {
+	if orgID == nil || *orgID == 0 {
+		return nil
+	}
+	yes := true
+	_, err := NewLinkRepo(r.db).Link(ctx, Ref{"person", personID}, Ref{"organization", *orgID}, model.LinkAttrs{Primary: &yes})
+	return err
 }
 
 func (r *PersonRepo) checkDuplicate(ctx context.Context, input model.CreatePersonInput) error {
@@ -134,11 +148,11 @@ func (r *PersonRepo) FindAll(ctx context.Context, filters model.PersonFilters) (
 	}
 
 	if filters.OrgID != nil {
+		col := "id"
 		if filters.Tag != nil {
-			query += " AND p.org_id = ?"
-		} else {
-			query += " AND org_id = ?"
+			col = "p.id"
 		}
+		query += " AND " + col + " IN (SELECT person_id FROM membership WHERE org_id = ? AND deleted_at IS NULL)"
 		args = append(args, *filters.OrgID)
 	}
 
@@ -215,10 +229,6 @@ func (r *PersonRepo) Update(ctx context.Context, id int64, input model.UpdatePer
 		setClauses = append(setClauses, "summary = ?")
 		args = append(args, *input.Summary)
 	}
-	if input.OrgID != nil {
-		setClauses = append(setClauses, "org_id = ?")
-		args = append(args, *input.OrgID)
-	}
 
 	if input.Birthday != nil {
 		if *input.Birthday == "" {
@@ -267,6 +277,9 @@ func (r *PersonRepo) Update(ctx context.Context, id int64, input model.UpdatePer
 	}
 
 	if len(setClauses) == 0 {
+		if err := r.setPrimaryOrg(ctx, id, input.OrgID); err != nil {
+			return nil, err
+		}
 		return r.FindByID(ctx, id)
 	}
 
@@ -306,6 +319,9 @@ func (r *PersonRepo) Update(ctx context.Context, id int64, input model.UpdatePer
 	}
 
 	if err := r.syncPrimary(ctx, id, input.Email, input.Phone); err != nil {
+		return nil, err
+	}
+	if err := r.setPrimaryOrg(ctx, id, input.OrgID); err != nil {
 		return nil, err
 	}
 
