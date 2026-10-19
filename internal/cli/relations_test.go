@@ -210,3 +210,15 @@ func TestHiddenOrganizationHidesItsLinksAndRestoreBringsThemBack(t *testing.T) {
 	require.Len(t, links, 1)
 	assert.Equal(t, "CTO", links[0]["role"])
 }
+
+func TestReferredByRendersFromTheViewingSide(t *testing.T) {
+	dbPath := linkSeed(t)
+	_, stderr, code := crm(t, dbPath, "person", "link", "person", "1", "2", "--kind", "referred-by")
+	require.Equal(t, 0, code, stderr)
+	jane := showLinks(t, dbPath, "person", "1")
+	bob := showLinks(t, dbPath, "person", "2")
+	require.Len(t, jane, 1)
+	require.Len(t, bob, 1)
+	assert.Equal(t, "referred-by", jane[0]["label"], "person 1 was referred by person 2")
+	assert.Equal(t, "referred", bob[0]["label"], "person 2 referred person 1")
+}

@@ -24,6 +24,8 @@ CREATE TABLE relation_kind (
     name TEXT NOT NULL COLLATE NOCASE,
     inverse_name TEXT NOT NULL COLLATE NOCASE,
     symmetric INTEGER NOT NULL DEFAULT 0 CHECK(symmetric IN (0, 1)),
+    -- phrase kinds are verbs (referred-by): the labels read from the viewing side, a's page shows name.
+    phrase INTEGER NOT NULL DEFAULT 0 CHECK(phrase IN (0, 1)),
     builtin INTEGER NOT NULL DEFAULT 0 CHECK(builtin IN (0, 1)),
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -33,17 +35,17 @@ CREATE TABLE relation_kind (
 CREATE UNIQUE INDEX idx_relation_kind_name ON relation_kind(object_type, name) WHERE deleted_at IS NULL;
 
 -- Built-in kinds have fixed uuids so every device agrees on them.
-INSERT INTO relation_kind (uuid, object_type, name, inverse_name, symmetric, builtin) VALUES
-    ('a0000001-0000-4000-8000-000000000001', 'person', 'related', 'related', 1, 1),
-    ('a0000001-0000-4000-8000-000000000002', 'person', 'spouse', 'spouse', 1, 1),
-    ('a0000001-0000-4000-8000-000000000003', 'person', 'sibling', 'sibling', 1, 1),
-    ('a0000001-0000-4000-8000-000000000004', 'person', 'friend', 'friend', 1, 1),
-    ('a0000001-0000-4000-8000-000000000005', 'person', 'colleague', 'colleague', 1, 1),
-    ('a0000001-0000-4000-8000-000000000006', 'person', 'parent', 'child', 0, 1),
-    ('a0000001-0000-4000-8000-000000000007', 'person', 'manager', 'report', 0, 1),
-    ('a0000001-0000-4000-8000-000000000008', 'person', 'mentor', 'mentee', 0, 1),
-    ('a0000001-0000-4000-8000-000000000009', 'person', 'referred-by', 'referred', 0, 1),
-    ('a0000002-0000-4000-8000-000000000001', 'organization', 'parent', 'child', 0, 1);
+INSERT INTO relation_kind (uuid, object_type, name, inverse_name, symmetric, builtin, phrase) VALUES
+    ('a0000001-0000-4000-8000-000000000001', 'person', 'related', 'related', 1, 1, 0),
+    ('a0000001-0000-4000-8000-000000000002', 'person', 'spouse', 'spouse', 1, 1, 0),
+    ('a0000001-0000-4000-8000-000000000003', 'person', 'sibling', 'sibling', 1, 1, 0),
+    ('a0000001-0000-4000-8000-000000000004', 'person', 'friend', 'friend', 1, 1, 0),
+    ('a0000001-0000-4000-8000-000000000005', 'person', 'colleague', 'colleague', 1, 1, 0),
+    ('a0000001-0000-4000-8000-000000000006', 'person', 'parent', 'child', 0, 1, 0),
+    ('a0000001-0000-4000-8000-000000000007', 'person', 'manager', 'report', 0, 1, 0),
+    ('a0000001-0000-4000-8000-000000000008', 'person', 'mentor', 'mentee', 0, 1, 0),
+    ('a0000001-0000-4000-8000-000000000009', 'person', 'referred-by', 'referred', 0, 1, 1),
+    ('a0000002-0000-4000-8000-000000000001', 'organization', 'parent', 'child', 0, 1, 0);
 
 -- Person to organization, many to many, with role, dates and a primary flag ------------------
 CREATE TABLE membership (
@@ -205,12 +207,13 @@ SELECT lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(h
 FROM interaction_people;
 
 -- Old person to person relationships. The old type is the new kind name, so the mapping is by name.
--- The old row (person_id, related_person_id, type) becomes (a, b, kind) in the same order.
+-- The old row (person_id, related_person_id, type) becomes (a, b, kind) in the same order, lower id
+-- first for a symmetric kind.
 INSERT OR IGNORE INTO person_relation (uuid, a_id, b_id, kind_id, notes, created_at)
 SELECT lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)), 2) || '-' ||
              substr('89ab', abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)), 2) || '-' || hex(randomblob(6))),
-       CASE WHEN k.symmetric = 1 AND r.related_person_id < r.person_id THEN r.related_person_id ELSE r.person_id END,
-       CASE WHEN k.symmetric = 1 AND r.related_person_id < r.person_id THEN r.person_id ELSE r.related_person_id END,
+       CASE WHEN k.symmetric = 1 THEN MIN(r.person_id, r.related_person_id) ELSE r.person_id END,
+       CASE WHEN k.symmetric = 1 THEN MAX(r.person_id, r.related_person_id) ELSE r.related_person_id END,
        k.id, r.notes, r.created_at
 FROM relationships r
 JOIN relation_kind k ON k.object_type = 'person' AND k.name = r.type;

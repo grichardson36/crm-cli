@@ -170,6 +170,9 @@ func (m *Model) pickKind(d *linkDraft) tea.Cmd {
 		desc := "mutual"
 		if !k.Symmetric {
 			desc = fmt.Sprintf("%s is %s · %s is %s", srcName, k.Name, tgtName, k.InverseName)
+			if k.Phrase {
+				desc = fmt.Sprintf("%s %s %s · %s %s %s", srcName, k.Name, tgtName, tgtName, k.InverseName, srcName)
+			}
 		}
 		it := overlayItem{id: "kind-" + k.Name, label: k.Name, desc: desc, value: k.Name}
 		if d.existing != nil && strings.EqualFold(d.existing.Label, k.Name) || d.existing != nil && strings.EqualFold(d.existing.Label, k.InverseName) {

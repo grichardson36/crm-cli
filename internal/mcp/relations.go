@@ -36,9 +36,10 @@ func registerRelationTools(s *server.MCPServer, db *sql.DB) {
 			gomcp.WithString("object_type", gomcp.Required(), gomcp.Enum("person", "organization"), gomcp.Description("person or organization")),
 			gomcp.WithString("name", gomcp.Required(), gomcp.Description("Kind name")),
 			gomcp.WithString("inverse_name", gomcp.Description("Name seen from the other end")),
+			gomcp.WithBoolean("phrase", gomcp.Description("A verb kind (referred-by): labels read from the viewing side, a's page shows name")),
 		),
 		func(ctx context.Context, req gomcp.CallToolRequest) (*gomcp.CallToolResult, error) {
-			k, err := kinds.Add(ctx, req.GetString("object_type", ""), req.GetString("name", ""), req.GetString("inverse_name", ""))
+			k, err := kinds.AddKind(ctx, req.GetString("object_type", ""), req.GetString("name", ""), req.GetString("inverse_name", ""), req.GetBool("phrase", false))
 			if err != nil {
 				return mcpError(err)
 			}

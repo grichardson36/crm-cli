@@ -448,3 +448,37 @@ func TestLinkActionsAndKeysExistForPersonToPerson(t *testing.T) {
 	assert.NotNil(t, m.actionByID("archived-type"))
 	assert.NotNil(t, m.actionByID("note-object"))
 }
+
+func TestReferredByRendersFromTheViewingSideInTheTUI(t *testing.T) {
+	m, _ := newTestModel(t)
+	kind := "referred-by"
+	_, err := m.links.Link(context.Background(), personRef(1), personRef(2), model.LinkAttrs{Kind: &kind})
+	require.NoError(t, err)
+	m.afterWrite()
+	press(m, "tab")
+	goTo(t, m, "referred-by")
+	assert.Equal(t, "Bob Baker", m.form[m.fcur].value, "Zed was referred by Bob")
+	m.selectPerson(2)
+	m.focus = focusDetail
+	m.syncDetail()
+	goTo(t, m, "referred")
+	assert.Equal(t, "Zed Adams", m.form[m.fcur].value, "Bob referred Zed")
+}
+
+func TestDealMovedBetweenClosedStagesIsRestamped(t *testing.T) {
+	m, _ := newTestModel(t)
+	ctx := context.Background()
+	d, err := m.dlr.Create(ctx, model.CreateDealInput{Title: "Site", Stage: "lead"})
+	require.NoError(t, err)
+	runPalette(m, "deals view")
+	press(m, "s", "5") // won
+	_, err = m.db.Exec(`UPDATE deals SET closed_at = '2000-01-01 00:00:00' WHERE id = ?`, d.ID)
+	require.NoError(t, err)
+	m.afterWrite()
+	press(m, "s", "6") // lost
+	got, err := m.dlr.FindByID(ctx, d.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "lost", got.Stage)
+	require.NotNil(t, got.ClosedAt)
+	assert.Equal(t, "2026-10-13 12:00:00", *got.ClosedAt, "re-stamped with the model clock")
+}

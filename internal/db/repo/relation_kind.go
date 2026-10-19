@@ -19,11 +19,11 @@ type KindRepo struct {
 // NewKindRepo creates a KindRepo.
 func NewKindRepo(db *sql.DB) *KindRepo { return &KindRepo{db: db} }
 
-const kindColumns = "id, uuid, object_type, name, inverse_name, symmetric, builtin, created_at, updated_at"
+const kindColumns = "id, uuid, object_type, name, inverse_name, symmetric, phrase, builtin, created_at, updated_at"
 
 func scanKind(row interface{ Scan(...any) error }) (*model.RelationKind, error) {
 	var k model.RelationKind
-	err := row.Scan(&k.ID, &k.UUID, &k.ObjectType, &k.Name, &k.InverseName, &k.Symmetric, &k.Builtin, &k.CreatedAt, &k.UpdatedAt)
+	err := row.Scan(&k.ID, &k.UUID, &k.ObjectType, &k.Name, &k.InverseName, &k.Symmetric, &k.Phrase, &k.Builtin, &k.CreatedAt, &k.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -95,6 +95,11 @@ func (r *KindRepo) Resolve(ctx context.Context, objectType, name string) (k *mod
 // Add creates a kind. With no inverse name the kind is symmetric. Names must not clash with any
 // name or inverse name of the same object type.
 func (r *KindRepo) Add(ctx context.Context, objectType, name, inverse string) (*model.RelationKind, error) {
+	return r.AddKind(ctx, objectType, name, inverse, false)
+}
+
+// AddKind is Add with the phrase flag: a verb kind whose labels read from the viewing side.
+func (r *KindRepo) AddKind(ctx context.Context, objectType, name, inverse string, phrase bool) (*model.RelationKind, error) {
 	if objectType != "person" && objectType != "organization" {
 		return nil, fmt.Errorf("kinds are for person or organization links, not %q: %w", objectType, model.ErrValidation)
 	}
@@ -115,8 +120,8 @@ func (r *KindRepo) Add(ctx context.Context, objectType, name, inverse string) (*
 	if n > 0 {
 		return nil, fmt.Errorf("a %s kind named %q or %q already exists: %w", objectType, name, inverse, model.ErrConflict)
 	}
-	res, err := r.db.ExecContext(ctx, `INSERT INTO relation_kind (uuid, object_type, name, inverse_name, symmetric, builtin)
-		VALUES (?, ?, ?, ?, ?, 0)`, uuid.New().String(), objectType, name, inverse, symmetric)
+	res, err := r.db.ExecContext(ctx, `INSERT INTO relation_kind (uuid, object_type, name, inverse_name, symmetric, phrase, builtin)
+		VALUES (?, ?, ?, ?, ?, ?, 0)`, uuid.New().String(), objectType, name, inverse, symmetric, phrase && !symmetric)
 	if err != nil {
 		return nil, fmt.Errorf("add kind: %w", err)
 	}

@@ -86,6 +86,7 @@ func TestMigration008_MovesDataAndDropsOldColumns(t *testing.T) {
 	assert.Equal(t, 1, scalar(t, d, `SELECT COUNT(*) FROM person_relation pr JOIN relation_kind k ON k.id = pr.kind_id WHERE k.name = 'colleague'`))
 	assert.Equal(t, 1, scalar(t, d, `SELECT a_id FROM person_relation pr JOIN relation_kind k ON k.id = pr.kind_id WHERE k.name = 'colleague'`), "symmetric pair stores the lower id first")
 	assert.Equal(t, 3, scalar(t, d, `SELECT a_id FROM person_relation pr JOIN relation_kind k ON k.id = pr.kind_id WHERE k.name = 'referred-by'`))
+	assert.Equal(t, 1, scalar(t, d, `SELECT phrase FROM relation_kind WHERE name = 'referred-by'`), "referred-by is a phrase kind")
 	assert.Equal(t, 4, scalar(t, d, `SELECT a_id FROM person_relation pr JOIN relation_kind k ON k.id = pr.kind_id WHERE k.name = 'mentor'`))
 	assert.Equal(t, 1, scalar(t, d, `SELECT COUNT(*) FROM person_relation WHERE notes = 'same team'`), "notes of the first duplicate are kept")
 

@@ -18,12 +18,12 @@ var relationKindColumns = []format.ColumnDef{
 	{Header: "Built-in", Field: "builtin"},
 }
 
-const relationKindFields = "id,uuid,object_type,name,inverse_name,symmetric,builtin,created_at,updated_at"
+const relationKindFields = "id,uuid,object_type,name,inverse_name,symmetric,phrase,builtin,created_at,updated_at"
 
 func kindToMap(k *model.RelationKind) map[string]any {
 	return map[string]any{
 		"id": k.ID, "uuid": k.UUID, "object_type": k.ObjectType, "name": k.Name, "inverse_name": k.InverseName,
-		"symmetric": k.Symmetric, "builtin": k.Builtin, "created_at": k.CreatedAt, "updated_at": k.UpdatedAt,
+		"symmetric": k.Symmetric, "phrase": k.Phrase, "builtin": k.Builtin, "created_at": k.CreatedAt, "updated_at": k.UpdatedAt,
 	}
 }
 
@@ -87,6 +87,7 @@ func relationKindListCmd() *cobra.Command {
 
 func relationKindAddCmd() *cobra.Command {
 	var typ, inverse string
+	var phrase bool
 	cmd := &cobra.Command{
 		Use:   "add <name>",
 		Short: "Add a link kind, mutual or with an inverse name",
@@ -101,7 +102,7 @@ func relationKindAddCmd() *cobra.Command {
 				return err
 			}
 			defer db.Close()
-			k, err := repo.NewKindRepo(db).Add(cmd.Context(), objType, args[0], inverse)
+			k, err := repo.NewKindRepo(db).AddKind(cmd.Context(), objType, args[0], inverse, phrase)
 			if err != nil {
 				return err
 			}
@@ -110,6 +111,7 @@ func relationKindAddCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&typ, "type", "person", "person or org")
 	cmd.Flags().StringVar(&inverse, "inverse", "", "name seen from the other end (leave out for a mutual kind)")
+	cmd.Flags().BoolVar(&phrase, "phrase", false, "a verb kind (referred-by): labels read from the viewing side, the first person's page shows the name")
 	return cmd
 }
 

@@ -128,3 +128,17 @@ func TestNotesAttachToOrganizationsAndDeals(t *testing.T) {
 	callJSON(t, s, "crm_context", map[string]any{"person_id": person["id"]}, &ctxOut)
 	assert.NotEmpty(t, ctxOut)
 }
+
+func TestReferredByRendersFromTheViewingSideInMCP(t *testing.T) {
+	s := setupTestServer(t)
+	var a, b, out map[string]any
+	callJSON(t, s, "crm_person_create", map[string]any{"first_name": "Ann"}, &a)
+	callJSON(t, s, "crm_person_create", map[string]any{"first_name": "Ben"}, &b)
+	callJSON(t, s, "crm_person_link", map[string]any{"id": a["id"], "other": "person", "other_id": b["id"], "kind": "referred-by"}, &out)
+	var links []map[string]any
+	callJSON(t, s, "crm_links", map[string]any{"kind": "person", "id": a["id"]}, &links)
+	require.Len(t, links, 1)
+	assert.Equal(t, "referred-by", links[0]["label"])
+	callJSON(t, s, "crm_links", map[string]any{"kind": "person", "id": b["id"]}, &links)
+	assert.Equal(t, "referred", links[0]["label"])
+}

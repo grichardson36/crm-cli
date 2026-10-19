@@ -23,7 +23,10 @@ type RelationKind struct {
 	Name        string `json:"name"`
 	InverseName string `json:"inverse_name"`
 	Symmetric   bool   `json:"symmetric"`
-	Builtin     bool   `json:"builtin"`
+	// Phrase kinds are verbs (referred-by). Their labels read from the viewing side: the page of a
+	// shows b as Name, the page of b shows a as InverseName. Other kinds show the other person's role.
+	Phrase  bool `json:"phrase"`
+	Builtin bool `json:"builtin"`
 	CreatedAt   string `json:"created_at"`
 	UpdatedAt   string `json:"updated_at"`
 }

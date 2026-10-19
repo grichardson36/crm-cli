@@ -12,11 +12,11 @@ crm person link org 2 1 --role Advisor --from 2023 --new
 crm roles
 ```
 
-The vCard ORG on a phone is the primary organization, TITLE stays the person's title. `people.company` stays as text until it is converted.
+The vCard ORG on a phone is the primary organization, TITLE stays the person's title. An ORG you edit on the phone moves the primary membership to the organization of that name. A name that matches nothing stays as company text and tags the person `org-review` for the conversion screen. `people.company` stays as text until it is converted.
 
 ## Kinds between people
 
-A kind reads "a is parent b", and seen from b the other label applies (child). Built in: related (the default), spouse, sibling, friend, colleague are mutual. parent/child, manager/report, mentor/mentee, referred-by/referred are directional. Naming the inverse (`--kind child`) reverses the ends.
+A kind reads "a is parent b", and seen from b the other label applies (child). Built in: related (the default), spouse, sibling, friend, colleague are mutual. parent/child, manager/report, mentor/mentee, referred-by/referred are directional. Noun kinds show the other person's role (a parent link shows child on the parent's page). Verb kinds (`--phrase`) read from the page you are on: A referred-by B shows "referred-by B" on A's page and "referred A" on B's. Naming the inverse (`--kind child`) reverses the ends.
 
 ```sh crm-example
 crm relation-kind list
@@ -31,6 +31,6 @@ crm person link person 1 2 --kind friend
 
 ## Merge and aliases
 
-`crm person merge` moves every link to the survivor. Exact duplicate links are dropped, memberships at one organization with the same end fold into the richest one with the earliest start, and the old id and uuid are kept as an alias so old references resolve.
+`crm person merge` moves every link to the survivor. Only exact duplicate links are dropped (a membership is a duplicate when organization, role, start and end all match, so CTO and Advisor at one organization both stay), and the old id and uuid are kept as an alias so old references resolve.
 
 See also: links, orgs, duplicates, dav, people.

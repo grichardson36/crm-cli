@@ -271,7 +271,7 @@ func NewServer(db *sql.DB, version string, opts ...Option) *server.MCPServer {
 			gomcp.WithNumber("value", gomcp.Description("Deal value")),
 			gomcp.WithString("stage", gomcp.Description("Stage: lead, prospect, proposal, negotiation, won, lost")),
 			gomcp.WithString("notes", gomcp.Description("Notes")),
-			gomcp.WithString("closed_at", gomcp.Description("Close date. It is set by itself when the stage becomes won or lost and cleared when it reopens. Empty clears it")),
+			gomcp.WithString("closed_at", gomcp.Description("Close date. It is re-stamped to now on every move into won or lost and cleared when it reopens. Empty clears it")),
 			gomcp.WithNumber("person_id", gomcp.Description("Also link this person")),
 			gomcp.WithNumber("org_id", gomcp.Description("Also link this organization as the primary one")),
 		),

@@ -808,10 +808,11 @@ func (r *LinkRepo) linkedVia(ctx context.Context, rel model.Relation, a Ref) ([]
 		join := ""
 		if rel.Kinded {
 			join = " JOIN relation_kind k ON k.id = l.kind_id"
+			// A phrase kind (referred-by) reads from the viewing side, so its labels are swapped.
 			if anchorIsA {
-				label = "k.inverse_name"
+				label = "CASE k.phrase WHEN 1 THEN k.name ELSE k.inverse_name END"
 			} else {
-				label = "k.name"
+				label = "CASE k.phrase WHEN 1 THEN k.inverse_name ELSE k.name END"
 			}
 		}
 		q := fmt.Sprintf(`SELECT l.id, l.%[1]s, %[2]s, %[3]s, %[4]s, %[5]s, %[6]s, %[7]s, %[8]s
