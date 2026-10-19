@@ -206,16 +206,6 @@ type membershipRow struct {
 	primary                bool
 }
 
-func (r membershipRow) richness() int {
-	n := 0
-	for _, s := range []sql.NullString{r.role, r.from, r.to, r.notes} {
-		if s.Valid && s.String != "" {
-			n++
-		}
-	}
-	return n
-}
-
 func (m *merger) memberships(person int64) ([]membershipRow, error) {
 	rows, err := m.tx.QueryContext(m.ctx, `SELECT id, org_id, role, started_on, ended_on, notes, is_primary FROM membership
 		WHERE person_id = ? AND deleted_at IS NULL ORDER BY id`, person)
@@ -236,73 +226,47 @@ func (m *merger) memberships(person int64) ([]membershipRow, error) {
 	return out, rows.Err()
 }
 
-// moveMemberships folds a dropped person's memberships into the survivor's. A membership at an
-// organization the survivor is also at, with the same end date (both open or equal), is the same
-// membership: the richest row stays, with the earliest start. Others move over. A different end
-// date means a different stay (left and came back) so both rows stay.
+// moveMemberships moves a dropped person's memberships to the survivor. Two memberships at one
+// organization can be different roles (CTO and Advisor), so both stay. Only a row identical to one
+// the survivor has (same organization, role, start and end) is dropped. A primary flag the dropped
+// row held moves to the identical survivor row when the survivor has no primary.
 func (m *merger) moveMemberships(d int64) error {
 	dropped, err := m.memberships(d)
 	if err != nil {
 		return fmt.Errorf("list memberships: %w", err)
 	}
+	same := func(a, b sql.NullString) bool { return a.Valid == b.Valid && a.String == b.String }
 	for _, r := range dropped {
 		keep, err := m.memberships(m.keepID)
 		if err != nil {
 			return err
 		}
-		var same *membershipRow
+		hasPrimary := false
+		var twin *membershipRow
 		for i := range keep {
 			k := keep[i]
-			if k.org == r.org && k.to.Valid == r.to.Valid && k.to.String == r.to.String {
-				same = &keep[i]
-				break
+			hasPrimary = hasPrimary || k.primary
+			if k.org == r.org && same(k.role, r.role) && same(k.from, r.from) && same(k.to, r.to) {
+				twin = &keep[i]
 			}
 		}
-		if same == nil {
-			hasPrimary := false
-			for _, k := range keep {
-				hasPrimary = hasPrimary || k.primary
+		if twin != nil {
+			if err := m.softDelete("membership", r.id); err != nil {
+				return err
 			}
-			primary := r.primary && !hasPrimary
-			if _, err := m.exec("UPDATE membership SET person_id = ?, is_primary = ?, updated_at = datetime('now') WHERE id = ?", m.keepID, primary, r.id); err != nil {
-				return fmt.Errorf("move membership: %w", err)
+			if r.primary && !hasPrimary {
+				if _, err := m.exec("UPDATE membership SET is_primary = 1, updated_at = datetime('now') WHERE id = ?", twin.id); err != nil {
+					return err
+				}
 			}
-			m.res.Moved["memberships"]++
+			m.duplicate(1)
 			continue
 		}
-		// Fold r into same. Delete r first so a primary flag it holds is free to move.
-		if err := m.softDelete("membership", r.id); err != nil {
-			return err
+		primary := r.primary && !hasPrimary
+		if _, err := m.exec("UPDATE membership SET person_id = ?, is_primary = ?, updated_at = datetime('now') WHERE id = ?", m.keepID, primary, r.id); err != nil {
+			return fmt.Errorf("move membership: %w", err)
 		}
-		rich := *same
-		poor := r
-		if r.richness() > same.richness() {
-			rich, poor = r, *same
-		}
-		fill := func(a, b sql.NullString) sql.NullString {
-			if a.Valid && a.String != "" {
-				return a
-			}
-			return b
-		}
-		role, notes, to := fill(rich.role, poor.role), fill(rich.notes, poor.notes), fill(rich.to, poor.to)
-		from := fill(rich.from, poor.from)
-		if poor.from.Valid && poor.from.String != "" && rich.from.Valid && rich.from.String != "" && poor.from.String < rich.from.String {
-			from = poor.from
-		}
-		primary := same.primary || r.primary
-		if _, err := m.exec(`UPDATE membership SET role = ?, started_on = ?, ended_on = ?, notes = ?, is_primary = ?, updated_at = datetime('now') WHERE id = ?`,
-			nullStr(role), nullStr(from), nullStr(to), nullStr(notes), primary, same.id); err != nil {
-			return fmt.Errorf("merge membership: %w", err)
-		}
-		m.duplicate(1)
-	}
-	return nil
-}
-
-func nullStr(s sql.NullString) any {
-	if s.Valid && s.String != "" {
-		return s.String
+		m.res.Moved["memberships"]++
 	}
 	return nil
 }

@@ -205,11 +205,12 @@ func (r *DealRepo) Update(ctx context.Context, id int64, input model.UpdateDealI
 		}
 		setClauses = append(setClauses, "stage = ?")
 		args = append(args, *input.Stage)
-		// closed_at follows the stage: set when it becomes won or lost, cleared when it reopens.
-		// A deal that moves between won and lost keeps its first close time.
+		// closed_at follows the stage (Salesforce): re-stamped to now on every move into won or
+		// lost, including won to lost, and cleared when the deal reopens.
 		if input.ClosedAt == nil {
 			if closedStage(*input.Stage) {
-				setClauses = append(setClauses, "closed_at = COALESCE(closed_at, datetime('now'))")
+				setClauses = append(setClauses, "closed_at = CASE WHEN stage <> ? THEN datetime('now') ELSE closed_at END")
+				args = append(args, *input.Stage)
 			} else {
 				setClauses = append(setClauses, "closed_at = NULL")
 			}

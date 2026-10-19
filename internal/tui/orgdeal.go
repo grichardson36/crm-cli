@@ -624,8 +624,6 @@ func (m *Model) hOverwriteDeal(id int64, after *model.Deal) error {
 	if before.Stage != after.Stage {
 		closed := func(s string) bool { return s == "won" || s == "lost" }
 		switch {
-		case closed(after.Stage) && before.ClosedAt != nil:
-			after.ClosedAt = before.ClosedAt
 		case closed(after.Stage):
 			now := m.now().UTC().Format("2006-01-02 15:04:05")
 			after.ClosedAt = &now

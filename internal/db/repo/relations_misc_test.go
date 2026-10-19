@@ -28,10 +28,21 @@ func TestDealClosedAtFollowsStage(t *testing.T) {
 	require.NotNil(t, deal.ClosedAt, "won sets closed_at")
 	first := *deal.ClosedAt
 
+	// Backdate the close time so a re-stamp is visible inside one test second.
+	_, err = d.Exec(`UPDATE deals SET closed_at = '2000-01-01 00:00:00' WHERE id = ?`, deal.ID)
+	require.NoError(t, err)
+	_ = first
 	lost := "lost"
 	deal, err = dr.Update(ctx, deal.ID, model.UpdateDealInput{Stage: &lost})
 	require.NoError(t, err)
-	assert.Equal(t, first, *deal.ClosedAt, "won to lost keeps the first close time")
+	assert.NotEqual(t, "2000-01-01 00:00:00", *deal.ClosedAt, "won to lost re-stamps closed_at to now")
+	stamped := *deal.ClosedAt
+	_, err = d.Exec(`UPDATE deals SET closed_at = '2000-01-01 00:00:00' WHERE id = ?`, deal.ID)
+	require.NoError(t, err)
+	deal, err = dr.Update(ctx, deal.ID, model.UpdateDealInput{Stage: &lost})
+	require.NoError(t, err)
+	assert.Equal(t, "2000-01-01 00:00:00", *deal.ClosedAt, "saving the same stage again does not re-stamp")
+	_ = stamped
 
 	open := "negotiation"
 	deal, err = dr.Update(ctx, deal.ID, model.UpdateDealInput{Stage: &open})

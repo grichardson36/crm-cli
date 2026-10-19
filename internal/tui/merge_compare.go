@@ -902,7 +902,7 @@ func (c *compareState) confirmLines(h int) []string {
 			}
 		}
 		if n := res.Moved["duplicates_dropped"]; n > 0 {
-			add(label("duplicate links") + fmt.Sprintf("%d dropped, the richest membership stays with the earliest start", n))
+			add(label("duplicate links") + fmt.Sprintf("%d dropped, only rows identical to the survivor's", n))
 		}
 		add(label("lists") + summarize(res))
 		for _, f := range res.Fields {

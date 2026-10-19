@@ -279,7 +279,7 @@ func dealEditCmd() *cobra.Command {
 	cmd.Flags().StringVar(&notes, "notes", "", "notes")
 	cmd.Flags().Int64Var(&personID, "person", 0, "also link this person")
 	cmd.Flags().Int64Var(&orgID, "org", 0, "also link this organization as the primary one")
-	cmd.Flags().StringVar(&closedAt, "closed-at", "", "close date. It is set when the stage becomes won or lost and cleared when it reopens. Empty clears it")
+	cmd.Flags().StringVar(&closedAt, "closed-at", "", "close date. It is re-stamped to now on every move into won or lost and cleared when it reopens. Empty clears it")
 
 	return cmd
 }

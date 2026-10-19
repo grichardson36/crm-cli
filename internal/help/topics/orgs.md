@@ -19,7 +19,7 @@ Organizations and deals are advanced views, not tabs. Open them from the palette
 
 - The standard keys: `a` adds (`+` also), `enter` or `e` edits, `d` deletes (asks y/n), `u` restores, `L` links, `ctrl+z` undoes. "Restore organization" and "Restore deal" are in the palette.
 - An organization is one line: `name | domain | industry | notes`. Its page lists members, parent and child organizations, deals, tasks and notes. `enter` on a linked row opens it, `n` adds a note.
-- A deal is `title | value | stage | organization | person | notes`. The organization (primary) and person are an id or a name. `s` picks the stage, a won or lost deal gets a close date.
+- A deal is `title | value | stage | organization | person | notes`. The organization (primary) and person are an id or a name. `s` picks the stage, a deal gets a close date each time it moves into won or lost.
 - Editing opens the same line filled in. A field you empty is cleared.
 
 ## Relationships between people

@@ -14,7 +14,7 @@ crm dupes --min high -f json
 
 ## Merge
 
-`crm person merge KEEP DROP...` merges the drop people into the keep person. The survivor keeps its own values. An empty field takes the first non-empty value from the dropped people. Emails, phones, links, tags and custom fields are combined. Interactions, tasks, deals, memberships and person links move to the survivor, exact duplicate links are dropped and the old id is kept as an alias (see relations). Dropped people are archived with a pointer to the survivor, so you can restore them. Always preview first.
+`crm person merge KEEP DROP...` merges the drop people into the keep person. The survivor keeps its own values. An empty field takes the first non-empty value from the dropped people. Emails, phones, links, tags and custom fields are combined. Interactions, tasks, deals, memberships and person links move to the survivor, exact duplicate links are dropped (two memberships with different roles both stay) and the old id is kept as an alias (see relations). Dropped people are archived with a pointer to the survivor, so you can restore them. Always preview first.
 
 ```sh crm-example
 crm person merge 1 3 --dry-run

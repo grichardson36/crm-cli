@@ -407,12 +407,14 @@ func TestMergeCombinesLinks(t *testing.T) {
 	tp := repo.Ref{Kind: "person", ID: third.ID}
 	o1, o2 := repo.Ref{Kind: "organization", ID: f.org}, repo.Ref{Kind: "organization", ID: f.org2}
 
-	// Same organization on both, same open end: folds into the richer row with the earlier start.
-	_, err = f.links.Link(ctx, keep, o1, model.LinkAttrs{StartedOn: sp("2020-05")})
+	// Same organization on both with different roles: both stay (CTO and Engineer are two memberships).
+	_, err = f.links.Link(ctx, keep, o1, model.LinkAttrs{StartedOn: sp("2020-05"), Role: sp("CTO")})
 	require.NoError(t, err)
 	_, err = f.links.Link(ctx, drop, o1, model.LinkAttrs{StartedOn: sp("2018"), Role: sp("Engineer"), Notes: sp("hired by Pat")})
 	require.NoError(t, err)
-	// Only the dropped person is at the second organization, and holds a primary there.
+	// An identical membership on both (same organization, role, start, end) is dropped once.
+	_, err = f.links.Link(ctx, keep, o2, model.LinkAttrs{Role: sp("Advisor")})
+	require.NoError(t, err)
 	_, err = f.links.Link(ctx, drop, o2, model.LinkAttrs{Role: sp("Advisor")})
 	require.NoError(t, err)
 	// Related people and a duplicate pair.
@@ -434,22 +436,28 @@ func TestMergeCombinesLinks(t *testing.T) {
 
 	res, err := f.people.Merge(ctx, f.person, []int64{f.other}, nil)
 	require.NoError(t, err)
-	assert.Equal(t, 1, res.Moved["memberships"], "the Globex membership moved")
+	assert.Equal(t, 1, res.Moved["memberships"], "only the Engineer stay moved, the identical Advisor row was dropped")
 	assert.Equal(t, 1, res.Moved["interactions"])
 	assert.Equal(t, 1, res.Moved["deals"])
 	assert.Equal(t, 1, res.Moved["aliases"])
-	assert.GreaterOrEqual(t, res.Moved["duplicates_dropped"], 3, "membership fold, friend pair, self link, task link")
+	assert.GreaterOrEqual(t, res.Moved["duplicates_dropped"], 4, "identical membership, friend pair, self link, task link")
 
 	orgs, err := f.links.Linked(ctx, keep, "organization")
 	require.NoError(t, err)
-	require.Len(t, orgs, 2)
-	assert.Equal(t, f.org, orgs[0].ID)
-	assert.True(t, orgs[0].Primary)
-	assert.Equal(t, "2018", *orgs[0].StartedOn, "earliest start")
-	assert.Equal(t, "Engineer", *orgs[0].Role, "richest row")
-	assert.Equal(t, "hired by Pat", *orgs[0].Notes)
-	assert.Equal(t, "Advisor", *orgs[1].Role)
-	assert.False(t, orgs[1].Primary, "the survivor keeps its own primary")
+	require.Len(t, orgs, 3, "CTO and Engineer at Initech, Advisor at Globex")
+	assert.True(t, orgs[0].Primary, "the survivor keeps its own primary")
+	var roles []string
+	for _, o := range orgs {
+		roles = append(roles, *o.Role)
+	}
+	assert.ElementsMatch(t, []string{"CTO", "Engineer", "Advisor"}, roles)
+	for _, o := range orgs {
+		if *o.Role == "Engineer" {
+			assert.Equal(t, "2018", *o.StartedOn, "the moved row keeps its own start and notes")
+			assert.Equal(t, "hired by Pat", *o.Notes)
+			assert.False(t, o.Primary)
+		}
+	}
 
 	rel, err := f.links.Linked(ctx, keep, "person")
 	require.NoError(t, err)
