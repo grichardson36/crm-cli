@@ -939,3 +939,55 @@ func TestListingFiveThousandContactsIsFast(t *testing.T) {
 	assert.Less(t, elapsed, time.Second, "PROPFIND depth 1 over HTTP")
 	t.Logf("5000 contacts: service list and PROPFIND depth 1 took %s over HTTP", elapsed)
 }
+
+// E4: the primary membership fills the vCard ORG, TITLE stays the person's title, the phone cannot
+// rename the organization, and a rename of the organization reaches the contact.
+func TestPrimaryOrganizationFillsOrg(t *testing.T) {
+	e := newEnv(t, false)
+	ctx := context.Background()
+	p, err := e.people.Create(ctx, model.CreatePersonInput{FirstName: "Jane", Company: ptr("Old Text Co"), Title: ptr("CTO")})
+	require.NoError(t, err)
+	orgs := repo.NewOrgRepo(e.db)
+	o, err := orgs.Create(ctx, model.CreateOrgInput{Name: "Acme Corp"})
+	require.NoError(t, err)
+	o2, err := orgs.Create(ctx, model.CreateOrgInput{Name: "Globex"})
+	require.NoError(t, err)
+
+	// No membership: the stored company text is the ORG.
+	card, _ := e.pull(e.reload(p.ID))
+	assert.Equal(t, "Old Text Co", card.PreferredValue(vcard.FieldOrganization))
+
+	links := repo.NewLinkRepo(e.db)
+	_, err = links.Link(ctx, repo.Ref{Kind: "person", ID: p.ID}, repo.Ref{Kind: "organization", ID: o.ID}, model.LinkAttrs{})
+	require.NoError(t, err)
+	_, err = links.Link(ctx, repo.Ref{Kind: "person", ID: p.ID}, repo.Ref{Kind: "organization", ID: o2.ID}, model.LinkAttrs{})
+	require.NoError(t, err)
+	e.bump(p.ID)
+	card, etag := e.pull(e.reload(p.ID))
+	assert.Equal(t, "Acme Corp", card.PreferredValue(vcard.FieldOrganization), "the first organization is primary")
+	assert.Equal(t, "CTO", card.PreferredValue(vcard.FieldTitle))
+
+	// The phone changes ORG: the CRM keeps the organization and the stored text is untouched.
+	card.SetValue(vcard.FieldOrganization, "Phone Edit Inc")
+	res, err := e.push(e.davID(e.reload(p.ID)), card, etagHeader(etag))
+	require.NoError(t, err)
+	assert.Empty(t, res.ETag, "the phone is told to fetch again")
+	after := e.reload(p.ID)
+	assert.Equal(t, "Old Text Co", *after.Company)
+	card, _ = e.pull(after)
+	assert.Equal(t, "Acme Corp", card.PreferredValue(vcard.FieldOrganization))
+
+	// Renaming the organization changes the contact's version.
+	_, etagBefore := e.pull(e.reload(p.ID))
+	e.clock = e.clock.Add(2 * time.Second)
+	_, err = e.db.Exec(`UPDATE people SET updated_at = datetime('now', '-1 day') WHERE id = ?`, p.ID)
+	require.NoError(t, err)
+	_, etagOld := e.pull(e.reload(p.ID))
+	name := "Acme International"
+	_, err = orgs.Update(ctx, o.ID, model.UpdateOrgInput{Name: &name})
+	require.NoError(t, err)
+	card, etagNew := e.pull(e.reload(p.ID))
+	assert.NotEqual(t, etagOld, etagNew)
+	_ = etagBefore
+	assert.Equal(t, "Acme International", card.PreferredValue(vcard.FieldOrganization))
+}

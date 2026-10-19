@@ -147,3 +147,32 @@ func TestImportDex_SkipTags(t *testing.T) {
 	require.NoError(t, d.QueryRow(`SELECT COUNT(*) FROM tags WHERE name = 'Acme'`).Scan(&n))
 	assert.Equal(t, 1, n)
 }
+
+const relatedCSV = `first_name,last_name,id,dex_related_contacts
+Jane,Doe,11111111-1111-1111-1111-111111111111,"Bob Real, 33333333-3333-3333-3333-333333333333, Nobody Known"
+Bob,Real,33333333-3333-3333-3333-333333333333,Jane Doe
+Cy,Poe,44444444-4444-4444-4444-444444444444,
+`
+
+func TestImportDexLinksRelatedContacts(t *testing.T) {
+	d, err := db.Open(":memory:")
+	require.NoError(t, err)
+	defer d.Close()
+	path := filepath.Join(t.TempDir(), "contacts.csv")
+	require.NoError(t, os.WriteFile(path, []byte(relatedCSV), 0o600))
+
+	rep, err := importer.ImportDex(context.Background(), d, path, "", importer.DexOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, 3, rep.ContactsImported)
+	// Jane lists Bob by name and by id (one pair), Bob lists Jane back (same pair), one name matches nobody.
+	assert.Equal(t, 1, rep.RelatedLinks)
+	assert.Equal(t, 1, rep.RelatedUnresolved)
+	var n int
+	require.NoError(t, d.QueryRow(`SELECT COUNT(*) FROM person_relation pr JOIN relation_kind k ON k.id = pr.kind_id WHERE k.name = 'related' AND pr.a_id < pr.b_id`).Scan(&n))
+	assert.Equal(t, 1, n)
+
+	// Importing again links nothing new.
+	rep, err = importer.ImportDex(context.Background(), d, path, "", importer.DexOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, 0, rep.RelatedLinks)
+}

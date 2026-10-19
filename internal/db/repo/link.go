@@ -755,13 +755,17 @@ func (r *LinkRepo) Linked(ctx context.Context, a Ref, otherKind string) ([]model
 	return r.linkedVia(ctx, rel, a)
 }
 
-// All lists every link of a across all its relations.
+// All lists every link of a across all its relations except notes: they are a timeline, `log list`
+// shows them.
 func (r *LinkRepo) All(ctx context.Context, a Ref) ([]model.LinkedObject, error) {
 	if err := r.check(ctx, a); err != nil {
 		return nil, err
 	}
 	var out []model.LinkedObject
 	for _, rel := range model.RelationsOf(a.Kind) {
+		if rel.A == "interaction" {
+			continue
+		}
 		items, err := r.linkedVia(ctx, rel, a)
 		if err != nil {
 			return nil, err

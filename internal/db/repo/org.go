@@ -172,7 +172,7 @@ func (r *OrgRepo) Archive(ctx context.Context, id int64) error {
 		return fmt.Errorf("organization %d: %w", id, model.ErrNotFound)
 	}
 
-	return nil
+	return r.touchMembers(ctx, id)
 }
 
 // Search performs full-text search on organizations.
@@ -241,7 +241,7 @@ func (r *OrgRepo) Restore(ctx context.Context, id int64) error {
 	if rows, _ := result.RowsAffected(); rows == 0 {
 		return fmt.Errorf("archived organization %d: %w", id, model.ErrNotFound)
 	}
-	return nil
+	return r.touchMembers(ctx, id)
 }
 
 // Overwrite sets every editable field to the values of o, including empty ones. Undo and redo
