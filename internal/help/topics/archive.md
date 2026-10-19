@@ -13,11 +13,11 @@ crm person list --archived
 crm person restore 4
 ```
 
-You can pass several IDs. `crm person delete` is a deprecated alias of `archive`. Organizations, deals, tasks and interactions are archived by their own `delete` or `rm` commands.
+You can pass several IDs. `crm person delete` is a deprecated alias of `archive`. Organizations, deals, tasks and interactions are archived by their own `delete` or `rm` commands. A deleted organization or deal hides its links, restoring it brings them back. The Archived view in the terminal UI lists every kind with a type filter.
 
 ## Purge
 
-Purge permanently deletes people who are already archived, with their contact details, relationships, tags, custom fields, and any interactions or tasks that involve only them. A tombstone is recorded so sync can propagate the delete. It cannot be undone, so it needs `--yes`.
+Purge permanently deletes people who are already archived, with their contact details, memberships and links, tags, custom fields, and any interactions or tasks that involve only them. A tombstone is recorded so sync can propagate the delete. It cannot be undone, so it needs `--yes`.
 
 ```sh crm-example
 crm person purge 4 --dry-run

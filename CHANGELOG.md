@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Relations (schema 8): a person belongs to many organizations with a role, dates and a primary flag. Person to person and organization to organization links carry a kind with an inverse (`crm relation-kind`). Deals link to several people and organizations. Tasks and notes attach to people, organizations and deals. Merging people re-points every link and keeps an alias. `crm roles`, `--org` and `--deal` on `log add`, `task edit --clear-due`, `crm doctor` link check. MCP tools `crm_relation_kind_*`, `crm_links`, `crm_link_roles`, `crm_task_update`.
+- Terminal UI: the Link form asks the kind and a role | from | to | primary | notes line, `E` edits a link, organizations and deals open as record pages, the Archived view lists every object kind with a type filter.
+
+### Changed
+
+- Breaking: `people.org_id`, `deals.person_id`, `deals.org_id`, `tasks.person_id`, `tasks.deal_id` and the tables `relationships`, `task_people`, `interaction_people` are gone. JSON: `person_id`/`org_id` on deals and tasks become `person_ids`, `org_ids`, `deal_ids` (a deal keeps `org_id` for its primary organization). Back up before upgrading, the data moves in one migration.
+- A deal gets `closed_at` when its stage becomes won or lost and loses it when it reopens.
+
 ## [0.1.6] - 2026-03-08
 
 ### Added

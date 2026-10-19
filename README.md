@@ -164,15 +164,19 @@ crm tag list                             # all tags
 crm tag delete "old-tag" --yes           # remove tag entirely (cannot be undone)
 ```
 
-### Relationships
+### Links: organizations, relationships, roles
 
 ```bash
-crm person relate 1 2 --type colleague --notes "Met at ReactConf"
-crm person relationships 1               # list all relationships
-crm person unrelate 1                    # remove by relationship ID
+crm person link org 2 1 --role CTO --from 2019-03 --primary   # a person can be in many organizations
+crm person link person 1 2 --kind parent                       # typed, 2 sees 1 as parent, 1 sees 2 as child
+crm org link org 1 2                                           # org 1 is the parent of org 2
+crm deal link person 1 3 --role champion
+crm log add --type note --org 1 "Kickoff went well"            # notes attach to organizations and deals
+crm relation-kind add godparent --inverse godchild             # your own kinds
+crm person show 1 -f json                                      # includes links with role, dates and kind
 ```
 
-Relationship types: `colleague`, `friend`, `manager`, `mentor`, `referred-by`
+`crm person relate|relationships|unrelate` still work and call the same link core. Kinds: `crm relation-kind list`. See `crm help links` and `crm help relations`.
 
 ### Search
 
@@ -234,7 +238,7 @@ crm person list --tag vip -q | xargs -I{} crm tag apply person {} "priority"
 
 ```bash
 # Bulk tag everyone at an org
-crm person list -f json | jq '.[] | select(.org_id == 1) | .id' | xargs -I{} crm tag apply person {} "acme-team"
+crm person list -f json | jq '.[] | .id' | xargs -I{} crm tag apply person {} "acme-team"
 
 # Interactive selection with fzf
 crm person list -f tsv | fzf | cut -f1 | xargs crm person show
@@ -303,7 +307,10 @@ Then point the agent at [`AGENTS.md`](AGENTS.md) so it knows how to use the CRM 
 | `crm_person_create` | Create a new person |
 | `crm_person_update` | Update person fields |
 | `crm_person_delete` | Delete (archive) a person |
-| `crm_person_relate` | Create relationship between people |
+| `crm_person_relate` | Create relationship between people (older name of `crm_person_link` with `other=person`) |
+| `crm_<object>_link` / `_unlink` | Link or unlink with role, dates, primary, kind |
+| `crm_relation_kind_list` / `_add` / `_remove` | Manage link kinds |
+| `crm_links` | List the links of an object |
 | `crm_org_search` | Search organizations |
 | `crm_org_get` | Get org details with members |
 | `crm_interaction_log` | Log a call, email, meeting, or note |
