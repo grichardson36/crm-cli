@@ -19,7 +19,7 @@ func registerConvertTools(s *server.MCPServer, db *sql.DB) {
 
 	s.AddTool(
 		gomcp.NewTool("crm_org_convert_list",
-			gomcp.WithDescription("List the review groups of people's company text, biggest first, with the suggested existing organization (match kind exact, alias or fuzzy; only exact and alias are safe to accept in bulk). Returns stats (people with company text, groups, matched) and the groups. Creates nothing"),
+			gomcp.WithDescription("List the review groups of people's company text, biggest first, with the suggested existing organization (match kind exact, alias or fuzzy; only exact and alias are safe to accept in bulk). Each group also has domain, the dominant non-free email domain of its people, and domain_match, an existing organization with that domain (a suggestion only, never part of accept_exact). Returns stats (people with company text, groups, matched) and the groups. Creates nothing"),
 			gomcp.WithNumber("limit", gomcp.Description("Max groups (default 50, 0 for all)")),
 			gomcp.WithNumber("min_people", gomcp.Description("Only groups with at least this many people")),
 			gomcp.WithBoolean("include_skipped", gomcp.Description("Also list groups that were skipped")),
@@ -49,7 +49,7 @@ func registerConvertTools(s *server.MCPServer, db *sql.DB) {
 
 	s.AddTool(
 		gomcp.NewTool("crm_org_convert_apply",
-			gomcp.WithDescription("Apply conversion decisions in one batch. Each decision is {key, action, org_id, name}: action create makes an organization (name defaults to the most common spelling) and links the group, link links to org_id, skip hides the group until its text changes, unskip brings it back. A person gets a membership with their title as the role, primary when they have none, and loses the org-review tag. people.company stays. accept_exact adds a link decision for every exact or alias match. dry_run previews without writing. Nothing is created without a decision"),
+			gomcp.WithDescription("Apply conversion decisions in one batch. Each decision is {key, action, org_id, name, domain}: action create makes an organization (name defaults to the most common spelling, domain to the group's dominant non-free email domain) and links the group, link links to org_id, skip hides the group until its text changes, unskip brings it back. A person gets a membership with their title as the role, primary when they have none, and loses the org-review tag. people.company stays. accept_exact adds a link decision for every exact or alias match. dry_run previews without writing. Nothing is created without a decision"),
 			gomcp.WithArray("decisions", gomcp.Description("Decisions, one per group key")),
 			gomcp.WithBoolean("accept_exact", gomcp.Description("Also link every group that matches an existing organization exactly")),
 			gomcp.WithBoolean("dry_run", gomcp.Description("Preview only")),
@@ -62,7 +62,7 @@ func registerConvertTools(s *server.MCPServer, db *sql.DB) {
 					return gomcp.NewToolResultError("validation error: decisions must be a list of objects"), nil
 				}
 				if err := json.Unmarshal(b, &decisions); err != nil {
-					return gomcp.NewToolResultError("validation error: decisions must be a list of {key, action, org_id, name}: " + err.Error()), nil
+					return gomcp.NewToolResultError("validation error: decisions must be a list of {key, action, org_id, name, domain}: " + err.Error()), nil
 				}
 			}
 			if req.GetBool("accept_exact", false) {

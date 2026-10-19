@@ -18,6 +18,8 @@ var convertColumns = []format.ColumnDef{
 	{Header: "Text", Field: "display"},
 	{Header: "People", Field: "people"},
 	{Header: "Match", Field: "match_text"},
+	{Header: "Domain", Field: "domain"},
+	{Header: "Domain match", Field: "domain_match_text"},
 	{Header: "Review", Field: "review"},
 }
 
@@ -26,13 +28,14 @@ var convertPlanColumns = []format.ColumnDef{
 	{Header: "Action", Field: "action"},
 	{Header: "People", Field: "people"},
 	{Header: "Organization", Field: "org_name"},
+	{Header: "Domain", Field: "domain"},
 	{Header: "Applied", Field: "applied"},
 	{Header: "Note", Field: "note"},
 }
 
 const (
-	convertFields     = "key,display,people,variants,review,skipped,match,match_text,people_list"
-	convertPlanFields = "key,action,people,org_id,org_name,note,applied"
+	convertFields     = "key,display,people,variants,review,skipped,match,match_text,domain,domain_match,domain_match_text,people_list"
+	convertPlanFields = "key,action,people,org_id,org_name,domain,note,applied"
 )
 
 // parseDecisionFlags reads --link KEY=ORGID, --create KEY[=NAME], --skip KEY and --unskip KEY.
@@ -72,7 +75,8 @@ func orgConvertCmd() *cobra.Command {
 		Use:   "convert",
 		Short: "Review company text and turn it into organizations, in passes",
 		Long: "Lists the people's company text grouped by normalized name (case, spacing and Inc/LLC/Ltd/Corp/Co endings ignored for grouping only), with the existing organization each group matches.\n" +
-			"Nothing is created by looking. Give a decision per group with --create KEY[=NAME], --link KEY=ORG_ID, --skip KEY, or a --decisions file (a JSON array of {key, action, org_id, name}), and --accept-exact to link every group that matches an organization exactly. Without --apply the decisions are only previewed.\n" +
+			"Nothing is created by looking. Give a decision per group with --create KEY[=NAME], --link KEY=ORG_ID, --skip KEY, or a --decisions file (a JSON array of {key, action, org_id, name, domain}), and --accept-exact to link every group that matches an organization exactly. Without --apply the decisions are only previewed.\n" +
+			"A group also shows the dominant email domain of its people (free-mail providers ignored) and the organization with that domain, a suggestion that --accept-exact never takes. Create sets the new organization's domain to it unless the decision has one.\n" +
 			"Create makes the organization and gives each person a membership (primary when they have none), the person's title as the role. people.company stays as it is. A converted group does not come back, a skipped group stays away until its text changes. See 'crm help convert'.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -114,7 +118,7 @@ func orgConvertCmd() *cobra.Command {
 				}
 				rows := make([]map[string]any, len(plan))
 				for i, p := range plan {
-					rows[i] = map[string]any{"key": p.Key, "action": p.Action, "people": p.People, "org_id": p.OrgID, "org_name": p.OrgName, "note": p.Note, "applied": false}
+					rows[i] = map[string]any{"key": p.Key, "action": p.Action, "people": p.People, "org_id": p.OrgID, "org_name": p.OrgName, "domain": p.Domain, "note": p.Note, "applied": false}
 				}
 				if apply {
 					ch, err := cr.Apply(ctx, decisions)
@@ -137,8 +141,8 @@ func orgConvertCmd() *cobra.Command {
 			if statsOnly {
 				return format.Output(os.Stdout, resolveFormat(), []map[string]any{{
 					"people": stats.People, "groups": stats.Groups, "matched": stats.Matched, "fuzzy": stats.Fuzzy,
-					"skipped_groups": stats.Skipped, "review_people": stats.Review,
-				}}, []format.ColumnDef{{Header: "People", Field: "people"}, {Header: "Groups", Field: "groups"}, {Header: "Matched", Field: "matched"}, {Header: "Fuzzy", Field: "fuzzy"}, {Header: "Skipped", Field: "skipped_groups"}}, flagQuiet)
+					"domain_matches": stats.DomainMatches, "domains": stats.Domains, "skipped_groups": stats.Skipped, "review_people": stats.Review,
+				}}, []format.ColumnDef{{Header: "People", Field: "people"}, {Header: "Groups", Field: "groups"}, {Header: "Matched", Field: "matched"}, {Header: "Fuzzy", Field: "fuzzy"}, {Header: "Domain matches", Field: "domain_matches"}, {Header: "Skipped", Field: "skipped_groups"}}, flagQuiet)
 			}
 			var rows []map[string]any
 			for _, g := range groups {

@@ -71,6 +71,70 @@ func NormalizeCompany(s string) string {
 	return strings.Join(words, " ")
 }
 
+// freeMailDomains are personal mail providers. They say nothing about a company, so the email domain
+// of a group ignores them.
+var freeMailDomains = map[string]bool{
+	"gmail.com": true, "googlemail.com": true, "outlook.com": true, "hotmail.com": true, "live.com": true, "msn.com": true,
+	"yahoo.com": true, "ymail.com": true, "icloud.com": true, "me.com": true, "mac.com": true, "aol.com": true,
+	"proton.me": true, "protonmail.com": true, "pm.me": true, "comcast.net": true, "verizon.net": true, "att.net": true,
+	"sbcglobal.net": true, "bellsouth.net": true, "cox.net": true, "earthlink.net": true, "charter.net": true, "rr.com": true, "gmx.com": true, "mail.com": true, "zoho.com": true, "fastmail.com": true,
+}
+
+// IsFreeMailDomain reports whether d is a personal mail provider.
+func IsFreeMailDomain(d string) bool {
+	d = strings.ToLower(strings.TrimSpace(d))
+	return freeMailDomains[d] || strings.HasSuffix(d, ".rr.com") // regional cable mail such as cfl.rr.com
+}
+
+// normalizeDomain lowercases a domain and drops a scheme, "www.", a path and an "@".
+func normalizeDomain(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	if i := strings.Index(s, "://"); i >= 0 {
+		s = s[i+3:]
+	}
+	if i := strings.IndexAny(s, "/?#"); i >= 0 {
+		s = s[:i]
+	}
+	s = strings.TrimPrefix(strings.TrimPrefix(s, "@"), "www.")
+	return strings.Trim(s, ". ")
+}
+
+func emailDomain(email string) string {
+	i := strings.LastIndex(email, "@")
+	if i < 0 {
+		return ""
+	}
+	return normalizeDomain(email[i+1:])
+}
+
+// dominantDomain picks the non-free email domain shared by the most people in a group (ties go to the
+// name that sorts first). A group of 2 or more people needs a domain at least 2 of them share, a
+// single person needs just their own. It returns "" when there is none.
+func dominantDomain(people []ConvertPerson, domains map[int64]map[string]bool) string {
+	count := map[string]int{}
+	for _, p := range people {
+		for d := range domains[p.ID] {
+			if d != "" && !IsFreeMailDomain(d) {
+				count[d]++
+			}
+		}
+	}
+	need := 1
+	if len(people) >= 2 {
+		need = 2
+	}
+	best, bestN := "", 0
+	for d, n := range count {
+		if n < need {
+			continue
+		}
+		if n > bestN || (n == bestN && d < best) {
+			best, bestN = d, n
+		}
+	}
+	return best
+}
+
 // ConvertPerson is one person in a group.
 type ConvertPerson struct {
 	ID         int64  `json:"id"`
@@ -88,7 +152,8 @@ type TextVariant struct {
 }
 
 // OrgMatch is an existing organization suggested for a group. Kind is exact (same normalized name),
-// alias (the name of a merged-away organization) or fuzzy (a close name, a suggestion only).
+// alias (the name of a merged-away organization), fuzzy (a close name, a suggestion only) or domain
+// (the organization's domain is the group's dominant email domain, a suggestion only).
 type OrgMatch struct {
 	OrgID int64   `json:"org_id"`
 	Name  string  `json:"name"`
@@ -105,7 +170,11 @@ type ConvertGroup struct {
 	Review   int             `json:"review"`
 	Skipped  bool            `json:"skipped,omitempty"`
 	Match    *OrgMatch       `json:"match,omitempty"`
-	People   []ConvertPerson `json:"people_list"`
+	// Domain is the dominant non-free email domain of the people. DomainMatch is the existing
+	// organization with that domain, kept apart from the name match.
+	Domain      string          `json:"domain,omitempty"`
+	DomainMatch *OrgMatch       `json:"domain_match,omitempty"`
+	People      []ConvertPerson `json:"people_list"`
 }
 
 // Record is the group as the CLI and MCP print it. withPeople adds the people list.
@@ -116,6 +185,13 @@ func (g ConvertGroup) Record(withPeople bool) map[string]any {
 	if g.Match != nil {
 		m["match"] = g.Match
 		m["match_text"] = fmt.Sprintf("%s #%d (%s)", g.Match.Name, g.Match.OrgID, g.Match.Kind)
+	}
+	if g.Domain != "" {
+		m["domain"] = g.Domain
+	}
+	if g.DomainMatch != nil {
+		m["domain_match"] = g.DomainMatch
+		m["domain_match_text"] = fmt.Sprintf("%s #%d (domain %s)", g.DomainMatch.Name, g.DomainMatch.OrgID, g.Domain)
 	}
 	if withPeople {
 		m["people_list"] = g.People
@@ -134,6 +210,10 @@ type ConvertStats struct {
 	Groups  int `json:"groups"`
 	Matched int `json:"matched"`
 	Fuzzy   int `json:"fuzzy"`
+	// DomainMatches counts groups with a domain suggestion and no exact name match. Domains counts
+	// groups that have a dominant non-free email domain.
+	DomainMatches int `json:"domain_matches"`
+	Domains       int `json:"domains"`
 	Skipped int `json:"skipped_groups"`
 	Review  int `json:"review_people"`
 }
@@ -216,22 +296,31 @@ func (r *ConvertRepo) setSkip(ctx context.Context, key string, on bool) error {
 }
 
 type orgIndex struct {
-	exact map[string]OrgMatch
+	byDomain map[string]OrgMatch
+	exact    map[string]OrgMatch
 	list  []OrgMatch
 	keys  []string
 }
 
 func (r *ConvertRepo) orgIndex(ctx context.Context) (*orgIndex, error) {
-	ix := &orgIndex{exact: map[string]OrgMatch{}}
-	rows, err := r.db.QueryContext(ctx, `SELECT id, name FROM organizations WHERE archived = 0 ORDER BY id`)
+	ix := &orgIndex{exact: map[string]OrgMatch{}, byDomain: map[string]OrgMatch{}}
+	rows, err := r.db.QueryContext(ctx, `SELECT id, name, COALESCE(domain, '') FROM organizations WHERE archived = 0 ORDER BY id`)
 	if err != nil {
 		return nil, fmt.Errorf("list organizations: %w", err)
 	}
 	for rows.Next() {
 		var m OrgMatch
-		if err := rows.Scan(&m.OrgID, &m.Name); err != nil {
+		var domain string
+		if err := rows.Scan(&m.OrgID, &m.Name, &domain); err != nil {
 			rows.Close()
 			return nil, err
+		}
+		if d := normalizeDomain(domain); d != "" {
+			if _, dup := ix.byDomain[d]; !dup {
+				dm := m
+				dm.Kind = "domain"
+				ix.byDomain[d] = dm
+			}
 		}
 		k := NormalizeCompany(m.Name)
 		if _, dup := ix.exact[k]; !dup {
@@ -314,6 +403,31 @@ func levenshtein(a, b string) int {
 	return prev[len(rb)]
 }
 
+// emailDomains maps a person id to the set of domains of their emails (primary and extra).
+func (r *ConvertRepo) emailDomains(ctx context.Context) (map[int64]map[string]bool, error) {
+	out := map[int64]map[string]bool{}
+	rows, err := r.db.QueryContext(ctx, `SELECT id, email FROM people WHERE archived = 0 AND email IS NOT NULL AND email <> ''
+		UNION SELECT e.person_id, e.email FROM person_emails e JOIN people p ON p.id = e.person_id WHERE p.archived = 0`)
+	if err != nil {
+		return nil, fmt.Errorf("list email domains: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int64
+		var email string
+		if err := rows.Scan(&id, &email); err != nil {
+			return nil, err
+		}
+		if d := emailDomain(email); d != "" {
+			if out[id] == nil {
+				out[id] = map[string]bool{}
+			}
+			out[id][d] = true
+		}
+	}
+	return out, rows.Err()
+}
+
 // Groups returns the groups still to review, biggest first, and the stats. People who already have a
 // live primary membership are left out unless their text differs from that organization's name.
 // Groups the user skipped are left out too (IncludeSkipped brings them back). Tagged people
@@ -329,6 +443,10 @@ func (r *ConvertRepo) Groups(ctx context.Context, includeSkipped bool) ([]Conver
 		return nil, stats, err
 	}
 	ix, err := r.orgIndex(ctx)
+	if err != nil {
+		return nil, stats, err
+	}
+	domains, err := r.emailDomains(ctx)
 	if err != nil {
 		return nil, stats, err
 	}
@@ -398,6 +516,11 @@ func (r *ConvertRepo) Groups(ctx context.Context, includeSkipped bool) ([]Conver
 		} else {
 			g.Match = ix.closeMatch(key)
 		}
+		g.Domain = dominantDomain(g.People, domains)
+		if m, ok := ix.byDomain[g.Domain]; ok && g.Domain != "" && !(g.Exact() && g.Match.OrgID == m.OrgID) {
+			mm := m
+			g.DomainMatch = &mm
+		}
 		out = append(out, *g)
 	}
 	sort.Slice(out, func(i, j int) bool {
@@ -417,6 +540,12 @@ func (r *ConvertRepo) Groups(ctx context.Context, includeSkipped bool) ([]Conver
 			stats.Groups++
 			stats.People += g.Count
 			stats.Review += g.Review
+			if g.Domain != "" {
+				stats.Domains++
+				if g.DomainMatch != nil && !g.Exact() {
+					stats.DomainMatches++
+				}
+			}
 			if g.Exact() {
 				stats.Matched++
 			} else if g.Match != nil {
@@ -429,13 +558,17 @@ func (r *ConvertRepo) Groups(ctx context.Context, includeSkipped bool) ([]Conver
 }
 
 // ConvertDecision is the choice for one group. Create makes an organization named Name (the most
-// common spelling when empty) and links the group. Link links to OrgID. Skip remembers the group as
+// common spelling when empty) with Domain (the group's dominant email domain when empty) and links the
+// group. A domain match is never part of ExactDecisions, only a decision for that group accepts it. Link links to OrgID. Skip remembers the group as
 // skipped. Unskip forgets that.
 type ConvertDecision struct {
 	Key    string `json:"key"`
 	Action string `json:"action"`
 	OrgID  int64  `json:"org_id,omitempty"`
 	Name   string `json:"name,omitempty"`
+	// Domain is set on the new organization by create. Empty means the group's dominant non-free
+	// email domain, if any.
+	Domain string `json:"domain,omitempty"`
 }
 
 // ExactDecisions is the bulk accept: link every group that has an exact or alias match.
@@ -513,7 +646,14 @@ func (r *ConvertRepo) Apply(ctx context.Context, decisions []ConvertDecision) (C
 			if name == "" {
 				name = g.Display
 			}
-			o, err := r.orgs.Create(ctx, model.CreateOrgInput{Name: name})
+			in := model.CreateOrgInput{Name: name}
+			if dom := normalizeDomain(d.Domain); dom != "" {
+				in.Domain = &dom
+			} else if g.Domain != "" {
+				dom := g.Domain
+				in.Domain = &dom
+			}
+			o, err := r.orgs.Create(ctx, in)
 			if err != nil {
 				return fail(err)
 			}
@@ -649,6 +789,8 @@ type ConvertPlanRow struct {
 	People  int    `json:"people"`
 	OrgID   int64  `json:"org_id,omitempty"`
 	OrgName string `json:"org_name,omitempty"`
+	// Domain is what a create would set on the new organization.
+	Domain string `json:"domain,omitempty"`
 	// Note is set when the decision does nothing now (the group is gone or already converted).
 	Note string `json:"note,omitempty"`
 }
@@ -680,6 +822,10 @@ func (r *ConvertRepo) Plan(ctx context.Context, decisions []ConvertDecision) ([]
 				row.OrgName = strings.TrimSpace(d.Name)
 				if row.OrgName == "" {
 					row.OrgName = g.Display
+				}
+				row.Domain = normalizeDomain(d.Domain)
+				if row.Domain == "" {
+					row.Domain = g.Domain
 				}
 			} else if o, err := r.orgs.FindByID(ctx, d.OrgID); err != nil {
 				return nil, fmt.Errorf("organization %d for %q: %w", d.OrgID, d.Key, err)

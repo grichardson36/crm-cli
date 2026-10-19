@@ -111,6 +111,8 @@ func (m *Model) convRows() ([]row, error) {
 			meta = "= " + g.Match.Name
 		case g.Match != nil:
 			meta = "~ " + g.Match.Name
+		case g.DomainMatch != nil:
+			meta = "@ " + g.DomainMatch.Name
 		}
 		if d, ok := m.convStaged[g.Key]; ok {
 			meta = "→ " + m.convDecisionText(d)
@@ -132,10 +134,29 @@ func (m *Model) convDecisionText(d repo.ConvertDecision) string {
 	case repo.ConvertLink:
 		return "link " + m.orgName(d.OrgID)
 	}
+	text := "create"
 	if d.Name != "" {
-		return "create " + d.Name
+		text += " " + d.Name
 	}
-	return "create"
+	if g, ok := m.convGroupByKey(d.Key); ok {
+		dom := d.Domain
+		if dom == "" {
+			dom = g.Domain
+		}
+		if dom != "" {
+			text += " (" + dom + ")"
+		}
+	}
+	return text
+}
+
+func (m *Model) convGroupByKey(key string) (repo.ConvertGroup, bool) {
+	for _, g := range m.convGroups {
+		if g.Key == key {
+			return g, true
+		}
+	}
+	return repo.ConvertGroup{}, false
 }
 
 // convStage records a decision for the group under the cursor and moves down.
@@ -164,8 +185,11 @@ func (m *Model) convPickOrg() {
 	if g.Match != nil {
 		items = append(items, overlayItem{id: "pick", label: cleanCell(g.Match.Name), desc: "suggested (" + g.Match.Kind + ")", ref: g.Match.OrgID, value: g.Match.Name})
 	}
+	if g.DomainMatch != nil && (g.Match == nil || g.Match.OrgID != g.DomainMatch.OrgID) {
+		items = append(items, overlayItem{id: "pick", label: cleanCell(g.DomainMatch.Name), desc: "domain " + g.Domain, ref: g.DomainMatch.OrgID, value: g.DomainMatch.Name})
+	}
 	for _, o := range list {
-		if g.Match != nil && o.ID == g.Match.OrgID {
+		if g.Match != nil && o.ID == g.Match.OrgID || g.DomainMatch != nil && o.ID == g.DomainMatch.OrgID {
 			continue
 		}
 		items = append(items, overlayItem{id: "pick", label: cleanCell(o.Name), desc: cleanCell(str(o.Industry)), ref: o.ID, value: o.Name})
@@ -312,6 +336,14 @@ func (m *Model) convDetail(r row) string {
 		b.WriteString(m.detailLine("close to", fmt.Sprintf("%s (#%d), a suggestion only", g.Match.Name, g.Match.OrgID)) + "\n")
 	default:
 		b.WriteString(m.detailLine("matches", "no organization yet") + "\n")
+	}
+	if g.Domain != "" {
+		b.WriteString(m.detailLine("email domain", g.Domain) + "\n")
+		if g.DomainMatch != nil {
+			b.WriteString(m.detailLine("domain match", fmt.Sprintf("%s (#%d), a suggestion only", g.DomainMatch.Name, g.DomainMatch.OrgID)) + "\n")
+		} else {
+			b.WriteString(m.detailLine("new org domain", g.Domain+", set when created") + "\n")
+		}
 	}
 	if d, ok := m.convStaged[g.Key]; ok {
 		b.WriteString(m.detailLine("staged", m.convDecisionText(d)) + "\n")
