@@ -60,6 +60,7 @@ func registerOrgCommands(rootCmd *cobra.Command) {
 	orgCmd.AddCommand(orgShowCmd())
 	orgCmd.AddCommand(orgEditCmd())
 	orgCmd.AddCommand(orgDeleteCmd())
+	orgCmd.AddCommand(orgConvertCmd())
 
 	rootCmd.AddCommand(orgCmd)
 }

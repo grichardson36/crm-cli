@@ -98,6 +98,10 @@ var commandMeta = map[string]cmdMeta{
 	"org edit":   {mutates: true, fields: orgFields, target: "organization", targetArgs: "first", examples: []string{`crm org edit 1 --domain acme.io`}},
 	"org delete": {mutates: true, target: "organization", targetArgs: "first", examples: []string{`crm org delete 1`}},
 
+	"org convert": {mutates: true, noDryRun: true, fields: convertFields + "," + convertPlanFields, examples: []string{
+		`crm org convert --limit 20 -f json`, `crm org convert --stats`,
+		`crm org convert --accept-exact --apply`, `crm org convert --create acme="Acme Corp" --skip mystery --apply`}},
+
 	// deals
 	"deal add":      {mutates: true, fields: dealFields, examples: []string{`crm deal add "Website Redesign" --value 15000 --person 1 --stage proposal`}},
 	"deal list":     {fields: dealFields, examples: []string{`crm deal list --open -f json`}},
