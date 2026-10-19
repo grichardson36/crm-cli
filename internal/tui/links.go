@@ -144,7 +144,8 @@ func (m *Model) startLinkVerb(unlink bool) tea.Cmd {
 	return nil
 }
 
-// linkedItems lists what src is linked to, as picker items.
+// linkedItems lists what src is linked to, as picker items. Every stored link is its own item, so a
+// person who was at one organization twice shows twice.
 func (m *Model) linkedItems(src repo.Ref, other string) []overlayItem {
 	if other == tagKind {
 		tags, _ := m.tagr.GetForEntity(m.ctx, src.Kind, src.ID)
@@ -154,19 +155,19 @@ func (m *Model) linkedItems(src repo.Ref, other string) []overlayItem {
 		}
 		return out
 	}
-	ids, err := m.links.Linked(m.ctx, src, other)
+	items, err := m.links.Linked(m.ctx, src, other)
 	if err != nil {
 		return nil
 	}
 	var out []overlayItem
-	for _, id := range ids {
-		r := repo.Ref{Kind: other, ID: id}
-		out = append(out, overlayItem{id: "pick", label: cleanCell(m.refName(r)), ref: id, value: m.refName(r)})
+	for _, li := range items {
+		out = append(out, overlayItem{id: "pick", label: linkSummary(li), ref: li.ID, link: li.LinkID, value: li.Name})
 	}
 	return out
 }
 
-// candidateItems lists what src could be linked to: everything not linked yet.
+// candidateItems lists what src could be linked to: every object of the kind except src itself.
+// Ones already linked stay in the list, picking one edits that link.
 func (m *Model) candidateItems(src repo.Ref, other string) []overlayItem {
 	if other == tagKind {
 		have := map[string]bool{}
@@ -187,16 +188,20 @@ func (m *Model) candidateItems(src repo.Ref, other string) []overlayItem {
 		return nil
 	}
 	linked := map[int64]bool{}
-	if ids, err := m.links.Linked(m.ctx, src, other); err == nil {
-		for _, id := range ids {
-			linked[id] = true
+	if items, err := m.links.Linked(m.ctx, src, other); err == nil {
+		for _, li := range items {
+			linked[li.ID] = true
 		}
 	}
 	var out []overlayItem
 	for _, it := range o.items(m) {
-		if !linked[it.ref] {
-			out = append(out, it)
+		if other == src.Kind && it.ref == src.ID {
+			continue
 		}
+		if linked[it.ref] {
+			it.desc = strings.TrimSpace("linked, enter edits " + it.desc)
+		}
+		out = append(out, it)
 	}
 	return out
 }
@@ -231,56 +236,28 @@ func (m *Model) startLink(src repo.Ref, other string, unlink bool) tea.Cmd {
 	return nil
 }
 
-// doLink links src to the picked object, creating it first when the row was Create. The create and
-// the link are one undo step.
+// doLink links src to the picked object. Tags apply at once. Anything else goes through the
+// Link form (linkflow.go): kind, attributes, then the write.
 func (m *Model) doLink(src repo.Ref, other string, it overlayItem) {
+	if other != tagKind {
+		m.pendingCmd = m.beginLinkDraft(src, other, it)
+		return
+	}
 	m.beginGroup()
 	defer func() { m.afterWrite() }()
 	name := m.refName(src)
-	if other == tagKind {
-		tag := strings.TrimLeft(it.value, "#")
-		if err := m.hTagApply(m.ctx, src.Kind, src.ID, tag); err != nil {
-			m.endGroup("")
-			m.setStatus(err.Error(), true)
-			return
-		}
-		m.endGroup("tag #" + tag + " on " + name)
-		m.setStatus("tagged "+name+" #"+tag+" (ctrl+z undoes)", false)
-		m.pendingCmd = m.showToast("tagged "+name+" #"+tag+" · ctrl+z undoes", false)
+	tag := strings.TrimLeft(it.value, "#")
+	if err := m.hTagApply(m.ctx, src.Kind, src.ID, tag); err != nil {
+		m.endGroup("")
+		m.setStatus(err.Error(), true)
 		return
 	}
-	o := objectByKind(other)
-	target := repo.Ref{Kind: other, ID: it.ref}
-	if it.id == "create" {
-		id, err := o.create(m, it.value)
-		if err != nil {
-			m.endGroup("")
-			m.setStatus(err.Error(), true)
-			m.pendingCmd = m.showToast(err.Error(), true)
-			return
-		}
-		target.ID = id
-	}
-	res, err := m.hLink(src, target)
-	targetName := m.refName(target)
-	m.endGroup("link " + name + " to " + targetName)
-	switch {
-	case err != nil:
-		m.setStatus(err.Error(), true)
-		m.pendingCmd = m.showToast(err.Error(), true)
-	case !res.Changed:
-		m.setStatus(name+" is already linked to "+targetName, false)
-		m.pendingCmd = m.showToast(name+" is already linked to "+targetName, false)
-	default:
-		msg := "linked " + name + " to " + targetName
-		if res.Replaced != nil {
-			msg += " (replaced " + m.refName(*res.Replaced) + ")"
-		}
-		m.setStatus(msg+" (ctrl+z undoes)", false)
-		m.pendingCmd = m.showToast(msg+" · ctrl+z undoes", false)
-	}
+	m.endGroup("tag #" + tag + " on " + name)
+	m.setStatus("tagged "+name+" #"+tag+" (ctrl+z undoes)", false)
+	m.pendingCmd = m.showToast("tagged "+name+" #"+tag+" · ctrl+z undoes", false)
 }
 
+// doUnlink removes the picked link, or the tag.
 func (m *Model) doUnlink(src repo.Ref, other string, it overlayItem) {
 	defer func() { m.afterWrite() }()
 	name := m.refName(src)
@@ -291,7 +268,7 @@ func (m *Model) doUnlink(src repo.Ref, other string, it overlayItem) {
 	} else {
 		target := repo.Ref{Kind: other, ID: it.ref}
 		targetName = m.refName(target)
-		err = m.hUnlink(src, target)
+		err = m.unlinkRecorded(src, target, it.link)
 	}
 	if err != nil {
 		m.setStatus(err.Error(), true)
@@ -301,65 +278,6 @@ func (m *Model) doUnlink(src repo.Ref, other string, it overlayItem) {
 	msg := "unlinked " + name + " from " + targetName
 	m.setStatus(msg+" (ctrl+z undoes)", false)
 	m.pendingCmd = m.showToast(msg+" · ctrl+z undoes", false)
-}
-
-// holderOf says which of a and b stores the link, and which is the target.
-func holderOf(a, b repo.Ref) (holder, target repo.Ref) {
-	if rel, ok := model.RelationBetween(a.Kind, b.Kind); ok && rel.Holder == b.Kind {
-		return b, a
-	}
-	return a, b
-}
-
-func (m *Model) isLinked(a, b repo.Ref) bool {
-	ids, err := m.links.Linked(m.ctx, a, b.Kind)
-	if err != nil {
-		return false
-	}
-	for _, id := range ids {
-		if id == b.ID {
-			return true
-		}
-	}
-	return false
-}
-
-// hLink makes a link and records it. Undo restores the object the holder pointed at before.
-func (m *Model) hLink(a, b repo.Ref) (repo.LinkResult, error) {
-	res, err := m.links.Link(m.ctx, a, b)
-	if err != nil || !res.Changed {
-		return res, err
-	}
-	holder, target := holderOf(a, b)
-	label := "link " + m.refName(a) + " to " + m.refName(b)
-	m.record(label,
-		func() error {
-			if !m.isLinked(holder, target) {
-				return staleError{m.refName(a) + " is no longer linked to " + m.refName(b)}
-			}
-			if res.Replaced != nil {
-				_, err := m.links.Link(m.ctx, holder, *res.Replaced)
-				return err
-			}
-			return m.links.Unlink(m.ctx, holder, target)
-		},
-		func() error {
-			_, err := m.links.Link(m.ctx, a, b)
-			return err
-		})
-	return res, nil
-}
-
-// hUnlink removes a link and records it.
-func (m *Model) hUnlink(a, b repo.Ref) error {
-	label := "unlink " + m.refName(a) + " from " + m.refName(b)
-	if err := m.links.Unlink(m.ctx, a, b); err != nil {
-		return err
-	}
-	m.record(label,
-		func() error { _, err := m.links.Link(m.ctx, a, b); return err },
-		func() error { return m.links.Unlink(m.ctx, a, b) })
-	return nil
 }
 
 // hCreateTask creates a task and records it.
@@ -391,40 +309,60 @@ func (m *Model) openObject(kind string, id int64) {
 	}
 }
 
-// openLinkRow is Enter on the organization or a deal row of a person: a linked row opens that
-// object, an empty row links one.
-func (m *Model) openLinkRow(r formRow) tea.Cmd {
-	other := "organization"
-	if r.kind == rkDeal {
-		other = "deal"
+// pageRef is the object whose record page is open in the detail pane.
+func (m *Model) pageRef() repo.Ref {
+	switch m.view {
+	case viewOrgs:
+		if r, ok := m.selected(); ok && r.orgID != 0 {
+			return repo.Ref{Kind: "organization", ID: r.orgID}
+		}
+	case viewDeals:
+		if r, ok := m.selected(); ok && r.dealID != 0 {
+			return repo.Ref{Kind: "deal", ID: r.dealID}
+		}
 	}
+	return repo.Ref{Kind: "person", ID: m.formPerson}
+}
+
+// openLinkRow is Enter on a linked row of a record page: a linked row opens that object, an empty
+// row links one.
+func (m *Model) openLinkRow(r formRow) tea.Cmd {
 	if !r.empty {
-		m.openObject(other, r.id)
+		m.openObject(r.other, r.id)
 		return nil
 	}
 	if m.readOnly {
-		m.setStatus("read-only: link "+other+" is disabled", true)
+		m.setStatus("read-only: link "+r.other+" is disabled", true)
 		return nil
 	}
-	return m.startLink(repo.Ref{Kind: "person", ID: m.formPerson}, other, false)
+	return m.startLink(m.pageRef(), r.other, false)
 }
 
-// askUnlinkRow is d on the organization or a deal row of a person.
+// editLinkRow is e on a linked row: edit the role, dates, primary flag, kind or notes of that link.
+func (m *Model) editLinkRow(r formRow) tea.Cmd {
+	if r.empty || r.li == nil {
+		return m.openLinkRow(r)
+	}
+	if m.readOnly {
+		m.setStatus("read-only: editing links is disabled", true)
+		return nil
+	}
+	return m.editLink(m.pageRef(), *r.li)
+}
+
+// askUnlinkRow is d on a linked row of a record page.
 func (m *Model) askUnlinkRow(r formRow) {
-	if r.empty {
+	if r.empty || r.li == nil {
 		m.setStatus("nothing to delete here", true)
 		return
 	}
-	other := "organization"
-	if r.kind == rkDeal {
-		other = "deal"
-	}
-	src := repo.Ref{Kind: "person", ID: m.formPerson}
+	src := m.pageRef()
+	li := *r.li
 	m.mode = modeConfirm
 	m.confirm = &confirmState{
-		prompt: fmt.Sprintf("unlink %s %q? y/n", other, truncateLabel(r.value)),
+		prompt: fmt.Sprintf("unlink %s %q? y/n", r.other, truncateLabel(r.value)),
 		yes: func() {
-			m.doUnlink(src, other, overlayItem{ref: r.id, label: r.value})
+			m.doUnlink(src, r.other, overlayItem{ref: li.ID, link: li.LinkID, label: li.Name})
 		},
 	}
 }

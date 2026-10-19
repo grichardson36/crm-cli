@@ -90,6 +90,12 @@ func whenDetail(m *Model) bool { return m.focus == focusDetail && len(m.form) > 
 func whenPerson(m *Model) bool { return m.curPerson() != 0 && m.view != viewArchived }
 func whenMarks(m *Model) bool  { return m.focus == focusList && len(m.markedIDs()) > 0 }
 func whenAdd(m *Model) bool    { return whenDetail(m) && addable(m.form[m.fcur].kind) }
+func whenObjectPage(m *Model) bool {
+	return m.onObjectPage() && (m.selOrg() != 0 || m.selDeal() != 0)
+}
+func whenLinkedRow(m *Model) bool {
+	return whenDetail(m) && m.form[m.fcur].kind == rkLinked && !m.form[m.fcur].empty
+}
 
 func whenMarkable(m *Model) bool {
 	r, ok := m.selected()
@@ -157,6 +163,11 @@ func buildActions() []action {
 			write: true, foot: 30, footIn: inBoth, when: whenPerson, run: func(m *Model) tea.Cmd { m.markContacted(); return nil }},
 		{id: "note", title: "Add note", group: "Contact", hint: "n", keys: []string{"n"}, desc: "add a note of the last used type (tab in the prompt changes the type)",
 			write: true, foot: 40, footIn: inBoth, when: whenPerson, run: func(m *Model) tea.Cmd { return m.startNotePrompt() }},
+		{id: "note-object", title: "Add note to organization or deal", group: "Contact", hint: "n", keys: []string{"n"}, desc: "add a note attached to the organization or deal on screen (same as crm log add --org / --deal)",
+			write: true, foot: 40, footIn: inBoth, when: whenObjectPage, run: func(m *Model) tea.Cmd { m.startObjectNote(); return m.takePending() }},
+		{id: "link-edit", title: "Edit link", group: "Link", hint: "E", keys: []string{"E"}, desc: "edit the role, dates, primary flag, kind or notes of the linked row under the cursor (detail pane). ctrl+z undoes",
+			write: true, foot: 13, footIn: inDetail, footLabel: "edit link", footIf: whenLinkedRow, when: whenLinkedRow,
+			run: func(m *Model) tea.Cmd { r, _ := m.rowFocused(); return m.editLinkRow(r) }},
 		{id: "note-pick", title: "Add note (pick type)", group: "Contact", hint: "N", keys: []string{"N"}, desc: "pick a note type from a list, then add the note",
 			write: true, when: whenPerson, run: func(m *Model) tea.Cmd { m.pickNoteType(); return nil }},
 		{id: "note-types", title: "Manage note types", group: "Contact", desc: "add or archive note types (call, email, meeting, ...)",

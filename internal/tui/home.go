@@ -144,8 +144,6 @@ func (m *Model) homeRows() ([]row, error) {
 			r := row{taskID: t.ID, title: cleanCell(t.Title), meta: dateOnly(*t.DueAt)}
 			if len(t.PersonIDs) > 0 {
 				r.personID = t.PersonIDs[0]
-			} else if t.PersonID != nil {
-				r.personID = *t.PersonID
 			}
 			if r.personID != 0 {
 				r.sub = m.nameOf(r.personID)

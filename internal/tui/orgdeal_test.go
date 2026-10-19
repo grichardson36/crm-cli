@@ -153,8 +153,7 @@ func TestDealAddEditStageDeleteRestoreWithUndo(t *testing.T) {
 	assert.Equal(t, 12500.0, *d.Value)
 	assert.Equal(t, "proposal", d.Stage)
 	assert.Equal(t, org.ID, *d.OrgID)
-	require.NotNil(t, d.PersonID)
-	assert.Equal(t, int64(2), *d.PersonID)
+	assert.Equal(t, []int64{2}, d.PersonIDs)
 	assert.Equal(t, "phase one", *d.Notes)
 	body := m.View()
 	assert.Contains(t, body, "Site redesign")
@@ -184,14 +183,14 @@ func TestDealAddEditStageDeleteRestoreWithUndo(t *testing.T) {
 	got := openDeals(t, m)[0]
 	assert.Equal(t, "Site v2", got.Title)
 	assert.Nil(t, got.Value)
-	assert.Nil(t, got.PersonID)
+	assert.Empty(t, got.PersonIDs)
 	assert.Nil(t, got.Notes)
 	assert.Equal(t, org.ID, *got.OrgID)
 	press(m, "ctrl+z")
 	got = openDeals(t, m)[0]
 	assert.Equal(t, "Site redesign", got.Title)
 	assert.Equal(t, 12500.0, *got.Value)
-	assert.Equal(t, int64(2), *got.PersonID)
+	assert.Equal(t, []int64{2}, got.PersonIDs)
 
 	// Bad input keeps the prompt open.
 	press(m, "e")

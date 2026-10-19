@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/dedupe"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/jdanielnd/crm-cli/internal/theme"
@@ -34,6 +35,9 @@ type cmpMember struct {
 	notes        int // interactions of type note
 	interactions int // all other interactions
 	tasks        int
+	orgs         int // organizations, past ones too
+	related      int // related people
+	deals        int
 }
 
 type cmpKind int
@@ -126,6 +130,16 @@ func (m *Model) openCompare(ids []int64, level dedupe.Level, reasons []string, m
 		if tasks, err := m.tr.FindAll(m.ctx, model.TaskFilters{PersonID: &pid}); err == nil {
 			mb.tasks = len(tasks)
 		}
+		ref := repo.Ref{Kind: "person", ID: pid}
+		if l, err := m.links.Linked(m.ctx, ref, "organization"); err == nil {
+			mb.orgs = len(l)
+		}
+		if l, err := m.links.Linked(m.ctx, ref, "person"); err == nil {
+			mb.related = len(l)
+		}
+		if l, err := m.links.Linked(m.ctx, ref, "deal"); err == nil {
+			mb.deals = len(l)
+		}
 		if ints, err := m.ir.FindAll(m.ctx, model.InteractionFilters{PersonID: &pid}); err == nil {
 			for _, it := range ints {
 				if it.Type == "note" {
@@ -203,7 +217,7 @@ func (c *compareState) buildRows() {
 
 	single("name", []string{"first_name", "last_name"}, false, true, fullName)
 	single("title", []string{"title"}, false, false, func(p *model.Person) string { return str(p.Title) })
-	single("company", []string{"company", "org_id"}, false, false, func(p *model.Person) string { return str(p.Company) })
+	single("company", []string{"company"}, false, false, func(p *model.Person) string { return str(p.Company) })
 	single("location", []string{"location"}, false, false, func(p *model.Person) string { return str(p.Location) })
 	single("birthday", []string{"birthday"}, false, false, formatBirthdayParts)
 
@@ -275,6 +289,9 @@ func (c *compareState) buildRows() {
 	info("notes", func(mb *cmpMember) int { return mb.notes })
 	info("interactions", func(mb *cmpMember) int { return mb.interactions })
 	info("tasks", func(mb *cmpMember) int { return mb.tasks })
+	info("organizations", func(mb *cmpMember) int { return mb.orgs })
+	info("related people", func(mb *cmpMember) int { return mb.related })
+	info("deals", func(mb *cmpMember) int { return mb.deals })
 
 	c.rows = rows
 	c.top = 0
@@ -602,10 +619,13 @@ func summarize(res *model.MergeResult) string {
 		}
 	}
 	var moved []string
-	for _, name := range []string{"interactions", "tasks", "task_people", "deals", "relationships"} {
+	for _, name := range []string{"interactions", "tasks", "deals", "relationships", "memberships"} {
 		if n := res.Moved[name]; n > 0 {
 			moved = append(moved, fmt.Sprintf("%d %s", n, strings.ReplaceAll(name, "_", " ")))
 		}
+	}
+	if n := res.Moved["duplicates_dropped"]; n > 0 {
+		moved = append(moved, fmt.Sprintf("%d duplicate links dropped", n))
 	}
 	if len(moved) > 0 {
 		parts = append(parts, "moved "+strings.Join(moved, ", "))
@@ -876,10 +896,13 @@ func (c *compareState) confirmLines(h int) []string {
 		add(c.st.Err.Render(c.previewErr))
 	} else if c.preview != nil {
 		res := c.preview
-		for _, name := range []string{"deals", "relationships"} {
+		for _, name := range []string{"memberships", "deals", "relationships"} {
 			if n := res.Moved[name]; n > 0 {
 				add(label(name) + fmt.Sprintf("%d move to #%d", n, keep.id))
 			}
+		}
+		if n := res.Moved["duplicates_dropped"]; n > 0 {
+			add(label("duplicate links") + fmt.Sprintf("%d dropped, the richest membership stays with the earliest start", n))
 		}
 		add(label("lists") + summarize(res))
 		for _, f := range res.Fields {

@@ -6,8 +6,9 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/mattn/go-runewidth"
+	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/mattn/go-runewidth"
 )
 
 // Organizations and Deals: advanced views (BUSINESS.md: not in the default navigation). They open
@@ -39,7 +40,7 @@ func nextView(v viewKind, dir int) viewKind {
 func notAdvancedView(m *Model) bool { return m.view < numViews }
 
 func (m *Model) selOrg() int64 {
-	if m.view != viewOrgs || m.focus != focusList {
+	if m.view != viewOrgs {
 		return 0
 	}
 	if r, ok := m.selected(); ok {
@@ -49,7 +50,7 @@ func (m *Model) selOrg() int64 {
 }
 
 func (m *Model) selDeal() int64 {
-	if m.view != viewDeals || m.focus != focusList {
+	if m.view != viewDeals {
 		return 0
 	}
 	if r, ok := m.selected(); ok {
@@ -150,61 +151,9 @@ func (m *Model) detailLine(label, value string) string {
 	return m.st.Dim.Render(fit(label, labelWidth)) + cutTo(value, max(1, m.detail.Width-labelWidth))
 }
 
-func (m *Model) orgDetail(r row) string {
-	o := m.orgs[r.orgID]
-	if o == nil {
-		return m.st.Dim.Render("Nothing selected.")
-	}
-	var b strings.Builder
-	b.WriteString(m.st.Name.Render(cutTo(cleanCell(o.Name), max(1, m.detail.Width))) + m.st.Dim.Render(fmt.Sprintf("  #%d", o.ID)) + "\n\n")
-	for _, kv := range [][2]string{{"domain", str(o.Domain)}, {"industry", str(o.Industry)}, {"notes", cleanCell(str(o.Notes))}} {
-		if kv[1] != "" {
-			b.WriteString(m.detailLine(kv[0], kv[1]) + "\n")
-		}
-	}
-	if people, err := m.orr.FindPeople(m.ctx, o.ID); err == nil && len(people) > 0 {
-		b.WriteString("\n" + m.st.Head.Render("People") + "\n")
-		for _, p := range people {
-			b.WriteString(cutTo(fullName(p), max(1, m.detail.Width)) + "\n")
-		}
-	}
-	oid := o.ID
-	if deals, err := m.dlr.FindAll(m.ctx, model.DealFilters{OrgID: &oid}); err == nil && len(deals) > 0 {
-		b.WriteString("\n" + m.st.Head.Render("Deals") + "\n")
-		for _, d := range deals {
-			b.WriteString(cutTo(strings.TrimSpace(d.Title+"  "+d.Stage+"  "+money(d.Value)), max(1, m.detail.Width)) + "\n")
-		}
-	}
-	b.WriteString("\n" + m.st.Dim.Render("enter edits, d deletes, a adds, L links"))
-	return strings.TrimRight(b.String(), "\n")
-}
-
-func (m *Model) dealDetail(r row) string {
-	d := m.deals[r.dealID]
-	if d == nil {
-		return m.st.Dim.Render("Nothing selected.")
-	}
-	var b strings.Builder
-	b.WriteString(m.st.Name.Render(cutTo(cleanCell(d.Title), max(1, m.detail.Width))) + m.st.Dim.Render(fmt.Sprintf("  #%d", d.ID)) + "\n\n")
-	b.WriteString(m.detailLine("stage", d.Stage) + "\n")
-	if d.Value != nil {
-		b.WriteString(m.detailLine("value", money(d.Value)) + "\n")
-	}
-	if d.OrgID != nil {
-		b.WriteString(m.detailLine("organization", m.orgName(*d.OrgID)) + "\n")
-	}
-	if d.PersonID != nil {
-		b.WriteString(m.detailLine("person", m.personLabel(*d.PersonID)) + "\n")
-	}
-	if d.ClosedAt != nil {
-		b.WriteString(m.detailLine("closed", *d.ClosedAt) + "\n")
-	}
-	if d.Notes != nil && *d.Notes != "" {
-		b.WriteString(m.detailLine("notes", cleanCell(*d.Notes)) + "\n")
-	}
-	b.WriteString("\n" + m.st.Dim.Render("enter edits, s sets the stage, d deletes, a adds, L links"))
-	return strings.TrimRight(b.String(), "\n")
-}
+// orgDetail and dealDetail are shown only when a page cannot be built.
+func (m *Model) orgDetail(r row) string  { return m.st.Dim.Render("Nothing selected.") }
+func (m *Model) dealDetail(r row) string { return m.st.Dim.Render("Nothing selected.") }
 
 // --- prompts ---
 
@@ -246,8 +195,8 @@ func (m *Model) startDealEdit(id int64) tea.Cmd {
 	if d.OrgID != nil {
 		org = m.orgName(*d.OrgID)
 	}
-	if d.PersonID != nil {
-		person = m.personLabel(*d.PersonID)
+	if len(d.PersonIDs) > 0 {
+		person = m.personLabel(d.PersonIDs[0])
 	}
 	line := strings.Join([]string{d.Title, plainNumber(d.Value), d.Stage, org, person, cleanCell(str(d.Notes))}, " | ")
 	m.startInput("deal-edit", dealPrompt(), strings.TrimRight(line, " |"))
@@ -382,6 +331,7 @@ func (m *Model) saveDealEdit(id int64, line string) (string, error) {
 		return "", fmt.Errorf("a deal needs a title")
 	}
 	after := *before
+	after.PersonIDs, after.OrgIDs = nil, nil
 	after.Title = f[0]
 	if after.Value, err = parseMoney(f[1]); err != nil {
 		return "", err
@@ -392,17 +342,59 @@ func (m *Model) saveDealEdit(id int64, line string) (string, error) {
 	if !model.ValidDealStage(after.Stage) {
 		return "", fmt.Errorf("stage must be one of: %s", strings.Join(model.DealStages, ", "))
 	}
-	if after.OrgID, err = m.resolveOrg(f[3], before.OrgID); err != nil {
+	newOrg, err := m.resolveOrg(f[3], before.OrgID)
+	if err != nil {
 		return "", err
 	}
-	if after.PersonID, err = m.resolvePerson(f[4], before.PersonID); err != nil {
+	var curPerson *int64
+	if len(before.PersonIDs) > 0 {
+		curPerson = &before.PersonIDs[0]
+	}
+	newPerson, err := m.resolvePerson(f[4], curPerson)
+	if err != nil {
 		return "", err
 	}
 	after.Notes = optional(f[5])
+	// The fields and the two links undo as one step.
+	m.beginGroup()
+	defer m.endGroup("edit deal " + truncateLabel(before.Title))
 	if err := m.hOverwriteDeal(id, &after); err != nil {
 		return "", err
 	}
+	deal := repo.Ref{Kind: "deal", ID: id}
+	if err := m.setDealLink(deal, "organization", before.OrgID, newOrg, true); err != nil {
+		return "", err
+	}
+	if err := m.setDealLink(deal, "person", curPerson, newPerson, false); err != nil {
+		return "", err
+	}
 	return "deal saved (ctrl+z undoes)", nil
+}
+
+// setDealLink makes the deal line's organization or person the one linked: it links the new one
+// (primary for an organization) and unlinks the old one. An emptied field unlinks.
+func (m *Model) setDealLink(deal repo.Ref, other string, old, now *int64, primary bool) error {
+	if eqInt(old, now) {
+		return nil
+	}
+	if old != nil {
+		if err := m.unlinkRecorded(deal, repo.Ref{Kind: other, ID: *old}, 0); err != nil {
+			return err
+		}
+	}
+	if now == nil {
+		return nil
+	}
+	target := repo.Ref{Kind: other, ID: *now}
+	attrs := model.LinkAttrs{}
+	if primary {
+		yes := true
+		attrs.Primary = &yes
+	}
+	return m.recordLinkChange("link "+m.refName(deal)+" to "+m.refName(target), deal, target, func() error {
+		_, err := m.links.Link(m.ctx, deal, target, attrs)
+		return err
+	})
 }
 
 // parseMoney reads a deal value such as 12500, $12,500 or 99.5. Empty means no value.
@@ -534,7 +526,7 @@ func orgSame(a, b *model.Organization) bool {
 
 func dealSame(a, b *model.Deal) bool {
 	return a.Title == b.Title && a.Stage == b.Stage && str(a.Notes) == str(b.Notes) && str(a.ClosedAt) == str(b.ClosedAt) &&
-		eqInt(a.PersonID, b.PersonID) && eqInt(a.OrgID, b.OrgID) && eqFloat(a.Value, b.Value)
+		eqFloat(a.Value, b.Value)
 }
 
 func eqInt(a, b *int64) bool     { return (a == nil && b == nil) || (a != nil && b != nil && *a == *b) }
@@ -627,6 +619,19 @@ func (m *Model) hOverwriteDeal(id int64, after *model.Deal) error {
 	before, err := m.dlr.FindByID(m.ctx, id)
 	if err != nil {
 		return err
+	}
+	// closed_at follows the stage in every door (X6): set when it becomes won or lost, cleared on reopen.
+	if before.Stage != after.Stage {
+		closed := func(s string) bool { return s == "won" || s == "lost" }
+		switch {
+		case closed(after.Stage) && before.ClosedAt != nil:
+			after.ClosedAt = before.ClosedAt
+		case closed(after.Stage):
+			now := m.now().UTC().Format("2006-01-02 15:04:05")
+			after.ClosedAt = &now
+		default:
+			after.ClosedAt = nil
+		}
 	}
 	if dealSame(before, after) {
 		return nil

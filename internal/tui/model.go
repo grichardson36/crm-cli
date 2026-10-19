@@ -112,6 +112,8 @@ type Model struct {
 	deleted map[string][]int64
 	// links makes, lists and removes links between objects.
 	links *repo.LinkRepo
+	// draft is the link being made in the Link form.
+	draft *linkDraft
 	// lineID is the record the open one-line edit prompt applies to. orgs and deals are the
 	// records of the rows by id for the detail pane of the Organizations and Deals views.
 	lineID int64
@@ -357,8 +359,6 @@ func (m *Model) rebuild(keep bool) error {
 			r := row{taskID: t.ID, title: cleanCell(t.Title)}
 			if len(t.PersonIDs) > 0 {
 				r.personID = t.PersonIDs[0]
-			} else if t.PersonID != nil {
-				r.personID = *t.PersonID
 			}
 			if t.DueAt != nil {
 				r.meta = *t.DueAt
@@ -789,7 +789,7 @@ func (m *Model) handlePromptKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.mode = modeNormal
 		m.input.Blur()
 		m.pendingCmd = nil
-		if value != "" {
+		if value != "" || kind == "link-attrs" {
 			m.runPrompt(kind, value)
 		}
 		cmd := m.pendingCmd
@@ -798,6 +798,10 @@ func (m *Model) handlePromptKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "tab", "shift+tab":
 		if m.promptKind == "note" {
 			m.cycleNoteType(msg.String() == "tab")
+			return m, nil
+		}
+		if m.promptKind == "link-attrs" && msg.String() == "tab" {
+			m.completeRole()
 			return m, nil
 		}
 	}
@@ -865,6 +869,12 @@ func (m *Model) runPrompt(kind, value string) {
 		return
 	}
 	switch kind {
+	case "link-attrs":
+		m.runLinkAttrs(value)
+		return
+	case "note-object":
+		m.saveObjectNote(value)
+		return
 	case "task-new":
 		m.runTaskLine(0, value, "task-new")
 		return

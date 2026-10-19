@@ -7,6 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/mattn/go-runewidth"
 )
@@ -24,8 +25,7 @@ const (
 	rkTag
 	rkTask
 	rkNote
-	rkOrg  // the organization of a person
-	rkDeal // a deal of a person
+	rkLinked // a link to another object: organization, related person, deal, member
 )
 
 // tierNames maps priority_tier (index) to a name. Index 0 clears the tier.
@@ -47,6 +47,10 @@ type formRow struct {
 	empty   bool // placeholder for an empty section
 	head    string
 	typ     string // rkNote: the interaction type
+	// rkLinked: the link, the kind of the object at the other end, and whether the link has ended.
+	li    *model.LinkedObject
+	other string
+	dim   bool
 }
 
 type editState struct {
@@ -67,7 +71,7 @@ type confirmState struct {
 
 func addable(k rowKind) bool {
 	switch k {
-	case rkEmail, rkPhone, rkHandle, rkTag, rkTask, rkNote:
+	case rkEmail, rkPhone, rkHandle, rkTag, rkTask, rkNote, rkLinked:
 		return true
 	}
 	return false
@@ -175,14 +179,10 @@ func (m *Model) personRows(p *model.Person) []formRow {
 	add(field("title", "title", title))
 	add(field("company", "company", company))
 	if p != nil {
-		// The organization is a link, shown as a row that opens the organization (link from either side).
-		r := formRow{kind: rkOrg, label: "organization", empty: true}
-		if p.OrgID != nil {
-			if o, err := m.orr.FindByID(m.ctx, *p.OrgID); err == nil {
-				r.value, r.id, r.empty = o.Name, o.ID, false
-			}
+		// Organizations are links, shown as rows that open the organization (link from either side).
+		for _, r := range m.linkRows(repo.Ref{Kind: "person", ID: p.ID}, "organization", "Organizations", "organization") {
+			add(r)
 		}
-		add(r)
 	}
 	add(field("location", "location", location))
 	bd := ""
@@ -272,15 +272,10 @@ func (m *Model) personRows(p *model.Person) []formRow {
 		add(formRow{kind: rkTask, label: "task", empty: true, head: taskHead})
 	}
 	if pid != 0 {
-		deals, _ := m.dlr.FindAll(m.ctx, model.DealFilters{PersonID: &pid})
-		for i, d := range deals {
-			r := formRow{kind: rkDeal, label: "deal", value: d.Title, id: d.ID, suffix: "  " + d.Stage}
-			if d.Value != nil {
-				r.suffix += "  " + money(d.Value)
-			}
-			if i == 0 {
-				r.head = "Deals"
-			}
+		for _, r := range m.linkRows(repo.Ref{Kind: "person", ID: pid}, "deal", "Deals", "deal") {
+			add(r)
+		}
+		for _, r := range m.linkRows(repo.Ref{Kind: "person", ID: pid}, "person", "Related people", "person") {
 			add(r)
 		}
 	}
@@ -352,9 +347,14 @@ func (m *Model) refreshDetail(force bool) {
 	changed := key != m.detailKey
 	m.detailKey = key
 	m.formPerson = r.personID
-	if ok && m.view != viewArchived {
+	switch {
+	case ok && m.view == viewOrgs:
+		m.form = m.buildOrgForm(r.orgID)
+	case ok && m.view == viewDeals:
+		m.form = m.buildDealForm(r.dealID)
+	case ok && m.view != viewArchived:
 		m.form = m.buildForm(r.personID, r.taskID)
-	} else {
+	default:
 		m.form, m.formTitle = nil, ""
 	}
 	if changed {
@@ -455,6 +455,8 @@ func (m *Model) renderRow(i int, r formRow, w int) []string {
 		out = append(out, m.st.Sel.Render(fit(plain, w)))
 	case valueStyled:
 		out = append(out, m.st.Dim.Render(label+first))
+	case r.dim:
+		out = append(out, m.st.Dim.Render(label+first+suffix))
 	default:
 		out = append(out, m.st.Dim.Render(label)+first+m.st.Dim.Render(suffix))
 	}
@@ -513,11 +515,15 @@ func (m *Model) startEdit() tea.Cmd {
 		m.setStatus("enter a name first", true)
 		return nil
 	}
+	if m.onObjectPage() {
+		m.objectPageEdit(r)
+		return m.takePending()
+	}
 	switch {
+	case r.kind == rkLinked:
+		return m.openLinkRow(r)
 	case r.empty && addable(r.kind):
 		return m.addRow(r.kind)
-	case r.kind == rkOrg || r.kind == rkDeal:
-		return m.openLinkRow(r)
 	case r.kind == rkInfo:
 		m.setStatus("this row is read-only", true)
 	case r.kind == rkNote:
@@ -559,6 +565,17 @@ func (m *Model) beginEdit(idx int, add bool) tea.Cmd {
 // addRow starts adding a row of the given kind to the current person.
 func (m *Model) addRow(k rowKind) tea.Cmd {
 	if m.needName() {
+		return nil
+	}
+	if k == rkLinked {
+		// a on a linked row links another object of that section.
+		if r, ok := m.rowFocused(); ok {
+			return m.startLink(m.pageRef(), r.other, false)
+		}
+		return nil
+	}
+	if m.onObjectPage() {
+		m.setStatus("add rows from a person page, L links and n adds a note here", true)
 		return nil
 	}
 	if m.curPerson() == 0 {
@@ -891,6 +908,10 @@ func (m *Model) askDelete() {
 		m.setStatus("nothing to delete here", true)
 		return
 	}
+	if m.onObjectPage() && r.kind != rkLinked {
+		m.setStatus("this row is read-only here, d unlinks a linked row", true)
+		return
+	}
 	pid := m.formPerson
 	var what string
 	var do func() error
@@ -906,7 +927,7 @@ func (m *Model) askDelete() {
 	case rkTask:
 		m.verbDelete(objectByKind("task"))
 		return
-	case rkOrg, rkDeal:
+	case rkLinked:
 		m.askUnlinkRow(r)
 		return
 	case rkNote:

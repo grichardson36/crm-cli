@@ -139,11 +139,39 @@ func linkVia(m *Model, key, relation, typed string) {
 	}
 }
 
+// personOrg is the primary organization of a person, nil when there is none.
 func personOrg(t *testing.T, m *Model, id int64) *int64 {
 	t.Helper()
-	p, err := m.pr.FindByID(context.Background(), id)
+	items, err := m.links.Linked(context.Background(), repo.Ref{Kind: "person", ID: id}, "organization")
 	require.NoError(t, err)
-	return p.OrgID
+	for _, li := range items {
+		if li.Primary {
+			oid := li.ID
+			return &oid
+		}
+	}
+	return nil
+}
+
+// isLinked reports whether a and b have a live link.
+func (m *Model) isLinked(a, b repo.Ref) bool {
+	items, err := m.links.Linked(m.ctx, a, b.Kind)
+	if err != nil {
+		return false
+	}
+	for _, li := range items {
+		if li.ID == b.ID {
+			return true
+		}
+	}
+	return false
+}
+
+// confirmLink answers the attribute line of the Link form with Enter (no attributes).
+func confirmLink(m *Model) {
+	if m.mode == modePrompt && m.promptKind == "link-attrs" {
+		press(m, "enter")
+	}
 }
 
 func TestLinkPersonToANewOrganizationAndUndo(t *testing.T) {
@@ -155,10 +183,14 @@ func TestLinkPersonToANewOrganizationAndUndo(t *testing.T) {
 	assert.Equal(t, "create", last.id, "the last row is Create typed text")
 	assert.Contains(t, last.label, "Globex")
 	press(m, "enter")
+	require.Equal(t, modePrompt, m.mode, "a membership asks for its attributes")
+	assert.Equal(t, "link-attrs", m.promptKind)
+	assert.Contains(t, m.input.Prompt, "role | from | to | primary | notes")
+	press(m, "enter")
 
 	orgs := openOrgs(t, m)
 	require.Len(t, orgs, 1)
-	require.NotNil(t, personOrg(t, m, 1))
+	require.NotNil(t, personOrg(t, m, 1), "the first organization of a person is primary")
 	assert.Equal(t, orgs[0].ID, *personOrg(t, m, 1))
 	assert.Contains(t, m.toast.text, "linked Zed Adams to Globex")
 	assert.Contains(t, m.detail.View(), "Globex", "the person page shows an organization row")
@@ -173,7 +205,7 @@ func TestLinkPersonToANewOrganizationAndUndo(t *testing.T) {
 	assert.NotNil(t, personOrg(t, m, 1))
 }
 
-func TestLinkPicksAnExistingObjectAndReplacesThePreviousOne(t *testing.T) {
+func TestLinkPicksAnExistingObjectAndAddsASecondOrganization(t *testing.T) {
 	m, _ := newTestModel(t)
 	ctx := context.Background()
 	a, err := m.orr.Create(ctx, model.CreateOrgInput{Name: "Acme"})
@@ -185,19 +217,35 @@ func TestLinkPicksAnExistingObjectAndReplacesThePreviousOne(t *testing.T) {
 	require.NotNil(t, m.ov)
 	typeText(m, "acme")
 	press(m, "enter")
+	typeText(m, "CTO | 2019-03")
+	press(m, "enter")
 	assert.Equal(t, a.ID, *personOrg(t, m, 1))
 
+	// A second organization is added, the first stays primary.
 	runPalette(m, "link organization")
 	typeText(m, "globex")
 	press(m, "enter")
-	assert.Equal(t, g.ID, *personOrg(t, m, 1))
-	assert.Contains(t, m.toast.text, "replaced Acme")
+	typeText(m, "Advisor")
+	press(m, "enter")
+	assert.Equal(t, a.ID, *personOrg(t, m, 1))
+	items, err := m.links.Linked(context.Background(), repo.Ref{Kind: "person", ID: 1}, "organization")
+	require.NoError(t, err)
+	require.Len(t, items, 2)
+	assert.Equal(t, g.ID, items[1].ID)
+	assert.Equal(t, "Advisor", *items[1].Role)
+	assert.Equal(t, "CTO", *items[0].Role)
+	assert.Equal(t, "2019-03", *items[0].StartedOn)
 	assert.Len(t, openOrgs(t, m), 2, "no duplicate was created")
 
 	press(m, "ctrl+z")
-	assert.Equal(t, a.ID, *personOrg(t, m, 1), "undo points the person back at the first organization")
+	items, _ = m.links.Linked(context.Background(), repo.Ref{Kind: "person", ID: 1}, "organization")
+	require.Len(t, items, 1, "undo removes the second link")
 	press(m, "ctrl+z")
 	assert.Nil(t, personOrg(t, m, 1))
+	press(m, "ctrl+y", "ctrl+y")
+	items, _ = m.links.Linked(context.Background(), repo.Ref{Kind: "person", ID: 1}, "organization")
+	require.Len(t, items, 2, "redo brings both back")
+	assert.True(t, items[0].Primary)
 }
 
 func TestUnlinkWithOneLinkActsAtOnceAndUndoRelinks(t *testing.T) {
@@ -231,6 +279,7 @@ func TestLinkFromTheOrganizationSide(t *testing.T) {
 	runPalette(m, "organizations view")
 	linkVia(m, "L", "person", "bob")
 	press(m, "enter")
+	confirmLink(m)
 	assert.Equal(t, o.ID, *personOrg(t, m, 2), "Bob Baker belongs to Acme")
 	assert.Contains(t, m.detail.View(), "Bob Baker", "the organization page lists its people")
 
@@ -261,12 +310,14 @@ func TestEveryRelationLinksFromBothSides(t *testing.T) {
 	runPalette(m, "link deal")
 	typeText(m, "site")
 	press(m, "enter")
+	confirmLink(m)
 	assert.True(t, linked(person, deal), "person to deal, from the person")
 
 	runPalette(m, "deals view")
 	runPalette(m, "link organization")
 	typeText(m, "acme")
 	press(m, "enter")
+	confirmLink(m)
 	assert.True(t, linked(deal, org), "deal to organization, from the deal")
 
 	runPalette(m, "link task")
@@ -344,6 +395,7 @@ func TestPersonPageHasAnOrganizationRowThatLinksAndOpens(t *testing.T) {
 	require.NotNil(t, m.ov)
 	typeText(m, "acme")
 	press(m, "enter")
+	confirmLink(m)
 	assert.Equal(t, o.ID, *personOrg(t, m, 1))
 	goTo(t, m, "organization")
 	assert.Equal(t, "Acme", m.form[m.fcur].value)

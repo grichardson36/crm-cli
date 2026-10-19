@@ -296,9 +296,12 @@ func TestCompareFlowSummaryThenApply(t *testing.T) {
 	d := m.db
 	_, err := d.Exec(`INSERT INTO interactions (uuid, type) VALUES ('n1', 'note'), ('c1', 'call'), ('c2', 'call')`)
 	require.NoError(t, err)
-	_, err = d.Exec(`INSERT INTO interaction_people (interaction_id, person_id) VALUES (1, 4), (2, 4), (3, 4)`)
+	_, err = d.Exec(`INSERT INTO activity_target (uuid, source_kind, source_id, target_kind, target_id) VALUES
+		('a1', 'interaction', 1, 'person', 4), ('a2', 'interaction', 2, 'person', 4), ('a3', 'interaction', 3, 'person', 4)`)
 	require.NoError(t, err)
-	_, err = d.Exec(`INSERT INTO tasks (uuid, title, person_id) VALUES ('t1', 'Call back', 4)`)
+	_, err = d.Exec(`INSERT INTO tasks (uuid, title) VALUES ('t1', 'Call back')`)
+	require.NoError(t, err)
+	_, err = d.Exec(`INSERT INTO activity_target (uuid, source_kind, source_id, target_kind, target_id) VALUES ('a4', 'task', 1, 'person', 4)`)
 	require.NoError(t, err)
 	// Reopen so the counts are read.
 	press(m, "esc", "enter")
@@ -344,7 +347,7 @@ func TestCompareFlowSummaryThenApply(t *testing.T) {
 	assert.Equal(t, "Austin", str(keep.Location))
 	assert.Equal(t, "bob baker", keep.FirstName+" "+str(keep.LastName), "the newer name won the conflict")
 	var moved int
-	require.NoError(t, d.QueryRow(`SELECT COUNT(*) FROM interaction_people WHERE person_id = 2`).Scan(&moved))
+	require.NoError(t, d.QueryRow(`SELECT COUNT(*) FROM activity_target WHERE source_kind = 'interaction' AND target_kind = 'person' AND target_id = 2 AND deleted_at IS NULL`).Scan(&moved))
 	assert.Equal(t, 3, moved)
 	_ = ctx
 }

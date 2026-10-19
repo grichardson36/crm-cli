@@ -229,8 +229,8 @@ func (m *Model) barSearch(scope byte, q string) []overlayItem {
 	if deals, err := repo.NewDealRepo(m.db).Search(m.ctx, q, barHitCap); err == nil {
 		for _, d := range deals {
 			var pid int64
-			if d.PersonID != nil {
-				pid = *d.PersonID
+			if len(d.PersonIDs) > 0 {
+				pid = d.PersonIDs[0]
 			}
 			out = append(out, overlayItem{id: fmt.Sprintf("deal:%d", d.ID), kind: kindDeal, label: d.Title, desc: d.Stage, ref: pid})
 		}

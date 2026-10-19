@@ -24,6 +24,8 @@ type overlayItem struct {
 	kind   string
 	ref    int64
 	origin string
+	// link is the id of a stored link, for the Unlink picker.
+	link int64
 }
 
 // overlay is a filterable list shown instead of the main screen: the command palette or a picker.
