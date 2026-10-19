@@ -105,9 +105,15 @@ func whenMarkable(m *Model) bool {
 // buildActions returns the full action registry in key-resolution order.
 func buildActions() []action {
 	viewAction := func(v viewKind) action {
+		id := "view-" + strings.ToLower(viewNames[v])
+		desc := "show " + strings.ToLower(viewNames[v])
+		if v == viewDue {
+			id = "view-due" // Preserve existing key-customization entries and palette searches.
+			desc += "; people due to reach out"
+		}
 		return action{
-			id: "view-" + strings.ToLower(viewNames[v]), title: viewNames[v] + " view", group: "Views",
-			hint: strconv.Itoa(int(v) + 1), keys: []string{strconv.Itoa(int(v) + 1)}, desc: "show " + strings.ToLower(viewNames[v]),
+			id: id, title: viewNames[v] + " view", group: "Views",
+			hint: strconv.Itoa(int(v) + 1), keys: []string{strconv.Itoa(int(v) + 1)}, desc: desc,
 			run: func(m *Model) tea.Cmd { m.switchView(v); return nil },
 		}
 	}

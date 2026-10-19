@@ -12,7 +12,7 @@ import (
 )
 
 // homeModel adds tasks and notes to the standard data and opens Home.
-// Today is 2026-10-13. Bob (2) is overdue for a reach out and has a birthday on 10-20.
+// Today is 2026-10-13. Bob (2) is overdue for a reach out.
 func homeModel(t *testing.T) *Model {
 	t.Helper()
 	m, _ := newTestModel(t)
@@ -67,38 +67,26 @@ func TestHomeShowsOnlySectionsWithContent(t *testing.T) {
 	m := homeModel(t)
 	out := m.View()
 	assert.Contains(t, out, "1 Home")
-	assert.Contains(t, out, "3 people, 3 open tasks, 1 overdue")
-	for _, h := range []string{"Due to reach out", "Birthdays next 14 days", "Tasks overdue / this week", "Recent notes"} {
+	for _, h := range []string{"Due to reach out", "Tasks due today"} {
 		assert.Contains(t, out, h)
 	}
 	assert.NotContains(t, out, "plan retreat", "tasks due later stay off Home")
-	assert.NotContains(t, rowTitles(m), "Sync", "no sources and an empty inbox hide the sync section")
+	assert.NotContains(t, out, "call back", "tasks due later this week stay off Home")
+	assert.NotContains(t, out, "Birthdays", "birthdays belong in their own view")
+	assert.NotContains(t, out, "Recent notes", "recent context belongs on the person record")
+	assert.NotContains(t, out, "Sync", "sync belongs in its own view")
 
 	titles := rowTitles(m)
 	assert.Contains(t, titles, "send deck")
-	assert.Contains(t, titles, "call back")
-	var recent []string
-	in := false
-	for _, r := range m.rows {
-		if r.skip {
-			in = r.title == "Recent notes"
-			continue
-		}
-		if in {
-			recent = append(recent, r.title+"|"+r.sub)
-		}
-	}
-	assert.ElementsMatch(t, []string{"Bob Baker|note: talked about the move", "Cara Cole|note: likes tea"}, recent)
 }
 
-func TestHomeEmptyDatabaseShowsOnlyTheStatusLine(t *testing.T) {
+func TestHomeEmptyDatabaseShowsNoDashboardCounts(t *testing.T) {
 	d := newTestModelDB(t)
 	m, err := New(context.Background(), d)
 	require.NoError(t, err)
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
-	require.Len(t, m.rows, 1)
-	assert.Equal(t, "0 people, 0 open tasks, 0 overdue", m.rows[0].title)
-	assert.True(t, m.rows[0].skip)
+	assert.Empty(t, m.rows)
+	assert.Contains(t, m.View(), "Nothing needs attention today.")
 }
 
 func TestHomeCursorSkipsHeadingsAndEnterOpensThePerson(t *testing.T) {
@@ -111,13 +99,10 @@ func TestHomeCursorSkipsHeadingsAndEnterOpensThePerson(t *testing.T) {
 	press(m, "j")
 	r, _ = m.selected()
 	assert.False(t, r.skip)
-	assert.Equal(t, "Bob Baker", r.title, "next item is the birthday, the heading is skipped")
-	press(m, "j")
-	r, _ = m.selected()
 	assert.Equal(t, "send deck", r.title)
-	press(m, "k", "k", "k")
+	press(m, "k", "k")
 	r, _ = m.selected()
-	assert.Equal(t, 2, m.cursor, "k stops at the first item")
+	assert.Equal(t, "Bob Baker", r.title, "k stops at the first action")
 	assert.False(t, r.skip)
 
 	press(m, "G")
@@ -157,7 +142,7 @@ func TestHomeViewAllRowsJumpToTheirView(t *testing.T) {
 		}
 	}
 	require.NotNil(t, jump, "only the top 5 show, the rest are one Enter away")
-	assert.Contains(t, jump.title, "all 8 in Due")
+	assert.Contains(t, jump.title, "all 8 in Follow-up")
 	due := 0
 	for _, r := range m.rows {
 		if r.personID != 0 && r.meta != "" && strings.HasSuffix(r.meta, "overdue") {
@@ -170,27 +155,13 @@ func TestHomeViewAllRowsJumpToTheirView(t *testing.T) {
 	assert.Equal(t, viewDue, m.view)
 }
 
-func TestHomeSyncSectionAppearsWithASource(t *testing.T) {
+func TestHomeHidesSyncState(t *testing.T) {
 	m := syncModel(t)
 	m.switchView(viewHome)
 	titles := rowTitles(m)
-	assert.Contains(t, titles, "Sync")
-	assert.Contains(t, titles, "fake")
+	assert.NotContains(t, titles, "Sync")
+	assert.NotContains(t, titles, "fake")
 	assert.NotContains(t, titles, "inbox: 2 pending")
-
-	pressRun(m, "8", "s")
-	m.switchView(viewHome)
-	titles = rowTitles(m)
-	assert.Contains(t, titles, "inbox: 2 pending")
-	var line string
-	for _, r := range m.rows {
-		if r.title == "fake" {
-			line = r.sub
-		}
-	}
-	assert.True(t, strings.HasPrefix(line, "ok "), line)
-	press(m, "G", "enter")
-	assert.Equal(t, viewSync, m.view, "the sync rows open the Sync view")
 }
 
 func TestHomeActionsInPaletteAndFooter(t *testing.T) {
@@ -213,7 +184,7 @@ func TestHomeActionsInPaletteAndFooter(t *testing.T) {
 	assert.Equal(t, "marked as contacted", m.status)
 }
 
-func TestHomeCapsBirthdaysAndLinksToTheView(t *testing.T) {
+func TestHomeHidesBirthdays(t *testing.T) {
 	m := homeModel(t)
 	for i := 0; i < 6; i++ {
 		p, err := m.pr.Create(context.Background(), model.CreatePersonInput{FirstName: "Bday" + string(rune('A'+i))})
@@ -222,22 +193,8 @@ func TestHomeCapsBirthdaysAndLinksToTheView(t *testing.T) {
 		require.NoError(t, err)
 	}
 	require.NoError(t, m.reload())
-	people := 0
-	var link row
-	in := false
+	assert.NotContains(t, rowTitles(m), "Birthdays next 14 days")
 	for _, r := range m.rows {
-		if r.skip {
-			in = strings.HasPrefix(r.title, "Birthdays")
-			continue
-		}
-		if in && r.personID != 0 {
-			people++
-		}
-		if in && r.jump != 0 {
-			link = r
-		}
+		assert.False(t, strings.HasPrefix(r.title, "Bday"))
 	}
-	assert.Equal(t, homeBirthdayMax, people)
-	assert.Equal(t, "all 7 in Birthdays", link.title)
-	assert.Equal(t, int(viewBirthdays)+1, link.jump)
 }

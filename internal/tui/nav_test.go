@@ -90,7 +90,7 @@ func TestTabBarNeverExceeds80Columns(t *testing.T) {
 		assert.LessOrEqual(t, lipgloss.Width(bar), 80, "view %d", v)
 		assert.Contains(t, bar, "1 Home")
 		assert.Contains(t, bar, "2 People")
-		assert.Contains(t, bar, "3 Due")
+		assert.Contains(t, bar, "3 Follow-up")
 		assert.Contains(t, bar, "4 Tasks")
 	}
 }

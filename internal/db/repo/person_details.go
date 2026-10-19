@@ -363,7 +363,12 @@ func (r *PersonRepo) Birthdays(ctx context.Context, days int, now time.Time) ([]
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	sort.SliceStable(out, func(i, j int) bool { return out[i].DaysUntil < out[j].DaysUntil })
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].DaysUntil != out[j].DaysUntil {
+			return out[i].DaysUntil < out[j].DaysUntil
+		}
+		return out[i].PersonID < out[j].PersonID
+	})
 	return out, nil
 }
 

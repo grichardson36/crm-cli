@@ -368,7 +368,7 @@ func TestTabBarFitsAndClicksWork(t *testing.T) {
 			press(m, string(rune('0'+v)))
 			line := strings.Split(m.View(), "\n")[0]
 			assert.LessOrEqual(t, lipgloss.Width(line), w, "tab bar at width %d view %d", w, v)
-			for _, name := range []string{"Home", "People", "Due", "Tasks"} {
+			for _, name := range []string{"Home", "People", "Follow-up", "Tasks"} {
 				assert.Contains(t, line, name, "main tabs at width %d view %d", w, v)
 			}
 			if !isMainTab(viewKind(v - 1)) {

@@ -46,7 +46,7 @@ const (
 	numAllViews
 )
 
-var viewNames = [numAllViews]string{"Home", "People", "Due", "Tasks", "Birthdays", "Merge", "Archived", "Sync", "Organizations", "Deals", "Company review"}
+var viewNames = [numAllViews]string{"Home", "People", "Follow-up", "Tasks", "Birthdays", "Merge", "Archived", "Sync", "Organizations", "Deals", "Company review"}
 
 type mode int
 
@@ -356,7 +356,16 @@ func (m *Model) rebuild(keep bool) error {
 		if err != nil {
 			return err
 		}
+		month := 0
 		for _, b := range list {
+			when, err := time.Parse("2006-01-02", b.Date)
+			if err != nil {
+				return fmt.Errorf("parse birthday date %q: %w", b.Date, err)
+			}
+			if int(when.Month()) != month {
+				month = int(when.Month())
+				rows = append(rows, row{title: when.Month().String(), skip: true})
+			}
 			meta := fmt.Sprintf("in %dd", b.DaysUntil)
 			if b.DaysUntil == 0 {
 				meta = "today"
