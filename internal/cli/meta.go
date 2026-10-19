@@ -32,7 +32,7 @@ type cmdMeta struct {
 
 const (
 	personFields = "id,uuid,first_name,last_name,name,email,phone,title,company,location,notes,summary,birthday,keep_in_touch,last_contacted_at,is_favorite,priority_tier,emails,phones,handles,links,created_at,updated_at"
-	orgFields    = "id,uuid,name,domain,industry,notes,summary,links,created_at,updated_at"
+	orgFields    = "id,uuid,name,domain,industry,notes,summary,website,size,city,region,country,linkedin_url,description,logo_path,links,created_at,updated_at"
 	dealFields   = "id,uuid,title,stage,value,person_ids,org_ids,org_id,notes,closed_at,links,created_at,updated_at"
 	taskFields   = "id,uuid,title,priority,completed,description,person_ids,org_ids,deal_ids,due_at,recurrence,tags,completed_at,links,created_at,updated_at"
 	logFields    = "id,uuid,type,subject,content,direction,occurred_at,person_ids,org_ids,deal_ids,created_at,updated_at"

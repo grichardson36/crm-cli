@@ -209,6 +209,14 @@ func (m *orgMerger) fields(keep *model.Organization, drops []*model.Organization
 		{"industry", func(o *model.Organization) *string { return o.Industry }},
 		{"notes", func(o *model.Organization) *string { return o.Notes }},
 		{"summary", func(o *model.Organization) *string { return o.Summary }},
+		{"website", func(o *model.Organization) *string { return o.Website }},
+		{"size", func(o *model.Organization) *string { return o.Size }},
+		{"city", func(o *model.Organization) *string { return o.City }},
+		{"region", func(o *model.Organization) *string { return o.Region }},
+		{"country", func(o *model.Organization) *string { return o.Country }},
+		{"linkedin_url", func(o *model.Organization) *string { return o.LinkedinURL }},
+		{"description", func(o *model.Organization) *string { return o.Description }},
+		{"logo_path", func(o *model.Organization) *string { return o.LogoPath }},
 	} {
 		empty := func(s *string) bool { return s == nil || strings.TrimSpace(*s) == "" }
 		have := !empty(f.val(keep))

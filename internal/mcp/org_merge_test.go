@@ -34,3 +34,16 @@ func TestOrgCreateRefusesDuplicatesAndOrgMergeTool(t *testing.T) {
 	_, isErr = call(t, s, "crm_org_merge", map[string]any{"keep_id": b["id"], "drop_ids": []any{b["id"]}})
 	assert.True(t, isErr)
 }
+
+func TestOrgNativeFieldsThroughMCP(t *testing.T) {
+	s := setupTestServer(t)
+	var o map[string]any
+	callJSON(t, s, "crm_org_create", map[string]any{"name": "Acme", "website": "https://acme.com", "size": "11-50", "city": "Austin", "country": "US",
+		"linkedin_url": "https://linkedin.com/company/acme", "description": "Rockets", "logo_path": "a.png", "region": "TX"}, &o)
+	assert.Equal(t, "11-50", o["size"])
+	assert.Equal(t, "TX", o["region"])
+	callJSON(t, s, "crm_org_update", map[string]any{"id": o["id"], "size": "51-200"}, &o)
+	assert.Equal(t, "51-200", o["size"])
+	assert.Equal(t, "https://acme.com", o["website"])
+	assert.Equal(t, "a.png", o["logo_path"])
+}

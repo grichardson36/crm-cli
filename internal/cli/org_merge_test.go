@@ -63,3 +63,33 @@ func TestOrgMergePreviewsThenApplies(t *testing.T) {
 	_, _, code = crm(t, dbPath, "org", "merge", "1", "1")
 	assert.NotEqual(t, 0, code)
 }
+
+func TestOrgNativeFieldFlags(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "crm.db")
+	_, stderr, code := crm(t, dbPath, "org", "add", "Acme", "--website", "https://acme.com", "--size", "51-200",
+		"--city", "Austin", "--region", "TX", "--country", "US", "--linkedin", "https://linkedin.com/company/acme", "--description", "Rockets", "--logo", "a.png")
+	require.Equal(t, 0, code, stderr)
+	stdout, _, code := crm(t, dbPath, "org", "show", "1", "-f", "json")
+	require.Equal(t, 0, code)
+	var arr []map[string]any
+	require.NoError(t, json.Unmarshal([]byte(stdout), &arr))
+	o := arr[0]
+	assert.Equal(t, "https://acme.com", o["website"])
+	assert.Equal(t, "51-200", o["size"])
+	assert.Equal(t, "Austin", o["city"])
+	assert.Equal(t, "TX", o["region"])
+	assert.Equal(t, "US", o["country"])
+	assert.Equal(t, "Rockets", o["description"])
+	assert.Equal(t, "a.png", o["logo_path"])
+	assert.Equal(t, "https://linkedin.com/company/acme", o["linkedin_url"])
+
+	_, stderr, code = crm(t, dbPath, "org", "edit", "1", "--size", "201-500", "--city", "")
+	require.Equal(t, 0, code, stderr)
+	stdout, _, _ = crm(t, dbPath, "org", "show", "1", "-f", "json")
+	arr = nil
+	require.NoError(t, json.Unmarshal([]byte(stdout), &arr))
+	o = arr[0]
+	assert.Equal(t, "201-500", o["size"])
+	assert.Equal(t, "", o["city"], "an empty flag clears the field")
+	assert.Equal(t, "TX", o["region"], "a field not mentioned is unchanged")
+}

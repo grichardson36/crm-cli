@@ -1,5 +1,7 @@
 package model
 
+import "strings"
+
 // Person represents a contact in the CRM.
 type Person struct {
 	ID        int64   `json:"id"`
@@ -101,8 +103,17 @@ type Organization struct {
 	Industry  *string `json:"industry"`
 	Notes     *string `json:"notes"`
 	Summary   *string `json:"summary"`
-	CreatedAt string  `json:"created_at"`
-	UpdatedAt string  `json:"updated_at"`
+	// Native fields (M15). Size is free text, OrgSizes lists the suggested buckets. LogoPath is a path only.
+	Website     *string `json:"website"`
+	Size        *string `json:"size"`
+	City        *string `json:"city"`
+	Region      *string `json:"region"`
+	Country     *string `json:"country"`
+	LinkedinURL *string `json:"linkedin_url"`
+	Description *string `json:"description"`
+	LogoPath    *string `json:"logo_path"`
+	CreatedAt   string  `json:"created_at"`
+	UpdatedAt   string  `json:"updated_at"`
 	// Links are filled by the show commands: members, parent and child organizations, deals, tasks.
 	Links []LinkedObject `json:"links,omitempty"`
 }
@@ -113,6 +124,7 @@ type CreateOrgInput struct {
 	Domain   *string
 	Industry *string
 	Notes    *string
+	OrgNativeFields
 	// AllowDuplicate skips the check for a live organization with the same normalized name or domain.
 	AllowDuplicate bool
 }
@@ -124,6 +136,56 @@ type UpdateOrgInput struct {
 	Industry *string
 	Notes    *string
 	Summary  *string
+	OrgNativeFields
+}
+
+// OrgNativeFields are the native organization fields beyond name, domain, industry and notes.
+type OrgNativeFields struct {
+	Website     *string
+	Size        *string
+	City        *string
+	Region      *string
+	Country     *string
+	LinkedinURL *string
+	Description *string
+	LogoPath    *string
+}
+
+// OrgSizes are the suggested company size buckets. The field itself is free text.
+var OrgSizes = []string{"1-10", "11-50", "51-200", "201-500", "501-1000", "1001-5000", "5000+"}
+
+// Location joins city, region and country, "Austin, TX, US".
+func (o *Organization) Location() string {
+	var parts []string
+	for _, p := range []*string{o.City, o.Region, o.Country} {
+		if p != nil && *p != "" {
+			parts = append(parts, *p)
+		}
+	}
+	return strings.Join(parts, ", ")
+}
+
+// SplitLocation reads "city, region, country" (one to three comma separated parts, empty ones
+// allowed) into the three columns. A single part is a city, two parts are city and country.
+func SplitLocation(s string) (city, region, country *string) {
+	var parts []string
+	for _, p := range strings.Split(s, ",") {
+		parts = append(parts, strings.TrimSpace(p))
+	}
+	opt := func(v string) *string {
+		if v == "" {
+			return nil
+		}
+		return &v
+	}
+	switch len(parts) {
+	case 1:
+		return opt(parts[0]), nil, nil
+	case 2:
+		return opt(parts[0]), nil, opt(parts[1])
+	default:
+		return opt(parts[0]), opt(parts[1]), opt(strings.Join(parts[2:], ", "))
+	}
 }
 
 // Interaction represents an activity log entry.

@@ -153,7 +153,9 @@ func (m *Model) buildOrgForm(id int64) []formRow {
 	// Identity
 	var rows []formRow
 	first := true
-	for _, kv := range [][2]string{{"domain", str(o.Domain)}, {"industry", str(o.Industry)}, {"notes", cleanCell(str(o.Notes))}} {
+	for _, kv := range [][2]string{{"domain", str(o.Domain)}, {"website", str(o.Website)}, {"industry", str(o.Industry)}, {"size", str(o.Size)},
+		{"location", o.Location()}, {"linkedin", str(o.LinkedinURL)}, {"about", cleanCell(str(o.Description))}, {"logo", str(o.LogoPath)},
+		{"notes", cleanCell(str(o.Notes))}} {
 		if kv[1] == "" {
 			continue
 		}

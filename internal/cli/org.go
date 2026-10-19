@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/format"
@@ -38,7 +39,51 @@ func orgToMap(o *model.Organization) map[string]any {
 	if o.Summary != nil {
 		m["summary"] = *o.Summary
 	}
+	for k, v := range map[string]*string{
+		"website": o.Website, "size": o.Size, "city": o.City, "region": o.Region, "country": o.Country,
+		"linkedin_url": o.LinkedinURL, "description": o.Description, "logo_path": o.LogoPath,
+	} {
+		if v != nil {
+			m[k] = *v
+		}
+	}
 	return m
+}
+
+// orgNative holds the flags of the native organization fields (M15) for org add and org edit.
+type orgNative struct {
+	website, size, city, region, country, linkedin, description, logo string
+}
+
+func (n *orgNative) register(cmd *cobra.Command) {
+	f := cmd.Flags()
+	f.StringVar(&n.website, "website", "", "website URL")
+	f.StringVar(&n.size, "size", "", "company size, free text, suggested: "+strings.Join(model.OrgSizes, ", "))
+	f.StringVar(&n.city, "city", "", "city")
+	f.StringVar(&n.region, "region", "", "state or region")
+	f.StringVar(&n.country, "country", "", "country")
+	f.StringVar(&n.linkedin, "linkedin", "", "LinkedIn company URL")
+	f.StringVar(&n.description, "description", "", "what the company does")
+	f.StringVar(&n.logo, "logo", "", "path to a logo file (stored as a path, not drawn yet)")
+}
+
+// fields returns the native fields. With onlyChanged an unset flag stays nil (an edit leaves it alone),
+// and a flag set to "" is an empty string (the edit clears it).
+func (n *orgNative) fields(cmd *cobra.Command, onlyChanged bool) model.OrgNativeFields {
+	pick := func(name, v string) *string {
+		if onlyChanged {
+			if !cmd.Flags().Changed(name) {
+				return nil
+			}
+			return &v
+		}
+		return nilIfEmpty(v)
+	}
+	return model.OrgNativeFields{
+		Website: pick("website", n.website), Size: pick("size", n.size), City: pick("city", n.city), Region: pick("region", n.region),
+		Country: pick("country", n.country), LinkedinURL: pick("linkedin", n.linkedin), Description: pick("description", n.description),
+		LogoPath: pick("logo", n.logo),
+	}
 }
 
 func orgsToMaps(orgs []*model.Organization) []map[string]any {
@@ -69,6 +114,7 @@ func registerOrgCommands(rootCmd *cobra.Command) {
 func orgAddCmd() *cobra.Command {
 	var domain, industry, notes string
 	var allowDup bool
+	var native orgNative
 
 	cmd := &cobra.Command{
 		Use:   "add <name>",
@@ -88,6 +134,7 @@ func orgAddCmd() *cobra.Command {
 				Notes:          nilIfEmpty(notes),
 				AllowDuplicate: allowDup,
 			}
+			input.OrgNativeFields = native.fields(cmd, false)
 
 			r := repo.NewOrgRepo(db)
 			org, err := r.Create(cmd.Context(), input)
@@ -103,6 +150,7 @@ func orgAddCmd() *cobra.Command {
 	cmd.Flags().StringVar(&domain, "domain", "", "domain name")
 	cmd.Flags().StringVar(&industry, "industry", "", "industry")
 	cmd.Flags().StringVar(&notes, "notes", "", "notes")
+	native.register(cmd)
 	cmd.Flags().BoolVar(&allowDup, "allow-duplicate", false, "create even when an organization with the same name (case, punctuation, Inc/LLC ignored) or domain exists")
 
 	return cmd
@@ -182,6 +230,7 @@ func orgShowCmd() *cobra.Command {
 
 func orgEditCmd() *cobra.Command {
 	var name, domain, industry, notes string
+	var native orgNative
 
 	cmd := &cobra.Command{
 		Use:   "edit <id>",
@@ -212,6 +261,7 @@ func orgEditCmd() *cobra.Command {
 			if cmd.Flags().Changed("notes") {
 				input.Notes = &notes
 			}
+			input.OrgNativeFields = native.fields(cmd, true)
 
 			r := repo.NewOrgRepo(db)
 			org, err := r.Update(cmd.Context(), id, input)
@@ -228,6 +278,7 @@ func orgEditCmd() *cobra.Command {
 	cmd.Flags().StringVar(&domain, "domain", "", "domain name")
 	cmd.Flags().StringVar(&industry, "industry", "", "industry")
 	cmd.Flags().StringVar(&notes, "notes", "", "notes")
+	native.register(cmd)
 
 	return cmd
 }

@@ -50,6 +50,14 @@ func registerObjectTools(s *server.MCPServer, db *sql.DB) {
 			gomcp.WithString("domain", gomcp.Description("Domain name")),
 			gomcp.WithString("industry", gomcp.Description("Industry")),
 			gomcp.WithString("notes", gomcp.Description("Notes")),
+			gomcp.WithString("website", gomcp.Description("Website URL")),
+			gomcp.WithString("size", gomcp.Description("Company size, free text. Suggested: 1-10, 11-50, 51-200, 201-500, 501-1000, 1001-5000, 5000+")),
+			gomcp.WithString("city", gomcp.Description("City")),
+			gomcp.WithString("region", gomcp.Description("State or region")),
+			gomcp.WithString("country", gomcp.Description("Country")),
+			gomcp.WithString("linkedin_url", gomcp.Description("LinkedIn company URL")),
+			gomcp.WithString("description", gomcp.Description("What the company does")),
+			gomcp.WithString("logo_path", gomcp.Description("Path to a logo file (a path only, nothing draws it yet)")),
 			gomcp.WithBoolean("allow_duplicate", gomcp.Description("Create even when a live organization has the same normalized name or domain (otherwise this is refused with a conflict naming the existing one)")),
 		),
 		func(ctx context.Context, req gomcp.CallToolRequest) (*gomcp.CallToolResult, error) {
@@ -57,7 +65,8 @@ func registerObjectTools(s *server.MCPServer, db *sql.DB) {
 			if name == "" {
 				return gomcp.NewToolResultError("validation error: name is required"), nil
 			}
-			o, err := or.Create(ctx, model.CreateOrgInput{Name: name, Domain: optString(req, "domain"), Industry: optString(req, "industry"), Notes: optString(req, "notes"), AllowDuplicate: req.GetBool("allow_duplicate", false)})
+			o, err := or.Create(ctx, model.CreateOrgInput{Name: name, Domain: optString(req, "domain"), Industry: optString(req, "industry"), Notes: optString(req, "notes"),
+				OrgNativeFields: orgNativeFromRequest(req), AllowDuplicate: req.GetBool("allow_duplicate", false)})
 			if err != nil {
 				return mcpError(err)
 			}
@@ -72,13 +81,22 @@ func registerObjectTools(s *server.MCPServer, db *sql.DB) {
 			gomcp.WithString("domain", gomcp.Description("Domain name")),
 			gomcp.WithString("industry", gomcp.Description("Industry")),
 			gomcp.WithString("notes", gomcp.Description("Notes")),
+			gomcp.WithString("website", gomcp.Description("Website URL")),
+			gomcp.WithString("size", gomcp.Description("Company size, free text. Suggested: 1-10, 11-50, 51-200, 201-500, 501-1000, 1001-5000, 5000+")),
+			gomcp.WithString("city", gomcp.Description("City")),
+			gomcp.WithString("region", gomcp.Description("State or region")),
+			gomcp.WithString("country", gomcp.Description("Country")),
+			gomcp.WithString("linkedin_url", gomcp.Description("LinkedIn company URL")),
+			gomcp.WithString("description", gomcp.Description("What the company does")),
+			gomcp.WithString("logo_path", gomcp.Description("Path to a logo file (a path only)")),
 		),
 		func(ctx context.Context, req gomcp.CallToolRequest) (*gomcp.CallToolResult, error) {
 			id, errResult := requireID(req, "id")
 			if errResult != nil {
 				return errResult, nil
 			}
-			in := model.UpdateOrgInput{Name: optString(req, "name"), Domain: optString(req, "domain"), Industry: optString(req, "industry"), Notes: optString(req, "notes")}
+			in := model.UpdateOrgInput{Name: optString(req, "name"), Domain: optString(req, "domain"), Industry: optString(req, "industry"), Notes: optString(req, "notes"),
+				OrgNativeFields: orgNativeFromRequest(req)}
 			o, err := or.Update(ctx, id, in)
 			if err != nil {
 				return mcpError(err)
@@ -255,4 +273,13 @@ func optString(req gomcp.CallToolRequest, key string) *string {
 	}
 	v := req.GetString(key, "")
 	return &v
+}
+
+// orgNativeFromRequest reads the native organization fields. A field left out is nil.
+func orgNativeFromRequest(req gomcp.CallToolRequest) model.OrgNativeFields {
+	return model.OrgNativeFields{
+		Website: optString(req, "website"), Size: optString(req, "size"), City: optString(req, "city"), Region: optString(req, "region"),
+		Country: optString(req, "country"), LinkedinURL: optString(req, "linkedin_url"), Description: optString(req, "description"),
+		LogoPath: optString(req, "logo_path"),
+	}
 }

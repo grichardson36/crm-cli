@@ -21,13 +21,14 @@ func NewOrgRepo(db *sql.DB) *OrgRepo {
 	return &OrgRepo{db: db}
 }
 
-var orgColumns = "id, uuid, name, domain, industry, notes, summary, created_at, updated_at"
+var orgColumns = "id, uuid, name, domain, industry, notes, summary, website, size, city, region, country, linkedin_url, description, logo_path, created_at, updated_at"
 
 func scanOrg(row interface{ Scan(...any) error }) (*model.Organization, error) {
 	var o model.Organization
 	err := row.Scan(
 		&o.ID, &o.UUID, &o.Name, &o.Domain, &o.Industry,
-		&o.Notes, &o.Summary, &o.CreatedAt, &o.UpdatedAt,
+		&o.Notes, &o.Summary, &o.Website, &o.Size, &o.City, &o.Region, &o.Country, &o.LinkedinURL, &o.Description, &o.LogoPath,
+		&o.CreatedAt, &o.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -55,9 +56,10 @@ func (r *OrgRepo) Create(ctx context.Context, input model.CreateOrgInput) (*mode
 	}
 	id := uuid.New().String()
 	result, err := r.db.ExecContext(ctx,
-		`INSERT INTO organizations (uuid, name, domain, industry, notes)
-		 VALUES (?, ?, ?, ?, ?)`,
+		`INSERT INTO organizations (uuid, name, domain, industry, notes, website, size, city, region, country, linkedin_url, description, logo_path)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		id, input.Name, input.Domain, input.Industry, input.Notes,
+		input.Website, input.Size, input.City, input.Region, input.Country, input.LinkedinURL, input.Description, input.LogoPath,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("insert organization: %w", err)
@@ -138,6 +140,18 @@ func (r *OrgRepo) Update(ctx context.Context, id int64, input model.UpdateOrgInp
 	if input.Summary != nil {
 		setClauses = append(setClauses, "summary = ?")
 		args = append(args, *input.Summary)
+	}
+	for _, f := range []struct {
+		col string
+		val *string
+	}{
+		{"website", input.Website}, {"size", input.Size}, {"city", input.City}, {"region", input.Region}, {"country", input.Country},
+		{"linkedin_url", input.LinkedinURL}, {"description", input.Description}, {"logo_path", input.LogoPath},
+	} {
+		if f.val != nil {
+			setClauses = append(setClauses, f.col+" = ?")
+			args = append(args, *f.val)
+		}
 	}
 
 	if len(setClauses) == 0 {
@@ -261,9 +275,10 @@ func (r *OrgRepo) Restore(ctx context.Context, id int64) error {
 // use it so a field that was empty goes back to empty.
 func (r *OrgRepo) Overwrite(ctx context.Context, id int64, o *model.Organization) error {
 	result, err := r.db.ExecContext(ctx,
-		`UPDATE organizations SET name = ?, domain = ?, industry = ?, notes = ?, updated_at = datetime('now')
+		`UPDATE organizations SET name = ?, domain = ?, industry = ?, notes = ?, website = ?, size = ?, city = ?, region = ?,
+		 country = ?, linkedin_url = ?, description = ?, logo_path = ?, updated_at = datetime('now')
 		 WHERE id = ? AND archived = 0`,
-		o.Name, o.Domain, o.Industry, o.Notes, id)
+		o.Name, o.Domain, o.Industry, o.Notes, o.Website, o.Size, o.City, o.Region, o.Country, o.LinkedinURL, o.Description, o.LogoPath, id)
 	if err != nil {
 		return fmt.Errorf("overwrite organization %d: %w", id, err)
 	}

@@ -18,7 +18,7 @@ import (
 // (archived), so ctrl+z and the Restore verb (u) bring it back.
 //
 // Pattern: one line with | between fields, as the task prompt does. Edit opens the
-// same line filled with the current values. An organization is name | domain | industry | notes.
+// same line filled with the current values. An organization is name | domain | industry | size | location | website | linkedin | description | notes (the old four field form still works).
 // A deal is title | value | stage | organization | person | notes. An organization or person is
 // an id or a name. On an edit, a field you empty is cleared.
 
@@ -175,8 +175,25 @@ func (m *Model) startOrgEdit(id int64) tea.Cmd {
 	return m.input.Focus()
 }
 
+// orgLine is the edit line: name | domain | industry | size | location | website | linkedin | description | notes.
+// It always has every field so an empty one can be told from a missing one.
 func orgLine(o *model.Organization) string {
-	return strings.TrimRight(strings.Join([]string{o.Name, cleanCell(str(o.Domain)), cleanCell(str(o.Industry)), cleanCell(str(o.Notes))}, " | "), " |")
+	return strings.Join([]string{o.Name, cleanCell(str(o.Domain)), cleanCell(str(o.Industry)), cleanCell(str(o.Size)), cleanCell(o.Location()),
+		cleanCell(str(o.Website)), cleanCell(str(o.LinkedinURL)), cleanCell(str(o.Description)), cleanCell(str(o.Notes))}, " | ")
+}
+
+// orgFromLine reads an add or edit line. A line of four parts or fewer is the old form
+// name | domain | industry | notes, the native fields are then absent (nil).
+func orgFromLine(line string) (o model.Organization, full bool) {
+	if strings.Count(line, "|") < 4 {
+		f := fields(line, 4)
+		return model.Organization{Name: f[0], Domain: optional(f[1]), Industry: optional(f[2]), Notes: optional(f[3])}, false
+	}
+	f := fields(line, 9)
+	o = model.Organization{Name: f[0], Domain: optional(f[1]), Industry: optional(f[2]), Size: optional(f[3]),
+		Website: optional(f[5]), LinkedinURL: optional(f[6]), Description: optional(f[7]), Notes: optional(f[8])}
+	o.City, o.Region, o.Country = model.SplitLocation(f[4])
+	return o, true
 }
 
 func (m *Model) startDealAdd() tea.Cmd {
@@ -264,11 +281,13 @@ func optional(s string) *string {
 }
 
 func (m *Model) saveOrgAdd(line string) (string, error) {
-	f := fields(line, 4)
-	if f[0] == "" {
+	parsed, _ := orgFromLine(line)
+	if parsed.Name == "" {
 		return "", fmt.Errorf("an organization needs a name")
 	}
-	in := model.CreateOrgInput{Name: f[0], Domain: optional(f[1]), Industry: optional(f[2]), Notes: optional(f[3])}
+	in := model.CreateOrgInput{Name: parsed.Name, Domain: parsed.Domain, Industry: parsed.Industry, Notes: parsed.Notes,
+		OrgNativeFields: model.OrgNativeFields{Website: parsed.Website, Size: parsed.Size, City: parsed.City, Region: parsed.Region,
+			Country: parsed.Country, LinkedinURL: parsed.LinkedinURL, Description: parsed.Description}}
 	show := func(o *model.Organization) {
 		if m.view == viewOrgs {
 			m.afterWrite()
@@ -303,12 +322,24 @@ func (m *Model) saveOrgAdd(line string) (string, error) {
 }
 
 func (m *Model) saveOrgEdit(id int64, line string) (string, error) {
-	f := fields(line, 4)
-	if f[0] == "" {
+	after, full := orgFromLine(line)
+	if after.Name == "" {
 		return "", fmt.Errorf("an organization needs a name")
 	}
-	after := &model.Organization{Name: f[0], Domain: optional(f[1]), Industry: optional(f[2]), Notes: optional(f[3])}
-	if err := m.hOverwriteOrg(id, after); err != nil {
+	if !full { // the old four field line leaves the native fields as they are
+		before, err := m.orr.FindByID(m.ctx, id)
+		if err != nil {
+			return "", err
+		}
+		after.Website, after.Size, after.City, after.Region, after.Country = before.Website, before.Size, before.City, before.Region, before.Country
+		after.LinkedinURL, after.Description = before.LinkedinURL, before.Description
+	}
+	if after.LogoPath == nil {
+		if before, err := m.orr.FindByID(m.ctx, id); err == nil {
+			after.LogoPath = before.LogoPath // the line has no logo field
+		}
+	}
+	if err := m.hOverwriteOrg(id, &after); err != nil {
 		return "", err
 	}
 	return "organization saved (ctrl+z undoes)", nil
@@ -548,7 +579,10 @@ func (m *Model) dealTitle(id int64) string {
 // --- recorded writes (undo and redo) ---
 
 func orgSame(a, b *model.Organization) bool {
-	return a.Name == b.Name && str(a.Domain) == str(b.Domain) && str(a.Industry) == str(b.Industry) && str(a.Notes) == str(b.Notes)
+	return a.Name == b.Name && str(a.Domain) == str(b.Domain) && str(a.Industry) == str(b.Industry) && str(a.Notes) == str(b.Notes) &&
+		str(a.Website) == str(b.Website) && str(a.Size) == str(b.Size) && str(a.City) == str(b.City) && str(a.Region) == str(b.Region) &&
+		str(a.Country) == str(b.Country) && str(a.LinkedinURL) == str(b.LinkedinURL) && str(a.Description) == str(b.Description) &&
+		str(a.LogoPath) == str(b.LogoPath)
 }
 
 func dealSame(a, b *model.Deal) bool {

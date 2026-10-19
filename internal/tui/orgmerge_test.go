@@ -96,3 +96,56 @@ func TestMergeMarkedOrganizationsIsOneUndoStep(t *testing.T) {
 	press(m, "ctrl+y")
 	assert.Len(t, openOrgs(t, m), 2)
 }
+
+func TestOrgEditLineCarriesNativeFieldsAndOldLineStillWorks(t *testing.T) {
+	m, _ := newTestModel(t)
+	ctx := context.Background()
+	o, err := m.orr.Create(ctx, model.CreateOrgInput{Name: "Acme"})
+	require.NoError(t, err)
+	logo := "a.png"
+	_, err = m.orr.Update(ctx, o.ID, model.UpdateOrgInput{OrgNativeFields: model.OrgNativeFields{LogoPath: &logo}})
+	require.NoError(t, err)
+	runPalette(m, "organizations view")
+
+	press(m, "a")
+	submit(m, "Globex | globex.com | Energy | 51-200 | Austin, TX, US | https://globex.com | https://linkedin.com/company/globex | Makes things | notes here")
+	var g *model.Organization
+	for _, x := range openOrgs(t, m) {
+		if x.Name == "Globex" {
+			g = x
+		}
+	}
+	require.NotNil(t, g)
+	assert.Equal(t, "51-200", *g.Size)
+	assert.Equal(t, "Austin, TX, US", g.Location())
+	assert.Equal(t, "https://globex.com", *g.Website)
+	assert.Equal(t, "Makes things", *g.Description)
+	assert.Equal(t, "notes here", *g.Notes)
+
+	// The edit line is filled with every field, the old four field form leaves the native ones alone.
+	line := orgLine(g)
+	assert.Equal(t, 8, strings.Count(line, "|"))
+	_, err = m.saveOrgEdit(g.ID, "Globex | globex.com | Oil")
+	require.NoError(t, err)
+	got, _ := m.orr.FindByID(ctx, g.ID)
+	assert.Equal(t, "Oil", *got.Industry)
+	assert.Equal(t, "51-200", *got.Size)
+	assert.Equal(t, "Austin, TX, US", got.Location())
+
+	// A full line clears a field that is empty in it, and the logo path is kept.
+	_, err = m.saveOrgEdit(o.ID, "Acme |  |  |  | Paris |  |  |  | ")
+	require.NoError(t, err)
+	got, _ = m.orr.FindByID(ctx, o.ID)
+	assert.Equal(t, "Paris", *got.City)
+	assert.Equal(t, "a.png", *got.LogoPath)
+
+	m.form = m.buildOrgForm(g.ID)
+	var shown []string
+	for _, r := range m.form {
+		shown = append(shown, r.label+"="+r.value)
+	}
+	joined := strings.Join(shown, "\n")
+	assert.Contains(t, joined, "location=Austin, TX, US")
+	assert.Contains(t, joined, "size=51-200")
+	assert.Contains(t, joined, "website=https://globex.com")
+}

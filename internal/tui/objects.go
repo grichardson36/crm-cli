@@ -113,7 +113,7 @@ func objectByKind(kind string) *objDef {
 func orgDef() *objDef {
 	return &objDef{
 		kind: "organization", label: "organization", short: "org", group: "Organizations", view: viewOrgs,
-		fields:   []string{"name", "domain", "industry", "notes"},
+		fields:   []string{"name", "domain", "industry", "size", "location", "website", "linkedin", "description", "notes"},
 		cols:     []string{"name", "industry", "domain"},
 		can:      map[verb]bool{vAdd: true, vEdit: true, vLink: true, vUnlink: true, vDelete: true, vRestore: true},
 		selected: func(m *Model) int64 { return m.selOrg() },
