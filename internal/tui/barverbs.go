@@ -22,7 +22,7 @@ import (
 // barReserved are keys the bar keeps for itself in the results.
 var barReserved = map[string]bool{
 	"enter": true, "esc": true, "tab": true, "shift+tab": true, "up": true, "down": true, "left": true, "right": true,
-	"pgup": true, "pgdown": true, "ctrl+n": true, "ctrl+p": true, "ctrl+c": true, "ctrl+k": true, "j": true, "k": true,
+	"pgup": true, "pgdown": true, "ctrl+n": true, "ctrl+p": true, "ctrl+c": true, "ctrl+k": true, "ctrl+a": true, "j": true, "k": true,
 	":": true, "/": true, "q": true, "?": true, "a": true, "+": true,
 }
 
@@ -119,6 +119,14 @@ func (m *Model) enterBarContext(t barTarget) barSaved {
 	case "tag":
 		m.view, m.rows = viewHome, nil
 		m.barTag = t.name
+	case "blank-person":
+		m.view, m.rows = viewPeople, nil
+	case "blank-organization":
+		m.view, m.rows = viewOrgs, nil
+	case "blank-deal":
+		m.view, m.rows = viewDeals, nil
+	case "blank-task":
+		m.view, m.rows = viewTasks, nil
 	default:
 		m.view, m.rows = viewHome, nil
 	}
@@ -321,11 +329,16 @@ func (m *Model) finishBarVerb(r *barResume) tea.Cmd {
 
 // resumeBar runs after every message. When a verb that took the screen is finished the bar returns.
 func (m *Model) resumeBar() tea.Cmd {
-	r := m.barResume
-	if r == nil || m.mode != modeNormal || m.ov != nil {
+	if m.mode != modeNormal || m.ov != nil {
 		return nil
 	}
-	return m.finishBarVerb(r)
+	if m.addResume != nil {
+		return m.finishGlobalAdd()
+	}
+	if r := m.barResume; r != nil {
+		return m.finishBarVerb(r)
+	}
+	return nil
 }
 
 // ensureCursor puts the cursor on the row with the id when it is still listed.

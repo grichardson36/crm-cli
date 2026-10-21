@@ -311,6 +311,13 @@ func (m *Model) overlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if o.onKey != nil && o.onKey(m, msg.String()) {
 		return m, nil
 	}
+	if o.palette && o.cmd == nil && m.globalAddKeyInBar(msg.String()) {
+		if m.readOnly {
+			return m, m.showToast("read-only: new object is disabled", true)
+		}
+		m.closeOverlay()
+		return m, m.openGlobalAdd(o)
+	}
 	if o.palette && o.cmd == nil {
 		if mdl, c, ok := m.barFocusKey(msg); ok {
 			return mdl, c

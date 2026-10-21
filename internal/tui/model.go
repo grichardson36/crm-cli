@@ -227,6 +227,8 @@ type Model struct {
 	// tagRenaming is the tag the rename prompt is for.
 	tagRenaming string
 	barResume *barResume
+	// addResume remembers where a global add (ctrl+a) came from (globaladd.go).
+	addResume *addReturn
 	// mods is the module arrangement (modules.go): which views are on and in what order.
 	mods modules.Arrangement
 	keyProblems  []string

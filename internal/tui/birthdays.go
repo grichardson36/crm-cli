@@ -79,11 +79,51 @@ func (m *Model) snapBirthdays() {
 	m.offset = max(0, min(m.bdTop, len(m.rows)-m.bodyHeight()))
 }
 
-func birthdayActions() []action {
+// todayActions is Go to today, one action for every module that has an anchor. Ctrl keys move the
+// view and bare keys move the object (pattern ctrl-moves-the-view-bare-moves-the-object), so it is
+// ctrl+t everywhere and t stays Add task. Birthdays also answers to ctrl+up. The anchor of each module:
+//   - Birthdays: today's divider, with the past above
+//   - Tasks: the first task due today or later, else the top
+//   - Home, People, Follow-up: the top of the list
+//
+// Modules without an anchor (Organizations, Deals, Merge, Archived, Sync, Company review) leave it out.
+func todayActions() []action {
 	return []action{
-		{id: "birthdays-today", title: "Birthdays: go to today", group: "Views", hint: "t", keys: []string{"t", "ctrl+up"},
-			desc: "scroll the Birthdays view back to today (past birthdays are above). Also ctrl+up",
-			foot: 18, footIn: inList, footLabel: "today", when: func(m *Model) bool { return m.view == viewBirthdays && m.focus == focusList },
-			run: func(m *Model) tea.Cmd { m.snapBirthdays(); m.clamp(); m.refreshDetail(false); return nil }},
+		{id: "go-today", title: "Go to today", group: "Views", hint: "ctrl+t", keys: []string{"ctrl+t", "ctrl+up"},
+			desc: "jump to today in this view: today's day in Birthdays (past birthdays are above), the first task dated today or later in Tasks, the top in Home, People and Follow-up. Also ctrl+up",
+			foot: 18, footIn: inList, footLabel: "today", when: hasTodayAnchor,
+			footIf: func(m *Model) bool { return m.view == viewBirthdays }, // elsewhere the palette shows the key
+			run: func(m *Model) tea.Cmd { m.goToday(); return nil }},
 	}
+}
+
+func hasTodayAnchor(m *Model) bool {
+	if m.focus != focusList {
+		return false
+	}
+	switch m.view {
+	case viewHome, viewPeople, viewDue, viewTasks, viewBirthdays:
+		return true
+	}
+	return false
+}
+
+func (m *Model) goToday() {
+	switch m.view {
+	case viewBirthdays:
+		m.snapBirthdays()
+	case viewTasks:
+		today := m.now().Format("2006-01-02")
+		m.step(-1 << 20)
+		for i, r := range m.rows {
+			if !r.skip && len(r.meta) >= 10 && r.meta[:10] >= today {
+				m.cursor = i
+				break
+			}
+		}
+	default:
+		m.step(-1 << 20)
+	}
+	m.clamp()
+	m.refreshDetail(false)
 }

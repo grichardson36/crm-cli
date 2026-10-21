@@ -104,8 +104,8 @@ func TestBirthdayViewOpensAtTodayWithThePastAbove(t *testing.T) {
 	assert.Equal(t, "47 yrs", m.rows[m.cursor].meta)
 }
 
-func TestBirthdayTodayKeyAndCtrlUpSnapBack(t *testing.T) {
-	for _, key := range []string{"t", "ctrl+up"} {
+func TestBirthdayGoToTodaySnapsBack(t *testing.T) {
+	for _, key := range []string{"ctrl+t", "ctrl+up"} {
 		m := birthdayModel(t)
 		press(m, "g")
 		assert.Equal(t, "Older", m.rows[m.cursor].title)
@@ -115,19 +115,68 @@ func TestBirthdayTodayKeyAndCtrlUpSnapBack(t *testing.T) {
 	}
 	m := birthdayModel(t)
 	assert.Contains(t, m.footerView(), "today", "the key shows in the footer")
+	assert.Contains(t, m.footerView(), "ctrl+t")
 
 	// The key is a registry action, rebindable.
-	m.applyKeys(map[string][]string{"birthdays-today": {"ctrl+b"}})
+	m.applyKeys(map[string][]string{"go-today": {"ctrl+b"}})
 	press(m, "g")
 	m.Update(tea.KeyMsg{Type: tea.KeyCtrlB})
 	assert.Equal(t, "Ann", m.rows[m.cursor].title)
-	assert.Equal(t, []string{"ctrl+b"}, m.actionByID("birthdays-today").keys)
+	assert.Equal(t, []string{"ctrl+b"}, m.actionByID("go-today").keys)
 }
 
-func TestTodayKeyOutsideBirthdaysStillMeansTask(t *testing.T) {
-	m, _ := newTestModel(t) // People view, a person selected
+func TestTIsAddTaskInEveryModuleIncludingBirthdays(t *testing.T) {
+	m := birthdayModel(t) // Birthdays view, a person selected
 	press(m, "t")
-	assert.Equal(t, modePrompt, m.mode, "t adds a task on a person outside the Birthdays view")
+	assert.Equal(t, modePrompt, m.mode, "t adds a task on the person in Birthdays, as everywhere")
+	press(m, "esc")
+
+	p, _ := newTestModel(t) // People view
+	press(p, "t")
+	assert.Equal(t, modePrompt, p.mode)
+}
+
+func TestGoToTodayInEveryModuleWithAnAnchor(t *testing.T) {
+	m, pr := newTestModel(t)
+	// Tasks: the first task due today or later.
+	for _, in := range []model.CreateTaskInput{
+		{Title: "old", Priority: "medium", DueAt: sp("2026-10-01")},
+		{Title: "later", Priority: "medium", DueAt: sp("2026-10-20")},
+		{Title: "today", Priority: "medium", DueAt: sp("2026-10-13")},
+	} {
+		_, err := m.tr.Create(context.Background(), in)
+		require.NoError(t, err)
+	}
+	_ = pr
+	m.afterWrite()
+	m.switchView(viewTasks)
+	press(m, "G")
+	press(m, "ctrl+t")
+	assert.Equal(t, "today", m.rows[m.cursor].title, "Tasks: the first task due today or later")
+
+	// Home, People and Follow-up: the top of the list.
+	for _, v := range []viewKind{viewHome, viewPeople, viewDue} {
+		m.switchView(v)
+		if len(m.rows) == 0 {
+			continue
+		}
+		press(m, "G")
+		press(m, "ctrl+t")
+		first := 0
+		for i, r := range m.rows {
+			if !r.skip {
+				first = i
+				break
+			}
+		}
+		assert.Equal(t, first, m.cursor, "%s: ctrl+t goes to the top", viewNames[v])
+	}
+
+	// A module with no anchor leaves the key alone.
+	for _, v := range []viewKind{viewOrgs, viewDeals, viewArchived, viewSync} {
+		m.switchView(v)
+		assert.False(t, m.actionByID("go-today").enabled(m), "%s has no anchor", viewNames[v])
+	}
 }
 
 func TestBirthdayViewFitsEightyColumns(t *testing.T) {

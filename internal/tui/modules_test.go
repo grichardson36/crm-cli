@@ -130,10 +130,10 @@ func TestStartupReadsTheArrangementAndSurvivesBadConfig(t *testing.T) {
 
 func TestRebindingAViewKeyKeepsTheUsersKey(t *testing.T) {
 	m, _ := newTestModel(t)
-	m.applyKeys(map[string][]string{"view-tasks": {"ctrl+t"}})
+	m.applyKeys(map[string][]string{"view-tasks": {"ctrl+e"}})
 	require.NoError(t, m.setModules(mustWith(t, m.mods, "follow-up", false)))
 	a := m.actionByID("view-tasks")
-	assert.Equal(t, []string{"ctrl+t"}, a.keys, "a rebound key is not replaced by the position")
+	assert.Equal(t, []string{"ctrl+e"}, a.keys, "a rebound key is not replaced by the position")
 	assert.Equal(t, []string{"4"}, m.actionByID("view-organizations").keys)
 }
 

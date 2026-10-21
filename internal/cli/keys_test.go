@@ -72,7 +72,7 @@ func TestKeysSetListAndReset(t *testing.T) {
 
 	// reset --all and the no-argument error.
 	keysRun(t, home, "keys", "set", "undo", "ctrl+g")
-	keysRun(t, home, "keys", "set", "tier", "ctrl+t")
+	keysRun(t, home, "keys", "set", "tier", "ctrl+e")
 	_, stderr, code = keysRun(t, home, "keys", "reset")
 	assert.Equal(t, 2, code, stderr)
 	_, _, code = keysRun(t, home, "keys", "reset", "--all")
