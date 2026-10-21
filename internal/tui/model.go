@@ -221,6 +221,10 @@ type Model struct {
 	// bdToday is the row of the first birthday from today on in the Birthdays view and bdTop the first
 	// heading above it (its day divider, and its month heading when that sits right above).
 	bdToday, bdTop int
+	// barTag is the tag of the bar row a verb is running on (barverbs.go). barResume remembers a bar that
+	// is waiting for a verb with a prompt, a confirm or a picker to finish.
+	barTag    string
+	barResume *barResume
 	// mods is the module arrangement (modules.go): which views are on and in what order.
 	mods modules.Arrangement
 	keyProblems  []string
@@ -676,6 +680,14 @@ func (m *Model) targets() []int64 {
 
 // Update implements tea.Model.
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	mm, cmd := m.update(msg)
+	if resume := m.resumeBar(); resume != nil {
+		cmd = tea.Batch(cmd, resume)
+	}
+	return mm, cmd
+}
+
+func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height

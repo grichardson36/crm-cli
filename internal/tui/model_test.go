@@ -407,6 +407,9 @@ func TestHelpOverlay(t *testing.T) {
 	// Every action with a key appears in the help text.
 	text := m.helpText()
 	for _, a := range m.actions {
+		if a.barOnly {
+			continue // the verbs of a tag row are listed by the bar footer
+		}
 		assert.Contains(t, text, a.desc, "help lists %s", a.id)
 	}
 }
@@ -823,7 +826,7 @@ func TestPaletteFilterAndRun(t *testing.T) {
 	require.Equal(t, modeOverlay, m.mode)
 	on := 0
 	for i := range m.actions {
-		if m.moduleOn(&m.actions[i]) {
+		if m.moduleOn(&m.actions[i]) && !m.actions[i].barOnly {
 			on++
 		}
 	}
@@ -894,8 +897,8 @@ func TestRegistryHasUniqueIDsAndEveryActionIsInThePalette(t *testing.T) {
 	seen := map[string]bool{}
 	for _, a := range m.actions {
 		assert.False(t, seen[a.id], "duplicate id %s", a.id)
-		if !m.moduleOn(&a) {
-			continue // an off module is not in the palette
+		if !m.moduleOn(&a) || a.barOnly {
+			continue // an off module and the verbs of a tag row are not in the palette
 		}
 		seen[a.id] = true
 		assert.NotEmpty(t, a.title, a.id)

@@ -30,6 +30,7 @@ In the detail form: `enter` edits a row, `a` adds a row, `d` deletes the row (as
 - Merge view: `enter` compare, `m` level, `D` dismiss, `u` undo dismiss. `M` merges marked people. Compare: `left`/`right`, `space`, `s`, `p`, `r`, `enter`, `esc`.
 - In the Organizations view `space` marks a row and `M` merges the marked organizations (see orgs). Company review (palette "Company review", or C in Organizations): c create, l link, e rename, s skip, x clear, A accept exact matches, enter applies the staged batch. See convert.
 - Birthdays view: day dividers and month headings are skipped by `j` / `k`, past birthdays are above, `t` or `ctrl+up` returns to today (`t` adds a task in the other views).
+- Bar (`ctrl+k`): `tab` on a person, organization, deal, task or tag row moves the focus to the results, where the view hotkeys act on that row without leaving the bar (`c` contacted, `s` snooze, `f` favorite, `n` note, `t` task, `L` link, `d` delete, `x` done, `e` edit organization, `ctrl+z` undo). The footer lists the verbs of the row. `esc` or `tab` returns to the input. A tag row has `d` delete, `L` give, `U` take off, `enter` opens its people.
 - Archived view lists people, organizations, deals and tasks: `T` filters by type, `u` restores, `X` purges a person after you type the name.
 - Sync view: `s` runs a source, `d` dry run. Inbox: `a` accepts, `p` attaches, `i` ignores. Home: `enter` opens the person.
 

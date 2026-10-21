@@ -27,6 +27,8 @@ type overlayItem struct {
 	origin string
 	// link is the id of a stored link, for the Unlink picker.
 	link int64
+	// exact marks a tag row whose name is the whole query: it ranks above the other objects.
+	exact bool
 }
 
 // overlay is a filterable list shown instead of the main screen: the command palette or a picker.
@@ -39,6 +41,8 @@ type overlay struct {
 	offset  int
 	palette bool
 	digits  bool // a number key picks the item with that hint (view switcher)
+	// focusResults is the bar mode where plain keys are verbs of the highlighted row (barverbs.go).
+	focusResults bool
 	// onKey sees every key first and returns true when it used it (the Modules screen). noFilter
 	// turns the filter line off.
 	onKey    func(m *Model, key string) bool
@@ -161,8 +165,8 @@ func (m *Model) openPalette() tea.Cmd {
 	items := make([]overlayItem, 0, len(m.actions))
 	for i := range m.actions {
 		a := &m.actions[i]
-		if !m.moduleOn(a) {
-			continue // an off module is not in the palette
+		if !m.moduleOn(a) || a.barOnly {
+			continue // an off module and the verbs of a tag row are not in the palette
 		}
 		it := overlayItem{id: a.id, label: a.title, hint: a.hint, desc: a.desc}
 		switch {
@@ -307,6 +311,11 @@ func (m *Model) overlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if o.onKey != nil && o.onKey(m, msg.String()) {
 		return m, nil
 	}
+	if o.palette && o.cmd == nil {
+		if mdl, c, ok := m.barFocusKey(msg); ok {
+			return mdl, c
+		}
+	}
 	if o.palette {
 		if mdl, c, ok := m.cmdKey(msg); ok {
 			return mdl, c
@@ -392,7 +401,7 @@ func (m *Model) overlayView() string {
 	var b strings.Builder
 	help := "   enter run  esc close  up/down choose"
 	if o.palette {
-		help = "   enter run  esc close   > actions  @ people  # tags  = settings  ? help"
+		help = "   enter run  esc close  tab verbs   > actions  @ people  # tags  = settings  ? help"
 	}
 	b.WriteString(lipgloss.NewStyle().MaxWidth(m.width).Render(m.st.Head.Render(o.title)+m.st.Dim.Render(help)) + "\n")
 	b.WriteString(o.filter.View() + "\n")
@@ -405,6 +414,11 @@ func (m *Model) overlayView() string {
 	hintW, titleW := 8, 24
 	if o.palette {
 		b.WriteString(m.barListView(o, end))
+		if o.focusResults {
+			if it, ok := o.highlighted(); ok {
+				b.WriteString("\n" + m.st.Head.Render(runewidth.Truncate(m.barVerbLine(it), m.width, "…")))
+			}
+		}
 		return b.String()
 	}
 	for i := o.offset; i < end; i++ {
@@ -466,7 +480,7 @@ func (m *Model) helpText() string {
 		b.WriteString(m.st.Head.Render(g) + "\n")
 		for i := range m.actions {
 			a := &m.actions[i]
-			if a.group != g {
+			if a.group != g || a.barOnly {
 				continue
 			}
 			key := a.hint

@@ -103,7 +103,11 @@ func (o *overlay) refilterBar() {
 		default:
 			score = i // the database already ranked these
 		}
-		list = append(list, scored{i, barRank[it.kind], score, len(it.label)})
+		rank := barRank[it.kind]
+		if it.kind == kindTag && it.exact {
+			rank, score = barRank[kindPerson], -1 // a tag named exactly like the query leads the objects
+		}
+		list = append(list, scored{i, rank, score, len(it.label)})
 	}
 	sort.SliceStable(list, func(a, b int) bool {
 		x, y := list[a], list[b]
@@ -133,7 +137,7 @@ func (o *overlay) refilterBar() {
 				if actions++; actions > barActionCap {
 					continue
 				}
-			case kindPerson, kindOrg, kindDeal, kindTask, kindNote, kindSetting:
+			case kindPerson, kindOrg, kindDeal, kindTask, kindNote, kindSetting, kindTag:
 				if hits[it.kind]++; hits[it.kind] > barHitCap {
 					continue
 				}
@@ -202,18 +206,39 @@ func (m *Model) barSearch(scope byte, q string) []overlayItem {
 		}
 		return out
 	}
-	terms := strings.Fields(strings.ToLower(q))
-	people := 0
-	for _, p := range m.people {
-		if matches(p, terms) {
-			desc := p.Company
-			if desc == "" {
-				desc = p.Title
+	// A tag is an object: its name in the query (any case, whole or part) lists it without the # prefix.
+	if low := strings.ToLower(strings.TrimSpace(q)); low != "" {
+		for _, t := range m.quickEnv().Tags {
+			lt := strings.ToLower(t)
+			if lt == low || strings.Contains(lt, low) {
+				out = append(out, overlayItem{id: "tag:" + t, kind: kindTag, label: "#" + t, desc: "tag: people with this tag", value: t, exact: lt == low})
 			}
-			out = append(out, overlayItem{id: fmt.Sprintf("person:%d", p.ID), kind: kindPerson, label: p.Name, desc: desc, ref: p.ID})
-			people++
 		}
 	}
+	terms := strings.Fields(strings.ToLower(q))
+	people := 0
+	var tagged []overlayItem // people who match only through a tag come after the ones whose own text matches
+	for _, p := range m.people {
+		if !matches(p, terms) {
+			continue
+		}
+		desc := p.Company
+		if desc == "" {
+			desc = p.Title
+		}
+		it := overlayItem{id: fmt.Sprintf("person:%d", p.ID), kind: kindPerson, label: p.Name, desc: desc, ref: p.ID}
+		bare := p
+		bare.Tags = ""
+		if !matches(bare, terms) {
+			// The text is not in the person, only in a tag: say which one, so the match is not a mystery.
+			it.desc = "tagged " + taggedBy(p.Tags, terms)
+			tagged = append(tagged, it)
+		} else {
+			out = append(out, it)
+		}
+		people++
+	}
+	out = append(out, tagged...)
 	if scope == '@' {
 		return out
 	}
@@ -397,4 +422,23 @@ func (m *Model) cursorOn(match func(row) bool) {
 		}
 	}
 	m.setStatus("not in this list", true)
+}
+
+// taggedBy names the tags of a person that carry the search terms, "#friend #the-well".
+func taggedBy(tags string, terms []string) string {
+	var hit []string
+	for _, t := range strings.Split(tags, ",") {
+		t = strings.TrimSpace(t)
+		low := strings.ToLower(t)
+		for _, term := range terms {
+			if strings.Contains(low, strings.TrimPrefix(term, "#")) {
+				hit = append(hit, "#"+t)
+				break
+			}
+		}
+	}
+	if len(hit) == 0 {
+		return "#" + strings.TrimSpace(tags)
+	}
+	return strings.Join(hit, " ")
 }

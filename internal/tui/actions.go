@@ -59,6 +59,9 @@ type action struct {
 	// from the palette. isView marks the action that opens the view and takes the module's number key.
 	module string
 	isView bool
+	// barOnly marks an action that only exists inside the bar's results (the verbs of a tag row). It is
+	// left out of the palette and the help screen, and can still be rebound.
+	barOnly bool
 	// keyFor limits one key at a time, for a verb whose keys mean different things in different views.
 	keyFor func(m *Model, key string) bool
 	// footLabel is the word in the footer. It falls back to footShort[id].
@@ -387,7 +390,7 @@ func buildActions() []action {
 		}
 	}
 	// birthdayActions come first: t means "today" in the Birthdays view and "task" elsewhere.
-	out := append(append(birthdayActions(), convertActions()...), acts[:at]...)
+	out := append(append(append(barTagActions(), birthdayActions()...), convertActions()...), acts[:at]...)
 	out = append(out, objectActions()...)
 	out = append(out, acts[at:]...)
 	out = append(out, orgMergeActions()...)
