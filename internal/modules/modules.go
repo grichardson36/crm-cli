@@ -5,8 +5,8 @@
 // arrangement is per device, in the [modules] table of ~/.crm/config.toml next to [keys]:
 //
 //	[modules]
-//	order  = ["home", "people", "follow-up", "tasks", "organizations", "birthdays", "merge", "archived", "sync", "deals"]
-//	hidden = ["deals"]
+//	order  = ["home", "people", "follow-up", "tasks", "organizations", "deals", "birthdays", "merge", "archived", "sync"]
+//	hidden = ["birthdays"]
 //
 // The rest of config.toml is kept when the table is written.
 package modules
@@ -34,14 +34,27 @@ var All = []Module{
 	{"follow-up", "Follow-up", "people to reach out to"},
 	{"tasks", "Tasks", "open tasks"},
 	{"organizations", "Organizations", "companies and groups"},
+	{"deals", "Deals", "deals with stage and value"},
 	{"birthdays", "Birthdays", "upcoming birthdays"},
 	{"merge", "Merge", "probable duplicates"},
 	{"archived", "Archived", "archived records, restore or purge"},
 	{"sync", "Sync", "sources and the inbox"},
-	{"deals", "Deals", "deals with stage and value"},
 }
 
-var defaultHidden = []string{"deals"}
+// The default is loose: every module is on. The user hides and reorders from there.
+var defaultHidden []string
+
+// Key is the number key of the place among the modules that are on: 1 to 9, then 0 for the tenth.
+// Later places have no number key.
+func Key(pos int) string {
+	switch {
+	case pos >= 1 && pos <= 9:
+		return fmt.Sprint(pos)
+	case pos == 10:
+		return "0"
+	}
+	return ""
+}
 
 var aliases = map[string]string{
 	"due": "follow-up", "followup": "follow-up", "follow": "follow-up", "orgs": "organizations", "org": "organizations",
@@ -340,7 +353,7 @@ type Row struct {
 	On       bool   `json:"on"`       // false: hidden from tabs, keys, [ ], the view list and the palette
 	Position int    `json:"position"` // place among the visible modules, 0 when off
 	Key      string `json:"key"`      // the number key that opens it, empty when off or past 9
-	Default  bool   `json:"default"`  // true when this module is on by default
+	Default  bool   `json:"default"`  // true when this module is on by default (all are)
 	Blurb    string `json:"description"`
 }
 
@@ -351,9 +364,7 @@ func (a Arrangement) Rows() []Row {
 	for i, id := range n.Order {
 		mod, _ := Lookup(id)
 		r := Row{Order: i + 1, ID: id, Name: mod.Name, On: !n.IsHidden(id), Position: n.Position(id), Blurb: mod.Blurb}
-		if r.Position >= 1 && r.Position <= 9 {
-			r.Key = fmt.Sprint(r.Position)
-		}
+		r.Key = Key(r.Position)
 		r.Default = !contains(defaultHidden, id)
 		rows = append(rows, r)
 	}

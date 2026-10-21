@@ -79,7 +79,7 @@ func TestCommandBarMarksChips(t *testing.T) {
 
 func TestCommandBarNameWorksWithoutASelectedPerson(t *testing.T) {
 	m, _ := newTestModel(t)
-	press(m, "7") // the Merge view has no selected person
+	press(m, "8") // the Merge view has no selected person
 	openBar(m, "n Bob called back")
 	require.NotNil(t, m.ov.cmd)
 	assert.Contains(t, plain(m.View()), `note on Bob Baker: "called back"`)
@@ -91,7 +91,7 @@ func TestCommandBarNameWorksWithoutASelectedPerson(t *testing.T) {
 
 func TestCommandBarNeedsAPersonOrAName(t *testing.T) {
 	m, _ := newTestModel(t)
-	press(m, "7")
+	press(m, "8")
 	openBar(m, "n called back")
 	assert.Contains(t, plain(m.View()), "who is this about?")
 	press(m, "enter")
@@ -105,7 +105,7 @@ func TestCommandBarAmbiguousNameBlocksEnter(t *testing.T) {
 	_, err := pr.Create(context.Background(), model.CreatePersonInput{FirstName: "Bob", LastName: sp("Brown")})
 	require.NoError(t, err)
 	require.NoError(t, m.reload())
-	press(m, "7")
+	press(m, "8")
 	openBar(m, "n Bob called back")
 	out := plain(m.View())
 	assert.Contains(t, out, "2 people match")
@@ -137,7 +137,7 @@ func TestCommandBarEscClosesWithoutWriting(t *testing.T) {
 
 func TestCommandBarTabCompletesVerbsNamesTagsDatesAndCadences(t *testing.T) {
 	m, _ := newTestModel(t)
-	press(m, "7")
+	press(m, "8")
 
 	// Verb.
 	press(m, "ctrl+k")
@@ -914,7 +914,7 @@ func TestNamesListInTheCommandBar(t *testing.T) {
 	assert.Len(t, tags, 1)
 
 	// A leading name that matches two people is listed too (no person is selected in Merge).
-	press(m, "7")
+	press(m, "8")
 	openBar(m, "n Bob called")
 	press(m, "enter")
 	require.Equal(t, modeNames, m.mode)
@@ -926,7 +926,7 @@ func TestNamesListInTheCommandBar(t *testing.T) {
 
 func TestNamesListMultiFieldSetStillAsksToConfirm(t *testing.T) {
 	m, pr := namesModel(t)
-	press(m, "7")
+	press(m, "8")
 	openBar(m, "set Bob: company=Zorg title=CTO")
 	press(m, "enter")
 	require.Equal(t, modeNames, m.mode)

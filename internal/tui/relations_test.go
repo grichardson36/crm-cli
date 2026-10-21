@@ -372,7 +372,7 @@ func TestArchivedViewListsEveryKindFiltersByTypeAndRestores(t *testing.T) {
 	require.NoError(t, repo.ArchiveObject(ctx, m.db, "task", task.ID))
 	require.NoError(t, repo.ArchiveObject(ctx, m.db, "person", 3))
 
-	press(m, "8") // Archived
+	press(m, "9") // Archived
 	require.Equal(t, viewArchived, m.view)
 	kinds := map[string]bool{}
 	for _, r := range m.rows {
@@ -431,7 +431,7 @@ func TestPurgeAppliesToArchivedPeopleOnly(t *testing.T) {
 	ctx := context.Background()
 	org, _ := m.orr.Create(ctx, model.CreateOrgInput{Name: "Acme"})
 	require.NoError(t, repo.ArchiveObject(ctx, m.db, "organization", org.ID))
-	press(m, "8")
+	press(m, "9")
 	require.Len(t, m.rows, 1)
 	assert.False(t, m.actionByID("purge").enabled(m), "an archived organization cannot be purged here")
 }

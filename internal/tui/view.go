@@ -3,16 +3,15 @@ package tui
 import (
 	"fmt"
 	"sort"
-	"strconv"
 	"strings"
 	"unicode"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/modules"
 	"github.com/mattn/go-runewidth"
 )
 
-func tabLabel(i int, name string) string { return fmt.Sprintf("%d %s", i+1, name) }
 
 // cleanCell removes emoji and control characters that break column widths in list cells.
 func cleanCell(s string) string {
@@ -107,8 +106,8 @@ func (m *Model) tabLayout() []tabSeg {
 	var items []item
 	for i, v := range m.visibleViews() {
 		full, short := viewNames[v], viewNames[v][:1]
-		if i < 9 {
-			full, short = tabLabel(i, viewNames[v]), strconv.Itoa(i+1)
+		if k := modules.Key(i + 1); k != "" {
+			full, short = k+" "+viewNames[v], k
 		}
 		items = append(items, item{full: full, short: short, seg: tabSeg{view: v, on: v == m.view}})
 	}
@@ -149,6 +148,7 @@ func (m *Model) tabLayout() []tabSeg {
 		labels[i] = labelAt(level, i, it)
 		total += runewidth.StringWidth(labels[i]) + 2
 	}
+	dropped := 0
 	for total > m.width {
 		drop := -1
 		for i := len(items) - 1; i >= 0; i-- {
@@ -163,6 +163,15 @@ func (m *Model) tabLayout() []tabSeg {
 		total -= runewidth.StringWidth(labels[drop]) + 2
 		items = append(items[:drop], items[drop+1:]...)
 		labels = append(labels[:drop], labels[drop+1:]...)
+		dropped++
+		// The More entry counts what no longer fits: "v +3" opens the full view list.
+		for i := range items {
+			if items[i].seg.more && !items[i].seg.on {
+				total -= runewidth.StringWidth(labels[i]) + 2
+				labels[i] = fmt.Sprintf("v +%d", dropped)
+				total += runewidth.StringWidth(labels[i]) + 2
+			}
+		}
 	}
 	var segs []tabSeg
 	x := 0

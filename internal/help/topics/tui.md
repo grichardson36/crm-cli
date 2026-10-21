@@ -11,7 +11,7 @@ crm tui --read-only
 
 ## Views
 
-Every view is a module you can turn on or off and reorder (see modules). Jump with the number keys, cycle with `[` and `]`, or press `v` for the view list. Deals is off by default. The keys below are the default order.
+Every view is a module you can turn on or off and reorder (see modules). Jump with the number keys, cycle with `[` and `]`, or press `v` for the view list. Every module is on by default. The keys below are the default order, the tenth module takes `0`.
 
 | Key | View | Shows |
 |---|---|---|
@@ -20,18 +20,18 @@ Every view is a module you can turn on or off and reorder (see modules). Jump wi
 | 3 | Follow-up | who you are due to contact (keep-in-touch) |
 | 4 | Tasks | open tasks |
 | 5 | Organizations | companies and groups |
-| 6 | Birthdays | upcoming birthdays |
-| 7 | Merge | groups of probable duplicates |
-| 8 | Archived | archived records |
-| 9 | Sync | sync sources and the inbox of unmatched records |
+| 6 | Deals | deals with stage and value |
+| 7 | Birthdays | upcoming birthdays |
+| 8 | Merge | groups of probable duplicates |
+| 9 | Archived | archived records |
+| 0 | Sync | sync sources and the inbox of unmatched records |
 
 ## Palette actions that mirror CLI commands
 
 These work in `--read-only` mode. Each opens a scrollable page (`j` / `k`, `g` / `G`, `esc` goes back).
 
 - "Help: topics" lists topics with a filter. "Help: search" lists matching lines.
-- "Doctor" runs the checks of `crm doctor` with the fix line for each problem.
-- "Where" shows the open database. "Domains" lists the databases in the data directory.
+- "Doctor" runs the checks of `crm doctor`. "Where" shows the open database. "Domains" lists the databases in the data directory.
 - "DAV: info", "DAV: conflicts" and "DAV: status" show the phone sync details, logged conflicts and counts. They never start the server (`crm help dav`).
 
 All keys, editing, merge, archive, notes, sync and Home are in `crm help tui-keys`.

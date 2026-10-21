@@ -120,8 +120,8 @@ func buildActions() []action {
 			id: id, title: viewNames[v] + " view", group: "Views", module: mod, isView: true, desc: desc,
 			run: func(m *Model) tea.Cmd { m.switchView(v); return nil },
 		}
-		if pos := modules.Default().Position(mod); pos >= 1 && pos <= 9 { // the number key of the default arrangement
-			a.hint, a.keys = strconv.Itoa(pos), []string{strconv.Itoa(pos)}
+		if k := modules.Key(modules.Default().Position(mod)); k != "" { // the number key of the default arrangement
+			a.hint, a.keys = k, []string{k}
 		}
 		return a
 	}

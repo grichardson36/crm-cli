@@ -2,7 +2,6 @@ package tui
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -92,8 +91,8 @@ func (m *Model) patchModuleActions() {
 		if _, custom := m.keyOverrides[a.id]; custom || !a.isView {
 			continue
 		}
-		if pos := m.mods.Position(a.module); pos >= 1 && pos <= 9 {
-			a.keys, a.hint = []string{strconv.Itoa(pos)}, strconv.Itoa(pos)
+		if k := modules.Key(m.mods.Position(a.module)); k != "" {
+			a.keys, a.hint = []string{k}, k
 		} else {
 			a.keys, a.hint = nil, ""
 		}
@@ -142,9 +141,7 @@ func (m *Model) moduleItems() []overlayItem {
 		hint := ""
 		if pos := m.mods.Position(id); pos > 0 {
 			state = "on"
-			if pos <= 9 {
-				hint = strconv.Itoa(pos)
-			}
+			hint = modules.Key(pos)
 		}
 		if a := m.actionByID(viewActionID(moduleViews[id])); a != nil && len(a.keys) > 0 && m.mods.Position(id) > 0 {
 			hint = keys.Display(a.keys[0])

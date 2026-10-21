@@ -20,8 +20,12 @@ func TestModulesCommands(t *testing.T) {
 	assert.Equal(t, true, rows["organizations"]["on"])
 	assert.EqualValues(t, 5, rows["organizations"]["position"])
 	assert.Equal(t, "5", rows["organizations"]["key"])
-	assert.Equal(t, false, rows["deals"]["on"])
+	assert.Equal(t, true, rows["deals"]["on"], "every module is on by default")
+	assert.EqualValues(t, 6, rows["deals"]["position"])
+	assert.Equal(t, "0", rows["sync"]["key"])
 
+	_, stderr, code = run("off", "deals")
+	require.Equal(t, 0, code, stderr)
 	_, stderr, code = run("on", "deals")
 	require.Equal(t, 0, code, stderr)
 	_, stderr, code = run("off", "Birthdays", "merge")
@@ -53,6 +57,7 @@ func TestModulesCommands(t *testing.T) {
 	stdout, _, code = run("reset", "-f", "json")
 	require.Equal(t, 0, code)
 	rows = keyRows(t, stdout)
-	assert.Equal(t, false, rows["deals"]["on"])
+	assert.Equal(t, true, rows["deals"]["on"])
+	assert.Equal(t, true, rows["birthdays"]["on"])
 	assert.EqualValues(t, 1, rows["home"]["position"])
 }

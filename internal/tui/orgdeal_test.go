@@ -29,7 +29,7 @@ func submit(m *Model, line string) {
 	press(m, "enter")
 }
 
-func TestOrgsAndDealsStayOutOfDefaultNavigation(t *testing.T) {
+func TestOrgsAndDealsAreOnByDefaultAndFollowTheArrangement(t *testing.T) {
 	m, _ := newTestModel(t)
 	press(m, "v")
 	require.NotNil(t, m.ov)
@@ -37,16 +37,20 @@ func TestOrgsAndDealsStayOutOfDefaultNavigation(t *testing.T) {
 	for _, it := range m.ov.items {
 		labels = append(labels, it.label)
 	}
-	assert.Contains(t, labels, "Organizations", "organizations are core and on by default")
-	assert.NotContains(t, labels, "Deals", "deals are advanced and off by default")
+	assert.Contains(t, labels, "Organizations")
+	assert.Contains(t, labels, "Deals", "the default shows every module")
 	press(m, "esc")
 	assert.Equal(t, 5, m.viewPosition(viewOrgs))
-	assert.Equal(t, 0, m.viewPosition(viewDeals))
+	assert.Equal(t, 6, m.viewPosition(viewDeals))
 	press(m, "5")
 	assert.Equal(t, viewOrgs, m.view)
 	press(m, "]")
+	assert.Equal(t, viewDeals, m.view)
+	press(m, "]")
 	assert.Equal(t, viewBirthdays, m.view)
-	// Deals opened from a link is outside the cycle: ] goes to the first view and [ to the last.
+
+	// Turned off, Deals leaves the cycle but a link still opens it. ] goes to the first view and [ to the last.
+	require.NoError(t, m.setModules(mustWith(t, m.mods, "deals", false)))
 	m.switchView(viewDeals)
 	assert.Contains(t, m.View(), "v Deals")
 	press(m, "]")

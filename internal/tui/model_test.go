@@ -223,7 +223,7 @@ func TestViewsDueBirthdaysTasks(t *testing.T) {
 	assert.Equal(t, []string{"Bob Baker"}, names(m))
 	assert.Contains(t, m.View(), "overdue")
 
-	press(m, "6")
+	press(m, "7")
 	var birthdays []row
 	for _, r := range m.rows {
 		if !r.skip {
@@ -240,6 +240,8 @@ func TestViewsDueBirthdaysTasks(t *testing.T) {
 
 	press(m, "]")
 	assert.Equal(t, viewOrgs, m.view, "Organizations follows Tasks")
+	press(m, "]")
+	assert.Equal(t, viewDeals, m.view, "Deals follows Organizations")
 	press(m, "]")
 	assert.Equal(t, viewBirthdays, m.view)
 	press(m, "]", "]", "]")
@@ -270,6 +272,7 @@ func TestBirthdayViewGroupsUpcomingBirthdaysByMonth(t *testing.T) {
 
 func TestMarkContactedRemovesFromDue(t *testing.T) {
 	m, pr := newTestModel(t)
+	m.now = time.Now // the due query uses the database clock, so the app clock must be the real one
 	press(m, "3")
 	require.Len(t, m.rows, 1)
 	press(m, "c")
@@ -279,11 +282,12 @@ func TestMarkContactedRemovesFromDue(t *testing.T) {
 	p, err := pr.FindByID(context.Background(), 2)
 	require.NoError(t, err)
 	require.NotNil(t, p.LastContactedAt)
-	assert.Equal(t, "2026-10-13 12:00:00", *p.LastContactedAt)
+	assert.Equal(t, time.Now().UTC().Format("2006-01-02"), (*p.LastContactedAt)[:10])
 }
 
 func TestSnoozeFavoriteNoteAndTask(t *testing.T) {
 	m, pr := newTestModel(t)
+	m.now = time.Now // the due query uses the database clock, so the app clock must be the real one
 	ctx := context.Background()
 
 	// Snooze Bob out of the due list for 7 days.

@@ -15,7 +15,7 @@ crm person edit 2 --org 1
 
 ## In the terminal UI
 
-Organizations is a tab (5 by default). Deals is off by default: turn it on with `crm modules on deals` or in the palette under "Modules".
+Organizations is tab 5 and Deals tab 6 by default. Hide a view you do not use with `crm modules off deals` or the palette entry "Modules" (see modules).
 
 - The standard keys: `a` adds (`+` also), `enter` or `e` edits, `d` deletes (asks y/n), `u` restores, `L` links, `ctrl+z` undoes. "Restore organization" and "Restore deal" are in the palette.
 - An organization is one line: `name | domain | industry | size | location | website | linkedin | description | notes` (the old `name | domain | industry | notes` still works). Location is `city, region, country`. Its page lists members, parent and child organizations, deals, tasks and notes. `enter` on a linked row opens it, `n` adds a note.

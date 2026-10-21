@@ -105,7 +105,7 @@ func TestAddAndRestoreKeysAreTheSameInEveryObjectView(t *testing.T) {
 	require.Equal(t, modeConfirm, m.mode)
 	press(m, "y")
 	assert.Len(t, m.people, before)
-	press(m, "8") // Archived
+	press(m, "9") // Archived
 	press(m, "u")
 	assert.Len(t, m.people, before+1, "u restores in the Archived view")
 }
@@ -371,7 +371,7 @@ func TestLinkIsBlockedInReadOnlyMode(t *testing.T) {
 
 func TestLinkActionsAreGreyedOutWithoutAnObjectToLinkFrom(t *testing.T) {
 	m, _ := newTestModel(t)
-	press(m, "8") // Archived view: nothing to link
+	press(m, "9") // Archived view: nothing to link
 	for _, id := range []string{"link", "unlink", "link-org", "unlink-tag"} {
 		assert.False(t, m.actionByID(id).enabled(m), id)
 	}

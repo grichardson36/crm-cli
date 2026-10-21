@@ -5,12 +5,12 @@ Every view of the terminal UI is a module: home, people, follow-up, tasks, organ
 ```sh crm-example
 crm modules list
 crm modules off birthdays merge
-crm modules on deals
+crm modules on birthdays
 crm modules move organizations 3
 crm modules reset
 ```
 
-The default order is Home, People, Follow-up, Tasks, Organizations, Birthdays, Merge, Archived, Sync, with Deals off. The number key of a module is its place among the modules that are on (1 to 9). One module must stay on, and Home or People, so there is always a start screen.
+The default is loose: every module is on, in the order Home, People, Follow-up, Tasks, Organizations, Deals, Birthdays, Merge, Archived, Sync. You hide and reorder from there. The number key of a module is its place among the modules that are on (1 to 9, then 0 for the tenth). One module must stay on, and Home or People, so there is always a start screen.
 
 ## In the terminal UI
 
@@ -22,8 +22,8 @@ Per device, in the `[modules]` table of `~/.crm/config.toml`, next to `[keys]` a
 
 ```toml
 [modules]
-order  = ["home", "people", "follow-up", "tasks", "organizations", "birthdays", "merge", "archived", "sync", "deals"]
-hidden = ["deals"]
+order  = ["home", "people", "follow-up", "tasks", "organizations", "deals", "birthdays", "merge", "archived", "sync"]
+hidden = ["birthdays"]
 ```
 
 A name that does not exist, bad TOML or an arrangement with no start screen is reported and the default is used for that part. MCP: `crm_modules_list`, `crm_modules_set` (`module`, `on`, `position`), `crm_modules_reset`.

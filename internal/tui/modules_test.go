@@ -28,12 +28,12 @@ func TestModuleOffHidesTabsKeysBracketsAndPalette(t *testing.T) {
 
 	assert.NotContains(t, tabBar(m), "Birthdays")
 	assert.Equal(t, 0, m.viewPosition(viewBirthdays))
-	assert.Equal(t, 6, m.viewPosition(viewMerge), "Merge takes the place after Organizations")
-	press(m, "6")
+	assert.Equal(t, 7, m.viewPosition(viewMerge), "Merge moves up one place")
+	press(m, "7")
 	assert.Equal(t, viewMerge, m.view, "the number key follows the arrangement")
 
 	// [ and ] skip it.
-	m.switchView(viewOrgs)
+	m.switchView(viewDeals)
 	press(m, "]")
 	assert.Equal(t, viewMerge, m.view)
 
@@ -81,9 +81,9 @@ func TestModulesScreenTogglesMovesResetsAndSaves(t *testing.T) {
 	require.Len(t, m.ov.items, 10)
 	assert.Contains(t, m.ov.items[0].label, "Home")
 	assert.Equal(t, "1", m.ov.items[0].hint)
-	assert.Contains(t, m.ov.items[9].label, "Deals")
-	assert.Contains(t, m.ov.items[9].label, "off")
-	assert.Equal(t, "", m.ov.items[9].hint)
+	assert.Contains(t, m.ov.items[5].label, "Deals")
+	assert.Contains(t, m.ov.items[5].label, "on")
+	assert.Equal(t, "0", m.ov.items[9].hint, "the tenth module takes 0")
 
 	// Space turns Home off (People keeps the start screen), K moves the cursor row up.
 	press(m, " ")

@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/jdanielnd/crm-cli/internal/modules"
 	"github.com/mattn/go-runewidth"
 )
 
@@ -225,9 +226,7 @@ func (m *Model) openViewSwitcher() tea.Cmd {
 	var items []overlayItem
 	for i, v := range m.visibleViews() {
 		it := overlayItem{id: viewActionID(v), label: viewNames[v], value: strconv.Itoa(int(v))}
-		if i < 9 {
-			it.hint = strconv.Itoa(i + 1)
-		}
+		it.hint = modules.Key(i + 1)
 		if v == m.view {
 			it.desc = "current view"
 		} else {
@@ -335,7 +334,7 @@ func (m *Model) overlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		o.move(page, page)
 		return m, nil
 	}
-	if k := msg.String(); o.digits && len(k) == 1 && k[0] >= '1' && k[0] <= '9' {
+	if k := msg.String(); o.digits && len(k) == 1 && k[0] >= '0' && k[0] <= '9' {
 		for i, idx := range o.shown {
 			if o.items[idx].hint == k {
 				return m, m.pickOverlay(i)

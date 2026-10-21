@@ -21,7 +21,7 @@ func openBobs(t *testing.T) (*Model, *compareState) {
 	require.NoError(t, err)
 	_, err = m.db.Exec(`UPDATE people SET updated_at = '2026-02-01 10:00:00' WHERE id = 4`)
 	require.NoError(t, err)
-	press(m, "7", "j", "enter")
+	press(m, "8", "j", "enter")
 	require.NotNil(t, m.cmp)
 	return m, m.cmp
 }

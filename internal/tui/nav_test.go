@@ -6,6 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/jdanielnd/crm-cli/internal/modules"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -15,15 +16,15 @@ func TestViewSwitcherListsEveryViewWithItsKey(t *testing.T) {
 	press(m, "v")
 	require.Equal(t, modeOverlay, m.mode)
 	assert.Equal(t, "Go to view", m.ov.title)
-	require.Len(t, m.ov.items, 9, "Deals is off by default")
+	require.Len(t, m.ov.items, 10, "every module is on by default")
 	for i, v := range m.visibleViews() {
 		assert.Equal(t, viewNames[v], m.ov.items[i].label)
-		assert.Equal(t, string(rune('1'+i)), m.ov.items[i].hint)
+		assert.Equal(t, modules.Key(i+1), m.ov.items[i].hint)
 	}
 	assert.Equal(t, "current view", m.ov.items[1].desc)
 
 	// A number key picks at once.
-	press(m, "7")
+	press(m, "8")
 	assert.Equal(t, modeNormal, m.mode)
 	assert.Equal(t, viewMerge, m.view)
 
@@ -46,7 +47,7 @@ func TestGoToViewInPalette(t *testing.T) {
 	press(m, "enter")
 	require.Equal(t, modeOverlay, m.mode)
 	assert.Equal(t, "Go to view", m.ov.title)
-	press(m, "9")
+	press(m, "0")
 	assert.Equal(t, viewSync, m.view)
 }
 
@@ -69,7 +70,7 @@ func TestViewSwitcherReachableByMouseOnMore(t *testing.T) {
 	// Click the Birthdays line (view 5 is the fifth item under the two header lines).
 	click(m, 3, overlayTop+m.viewPosition(viewBirthdays)-1)
 	assert.Equal(t, viewBirthdays, m.view)
-	assert.Contains(t, strings.Split(m.View(), "\n")[0], "6 Birthdays")
+	assert.Contains(t, strings.Split(m.View(), "\n")[0], "7 Birthdays")
 }
 
 func TestHelpAndFooterMentionNewKeys(t *testing.T) {
@@ -85,7 +86,7 @@ func TestTabBarNeverExceeds80Columns(t *testing.T) {
 	m, _ := newTestModel(t)
 	m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
 	for i := range m.visibleViews() {
-		press(m, string(rune('1'+i)))
+		press(m, modules.Key(i+1))
 		bar := strings.Split(m.View(), "\n")[0]
 		assert.LessOrEqual(t, lipgloss.Width(bar), 80, "view %d", i+1)
 		assert.Contains(t, bar, "1 Home")

@@ -86,7 +86,7 @@ func TestEveryViewRendersWithEveryTheme(t *testing.T) {
 			press(m, "esc", "?")
 			check("help")
 			press(m, "x")
-			press(m, "7", "j", "enter")
+			press(m, "8", "j", "enter")
 			if m.cmp != nil {
 				check("compare screen")
 				press(m, "esc")

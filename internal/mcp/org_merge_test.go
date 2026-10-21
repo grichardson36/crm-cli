@@ -64,8 +64,12 @@ func TestModulesTools(t *testing.T) {
 	callJSON(t, s, "crm_modules_list", map[string]any{}, &rows)
 	require.Len(t, rows, 10)
 	assert.Equal(t, "home", rows[0]["id"])
-	assert.Equal(t, false, rows[9]["on"])
+	assert.Equal(t, "deals", rows[5]["id"])
+	for _, r := range rows {
+		assert.Equal(t, true, r["on"], "every module is on by default")
+	}
 
+	callJSON(t, s, "crm_modules_set", map[string]any{"module": "deals", "on": false}, &rows)
 	callJSON(t, s, "crm_modules_set", map[string]any{"module": "deals", "on": true}, &rows)
 	callJSON(t, s, "crm_modules_set", map[string]any{"module": "organizations", "position": 2}, &rows)
 	callJSON(t, s, "crm_modules_set", map[string]any{"module": "birthdays", "on": false}, &rows)
@@ -87,5 +91,6 @@ func TestModulesTools(t *testing.T) {
 
 	callJSON(t, s, "crm_modules_reset", map[string]any{}, &rows)
 	assert.Equal(t, true, rows[0]["on"])
-	assert.Equal(t, false, rows[9]["on"])
+	assert.Equal(t, true, rows[9]["on"])
+	assert.Equal(t, "home", rows[0]["id"])
 }

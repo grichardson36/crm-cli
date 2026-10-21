@@ -12,9 +12,12 @@ import (
 
 func TestDefaultArrangement(t *testing.T) {
 	a := modules.Default()
-	assert.Equal(t, []string{"home", "people", "follow-up", "tasks", "organizations", "birthdays", "merge", "archived", "sync"}, a.Visible())
+	assert.Equal(t, []string{"home", "people", "follow-up", "tasks", "organizations", "deals", "birthdays", "merge", "archived", "sync"}, a.Visible(), "the default shows every module")
 	assert.Equal(t, 5, a.Position("organizations"))
-	assert.Equal(t, 0, a.Position("deals"), "deals are advanced and off by default")
+	assert.Equal(t, 6, a.Position("deals"))
+	assert.Equal(t, "0", modules.Key(a.Position("sync")), "the tenth module takes the 0 key")
+	assert.Equal(t, "", modules.Key(11))
+	assert.Empty(t, a.Hidden)
 	assert.True(t, a.IsDefault())
 	assert.NoError(t, a.Check())
 }
@@ -35,10 +38,13 @@ func TestOnOffMoveAndGuards(t *testing.T) {
 	a, err = a.With("birthdays", false)
 	require.NoError(t, err)
 	assert.Equal(t, 0, a.Position("birthdays"))
-	assert.Equal(t, 6, a.Position("merge"), "the next module takes its place")
+	assert.Equal(t, 7, a.Position("merge"), "the next module takes its place")
+	a, err = a.With("deals", false)
+	require.NoError(t, err)
+	assert.Equal(t, 0, a.Position("deals"))
 	a, err = a.With("deals", true)
 	require.NoError(t, err)
-	assert.Equal(t, 9, a.Position("deals"))
+	assert.Equal(t, 6, a.Position("deals"), "turning it on again restores its place")
 
 	a, err = a.Moved("deals", 1)
 	require.NoError(t, err)
@@ -54,7 +60,7 @@ func TestOnOffMoveAndGuards(t *testing.T) {
 	_, err = b.With("people", false)
 	assert.ErrorContains(t, err, "Home or People")
 	var c modules.Arrangement = modules.Default()
-	for _, id := range []string{"home", "follow-up", "tasks", "organizations", "birthdays", "merge", "archived", "sync", "people"} {
+	for _, id := range []string{"home", "follow-up", "tasks", "organizations", "deals", "birthdays", "merge", "archived", "sync", "people"} {
 		c, err = c.With(id, false)
 		if err != nil {
 			break
@@ -111,7 +117,7 @@ func TestLoadNeverFails(t *testing.T) {
 	assert.Len(t, problems, 2, "each unknown name is reported")
 	assert.Equal(t, []string{"tasks", "home"}, got.Visible()[:2])
 	assert.Equal(t, 0, got.Position("birthdays"))
-	assert.Equal(t, 9, got.Position("deals"), "hidden replaces the default hidden list, deals is on and last")
+	assert.Equal(t, 6, got.Position("deals"), "a module missing from order is appended in default order, and hidden names only birthdays")
 
 	write("[modules]\nhidden = [\"home\", \"people\"]\n")
 	got, problems = modules.Load(dir)
