@@ -224,6 +224,8 @@ type Model struct {
 	// barTag is the tag of the bar row a verb is running on (barverbs.go). barResume remembers a bar that
 	// is waiting for a verb with a prompt, a confirm or a picker to finish.
 	barTag    string
+	// tagRenaming is the tag the rename prompt is for.
+	tagRenaming string
 	barResume *barResume
 	// mods is the module arrangement (modules.go): which views are on and in what order.
 	mods modules.Arrangement
@@ -896,6 +898,10 @@ func (m *Model) bulk(ids []int64, single, plural string, fn func(id int64) error
 }
 
 func (m *Model) runPrompt(kind, value string) {
+	if kind == "tag-rename" {
+		m.runTagRename(value)
+		return
+	}
 	if kind == "convert-name" {
 		m.runConvertName(value)
 		return

@@ -327,7 +327,7 @@ func TestBarTagNameDoesNotMixTaggedPeopleIntoTheResults(t *testing.T) {
 func TestBarTagRowOpensItsTaggedPeopleAndHasItsOwnVerbs(t *testing.T) {
 	m, _ := newTestModel(t)
 	startBar(t, m, "friend", "tag:friend")
-	assert.Equal(t, []string{"d delete tag", "L tag a person", "U untag a person", "ctrl+z undo", "ctrl+y redo"}, barVerbLabelsFor(m, "tag:friend"), "tag verbs, not person verbs")
+	assert.Equal(t, []string{"d delete tag", "L tag a person", "U untag a person", "r rename", "m merge", "ctrl+z undo", "ctrl+y redo"}, barVerbLabelsFor(m, "tag:friend"), "tag verbs, not person verbs")
 
 	// Enter opens the tag: the People view filtered by #friend, as # does.
 	press(m, "enter")

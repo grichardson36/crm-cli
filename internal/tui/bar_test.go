@@ -33,7 +33,7 @@ func TestBarGroupsActionsAndPeople(t *testing.T) {
 	typeText(m, "bob")
 	k := kindsOf(m)
 	assert.Equal(t, 1, k[kindPerson], "Bob Baker is a People hit: %v", shownKinds(m))
-	// Groups come in a fixed order: actions before people.
+	// Groups come in a fixed order: objects, then actions, then settings.
 	last := -1
 	for _, i := range m.ov.shown {
 		r := barRank[m.ov.items[i].kind]

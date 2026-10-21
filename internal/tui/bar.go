@@ -33,10 +33,24 @@ const (
 	kindCreate  = "create"
 )
 
-// barRank orders the groups in the bar.
+// barRank orders the groups in the bar (owner decision 2026-10-16): Recent when the box is empty, then
+// objects (people, organizations, deals, tasks, notes, tags), then actions, then settings. A typed verb
+// (n, t, set, tag, snooze) is the exception: its action line comes first, see verbRank.
 var barRank = map[string]int{
-	kindRecent: 0, kindSetting: 1, kindAction: 2, kindVerb: 2, kindPerson: 3, kindAll: 3, kindOrg: 4, kindDeal: 5, kindTask: 6, kindNote: 7,
-	kindTag: 8, kindHelp: 9, kindCreate: 10,
+	kindRecent: 0, kindPerson: 1, kindAll: 1, kindOrg: 2, kindDeal: 3, kindTask: 4, kindNote: 5, kindTag: 6,
+	kindAction: 7, kindVerb: 7, kindSetting: 8, kindHelp: 9, kindCreate: 10,
+}
+
+// verbRank is the rank of a verb line (Add note (n), Snooze (snooze)). While the first word being
+// typed is the start of the verb it leads the list, ahead of the objects, so typing n or snooze still
+// shows the action first. Otherwise it ranks with the actions.
+func verbRank(it overlayItem, q string) int {
+	first := strings.ToLower(strings.Fields(q + " ")[0])
+	word := strings.ToLower(strings.TrimSpace(it.value))
+	if first != "" && strings.HasPrefix(word, first) {
+		return 0
+	}
+	return barRank[kindVerb]
 }
 
 // barGroup is the label shown at the start of each group.
@@ -104,6 +118,9 @@ func (o *overlay) refilterBar() {
 			score = i // the database already ranked these
 		}
 		rank := barRank[it.kind]
+		if it.kind == kindVerb {
+			rank = verbRank(it, q)
+		}
 		if it.kind == kindTag && it.exact {
 			rank, score = barRank[kindPerson], -1 // a tag named exactly like the query leads the objects
 		}

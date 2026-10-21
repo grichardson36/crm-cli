@@ -146,9 +146,9 @@ func (m *Model) barVerbKeyOK(a *action, key string, tag bool) bool {
 		return true // ctrl+z and ctrl+y undo and redo the verb just run
 	}
 	if tag {
-		return a.barOnly
+		return a.barOnly || a.tagVerb
 	}
-	return barVerbGroups[a.group] && !barNoVerb[a.id] && !a.barOnly
+	return barVerbGroups[a.group] && !barNoVerb[a.id] && !a.barOnly && !a.tagVerb
 }
 
 // barVerb is one verb of the highlighted object with its key.
