@@ -81,6 +81,8 @@ type row struct {
 
 	// skip rows (section headings, the status line) are drawn but never selected.
 	skip bool
+	// rule marks a skip row drawn as a divider: title at the left, a line, meta at the right edge.
+	rule bool
 	// akind is the object kind of a row in the Archived view.
 	akind string
 	// convKey is the group key of a row in the company review.
@@ -216,6 +218,9 @@ type Model struct {
 	// Key bindings changed by the user (config.toml [keys]), the problems found while loading
 	// them, and the action being rebound while the next key press is captured.
 	keyOverrides keys.Overrides
+	// bdToday is the row of the first birthday from today on in the Birthdays view and bdTop the first
+	// heading above it (its day divider, and its month heading when that sits right above).
+	bdToday, bdTop int
 	// mods is the module arrangement (modules.go): which views are on and in what order.
 	mods modules.Arrangement
 	keyProblems  []string
@@ -359,30 +364,11 @@ func (m *Model) rebuild(keep bool) error {
 			rows = append(rows, row{personID: d.PersonID, title: cleanCell(d.Name), sub: d.KeepInTouch, meta: fmt.Sprintf("%dd overdue", d.DaysOverdue)})
 		}
 	case viewBirthdays:
-		list, err := m.pr.Birthdays(m.ctx, 90, m.now())
+		br, err := m.birthdayRows()
 		if err != nil {
 			return err
 		}
-		month := 0
-		for _, b := range list {
-			when, err := time.Parse("2006-01-02", b.Date)
-			if err != nil {
-				return fmt.Errorf("parse birthday date %q: %w", b.Date, err)
-			}
-			if int(when.Month()) != month {
-				month = int(when.Month())
-				rows = append(rows, row{title: when.Month().String(), skip: true})
-			}
-			meta := fmt.Sprintf("in %dd", b.DaysUntil)
-			if b.DaysUntil == 0 {
-				meta = "today"
-			}
-			sub := b.Date
-			if b.Turning != nil {
-				sub += fmt.Sprintf(" (turns %d)", *b.Turning)
-			}
-			rows = append(rows, row{personID: b.PersonID, title: cleanCell(b.Name), sub: sub, meta: meta})
-		}
+		rows = br
 	case viewTasks:
 		tasks, err := m.tr.FindAll(m.ctx, model.TaskFilters{})
 		if err != nil {
@@ -460,6 +446,9 @@ func (m *Model) rebuild(keep bool) error {
 		m.offset = 0
 	}
 	m.settle()
+	if m.view == viewBirthdays && !keep {
+		m.snapBirthdays()
+	}
 	m.clamp()
 	m.refreshDetail(true)
 	return nil

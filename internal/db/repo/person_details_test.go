@@ -300,3 +300,55 @@ func TestNextDue(t *testing.T) {
 		assert.Equal(t, tt.want, got, "%s + %s", tt.due, tt.rec)
 	}
 }
+
+func TestPersonBirthdaysWindowLooksBack(t *testing.T) {
+	d, err := db.Open(":memory:")
+	require.NoError(t, err)
+	defer d.Close()
+	r := repo.NewPersonRepo(d)
+	ctx := context.Background()
+	mk := func(name, birthday string) {
+		p, err := r.Create(ctx, model.CreatePersonInput{FirstName: name})
+		require.NoError(t, err)
+		_, err = r.Update(ctx, p.ID, model.UpdatePersonInput{Birthday: ptr(birthday)})
+		require.NoError(t, err)
+	}
+	mk("Yesterday", "1990-10-12")
+	mk("Today", "--10-13")
+	mk("LastWeek", "2000-10-06")
+	mk("LongAgo", "--06-01")    // 134 days back: outside a 90 day window
+	mk("YearEnd", "1985-01-02") // 284 days back, but in 81 days ahead
+	now := time.Date(2026, 10, 13, 15, 0, 0, 0, time.UTC)
+
+	got, err := r.BirthdaysWindow(ctx, 90, 365, now)
+	require.NoError(t, err)
+	type item struct {
+		name  string
+		until int
+		rel   string
+	}
+	var items []item
+	for _, b := range got {
+		items = append(items, item{b.Name, b.DaysUntil, b.Relative})
+	}
+	assert.Equal(t, []item{
+		{"LastWeek", -7, "1w ago"},
+		{"Yesterday", -1, "1d ago"},
+		{"Today", 0, "today"},
+		{"YearEnd", 81, "in 2mo 2w 6d"},
+		{"LongAgo", 231, "in 7mo 2w 5d"},
+		{"LastWeek", 358, "in 11mo 3w 2d"},
+		{"Yesterday", 364, "in 11mo 4w 1d"},
+	}, items)
+	assert.Equal(t, "2026-10-06", got[0].Date)
+	assert.Equal(t, 26, *got[0].Turning, "the age they turned on that date")
+	assert.Equal(t, 36, *got[1].Turning)
+	assert.Nil(t, got[2].Turning)
+
+	// The look-ahead only form is unchanged: nothing in the past.
+	ahead, _ := r.Birthdays(ctx, 365, now)
+	for _, b := range ahead {
+		assert.GreaterOrEqual(t, b.DaysUntil, 0)
+		assert.NotEmpty(t, b.Relative)
+	}
+}

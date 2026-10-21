@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -144,4 +145,24 @@ func TestBackupCommand(t *testing.T) {
 
 	_, _, code = crm(t, db, "backup", dest)
 	assert.Equal(t, 4, code, "refuses to overwrite")
+}
+
+func TestBirthdaysJSONHasRelativeAlongsideDaysUntil(t *testing.T) {
+	db := filepath.Join(t.TempDir(), "crm.db")
+	now := time.Now()
+	crm(t, db, "person", "add", "Today Tom", "--birthday", "1990-"+now.Format("01-02"))
+	crm(t, db, "person", "add", "Soon Sue", "--birthday", "--"+now.AddDate(0, 0, 8).Format("01-02"))
+	out, _, code := crm(t, db, "birthdays", "--days", "30", "-f", "json")
+	require.Equal(t, 0, code)
+	byName := map[string]map[string]any{}
+	for _, r := range jsonRows(t, out) {
+		byName[r["name"].(string)] = r
+	}
+	require.Len(t, byName, 2)
+	assert.EqualValues(t, 0, byName["Today Tom"]["days_until"], "existing fields stay")
+	assert.Equal(t, "today", byName["Today Tom"]["relative"])
+	assert.Contains(t, byName["Today Tom"], "turning")
+	assert.EqualValues(t, 8, byName["Soon Sue"]["days_until"])
+	assert.Equal(t, "in 1w 1d", byName["Soon Sue"]["relative"])
+	assert.NotContains(t, byName["Soon Sue"], "turning")
 }

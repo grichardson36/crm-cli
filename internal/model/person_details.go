@@ -64,12 +64,15 @@ type DueContact struct {
 	DaysOverdue int     `json:"days_overdue"`
 }
 
-// UpcomingBirthday is a person's next birthday.
+// UpcomingBirthday is a birthday on a date: the next one, or with a look-back window a past one.
+// DaysUntil is negative for a past date. Relative reads it in calendar units ("in 1w 1d", "3d ago").
+// Turning is the age they turn on that date, nil when the birth year is unknown.
 type UpcomingBirthday struct {
 	PersonID  int64  `json:"person_id"`
 	Name      string `json:"name"`
 	Date      string `json:"date"`
 	DaysUntil int    `json:"days_until"`
+	Relative  string `json:"relative"`
 	Turning   *int   `json:"turning"`
 }
 

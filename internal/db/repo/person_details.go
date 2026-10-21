@@ -329,6 +329,13 @@ func (r *PersonRepo) Due(ctx context.Context, withinDays, limit int) ([]model.Du
 // Birthdays lists birthdays within the next days days, soonest first. A Feb 29 birthday
 // falls on Feb 28 in non-leap years.
 func (r *PersonRepo) Birthdays(ctx context.Context, days int, now time.Time) ([]model.UpcomingBirthday, error) {
+	return r.BirthdaysWindow(ctx, 0, days, now)
+}
+
+// BirthdaysWindow lists birthdays from daysBack days before today to daysAhead days after, oldest
+// first. A person shows once for each of their birthdays inside the window: the most recent one
+// before today (negative DaysUntil) and the next one from today on.
+func (r *PersonRepo) BirthdaysWindow(ctx context.Context, daysBack, daysAhead int, now time.Time) ([]model.UpcomingBirthday, error) {
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT id, first_name, last_name, birthday_month, birthday_day, birthday_year
 		 FROM people WHERE archived = 0 AND birthday_month IS NOT NULL AND birthday_day IS NOT NULL`)
@@ -348,17 +355,23 @@ func (r *PersonRepo) Birthdays(ctx context.Context, days int, now time.Time) ([]
 		if err := rows.Scan(&id, &first, &last, &month, &day, &year); err != nil {
 			return nil, fmt.Errorf("scan birthday: %w", err)
 		}
-		next := nextOccurrence(today, month, day)
-		until := int(next.Sub(today).Hours() / 24)
-		if until > days {
-			continue
+		add := func(when time.Time) {
+			until := int(when.Sub(today).Hours() / 24)
+			if until > daysAhead || until < -daysBack {
+				return
+			}
+			b := model.UpcomingBirthday{PersonID: id, Name: displayName(first, last), Date: when.Format("2006-01-02"), DaysUntil: until,
+				Relative: model.RelativeDate(today, when)}
+			if year.Valid {
+				age := when.Year() - int(year.Int64)
+				b.Turning = &age
+			}
+			out = append(out, b)
 		}
-		b := model.UpcomingBirthday{PersonID: id, Name: displayName(first, last), Date: next.Format("2006-01-02"), DaysUntil: until}
-		if year.Valid {
-			age := next.Year() - int(year.Int64)
-			b.Turning = &age
+		if daysBack > 0 {
+			add(previousOccurrence(today, month, day))
 		}
-		out = append(out, b)
+		add(nextOccurrence(today, month, day))
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -370,6 +383,20 @@ func (r *PersonRepo) Birthdays(ctx context.Context, days int, now time.Time) ([]
 		return out[i].PersonID < out[j].PersonID
 	})
 	return out, nil
+}
+
+// previousOccurrence is the latest birthday strictly before today.
+func previousOccurrence(today time.Time, month, day int) time.Time {
+	for year := today.Year(); ; year-- {
+		d := day
+		if last := time.Date(year, time.Month(month)+1, 0, 0, 0, 0, 0, time.UTC).Day(); d > last {
+			d = last
+		}
+		t := time.Date(year, time.Month(month), d, 0, 0, 0, 0, time.UTC)
+		if t.Before(today) {
+			return t
+		}
+	}
 }
 
 func nextOccurrence(today time.Time, month, day int) time.Time {

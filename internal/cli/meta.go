@@ -88,7 +88,7 @@ var commandMeta = map[string]cmdMeta{
 	// keep in touch
 	"due": {fields: "person_id,id,name,keep_in_touch,last_seen,due_at,days_overdue", examples: []string{
 		`crm due -f json`, `crm due --within 7 -f json`}},
-	"birthdays": {fields: "person_id,id,name,date,days_until,turning", examples: []string{
+	"birthdays": {fields: "person_id,id,name,date,days_until,relative,turning", examples: []string{
 		`crm birthdays -f json`, `crm birthdays --days 90 -f json`}},
 
 	// organizations

@@ -3,6 +3,7 @@ package mcp_test
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/stretchr/testify/assert"
@@ -110,4 +111,16 @@ func TestRecurringTaskViaMCP(t *testing.T) {
 
 	callJSON(t, s, "crm_task_complete", map[string]any{"id": 1}, &task)
 	assert.EqualValues(t, 2, task["next_task_id"])
+}
+
+func TestBirthdaysToolHasRelative(t *testing.T) {
+	s := setupTestServer(t)
+	var p map[string]any
+	callJSON(t, s, "crm_person_create", map[string]any{"first_name": "Tom"}, &p)
+	callJSON(t, s, "crm_person_update", map[string]any{"id": p["id"], "birthday": "1990-" + time.Now().Format("01-02")}, &p)
+	var b []map[string]any
+	callJSON(t, s, "crm_birthdays", map[string]any{"days": 30}, &b)
+	require.Len(t, b, 1)
+	assert.EqualValues(t, 0, b[0]["days_until"])
+	assert.Equal(t, "today", b[0]["relative"])
 }

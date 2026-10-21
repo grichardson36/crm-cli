@@ -186,6 +186,17 @@ func (m *Model) tabLayout() []tabSeg {
 	return segs
 }
 
+// ruleLine draws a divider: left text, a line of dashes, right text at the edge of width w.
+func ruleLine(left, right string, w int) string {
+	rw := runewidth.StringWidth(right)
+	left = runewidth.Truncate(left, max(1, w-rw-4), "…")
+	fill := w - runewidth.StringWidth(left) - rw - 2
+	if fill < 1 {
+		return runewidth.Truncate(left+" "+right, w, "…")
+	}
+	return left + " " + strings.Repeat("─", fill) + " " + right
+}
+
 // countText is the right side of the tab bar.
 func (m *Model) countText() string {
 	switch m.view {
@@ -284,6 +295,13 @@ func (m *Model) listView(w, h int) string {
 	for i := m.offset; i < end; i++ {
 		r := m.rows[i]
 		title, sub := cleanCell(r.title), cleanCell(r.sub)
+		if r.rule {
+			b.WriteString(m.st.Dim.Render(ruleLine(title, cleanCell(r.meta), w)))
+			if i < end-1 {
+				b.WriteString("\n")
+			}
+			continue
+		}
 		if r.skip {
 			meta := runewidth.Truncate(cleanCell(r.meta), w/2, "…")
 			metaW := runewidth.StringWidth(meta)

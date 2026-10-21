@@ -39,6 +39,7 @@ var birthdayColumns = []format.ColumnDef{
 	{Header: "ID", Field: "person_id"},
 	{Header: "Name", Field: "name"},
 	{Header: "Date", Field: "date"},
+	{Header: "When", Field: "relative"},
 	{Header: "In (days)", Field: "days_until"},
 	{Header: "Turning", Field: "turning"},
 }
@@ -356,7 +357,7 @@ func registerReminderCommands(rootCmd *cobra.Command) {
 				for i, b := range list {
 					data[i] = map[string]any{
 						"person_id": b.PersonID, "id": b.PersonID, "name": b.Name,
-						"date": b.Date, "days_until": b.DaysUntil,
+						"date": b.Date, "days_until": b.DaysUntil, "relative": b.Relative,
 					}
 					if b.Turning != nil {
 						data[i]["turning"] = *b.Turning

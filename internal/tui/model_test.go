@@ -57,7 +57,7 @@ func newTestModel(t *testing.T) (*Model, *repo.PersonRepo) {
 var specialKeys = map[string]tea.KeyType{
 	"enter": tea.KeyEnter, "esc": tea.KeyEsc, "tab": tea.KeyTab, "shift+tab": tea.KeyShiftTab,
 	"ctrl+d": tea.KeyCtrlD, "ctrl+k": tea.KeyCtrlK, "ctrl+u": tea.KeyCtrlU, "ctrl+z": tea.KeyCtrlZ, "ctrl+y": tea.KeyCtrlY,
-	"left": tea.KeyLeft, "right": tea.KeyRight, "up": tea.KeyUp, "down": tea.KeyDown,
+	"left": tea.KeyLeft, "right": tea.KeyRight, "up": tea.KeyUp, "down": tea.KeyDown, "ctrl+up": tea.KeyCtrlUp,
 }
 
 func press(m *Model, keys ...string) {
@@ -225,14 +225,20 @@ func TestViewsDueBirthdaysTasks(t *testing.T) {
 
 	press(m, "7")
 	var birthdays []row
+	var days []row
 	for _, r := range m.rows {
-		if !r.skip {
+		if r.rule {
+			days = append(days, r)
+		} else if !r.skip {
 			birthdays = append(birthdays, r)
 		}
 	}
 	require.Len(t, birthdays, 1)
 	assert.Equal(t, "Bob Baker", birthdays[0].title)
-	assert.Equal(t, "in 7d", birthdays[0].meta)
+	assert.Equal(t, "", birthdays[0].meta, "no birth year, no age")
+	require.Len(t, days, 1)
+	assert.Equal(t, "2026-10-20", days[0].title)
+	assert.Equal(t, "in 1w", days[0].meta)
 
 	press(m, "4")
 	assert.Empty(t, m.rows)
@@ -250,24 +256,6 @@ func TestViewsDueBirthdaysTasks(t *testing.T) {
 	assert.Equal(t, viewHome, m.view, "] wraps around")
 	press(m, "[")
 	assert.Equal(t, viewSync, m.view, "[ wraps back")
-}
-
-func TestBirthdayViewGroupsUpcomingBirthdaysByMonth(t *testing.T) {
-	m, pr := newTestModel(t)
-	ctx := context.Background()
-	for _, birthday := range []string{"--10-20", "--11-02"} {
-		p, err := pr.Create(ctx, model.CreatePersonInput{FirstName: birthday})
-		require.NoError(t, err)
-		_, err = pr.Update(ctx, p.ID, model.UpdatePersonInput{Birthday: sp(birthday)})
-		require.NoError(t, err)
-	}
-	m.switchView(viewBirthdays)
-
-	assert.Equal(t, []string{"October", "Bob Baker", "--10-20", "November", "--11-02"}, []string{
-		m.rows[0].title, m.rows[1].title, m.rows[2].title, m.rows[3].title, m.rows[4].title,
-	})
-	assert.True(t, m.rows[0].skip)
-	assert.True(t, m.rows[3].skip)
 }
 
 func TestMarkContactedRemovesFromDue(t *testing.T) {

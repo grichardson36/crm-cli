@@ -386,7 +386,8 @@ func buildActions() []action {
 			break
 		}
 	}
-	out := append(convertActions(), acts[:at]...)
+	// birthdayActions come first: t means "today" in the Birthdays view and "task" elsewhere.
+	out := append(append(birthdayActions(), convertActions()...), acts[:at]...)
 	out = append(out, objectActions()...)
 	out = append(out, acts[at:]...)
 	out = append(out, orgMergeActions()...)
