@@ -35,6 +35,38 @@ func registerLogEditTools(s *server.MCPServer, ir *repo.InteractionRepo) {
 	)
 }
 
+// registerNoteTools adds the note object's own create and update. Delete, restore, link and unlink
+// come from registerObjectTools like every object. crm_interaction_log, crm_log_update and
+// crm_log_delete stay as the older names.
+func registerNoteTools(s *server.MCPServer, ir *repo.InteractionRepo) {
+	s.AddTool(
+		gomcp.NewTool("crm_note_create",
+			gomcp.WithDescription("Add a note (an interaction of any type, see crm_note_types). Attach it with person_ids, org_ids and deal_ids, or later with crm_note_link"),
+			gomcp.WithString("type", gomcp.Description("Note type, case-insensitive. Default note")),
+			gomcp.WithString("subject", gomcp.Description("Subject/title")),
+			gomcp.WithString("content", gomcp.Description("Content/body")),
+			gomcp.WithString("direction", gomcp.Description("Direction: inbound or outbound")),
+			gomcp.WithString("occurred_at", gomcp.Description("When it occurred (ISO 8601)")),
+			gomcp.WithArray("person_ids", gomcp.Description("Array of person IDs to attach it to"), gomcp.WithNumberItems()),
+			gomcp.WithArray("org_ids", gomcp.Description("Array of organization IDs to attach it to"), gomcp.WithNumberItems()),
+			gomcp.WithArray("deal_ids", gomcp.Description("Array of deal IDs to attach it to"), gomcp.WithNumberItems()),
+		),
+		interactionLogHandler(ir),
+	)
+	s.AddTool(
+		gomcp.NewTool("crm_note_update",
+			gomcp.WithDescription("Edit a note. Only the fields you pass change. Empty subject, content or direction clears it."),
+			gomcp.WithNumber("id", gomcp.Required(), gomcp.Description("Note ID")),
+			gomcp.WithString("type", gomcp.Description("New type, must be an active type from crm_note_types")),
+			gomcp.WithString("subject", gomcp.Description("Subject/title")),
+			gomcp.WithString("content", gomcp.Description("Content/body")),
+			gomcp.WithString("direction", gomcp.Description("inbound or outbound")),
+			gomcp.WithString("occurred_at", gomcp.Description("When it occurred (ISO 8601)")),
+		),
+		logUpdateHandler(ir),
+	)
+}
+
 func logUpdateHandler(ir *repo.InteractionRepo) server.ToolHandlerFunc {
 	return func(ctx context.Context, req gomcp.CallToolRequest) (*gomcp.CallToolResult, error) {
 		id, errResult := requireID(req, "id")

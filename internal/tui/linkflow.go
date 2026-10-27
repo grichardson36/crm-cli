@@ -40,14 +40,9 @@ func (d *linkDraft) targetName(m *Model) string {
 	return d.create
 }
 
-// linkAttrsPrompt is the prompt of the attribute line: "role | from | to | primary | notes: ".
-func linkAttrsPrompt(rel model.Relation) string {
-	var labels []string
-	for _, k := range rel.AskAttrs() {
-		labels = append(labels, strings.ToLower(model.AttrSpecs[k].Label))
-	}
-	return "Link (" + strings.Join(labels, " | ") + "): "
-}
+// linkAttrsPrompt is the prompt of the attribute line. The attributes (role | from | to | primary |
+// notes) show as the dim hint after the cursor, from the relation registry (hint.go).
+func linkAttrsPrompt(_ model.Relation) string { return "Link: " }
 
 // beginLinkDraft starts the form after the target was picked or typed.
 func (m *Model) beginLinkDraft(src repo.Ref, other string, it overlayItem) tea.Cmd {

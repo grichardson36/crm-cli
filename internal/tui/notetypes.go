@@ -67,6 +67,9 @@ func (m *Model) cycleNoteType(forward bool) {
 	}
 	m.noteType = names[cur]
 	m.input.Prompt = m.noteType + ": "
+	if m.promptKind == "note-object" {
+		m.input.Prompt = m.objectNotePrompt(m.pageRef())
+	}
 }
 
 // pickNoteType lists the active types (the remembered one first), then opens the note prompt.

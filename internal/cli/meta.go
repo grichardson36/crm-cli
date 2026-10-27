@@ -251,7 +251,7 @@ var commandMeta = map[string]cmdMeta{
 }
 
 // generatedMeta describes the commands built from the object list (link, unlink, restore).
-var generatedMeta = linkMeta()
+var generatedMeta = mergeMeta(linkMeta(), noteMeta())
 
 // applyMeta annotates every command from commandMeta, adds --dry-run to mutating commands that
 // lack it, and makes argument errors usage errors.
@@ -467,4 +467,14 @@ func dryRunTargets(m cmdMeta, args []string) ([]recordRef, error) {
 		}
 	}
 	return refs, nil
+}
+
+func mergeMeta(parts ...map[string]cmdMeta) map[string]cmdMeta {
+	out := map[string]cmdMeta{}
+	for _, p := range parts {
+		for k, v := range p {
+			out[k] = v
+		}
+	}
+	return out
 }

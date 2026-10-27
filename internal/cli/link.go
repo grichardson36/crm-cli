@@ -17,7 +17,7 @@ import (
 // (patterns/objects-first, link-from-either-side). Names read crm <object> link <other> <id> <other id>.
 
 // objectNoun is the CLI word of each object kind.
-var objectNoun = map[string]string{"person": "person", "organization": "org", "deal": "deal", "task": "task"}
+var objectNoun = map[string]string{"person": "person", "organization": "org", "deal": "deal", "task": "task", model.NoteKind: "note"}
 
 // kindOfNoun turns a CLI word back into an object kind. "organization" is accepted too.
 func kindOfNoun(s string) (string, bool) {
@@ -58,7 +58,7 @@ func linkMeta() map[string]cmdMeta {
 			examples: []string{fmt.Sprintf("crm %s link tag 1 vip", noun)}}
 		meta[noun+" unlink tag"] = cmdMeta{mutates: true, fields: tagFields, target: kind, targetArgs: "first",
 			examples: []string{fmt.Sprintf("crm %s unlink tag 1 vip", noun)}}
-		if kind == "organization" || kind == "deal" { // person and task already have restore
+		if kind == "organization" || kind == "deal" || kind == model.NoteKind { // person and task already have restore
 			meta[noun+" restore"] = cmdMeta{mutates: true, target: kind, targetArgs: "first",
 				examples: []string{fmt.Sprintf("crm %s restore 1", noun)}}
 		}

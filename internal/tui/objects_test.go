@@ -185,7 +185,7 @@ func TestLinkPersonToANewOrganizationAndUndo(t *testing.T) {
 	press(m, "enter")
 	require.Equal(t, modePrompt, m.mode, "a membership asks for its attributes")
 	assert.Equal(t, "link-attrs", m.promptKind)
-	assert.Contains(t, m.input.Prompt, "role | from | to | primary | notes")
+	assert.Contains(t, plain(m.footerView()), "role | from | to | primary | notes", "the attributes show as the hint")
 	press(m, "enter")
 
 	orgs := openOrgs(t, m)

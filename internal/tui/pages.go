@@ -95,23 +95,21 @@ func (m *Model) rowsFromLinks(items []model.LinkedObject, srcKind, other, head, 
 func infoRow(label, value string) formRow { return formRow{kind: rkInfo, label: label, value: value} }
 
 // timelineRows lists the notes attached to an object, newest first, as note rows under a heading.
+// Every record page builds them here, with one dim placeholder row when there are none, so Enter on
+// it adds the first note.
 func (m *Model) timelineRows(f model.InteractionFilters) []formRow {
 	f.Limit = 8
 	ints, err := m.ir.FindAll(m.ctx, f)
 	if err != nil || len(ints) == 0 {
-		return nil
+		return []formRow{{kind: rkNote, label: "note", empty: true, head: "Recent"}}
 	}
 	var rows []formRow
 	for i, it := range ints {
-		date := it.OccurredAt
-		if len(date) > 10 {
-			date = date[:10]
-		}
 		val := it.Type
 		if it.Subject != nil && *it.Subject != "" {
 			val += ": " + *it.Subject
 		}
-		r := formRow{kind: rkNote, label: date, key: val, value: str(it.Content), id: it.ID, typ: it.Type}
+		r := formRow{kind: rkNote, label: shortDate(it.OccurredAt), key: val, value: str(it.Content), id: it.ID, typ: it.Type}
 		if i == 0 {
 			r.head = "Recent"
 		}
@@ -120,17 +118,20 @@ func (m *Model) timelineRows(f model.InteractionFilters) []formRow {
 	return rows
 }
 
-// taskRows lists open tasks linked to an object.
+// taskRows lists open tasks linked to an object, with one dim placeholder row when there are none.
 func (m *Model) taskRows(f model.TaskFilters) []formRow {
 	tasks, err := m.tr.FindAll(m.ctx, f)
 	if err != nil || len(tasks) == 0 {
-		return nil
+		return []formRow{{kind: rkTask, label: "task", empty: true, head: "Open tasks"}}
 	}
 	var rows []formRow
 	for i, t := range tasks {
 		r := formRow{kind: rkTask, label: "task", value: t.Title, id: t.ID}
 		if t.DueAt != nil {
 			r.suffix = "  due " + *t.DueAt
+		}
+		for _, tg := range t.Tags {
+			r.suffix += "  #" + tg
 		}
 		if i == 0 {
 			r.head = "Open tasks"
@@ -255,32 +256,34 @@ func (m *Model) buildDealForm(id int64) []formRow {
 // onObjectPage is true while the detail pane shows an organization or a deal.
 func (m *Model) onObjectPage() bool { return m.view == viewOrgs || m.view == viewDeals }
 
-// objectPageEdit handles Enter on a row of an organization or deal page. Linked rows open the
-// other object, task rows open the task, the rest is read-only here.
+// objectPageEdit handles Enter on a row of an organization or deal page that is not a task or note
+// (those edit inline like a person's, see startEdit). Linked rows open the other object.
 func (m *Model) objectPageEdit(r formRow) {
 	switch r.kind {
 	case rkLinked:
 		m.pendingCmd = m.openLinkRow(r)
-	case rkTask:
-		m.openObject("task", r.id)
-	case rkNote:
-		m.setStatus("notes are edited on their person's page, n adds a note here", false)
 	default:
 		m.setStatus("enter on the list edits this record, this row is read-only", true)
 	}
 }
 
-// startObjectNote adds a note to the organization or deal under the cursor.
+// startObjectNote adds a note to the organization or deal under the cursor. Tab in the prompt
+// changes the type, as it does for a person's note.
 func (m *Model) startObjectNote() {
 	ref := m.pageRef()
 	if ref.Kind == "person" {
 		return
 	}
-	m.startInput("note-object", m.currentNoteType()+" on "+m.refName(ref)+": ", "")
+	m.noteType = m.currentNoteType()
+	m.startInput("note-object", m.objectNotePrompt(ref), "")
 	m.pendingCmd = m.input.Focus()
 }
 
-// saveObjectNote logs a note attached to the organization or deal and records it for undo.
+func (m *Model) objectNotePrompt(ref repo.Ref) string {
+	return m.noteType + " on " + m.refName(ref) + ": "
+}
+
+// saveObjectNote adds a note attached to the organization or deal and records it for undo.
 func (m *Model) saveObjectNote(text string) {
 	ref := m.pageRef()
 	typ := m.currentNoteType()
@@ -292,15 +295,10 @@ func (m *Model) saveObjectNote(text string) {
 	} else {
 		return
 	}
-	it, err := m.ir.Create(m.ctx, in)
-	if err != nil {
+	if _, err := m.hCreateNote(in); err != nil {
 		m.setStatus(err.Error(), true)
 		return
 	}
-	id := it.ID
-	m.record("add "+typ+" to "+m.refName(ref),
-		func() error { return m.ir.Archive(m.ctx, id) },
-		func() error { return m.ir.Restore(m.ctx, id) })
 	m.afterWrite()
 	m.setStatus(typ+" added to "+m.refName(ref)+" (ctrl+z undoes)", false)
 	m.pendingCmd = m.showToast(typ+" added · ctrl+z undoes", false)

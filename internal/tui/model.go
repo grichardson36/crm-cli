@@ -113,8 +113,6 @@ type Model struct {
 	// busy names the background job in flight ("" when idle). spin animates the status bar.
 	busy string
 	spin spinner.Model
-	// deletedNotes is the session stack of deleted note ids for "Restore last deleted note".
-	deletedNotes []int64
 	// deleted is the session stack of deleted ids per object kind, for the Restore verb.
 	deleted map[string][]int64
 	// links makes, lists and removes links between objects.
@@ -823,7 +821,7 @@ func (m *Model) handlePromptKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.pendingCmd = nil
 		return m, cmd
 	case "tab", "shift+tab":
-		if m.promptKind == "note" {
+		if m.promptKind == "note" || m.promptKind == "note-object" {
 			m.cycleNoteType(msg.String() == "tab")
 			return m, nil
 		}
@@ -908,6 +906,9 @@ func (m *Model) runPrompt(kind, value string) {
 		return
 	case "task-new":
 		m.runTaskLine(0, value, "task-new")
+		return
+	case "task-page":
+		m.runTaskLine(0, value, "task-page")
 		return
 	case "task-edit":
 		m.saveTaskEdit(m.lineID, value)

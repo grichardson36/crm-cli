@@ -1,9 +1,13 @@
 package model
 
 // ObjectKinds are the objects that link to each other. Tags attach to anything and have their own
-// commands (crm tag apply, crm tag remove). Interactions (notes) also link, see Relations, but they
-// are not an object with their own link commands (patterns/open-discrepancies X13).
-var ObjectKinds = []string{"person", "organization", "deal", "task"}
+// commands (crm tag apply, crm tag remove). A note is the "interaction" kind (the CLI, MCP and TUI
+// call it note) and is a registered object like the others: add, edit, delete, restore, link, unlink.
+var ObjectKinds = []string{"person", "organization", "deal", "task", "interaction"}
+
+// NoteKind is the object kind of a note. Its rows are the interactions table, its types are the
+// note types (call, email, meeting, note, message and the ones the user adds).
+const NoteKind = "interaction"
 
 // Attribute keys a link can carry. They are the flag names of `crm <object> link` (--role, --from,
 // --to, --primary, --kind, --notes) and the field names in MCP and JSON.

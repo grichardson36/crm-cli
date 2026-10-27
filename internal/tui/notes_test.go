@@ -79,26 +79,27 @@ func TestNoteDeleteAsksThenRestoreFromPalette(t *testing.T) {
 	m, id := noteModel(t)
 	press(m, "d")
 	assert.Equal(t, modeConfirm, m.mode)
-	assert.Contains(t, m.confirm.prompt, "delete the note note")
+	assert.Contains(t, m.confirm.prompt, `delete note "note `)
+	assert.Contains(t, m.confirm.prompt, "first draft")
 	press(m, "n")
 	assert.Len(t, notesOf(t, m, 2), 1, "n keeps it")
 
 	press(m, "d", "y")
 	assert.Empty(t, notesOf(t, m, 2))
-	assert.Contains(t, m.status, "Restore last deleted note")
-	assert.Equal(t, []int64{id}, m.deletedNotes)
+	assert.Equal(t, "note deleted (ctrl+z undoes)", m.status)
+	assert.Equal(t, []int64{id}, m.deleted[model.NoteKind])
 
 	press(m, "ctrl+k")
-	typeText(m, "restore last deleted")
+	typeText(m, "restore note")
 	press(m, "enter")
 	assert.Equal(t, "note restored", m.status)
 	require.Len(t, notesOf(t, m, 2), 1)
-	assert.Empty(t, m.deletedNotes)
+	assert.Empty(t, m.deleted[model.NoteKind])
 	assert.Equal(t, id, m.form[m.fcur].id)
 
 	// Nothing left to restore.
 	press(m, "ctrl+k")
-	typeText(m, "restore last deleted")
+	typeText(m, "restore note")
 	var it overlayItem
 	for _, i := range m.ov.shown {
 		if m.ov.items[i].id == "note-restore" {
@@ -118,20 +119,20 @@ func TestNoteDeleteRestoreStackIsLastInFirstOut(t *testing.T) {
 	focusNote(t, m)
 	press(m, "d", "y")
 	require.Empty(t, notesOf(t, m, 2))
-	require.Len(t, m.deletedNotes, 2)
-	last := m.deletedNotes[1]
-	m.restoreLastNote()
+	require.Len(t, m.deleted[model.NoteKind], 2)
+	last := m.deleted[model.NoteKind][1]
+	m.verbRestore(noteDef())
 	got := notesOf(t, m, 2)
 	require.Len(t, got, 1)
 	assert.Equal(t, last, got[0].ID, "the note deleted last comes back first")
-	assert.Len(t, m.deletedNotes, 1)
+	assert.Len(t, m.deleted[model.NoteKind], 1)
 }
 
 func TestReadOnlyBlocksNoteEditTypeDeleteRestore(t *testing.T) {
 	m, id := noteModel(t)
 	press(m, "d", "y")
 	require.Empty(t, notesOf(t, m, 2))
-	m.restoreLastNote() // bring it back to test the other keys, then lock
+	m.verbRestore(noteDef()) // bring it back to test the other keys, then lock
 	focusNote(t, m)
 	m.readOnly = true
 
@@ -147,9 +148,9 @@ func TestReadOnlyBlocksNoteEditTypeDeleteRestore(t *testing.T) {
 	assert.Equal(t, "note", noteContent(t, m, id).Type)
 	assert.Len(t, notesOf(t, m, 2), 1)
 
-	m.deletedNotes = []int64{id}
+	m.deleted[model.NoteKind] = []int64{id}
 	press(m, "ctrl+k")
-	typeText(m, "restore last deleted")
+	typeText(m, "restore note")
 	for _, i := range m.ov.shown {
 		if m.ov.items[i].id == "note-restore" {
 			assert.Equal(t, "read-only", m.ov.items[i].disabled)

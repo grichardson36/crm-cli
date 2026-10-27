@@ -250,22 +250,8 @@ func (m *Model) personRows(p *model.Person) []formRow {
 	} else {
 		add(formRow{kind: rkTag, label: "tag", empty: true, head: tagHead})
 	}
-	var tasks []*model.Task
 	if pid != 0 {
-		tasks, _ = m.tr.FindAll(m.ctx, model.TaskFilters{PersonID: &pid})
-	}
-	if len(tasks) > 0 {
-		for i, t := range tasks {
-			r := formRow{kind: rkTask, label: "task", value: t.Title, id: t.ID}
-			if t.DueAt != nil {
-				r.suffix = "  due " + *t.DueAt
-			}
-			for _, tg := range t.Tags {
-				r.suffix += "  #" + tg
-			}
-			if i == 0 {
-				r.head = taskHead
-			}
+		for _, r := range m.taskRows(model.TaskFilters{PersonID: &pid}) {
 			add(r)
 		}
 	} else {
@@ -279,24 +265,8 @@ func (m *Model) personRows(p *model.Person) []formRow {
 			add(r)
 		}
 	}
-	var ints []*model.Interaction
 	if pid != 0 {
-		ints, _ = m.ir.FindAll(m.ctx, model.InteractionFilters{PersonID: &pid, Limit: 8})
-	}
-	if len(ints) > 0 {
-		for i, it := range ints {
-			date := it.OccurredAt
-			if len(date) > 10 {
-				date = date[:10]
-			}
-			val := it.Type
-			if it.Subject != nil && *it.Subject != "" {
-				val += ": " + *it.Subject
-			}
-			r := formRow{kind: rkNote, label: date, key: val, value: str(it.Content), id: it.ID, typ: it.Type}
-			if i == 0 {
-				r.head = recentHead
-			}
+		for _, r := range m.timelineRows(model.InteractionFilters{PersonID: &pid}) {
 			add(r)
 		}
 	} else {
@@ -515,7 +485,8 @@ func (m *Model) startEdit() tea.Cmd {
 		m.setStatus("enter a name first", true)
 		return nil
 	}
-	if m.onObjectPage() {
+	// Task and note rows edit inline on every record page, the same path as a person's page.
+	if m.onObjectPage() && r.kind != rkTask && r.kind != rkNote {
 		m.objectPageEdit(r)
 		return m.takePending()
 	}
@@ -575,7 +546,14 @@ func (m *Model) addRow(k rowKind) tea.Cmd {
 		return nil
 	}
 	if m.onObjectPage() {
-		m.setStatus("add rows from a person page, L links and n adds a note here", true)
+		// A task or note row adds with the same prompts as t and n. The other rows are the person's.
+		switch k {
+		case rkTask:
+			return m.startTaskAdd()
+		case rkNote:
+			return objectByKind(model.NoteKind).add(m)
+		}
+		m.setStatus("add rows from a person page, L links here", true)
 		return nil
 	}
 	if m.curPerson() == 0 {
@@ -908,7 +886,7 @@ func (m *Model) askDelete() {
 		m.setStatus("nothing to delete here", true)
 		return
 	}
-	if m.onObjectPage() && r.kind != rkLinked {
+	if m.onObjectPage() && r.kind != rkLinked && r.kind != rkTask && r.kind != rkNote {
 		m.setStatus("this row is read-only here, d unlinks a linked row", true)
 		return
 	}
@@ -931,7 +909,7 @@ func (m *Model) askDelete() {
 		m.askUnlinkRow(r)
 		return
 	case rkNote:
-		m.askDeleteNote(r)
+		m.verbDelete(objectByKind(model.NoteKind))
 		return
 	case rkInfo:
 		m.setStatus("this row is read-only", true)

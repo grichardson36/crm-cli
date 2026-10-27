@@ -13,7 +13,7 @@ import (
 )
 
 // objectNoun is the tool-name word of each object kind, the same words the CLI uses.
-var objectNoun = map[string]string{"person": "person", "organization": "org", "deal": "deal", "task": "task"}
+var objectNoun = map[string]string{"person": "person", "organization": "org", "deal": "deal", "task": "task", model.NoteKind: "note"}
 
 // registerObjectTools adds the verbs every object shares, built once from the object list and
 // model.Relations: restore, and link and unlink for each relation, from either end. It also fills
@@ -105,7 +105,7 @@ func registerObjectTools(s *server.MCPServer, db *sql.DB) {
 		},
 	)
 
-	for _, kind := range []string{"organization", "deal", "task", "person"} {
+	for _, kind := range []string{"organization", "deal", "task", "person", model.NoteKind} {
 		kind := kind
 		noun := objectNoun[kind]
 		if kind != "person" {

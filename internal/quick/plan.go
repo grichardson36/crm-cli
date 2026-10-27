@@ -35,6 +35,8 @@ type Env struct {
 	NoteType string
 	// DueOverride, when set, is the stored due date of a task line, whatever the text says.
 	DueOverride string
+	// TaskOrg and TaskDeal attach a task line to the organization or deal whose page it is typed on.
+	TaskOrg, TaskDeal int64
 	// Dismissed lists token texts the user turned back into plain text.
 	Dismissed []string
 	// Choices answer the names a plan asked about (Plan.Names), by NameRef.Key.
@@ -925,6 +927,12 @@ func (b *builder) planTask(title string, res shortsyntax.Result) {
 				first := pid[0]
 				in.PersonID = &first
 				in.PersonIDs = pid[1:]
+			}
+			if b.env.TaskOrg != 0 {
+				in.OrgIDs = []int64{b.env.TaskOrg}
+			}
+			if b.env.TaskDeal != 0 {
+				in.DealIDs = []int64{b.env.TaskDeal}
 			}
 			t, err := r.Tasks.Create(ctx, in)
 			if err != nil {

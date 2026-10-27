@@ -59,6 +59,13 @@ type objDef struct {
 	fields []string // fields of the one-line form, in order. Empty when the detail form edits it
 	cols   []string // list columns, left to right
 
+	// prompts are the prompt kinds of this object's pipe line (org-add, org-edit). The inline hint
+	// shows fields for them. barVerb and barFields give the command bar its hint for the verb that
+	// adds this object (task, note), see hint.go.
+	prompts   []string
+	barVerb   string
+	barFields []hintField
+
 	can map[verb]bool // verbs this object supports
 
 	// ids keeps the action ids that existed before the registry, so rebound keys still work.
@@ -82,7 +89,7 @@ type objDef struct {
 
 // prompt is the one-line form prompt of an object with fields.
 func (o *objDef) prompt() string {
-	return o.label + " (" + strings.Join(o.fields, " | ") + "): "
+	return o.label + ": " // the fields show as the hint after the cursor (hint.go)
 }
 
 func (o *objDef) has(v verb) bool { return o.can[v] }
@@ -96,7 +103,7 @@ func (o *objDef) actionID(v verb) string {
 
 // objectDefs registers every object, in key-resolution order.
 func objectDefs() []*objDef {
-	return []*objDef{orgDef(), dealDef(), taskDef(), personDef()}
+	return []*objDef{orgDef(), dealDef(), taskDef(), noteDef(), personDef()}
 }
 
 func objectByKind(kind string) *objDef {
@@ -115,6 +122,7 @@ func orgDef() *objDef {
 		kind: "organization", label: "organization", short: "org", group: "Organizations", view: viewOrgs,
 		fields:   []string{"name", "domain", "industry", "size", "location", "website", "linkedin", "description", "notes"},
 		cols:     []string{"name", "industry", "domain"},
+		prompts:  []string{"org-add", "org-edit"},
 		can:      map[verb]bool{vAdd: true, vEdit: true, vLink: true, vUnlink: true, vDelete: true, vRestore: true},
 		selected: func(m *Model) int64 { return m.selOrg() },
 		nameOf:   func(m *Model, id int64) string { return m.orgName(id) },
@@ -151,6 +159,7 @@ func dealDef() *objDef {
 		kind: "deal", label: "deal", short: "deal", group: "Deals", view: viewDeals,
 		fields:   []string{"title", "value", "stage", "organization", "person", "notes"},
 		cols:     []string{"title", "stage and organization", "value"},
+		prompts:  []string{"deal-add", "deal-edit"},
 		can:      map[verb]bool{vAdd: true, vEdit: true, vLink: true, vUnlink: true, vDelete: true, vRestore: true},
 		selected: func(m *Model) int64 { return m.selDeal() },
 		nameOf:   func(m *Model, id int64) string { return m.dealTitle(id) },
@@ -187,6 +196,10 @@ func taskDef() *objDef {
 		kind: "task", label: "task", short: "task", group: "Tasks", view: viewTasks,
 		fields:   []string{"title", "due"},
 		cols:     []string{"title", "repeat and tags", "due"},
+		prompts:  []string{"task-new", "task-edit", "task", "task-page"},
+		barVerb:  "task",
+		barFields: []hintField{{Label: "title"}, {Label: "by date", Marker: "by "}, {Label: "@person", Marker: "@"}, {Label: "#tag", Marker: "#"},
+			{Label: "!priority", Marker: "!"}, {Label: "every 3m", Marker: "every "}},
 		can:      map[verb]bool{vAdd: true, vEdit: true, vLink: true, vUnlink: true, vDelete: true, vRestore: true, vMark: true},
 		ids:      map[verb]string{vAdd: "task", vDelete: "task-delete", vRestore: "task-restore"},
 		selected: func(m *Model) int64 { return m.taskTarget() },
@@ -223,9 +236,62 @@ func taskDef() *objDef {
 		// Task keys work in the Tasks view. In a person's detail form they work on a task row.
 		keyHere: func(m *Model, v verb, key string) bool {
 			if v == vAdd {
-				return m.view == viewTasks && m.focus == focusList || (key == "t" && whenPerson(m))
+				return m.view == viewTasks && m.focus == focusList || (key == "t" && (whenPerson(m) || whenObjectPage(m)))
 			}
 			return m.view == viewTasks && m.focus == focusList || m.focus == focusDetail && v == vDelete
+		},
+	}
+}
+
+// noteDef registers notes (the interactions table) like every other object. A note is added with n
+// on a person, organization or deal, edited and deleted as a row of its page, restored from the
+// palette, and linked to any object with Link (patterns/objects-first). It has no list view of its own.
+func noteDef() *objDef {
+	return &objDef{
+		kind: model.NoteKind, label: "note", short: "note", group: "Contact", view: viewPeople,
+		fields:  []string{"text"},
+		cols:    []string{"date", "type and subject", "text"},
+		prompts: []string{"note", "note-object"},
+		barVerb: "note",
+		barFields: []hintField{{Label: "text"}, {Label: "@person", Marker: "@"}, {Label: "#tag", Marker: "#"}, {Label: "remind fri", Marker: "remind "}},
+		can:    map[verb]bool{vAdd: true, vEdit: true, vLink: true, vUnlink: true, vDelete: true, vRestore: true},
+		// The action ids that existed before the registry keep working for rebound keys.
+		ids:      map[verb]string{vAdd: "note", vRestore: "note-restore"},
+		selected: func(m *Model) int64 { return m.noteTarget() },
+		nameOf:   func(m *Model, id int64) string { return m.noteName(id) },
+		add: func(m *Model) tea.Cmd {
+			if m.onObjectPage() {
+				m.startObjectNote()
+				return m.takePending()
+			}
+			return m.startNotePrompt()
+		},
+		edit: func(m *Model, id int64) tea.Cmd {
+			m.selectNote(id)
+			return m.beginEdit(m.fcur, false)
+		},
+		archive: func(m *Model, id int64) error { return m.hArchiveNote(m.ctx, id) },
+		restore: func(m *Model, id int64) error { return m.hRestoreNote(m.ctx, id) },
+		showRow: func(m *Model, id int64) { m.selectNote(id) },
+		items: func(m *Model) []overlayItem {
+			var out []overlayItem
+			list, _ := m.ir.FindAll(m.ctx, model.InteractionFilters{Limit: 500})
+			for _, n := range list {
+				out = append(out, overlayItem{id: "pick", label: cleanCell(noteLabel(n)), desc: cleanCell(n.Type + " " + shortDate(n.OccurredAt)), ref: n.ID, value: noteLabel(n)})
+			}
+			return out
+		},
+		create: func(m *Model, text string) (int64, error) {
+			n, err := m.hCreateNote(model.CreateInteractionInput{Type: m.currentNoteType(), Content: &text})
+			if err != nil {
+				return 0, err
+			}
+			return n.ID, nil
+		},
+		// n adds a note to the person, organization or deal on screen. The other note verbs work on a
+		// note row of a page and have no key of their own: enter and d on the row, the palette.
+		keyHere: func(m *Model, v verb, key string) bool {
+			return v == vAdd && (whenPerson(m) || whenObjectPage(m))
 		},
 	}
 }
@@ -332,6 +398,11 @@ func (o *objDef) keysFor(v verb) []string {
 		return []string{"a", "+", "t"}
 	case o.kind == "person" && v == vDelete:
 		return []string{"d", "#"}
+	case o.kind == model.NoteKind:
+		if v == vAdd {
+			return []string{"n"}
+		}
+		return nil
 	case v == vEdit && o.kind != "organization" && o.kind != "deal":
 		return []string{"enter"}
 	}
@@ -358,7 +429,13 @@ func (o *objDef) addAction() action {
 		a.title, a.hint, a.desc = "Add person", "a", "create a contact: opens a blank form, saved when you enter a name. a or + in a people list, or from the palette"
 	}
 	if o.kind == "task" {
-		a.desc = "add a task: title | optional due date. a or + in the Tasks view, t on a person, or from the palette (same as crm task add)"
+		a.desc = "add a task: title | optional due date. a or + in the Tasks view, t on a person, organization or deal, or from the palette (same as crm task add)"
+	}
+	if o.kind == model.NoteKind {
+		a.hint, a.foot, a.footIn, a.footLabel = "n", 40, inBoth, ""
+		a.when = func(m *Model) bool { return whenPerson(m) || whenObjectPage(m) }
+		a.footIf = nil
+		a.desc = "add a note of the last used type to the person, organization or deal on screen (tab in the prompt changes the type; same as crm note add). n"
 	}
 	return a
 }
@@ -374,6 +451,10 @@ func (o *objDef) editAction() action {
 	}
 	if len(a.keys) > 1 {
 		a.desc += " or e"
+	}
+	if o.kind == model.NoteKind {
+		a.hint, a.foot = "enter", 0
+		a.desc = "edit the note under the cursor inline (enter on the note row; same as crm note edit)"
 	}
 	if o.kind == "person" {
 		a.write = false
@@ -393,6 +474,10 @@ func (o *objDef) deleteAction() action {
 	}
 	if o.kind == "task" {
 		a.footIf = func(m *Model) bool { return m.view == viewTasks }
+	}
+	if o.kind == model.NoteKind {
+		a.hint, a.foot = "d", 0
+		a.desc = "delete the note under the cursor (asks y/n, the same soft delete as crm note delete). d on the note row, ctrl+z undoes it"
 	}
 	if o.kind == "person" {
 		a.desc = "delete (archive) the person or all marked (asks y/n, restore from the Archived view). # also"
@@ -418,6 +503,10 @@ func (o *objDef) restoreAction() action {
 	} else {
 		a.footIf = func(m *Model) bool { return len(m.deleted[o.kind]) > 0 && o.keyHere(m, vRestore, "u") }
 	}
+	if o.kind == model.NoteKind {
+		a.hint, a.foot = "", 0
+		a.desc = "bring back the note deleted last in this session (ctrl+z does the same for the newest change; same as crm note restore)"
+	}
 	return a
 }
 
@@ -439,6 +528,9 @@ func article(label string) string {
 func cliNoun(kind string) string {
 	if kind == "organization" {
 		return "org"
+	}
+	if kind == model.NoteKind {
+		return "note"
 	}
 	return kind
 }

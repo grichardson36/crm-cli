@@ -5,6 +5,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/jdanielnd/crm-cli/internal/keys"
+	"github.com/jdanielnd/crm-cli/internal/model"
 )
 
 // Global add (ctrl+a). Bare a and + add the view's own object. ctrl+a is the same verb from
@@ -43,10 +44,13 @@ func addKinds() []overlayItem {
 	}
 	for _, o := range objectDefs() { // any kind registered later
 		if !seen[o.kind] && o.add != nil {
-			items = append(items, overlayItem{id: "add:" + o.kind, label: capitalize(o.label), desc: "add " + article(o.label) + " " + o.label, value: o.kind})
+			desc := "add " + article(o.label) + " " + o.label
+			if o.kind == model.NoteKind {
+				desc += " to a person you pick"
+			}
+			items = append(items, overlayItem{id: "add:" + o.kind, label: capitalize(o.label), desc: desc, value: o.kind})
 		}
 	}
-	items = append(items, overlayItem{id: "add:note", label: "Note", desc: "add a note to a person you pick", value: "note"})
 	for i := range items {
 		items[i].hint = fmt.Sprint(i + 1)
 	}
@@ -75,7 +79,7 @@ func (m *Model) startGlobalAdd(kind string) tea.Cmd {
 		ret = &addReturn{}
 		m.addResume = ret
 	}
-	if kind == "note" {
+	if kind == model.NoteKind {
 		var items []overlayItem
 		for _, p := range m.people {
 			items = append(items, overlayItem{id: fmt.Sprintf("person:%d", p.ID), label: cleanCell(p.Name), desc: cleanCell(p.Company), ref: p.ID})

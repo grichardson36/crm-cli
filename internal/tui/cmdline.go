@@ -388,7 +388,8 @@ func (m *Model) cmdInputLine(o *overlay) string {
 		}
 		cells = append(cells, cell{string(r), st, runewidth.RuneWidth(r)})
 	}
-	if cursor >= len(val) {
+	atEnd := cursor >= len(val)
+	if atEnd {
 		cursorIdx = len(cells)
 		cells = append(cells, cell{" ", lipgloss.NewStyle().Reverse(true), 1})
 	}
@@ -406,6 +407,9 @@ func (m *Model) cmdInputLine(o *overlay) string {
 	b.WriteString(m.st.Dim.Render("> "))
 	for _, c := range cells[skip:] {
 		b.WriteString(c.style.Render(c.s))
+	}
+	if atEnd { // the shape of the verb, dim and never part of the line
+		b.WriteString(m.st.Dim.Render(m.barSyntaxHint(val, room-total)))
 	}
 	return b.String()
 }
@@ -535,4 +539,4 @@ func (m *Model) askNamesFromBar() tea.Cmd {
 		return m.cmdRun()
 	})
 	return nil
-}
+}

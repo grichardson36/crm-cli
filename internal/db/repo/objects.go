@@ -8,7 +8,7 @@ import (
 	"github.com/jdanielnd/crm-cli/internal/model"
 )
 
-// ArchiveObject is the one soft delete for every object kind (person, organization, deal, task).
+// ArchiveObject is the one soft delete for every object kind (person, organization, deal, task, note).
 func ArchiveObject(ctx context.Context, db *sql.DB, kind string, id int64) error {
 	switch kind {
 	case "person":
@@ -19,6 +19,8 @@ func ArchiveObject(ctx context.Context, db *sql.DB, kind string, id int64) error
 		return NewDealRepo(db).Archive(ctx, id)
 	case "task":
 		return NewTaskRepo(db).Archive(ctx, id)
+	case "interaction":
+		return NewInteractionRepo(db).Archive(ctx, id)
 	}
 	return fmt.Errorf("unknown object %q: %w", kind, model.ErrValidation)
 }
@@ -34,6 +36,8 @@ func RestoreObject(ctx context.Context, db *sql.DB, kind string, id int64) error
 		return NewDealRepo(db).Restore(ctx, id)
 	case "task":
 		return NewTaskRepo(db).Restore(ctx, id)
+	case "interaction":
+		return NewInteractionRepo(db).Restore(ctx, id)
 	}
 	return fmt.Errorf("unknown object %q: %w", kind, model.ErrValidation)
 }

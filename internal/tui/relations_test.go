@@ -32,7 +32,7 @@ func TestLinkFormAsksRoleDatesAndPrimaryAndEditChangesThemInPlace(t *testing.T) 
 	typeText(m, "acme")
 	press(m, "enter")
 	require.Equal(t, modePrompt, m.mode)
-	assert.Contains(t, m.input.Prompt, "role | from | to | primary | notes")
+	assert.Contains(t, plain(m.footerView()), "role | from | to | primary | notes", "the attributes show as the hint")
 	submit(m, "CTO | 2019-03 | | yes | joined via Pat")
 	items := linkedOrgs(t, m, 1)
 	require.Len(t, items, 1)
@@ -446,7 +446,10 @@ func TestLinkActionsAndKeysExistForPersonToPerson(t *testing.T) {
 	assert.True(t, strings.Contains(a.desc, "link"))
 	assert.NotNil(t, m.actionByID("link-edit"))
 	assert.NotNil(t, m.actionByID("archived-type"))
-	assert.NotNil(t, m.actionByID("note-object"))
+	assert.Nil(t, m.actionByID("note-object"), "one Add note action for every page")
+	assert.NotNil(t, m.actionByID("note"))
+	assert.NotNil(t, m.actionByID("link-note"))
+	assert.NotNil(t, m.actionByID("unlink-note"))
 }
 
 func TestReferredByRendersFromTheViewingSideInTheTUI(t *testing.T) {

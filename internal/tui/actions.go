@@ -180,10 +180,6 @@ func buildActions() []action {
 		// from the registry in objects.go and inserted after them.
 		{id: "contacted", title: "Mark contacted", group: "Contact", hint: "c", keys: []string{"c", "e"}, desc: "mark contacted now (resets the keep-in-touch clock)",
 			write: true, foot: 30, footIn: inBoth, when: whenPerson, run: func(m *Model) tea.Cmd { m.markContacted(); return nil }},
-		{id: "note", title: "Add note", group: "Contact", hint: "n", keys: []string{"n"}, desc: "add a note of the last used type (tab in the prompt changes the type)",
-			write: true, foot: 40, footIn: inBoth, when: whenPerson, run: func(m *Model) tea.Cmd { return m.startNotePrompt() }},
-		{id: "note-object", title: "Add note to organization or deal", group: "Contact", hint: "n", keys: []string{"n"}, desc: "add a note attached to the organization or deal on screen (same as crm log add --org / --deal)",
-			write: true, foot: 40, footIn: inBoth, when: whenObjectPage, run: func(m *Model) tea.Cmd { m.startObjectNote(); return m.takePending() }},
 		{id: "link-edit", title: "Edit link", group: "Link", hint: "E", keys: []string{"E"}, desc: "edit the role, dates, primary flag, kind or notes of the linked row under the cursor (detail pane). ctrl+z undoes",
 			write: true, foot: 13, footIn: inDetail, footLabel: "edit link", footIf: whenLinkedRow, when: whenLinkedRow,
 			run: func(m *Model) tea.Cmd { r, _ := m.rowFocused(); return m.editLinkRow(r) }},
@@ -193,8 +189,6 @@ func buildActions() []action {
 			write: true, run: func(m *Model) tea.Cmd { return m.openNoteTypes() }},
 		{id: "note-retype", title: "Change note type", group: "Edit pane", hint: "t", keys: []string{"t"}, desc: "pick a new type for the note under the cursor (detail pane)",
 			write: true, foot: 16, footIn: inDetail, footIf: whenNoteRow, when: whenNoteRow, run: func(m *Model) tea.Cmd { m.retypeNote(); return nil }},
-		{id: "note-restore", title: "Restore last deleted note", group: "Edit pane", desc: "bring back the note deleted last in this session",
-			write: true, when: whenDeletedNote, run: func(m *Model) tea.Cmd { m.restoreLastNote(); return nil }},
 		{id: "snooze", title: "Snooze keep-in-touch", group: "Contact", hint: "s", keys: []string{"s"}, desc: "snooze keep-in-touch for N days",
 			write: true, when: whenPerson, run: func(m *Model) tea.Cmd {
 				m.startPrompt("snooze", "snooze days: ", "7")
