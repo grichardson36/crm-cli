@@ -4,6 +4,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/jdanielnd/crm-cli/internal/alias"
 	"golang.org/x/text/unicode/norm"
 )
 
@@ -19,80 +20,10 @@ var namePrefixes = map[string]bool{
 	"mr": true, "mrs": true, "ms": true, "miss": true, "dr": true, "prof": true,
 }
 
-// nicknames maps a nickname or spelling variant to its canonical given name.
-var nicknames = map[string]string{
-	"bob": "robert", "bobby": "robert", "rob": "robert", "robbie": "robert", "robby": "robert", "bert": "robert",
-	"bill": "william", "billy": "william", "will": "william", "willy": "william", "willie": "william",
-	"liz": "elizabeth", "lizzie": "elizabeth", "beth": "elizabeth", "betty": "elizabeth", "eliza": "elizabeth", "libby": "elizabeth", "betsy": "elizabeth",
-	"jim": "james", "jimmy": "james", "jamie": "james", "jimbo": "james",
-	"jack": "john", "johnny": "john", "johnnie": "john",
-	"jon":  "jonathan",
-	"rick": "richard", "ricky": "richard", "rich": "richard", "richie": "richard", "dick": "richard",
-	"mike": "michael", "mikey": "michael", "mick": "michael",
-	"tom": "thomas", "tommy": "thomas",
-	"charlie": "charles", "chuck": "charles", "chas": "charles",
-	"joe": "joseph", "joey": "joseph",
-	"dan": "daniel", "danny": "daniel",
-	"matt":  "matthew",
-	"chris": "christopher", "topher": "christopher",
-	"tony": "anthony",
-	"andy": "andrew", "drew": "andrew",
-	"ed": "edward", "eddie": "edward", "ted": "edward", "teddy": "edward", "ned": "edward",
-	"maggie": "margaret", "meg": "margaret", "peggy": "margaret", "marge": "margaret",
-	"kate": "katherine", "katie": "katherine", "kathy": "katherine", "kat": "katherine", "katy": "katherine",
-	"catherine": "katherine", "kathryn": "katherine", "katharine": "katherine", "cathy": "katherine",
-	"pat": "patricia", "patty": "patricia", "trish": "patricia", "tricia": "patricia",
-	"jen": "jennifer", "jenny": "jennifer",
-	"jess": "jessica", "jessie": "jessica",
-	"sue": "susan", "susie": "susan", "suzy": "susan",
-	"deb": "deborah", "debbie": "deborah",
-	"barb": "barbara", "barbie": "barbara",
-	"nick": "nicholas", "nicky": "nicholas",
-	"sam": "samuel", "sammy": "samuel",
-	"ben": "benjamin", "benny": "benjamin", "benji": "benjamin",
-	"alex":  "alexander",
-	"steve": "stephen", "stevie": "stephen", "steven": "stephen",
-	"tim": "timothy", "timmy": "timothy",
-	"greg":  "gregory",
-	"becky": "rebecca", "becca": "rebecca",
-	"vicky": "victoria", "vicki": "victoria", "tori": "victoria",
-	"fred": "frederick", "freddie": "frederick", "freddy": "frederick",
-	"ken": "kenneth", "kenny": "kenneth",
-	"ron": "ronald", "ronnie": "ronald",
-	"don": "donald", "donnie": "donald",
-	"larry": "lawrence", "laurence": "lawrence",
-	"zach": "zachary", "zack": "zachary", "zak": "zachary",
-	"nate": "nathan", "nathaniel": "nathan",
-	"pete": "peter",
-	"phil": "philip", "phillip": "philip",
-	"jeff": "jeffrey", "jeffery": "jeffrey",
-	"vince": "vincent", "vinny": "vincent",
-	"hank": "henry", "harry": "henry",
-	"abby": "abigail", "abbie": "abigail",
-	"mandy":  "amanda",
-	"cindy":  "cynthia",
-	"pam":    "pamela",
-	"steph":  "stephanie",
-	"jackie": "jacqueline",
-	"kim":    "kimberly",
-	"josh":   "joshua",
-	"dave":   "david", "davy": "david",
-	"doug":  "douglas",
-	"jake":  "jacob",
-	"nikki": "nicole",
-	"gene":  "eugene",
-	"jerry": "gerald", "gerry": "gerald",
-	"len": "leonard", "lenny": "leonard", "leo": "leonard",
-	"walt": "walter", "wally": "walter",
-}
 
-// Canonical returns the canonical given name for a normalized first name.
-func Canonical(first string) string {
-	if c, ok := nicknames[first]; ok {
-		return c
-	}
-	return first
-}
+// Canonical returns the canonical given name for a normalized first name, from the built-in aliases
+// (internal/alias). Find reads the table in Options.Aliases, which adds the user's aliases.
+func Canonical(first string) string { return alias.Default().Canonical(first) }
 
 // fold lowercases s, strips accents and replaces every non letter/digit rune with a space.
 func fold(s string) string {

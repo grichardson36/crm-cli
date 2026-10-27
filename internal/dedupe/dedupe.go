@@ -26,6 +26,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/jdanielnd/crm-cli/internal/alias"
 )
 
 // Level is a confidence level. Higher is more confident.
@@ -99,6 +101,8 @@ type Options struct {
 	Min Level
 	// Dismissed holds dismissed pairs as [2]int64{low, high}.
 	Dismissed map[[2]int64]bool
+	// Aliases is the effective name alias table. Nil means the built-in set.
+	Aliases *alias.Table
 }
 
 // Member is one person in a group.
@@ -242,7 +246,7 @@ func Find(people []Person, opts Options) []Group {
 			}
 			nk := pp.first + " " + pp.last
 			names[nk] = append(names[nk], i)
-			ck := Canonical(pp.first) + " " + pp.last
+			ck := opts.Aliases.Canonical(pp.first) + " " + pp.last
 			canon[ck] = append(canon[ck], i)
 		}
 		link(names, Medium, func(k string) string { return "same name " + k })
@@ -511,4 +515,12 @@ func minInt(a, b, c int) int {
 		a = c
 	}
 	return a
+}
+
+// Similarity is the spelling similarity (1 minus the edit distance over the longer length) of two
+// names after folding case, accents and punctuation. It is the score the Fuzzy level uses, exposed
+// for typeaheads that forgive a typo. A pair below FuzzyThreshold scores 0.
+func Similarity(a, b string) float64 {
+	var bufA, bufB []int
+	return similarity([]rune(strings.Join(strings.Fields(fold(a)), " ")), []rune(strings.Join(strings.Fields(fold(b)), " ")), &bufA, &bufB)
 }

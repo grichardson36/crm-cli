@@ -13,6 +13,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/jdanielnd/crm-cli/internal/alias"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/dedupe"
 	"github.com/jdanielnd/crm-cli/internal/keys"
@@ -153,6 +154,8 @@ type Model struct {
 	marked      map[int64]bool
 	// orgCreateAnyway lets the next organization create skip the duplicate check (the user chose Create anyway).
 	orgCreateAnyway bool
+	// aliases is the name alias table, read once from the database (aliasTable).
+	aliases *alias.Table
 	detail      viewport.Model
 	detailKey   string
 	input       textinput.Model
@@ -490,7 +493,7 @@ func (m *Model) peopleRows() []row {
 	terms := strings.Fields(strings.ToLower(m.query))
 	var rows []row
 	for _, p := range people {
-		if !matches(p, terms) {
+		if !matchesAlias(p, terms, m.aliasTable()) {
 			continue
 		}
 		name := cleanCell(p.Name)
@@ -506,7 +509,10 @@ func (m *Model) peopleRows() []row {
 	return rows
 }
 
-func matches(p model.PersonSummary, terms []string) bool {
+func matches(p model.PersonSummary, terms []string) bool { return matchesAlias(p, terms, nil) }
+
+// matchesAlias is matches with each plain word expanded through the name aliases (Rick finds Richard).
+func matchesAlias(p model.PersonSummary, terms []string, tbl *alias.Table) bool {
 	if len(terms) == 0 {
 		return true
 	}
@@ -538,7 +544,14 @@ func matches(p model.PersonSummary, terms []string) bool {
 				continue
 			}
 		}
-		if !strings.Contains(hay, t) && !strings.Contains(tags, t) {
+		found := false
+		for _, n := range tbl.Expand(t) {
+			if strings.Contains(hay, n) || strings.Contains(tags, n) {
+				found = true
+				break
+			}
+		}
+		if !found {
 			return false
 		}
 	}
@@ -989,4 +1002,18 @@ func (m *Model) runPrompt(kind, value string) {
 		return
 	}
 	m.afterWrite()
+}
+
+// aliasTable is the name alias table of this database, read once per session. A failed read gives
+// the built-in set.
+func (m *Model) aliasTable() *alias.Table {
+	if m.aliases == nil {
+		m.aliases = alias.Default()
+		if m.db != nil {
+			if t, err := repo.NewAliasRepo(m.db).Table(m.ctx); err == nil {
+				m.aliases = t
+			}
+		}
+	}
+	return m.aliases
 }

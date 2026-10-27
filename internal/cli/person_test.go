@@ -198,3 +198,34 @@ func TestPersonInvalidID(t *testing.T) {
 	assert.Equal(t, 2, code)
 	assert.Contains(t, stderr, "invalid person ID")
 }
+
+func TestAliasCommands(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "alias.db")
+	_, _, code := crm(t, dbPath, "person", "add", "Zachary Lee")
+	require.Equal(t, 0, code)
+
+	out, _, code := crm(t, dbPath, "search", "Zach", "-f", "json")
+	require.Equal(t, 0, code)
+	assert.Contains(t, out, "Zachary")
+
+	out, _, code = crm(t, dbPath, "search", "Zeke", "-f", "json")
+	require.Equal(t, 0, code)
+	assert.NotContains(t, out, "Zachary")
+
+	_, _, code = crm(t, dbPath, "alias", "add", "zeke", "zachary")
+	require.Equal(t, 0, code)
+	out, _, _ = crm(t, dbPath, "search", "Zeke", "-f", "json")
+	assert.Contains(t, out, "Zachary")
+
+	out, _, code = crm(t, dbPath, "alias", "list", "-f", "json")
+	require.Equal(t, 0, code)
+	assert.Contains(t, out, `"zeke"`)
+	assert.Contains(t, out, `"built-in"`)
+
+	_, _, code = crm(t, dbPath, "alias", "add", "big bob", "robert")
+	assert.Equal(t, 2, code)
+	_, _, code = crm(t, dbPath, "alias", "remove", "zeke")
+	require.Equal(t, 0, code)
+	_, _, code = crm(t, dbPath, "alias", "remove", "zeke")
+	assert.Equal(t, 3, code)
+}

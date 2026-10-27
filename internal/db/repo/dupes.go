@@ -31,7 +31,11 @@ func (r *DupeRepo) Find(ctx context.Context, min dedupe.Level) ([]dedupe.Group, 
 	if err != nil {
 		return nil, err
 	}
-	return dedupe.Find(people, dedupe.Options{Min: min, Dismissed: dismissed}), nil
+	tbl, err := NewAliasRepo(r.db).Table(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return dedupe.Find(people, dedupe.Options{Min: min, Dismissed: dismissed, Aliases: tbl}), nil
 }
 
 func (r *DupeRepo) loadPeople(ctx context.Context) ([]dedupe.Person, error) {

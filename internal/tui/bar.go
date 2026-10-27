@@ -236,7 +236,7 @@ func (m *Model) barSearch(scope byte, q string) []overlayItem {
 	people := 0
 	var tagged []overlayItem // people who match only through a tag come after the ones whose own text matches
 	for _, p := range m.people {
-		if !matches(p, terms) {
+		if !matchesAlias(p, terms, m.aliasTable()) {
 			continue
 		}
 		desc := p.Company
@@ -246,7 +246,7 @@ func (m *Model) barSearch(scope byte, q string) []overlayItem {
 		it := overlayItem{id: fmt.Sprintf("person:%d", p.ID), kind: kindPerson, label: p.Name, desc: desc, ref: p.ID}
 		bare := p
 		bare.Tags = ""
-		if !matches(bare, terms) {
+		if !matchesAlias(bare, terms, m.aliasTable()) {
 			// The text is not in the person, only in a tag: say which one, so the match is not a mystery.
 			it.desc = "tagged " + taggedBy(p.Tags, terms)
 			tagged = append(tagged, it)

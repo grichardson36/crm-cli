@@ -92,6 +92,11 @@ var commandMeta = map[string]cmdMeta{
 		`crm birthdays -f json`, `crm birthdays --days 90 -f json`}},
 
 	// organizations
+	"alias":        {examples: []string{`crm alias list`}},
+	"alias list":   {fields: "alias,canonical,source,active", examples: []string{`crm alias list -f json`}},
+	"alias add":    {mutates: true, noDryRun: true, examples: []string{`crm alias add zeke zachary`}},
+	"alias remove": {mutates: true, noDryRun: true, examples: []string{`crm alias remove zeke`}},
+
 	"org add":    {mutates: true, fields: orgFields, examples: []string{`crm org add "Acme Corp" --domain acme.com --industry SaaS`}},
 	"org list":   {fields: orgFields, examples: []string{`crm org list -f json`}},
 	"org show":   {fields: orgFields + ",people", examples: []string{`crm org show 1 --with-people -f json`}},

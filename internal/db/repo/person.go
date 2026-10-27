@@ -364,7 +364,8 @@ func (r *PersonRepo) Search(ctx context.Context, query string, limit int) ([]*mo
 	)
 
 	// Quote the query to handle special FTS5 characters like @
-	ftsQuery := `"` + strings.ReplaceAll(query, `"`, `""`) + `"` + "*"
+	tbl, _ := NewAliasRepo(r.db).Table(ctx)
+	ftsQuery := PersonFTSQuery(query, tbl)
 	like := "%" + query + "%"
 	rows, err := r.db.QueryContext(ctx, sql, ftsQuery, like, like, limit)
 	if err != nil {
