@@ -1,38 +1,39 @@
 # Terminal UI keys
 
-Every key in the terminal UI. The palette (`ctrl+k`) runs any of these by name, as "Verb object" (Add organization). `?` inside lists the keys of the current view.
+The palette (`ctrl+k`) runs any action by name, as "Verb object" (Add organization). `?` lists the keys that work in the current view and mode, grouped by layer: the framework (the same in every view) and the app (specific to this CRM).
 
-## Standard keys (same in every object view)
+## Universal verbs (same in every view)
 
-- `a` add (`+` also). `enter` edit (`e` also in Organizations and Deals). `d` delete, asks y/n. `u` restore. `L` link. `U` unlink. `space` mark. `ctrl+z` undo, `ctrl+y` redo.
-- The object is the one under the cursor: a person, a task, or in the Organizations and Deals views an organization or a deal. Restore brings back the object you deleted last in this session. In the Archived view `u` restores the archived object, `t` filters by type.
-- `L` and `U` ask which relation (organization, person, deal, task, tag), then pick or create in one step, then the kind or the role/dates line. `E` edits a linked row. See links.
+- `a` add. A picker of kinds opens with the view's own kind preselected, so `a` then `enter` adds the view's own object. Each kind shows its first letter and typing it jumps there: `a t` task, `a n` note, `a o` organization, `a p` person, `a d` deal.
+- If an object is highlighted when you add a task or a note, the prompt shows its name dimmed after the cursor (`tab: link Bob Baker`). `tab` links the new task or note to it. Nothing is linked until you press `tab`.
+- `enter` and `e` are one action, activate: open the highlighted thing further, or edit the field under the cursor. Rename is just this.
+- `d` delete (soft, `ctrl+z` undoes). `r` restores in the Archived view, where `d` purges a person after you type the name.
+- `l` link the highlighted object to another (a tag is an object, so tagging is linking). `u` unlink.
+- `x` mark, one meaning per type: a task is done (again reopens it), a person is contacted. `f` favorite.
+- `space` selects rows, `*` selects all. `m` merges the selected rows (people, organizations), or opens the compare for the highlighted duplicate group.
+- `ctrl+z` undo, `ctrl+y` redo, `ctrl+r` refresh. No bare `z` or `u` for undo, no separate rename key.
 
 ## Moving
 
-- `j` / `k` or arrows: next and previous row. `g` / `G`: first and last. `ctrl+d` / `ctrl+u`: half page. `J` / `K`: scroll the detail pane.
-- `tab` or `l`: move into the detail form. `esc`, `h` or `tab`: back to the list.
-- `/`, `ctrl+k` or `:` opens the bar: find people, orgs, deals, tasks, notes, actions and settings. `#tag` filters by tag, `esc` clears it. `=` lists settings.
-- `o` toggles sort. `r` reloads. Rebind keys: see `keys`.
+- Arrow keys, `tab` and `shift+tab` (`h j k l g G` and the `1`/`2` compare aliases are gone). `ctrl+u` / `ctrl+d` half a page, `pgup` / `pgdown` a full page, `home` / `end` first and last row in every view.
+- `ctrl+up` / `ctrl+down` jump by the unit the view declares: a day in Birthdays, the next first letter in People and Organizations, a page elsewhere.
+- `ctrl+shift+up` / `ctrl+shift+down` go to the view's home destination (today in Birthdays), else the first and last row. Some terminals do not report these chords, and `home` and `end` always work.
+- `tab` moves into the detail form, `esc` or `tab` back. `/`, `ctrl+k` or `:` opens the bar. `ctrl+o` toggles the People sort. `ctrl+l` cycles the duplicate level in Merge. `ctrl+f` filters the Archived view by type. `ctrl+t` and `ctrl+up` as go-to-today are retired: "Go to today" is a palette entry.
 
-## Person keys
+## App keys and palette entries
 
-- `c` mark contacted. `s` snooze. `n` add a note, `N` pick the type first. `t` add a task for the person, organization or deal on screen: `title | optional due date`. `x` complete a task.
-- `f` favorite. `T` tag (`-name` removes). `F` cadence. `p` priority tier. `*` marks all visible, then `c`, `f`, `T`, `F`, `p`, `d` apply to every marked person.
-- `s` sets a deal stage in the Deals view. Linked rows (organizations, related people, deals, members) in the detail form: `enter` opens (or links when empty), `d` unlinks, `E` edits the role and dates. `n` adds a note and `t` adds a task on an organization or deal page, the same keys as a person page.
+- `s` snooze. `F` cadence. Set priority tier, Set deal stage, Sync now, Dry-run sync, Attach inbox record, Add note (pick type), Tag and Undo dismiss are palette entries. To change a note type press `tab` in the note prompt, or `E` on a note row.
+- With rows selected, `d`, `f`, `x`, `m` and the palette's Tag and Set keep-in-touch apply to every selected person.
 
-## Edit pane
+## Edit pane (detail form)
 
-In the detail form: `enter` edits a row, `a` adds a row, `d` deletes the row (asks y/n), `y` copies the value, `o` opens a link, email or phone. Task and note rows edit with `enter` on every record page (person, organization, deal). A note row: `t` changes the type. Notes are an object like the others: Add, Edit, Delete and Restore note, and Link note attaches an existing note to any object (palette). While you type in a prompt such as `title | due`, the rest of the line shows dimmed after the cursor, and the bar shows the shape of a verb you typed (`task`, `note`, `set`, `snooze`). The hint is never submitted.
+`enter` or `e` edits a row. `a` adds a row. `d` deletes the row (asks y/n). `y` copies the value, `o` opens a link, email or phone. `E`, the heavier twin of `e`, edits the role and dates of a linked row or picks the type of a note row. While you type in a prompt such as `title | due`, the rest of the line shows dimmed after the cursor. The hint is never submitted.
 
-## Merge, archive, notes, sync, home
+## Merge, archive, sync, bar
 
-- Merge view: `enter` compare, `m` level, `D` dismiss, `u` undo dismiss. `M` merges marked people. Compare: `left`/`right`, `space`, `s`, `p`, `r`, `enter`, `esc`.
-- In the Organizations view `space` marks a row and `M` merges the marked organizations (see orgs). Company text creates or reuses organizations on its own, so there is no review screen (see convert). An organization with a near-duplicate name shows `~ name` in the list and a "similar name" row on its page, mark both and merge.
-- Birthdays view: day dividers and month headings are skipped by `j` / `k`, past birthdays are above, `ctrl+t` or `ctrl+up` returns to today.
-- `ctrl+a` adds any object from any view (a picker: person, organization, deal, task, note), runs that add flow and returns you to where you were, also from the bar. `a` and `+` add the view's own object. `ctrl+t` goes to today: the day in Birthdays, the first task dated today or later in Tasks, the top in Home, People and Follow-up. Ctrl keys move the view, bare keys act on the object.
-- Bar (`ctrl+k`): `tab` on a person, organization, deal, task or tag row moves the focus to the results, where the view hotkeys act on that row without leaving the bar (`c` contacted, `s` snooze, `f` favorite, `n` note, `t` task, `L` link, `d` delete, `x` done, `e` edit organization, `ctrl+z` undo). The footer lists the verbs of the row. `esc` or `tab` returns to the input. A tag row has `d` delete, `L` give, `U` take off, `r` rename, `m` merge into another tag, `enter` opens its people. The bar lists objects first, then actions, then settings. A verb you are typing (`n`, `t`, `set`, `snooze`) leads.
-- Archived view lists people, organizations, deals and tasks: `T` filters by type, `u` restores, `X` purges a person after you type the name.
-- Sync view: `s` runs a source, `d` dry run. Inbox: `a` accepts, `p` attaches, `i` ignores. Home: `enter` opens the person.
+- Merge view: `enter`, `e` or `m` compare, `d` dismiss the group. Compare: `left`/`right` pick, `space` toggle, `ctrl+e` survivor, `ctrl+b` next pair, `ctrl+w` switch pane, `d` dismiss, `m` or `enter` merge, `esc` or `q` back.
+- Organizations: `space` marks, `m` merges the marked. Archived view lists people, organizations, deals and tasks. Sync inbox: `enter` or `e` accepts a record, `d` ignores it. Home: `enter` opens the person.
+- Bar (`ctrl+k`): `tab` on a person, organization, deal, task or tag row moves the focus to the results, where the universal verbs act on that row (`x`, `s`, `f`, `e`, `d`, `l`, `u`, `ctrl+z`) and `a` opens the add picker with the row's kind preselected. A tag row has `d` delete, `l` give, `u` take off, `e` rename, `m` merge into another tag, `enter` opens its people.
+- `crm keys set` warns about chords terminals swallow: `ctrl+i`, `ctrl+m`, `ctrl+h`, `ctrl+[`, `ctrl+j` and the `ctrl+shift` arrows. A `[keys]` entry for an action or key that is gone is reported, never a crash.
 
 See also: tui, keys, links, duplicates, archive, notes, sync, orgs.

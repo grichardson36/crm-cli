@@ -24,7 +24,7 @@ crm task done 1
 crm task delete 1
 ```
 
-`task delete` archives the task and `task restore 1` brings it back. `task done` marks it completed. Delete and done accept `--dry-run`. In the TUI: `a` adds, `enter` edits, `d` deletes (asks y/n), `u` restores, `ctrl+z` undoes. Link a task to people and deals with `crm task link person|deal`.
+`task delete` archives the task and `task restore 1` brings it back. `task done` marks it completed. Delete and done accept `--dry-run`. In the TUI: `a` then `enter` adds (or `a t` from any view), `enter` edits, `d` deletes (asks y/n), `x` marks done (again reopens it), `ctrl+z` undoes. Link a task to people and deals with `crm task link person|deal`.
 
 ## Recurring tasks
 

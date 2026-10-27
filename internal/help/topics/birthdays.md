@@ -29,6 +29,6 @@ Fields: `person_id`, `name`, `date`, `days_until`, `relative`, `turning`. `turni
 
 ## In the terminal UI
 
-The Birthdays view groups by month (OCTOBER), then by day with a divider: the date at the left and the relative time at the right, the people below it with the age they turn at the right edge (blank when the year is unknown). It opens at today with the last 90 days above and the next 365 below. Scroll up to see past birthdays. `ctrl+t` or `ctrl+up` jumps back to today (`t` is still Add task); the key is the action "Go to today" and can be rebound.
+The Birthdays view groups by month (OCTOBER), then by day with a divider: the date at the left and the relative time at the right, the people below it with the age they turn at the right edge (blank when the year is unknown). It opens at today with the last 90 days above and the next 365 below. Scroll up to see past birthdays. `ctrl+shift+up` or `ctrl+shift+down` jumps back to today (`home` and `end` are the first and last row, and the fallback where a terminal does not report the chord). `ctrl+up` and `ctrl+down` jump a day. "Go to today" is also a palette entry.
 
 See also: keep-in-touch, tui (Birthdays view, key 7), modules.

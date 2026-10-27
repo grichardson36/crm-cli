@@ -17,10 +17,10 @@ crm person edit 2 --org 1
 
 Organizations is tab 5 and Deals tab 6 by default. Hide a view you do not use with `crm modules off deals` or the palette entry "Modules" (see modules).
 
-- The standard keys: `a` adds (`+` also), `enter` or `e` edits, `d` deletes (asks y/n), `u` restores, `L` links, `ctrl+z` undoes. "Restore organization" and "Restore deal" are in the palette.
-- An organization is one line: `name | domain | industry | size | location | website | linkedin | description | notes` (the old `name | domain | industry | notes` still works). Location is `city, region, country`. Its page lists members, parent and child organizations, deals, tasks and notes. `enter` on a linked row opens it, `n` adds a note.
+- The standard keys: `a` then `enter` adds (the picker preselects Organization here), `enter` or `e` edits, `d` deletes (asks y/n), `l` links, `ctrl+z` undoes. "Restore organization" and "Restore deal" are in the palette.
+- An organization is one line: `name | domain | industry | size | location | website | linkedin | description | notes` (the old `name | domain | industry | notes` still works). Location is `city, region, country`. Its page lists members, parent and child organizations, deals, tasks and notes. `enter` on a linked row opens it, `a n` adds a note (press `tab` to link it to the organization).
 - A deal is `title | value | stage | organization | person | notes`. The organization (primary) and person are an id or a name. `s` picks the stage, a deal gets a close date each time it moves into won or lost.
-- Editing opens the same line filled in. A field you empty is cleared. `space` marks rows and `M` merges them, see org-merge.
+- Editing opens the same line filled in. A field you empty is cleared. `space` marks rows and `m` merges them, see org-merge.
 
 ## Relationships between people
 

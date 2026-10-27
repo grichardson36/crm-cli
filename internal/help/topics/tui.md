@@ -28,7 +28,7 @@ Every view is a module you can turn on or off and reorder (see modules). Jump wi
 
 ## Palette actions that mirror CLI commands
 
-These work in `--read-only` mode. Each opens a scrollable page (`j` / `k`, `g` / `G`, `esc` goes back).
+These work in `--read-only` mode. Each opens a scrollable page (`up` / `down`, `home` / `end`, `esc` goes back).
 
 - "Help: topics" lists topics with a filter. "Help: search" lists matching lines.
 - "Doctor" runs the checks of `crm doctor`. "Where" shows the open database. "Domains" lists the databases in the data directory.
