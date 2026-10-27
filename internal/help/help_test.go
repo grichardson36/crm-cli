@@ -12,8 +12,8 @@ import (
 
 var requiredTopics = []string{
 	"overview", "people", "orgs", "links", "relations", "convert", "org-merge", "merge-log", "modules", "contact-methods", "keep-in-touch", "birthdays", "tasks", "notes", "note-types", "short-syntax", "tags",
-	"duplicates", "archive", "domains", "import", "sync", "sync-inbox", "dav", "dav-server", "output", "errors", "agents",
-	"tui", "tui-keys", "keys", "theme", "install", "backup",
+	"duplicates", "archive", "purge", "domains", "import", "sync", "sync-inbox", "dav", "dav-server", "output", "errors", "agents",
+	"tui", "tui-keys", "tui-selection", "tui-key-changes", "keys", "theme", "install", "backup",
 }
 
 func TestTopicsExistInOrder(t *testing.T) {
@@ -98,7 +98,7 @@ func TestExamplesAreCrmCommands(t *testing.T) {
 	}
 	for _, name := range requiredTopics {
 		switch name {
-		case "tui", "tui-keys", "dav-server":
+		case "tui", "tui-keys", "tui-selection", "tui-key-changes", "dav-server":
 			continue // interactive or long-running: their examples cannot run in a test
 		}
 		assert.Positive(t, topics[name], "topic %s has no runnable example", name)

@@ -34,6 +34,6 @@ crm person unlink org 2 1 --id 4
 
 ## MCP and the terminal UI
 
-MCP: `crm_<object>_link` and `_unlink` (same attributes), `crm_links`, `crm_link_roles`. In the terminal UI press `l` on an object, pick the relation, pick or create the other object, then answer the kind picker or the one-line prompt (role | from | to | primary | notes). `E` edits a link row, `u` unlinks, `ctrl+z` undoes each step.
+MCP: `crm_<object>_link` and `_unlink` (same attributes), `crm_links`, `crm_link_roles`. In the terminal UI press `l` on an object, pick the relation, pick or create the other object, then answer the kind picker or the one-line prompt (role | from | to | primary | notes). With several rows selected, `l` links all of them to the one target you pick, asking the role and dates once. In the detail pane the attributes of a link are cells of its row: `right` moves to a cell and `enter` edits it. `u` unlinks, `ctrl+z` undoes each step.
 
 See also: relations, orgs, tags, tasks, tui-keys, agents.

@@ -7,7 +7,7 @@ crm tui
 crm tui --read-only
 ```
 
-`--read-only` disables every key that changes data. Press `?` inside for the full key list. The bar (`ctrl+k`, `:` or `/`) is the one box. Type to find a person, org, deal, task or note, run an action, check or change a setting (`theme`, `keys`, `syntax`), or enter a command (`n Sam called`). Prefixes narrow it: `>` actions, `@` people, `#` tags, `=` settings, `?` help. An empty box lists what you used recently. A name with no match offers to create the person or add a note. A tag name lists the tag without `#`. `tab` puts the focus on the results, where the keys of the object's view work on the highlighted row (see tui-keys).
+`--read-only` disables every key that changes data. Press `?` inside for the full key list. The bar (`ctrl+k` or `/`) is the one box. Type to find a person, org, deal, task or note, run an action, check or change a setting (`theme`, `keys`, `syntax`), or enter a command (`n Sam called`). Prefixes narrow it: `>` actions, `@` people, `#` tags, `=` settings, `?` help. An empty box lists what you used recently. A name with no match offers to create the person or add a note. A tag name lists the tag without `#`. `tab` puts the focus on the results, where the keys of the object's view work on the highlighted row (see tui-keys).
 
 ## Views
 
