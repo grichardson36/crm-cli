@@ -264,3 +264,36 @@ func TestPurgeArchivedCommand(t *testing.T) {
 	_, _, code = crm(t, dbPath, "person", "show", "3")
 	assert.Equal(t, 0, code, "live people are untouched")
 }
+
+func TestPurgeArchivedCommandTakesEveryType(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "purge-types.db")
+	_, _, code := crm(t, dbPath, "org", "add", "Acme")
+	require.Equal(t, 0, code)
+	_, _, code = crm(t, dbPath, "deal", "add", "Site")
+	require.Equal(t, 0, code)
+	_, _, code = crm(t, dbPath, "task", "add", "Send deck")
+	require.Equal(t, 0, code)
+	_, _, code = crm(t, dbPath, "person", "add", "Ann")
+	require.Equal(t, 0, code)
+	for _, args := range [][]string{{"org", "delete", "1"}, {"deal", "delete", "1"}, {"task", "delete", "1"}, {"person", "archive", "1"}} {
+		_, _, code = crm(t, dbPath, args...)
+		require.Equal(t, 0, code, args)
+	}
+
+	out, _, code := crm(t, dbPath, "purge", "--archived", "-f", "json")
+	require.Equal(t, 0, code)
+	for _, want := range []string{`"organization"`, `"deal"`, `"task"`, `"person"`, "would purge"} {
+		assert.Contains(t, out, want)
+	}
+	_, _, code = crm(t, dbPath, "purge", "--archived", "--type", "organization", "--ids", "1", "--apply")
+	require.Equal(t, 0, code)
+	out, _, _ = crm(t, dbPath, "purge", "--archived", "-f", "json")
+	assert.NotContains(t, out, `"organization"`, "the organization is gone")
+	assert.Contains(t, out, `"deal"`)
+	_, _, code = crm(t, dbPath, "purge", "--archived", "--apply")
+	require.Equal(t, 0, code)
+	out, _, _ = crm(t, dbPath, "purge", "--archived", "-f", "json")
+	assert.NotContains(t, out, "would purge")
+	_, _, code = crm(t, dbPath, "org", "show", "1")
+	assert.Equal(t, 3, code, "purged for good")
+}
