@@ -652,8 +652,9 @@ func (m *Model) applyMerge() {
 	if c.manual {
 		m.marked = map[int64]bool{}
 	}
+	m.recordMerge(res.LogID)
 	m.afterWrite()
-	m.setStatus(fmt.Sprintf("merged %d into #%d %s: %d fields, %s", len(drops), keep, name, len(res.Fields), summarize(res)), false)
+	m.setStatus(fmt.Sprintf("merged %d into #%d %s: %d fields, %s (ctrl+z undoes)", len(drops), keep, name, len(res.Fields), summarize(res)), false)
 }
 
 // --- layout and rendering ---

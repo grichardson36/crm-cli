@@ -27,7 +27,7 @@ crm person list --tag vip -q
 
 ## Delete a tag everywhere
 
-This removes the tag and every use of it. It cannot be undone, so it needs `--yes`. Preview first.
+A tag is a name on records, so deleting it untags every record that carries it, as one step, and the tag drops out of the tag list. Each tagging is soft deleted: tagging a record with the name again brings its old tagging back, and in the terminal UI `ctrl+z` restores all of them at once. It still needs `--yes`. Preview first.
 
 ```sh crm-example
 crm tag delete vip --dry-run

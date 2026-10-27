@@ -12,7 +12,7 @@ People, organizations, deals and tasks link to each other. Every link is made, s
 
 ## CLI
 
-`crm <object> link <other> <id> <other id>` and `crm <object> unlink ...`. The ids follow the object order in the command. Linking what is linked changes nothing. Flags carry the attributes: `--role --from --to --primary --kind --notes`. `--new` adds a second link for a pair (a second stay). `unlink --id N` removes one of several.
+`crm <object> link <other> <id> <other id>` and `crm <object> unlink ...`. The ids follow the object order in the command. Linking what is linked changes nothing. Unlinking soft deletes the link and keeps its role, dates, kind and notes: linking the same pair (and kind) again brings that row back with them unless you give new ones. Tags work the same way. `--new` is the only way to add a second row. Flags carry the attributes: `--role --from --to --primary --kind --notes`. `--new` adds a second link for a pair (a second stay). `unlink --id N` removes one of several.
 
 ```sh crm-example
 crm person link org 2 1 --role CTO --from 2019-03

@@ -17,7 +17,8 @@ import (
 // clears what could be redone. The stack lives in memory only.
 //
 // Writes go through the h* methods below. They call the repository, then record how to reverse
-// and repeat the change. Merging people and purging are not undoable and are not recorded.
+// and repeat the change. Person and organization merges go through the persistent merge log
+// (recordMerge). Purging is not undoable and is not recorded.
 
 type histEntry struct {
 	label string
@@ -119,6 +120,32 @@ func (m *Model) recordQuick(_ string, changes []quick.Change) {
 			}
 			return quick.Redo(m.ctx, r, changes)
 		})
+}
+
+// recordMerge puts a logged merge (person or organization) on the undo stack. Undo and redo go
+// through the persistent merge log, so `crm merge undo` and the stack never disagree: a merge undone
+// here shows as undone in the log, and one undone from the CLI is refused here.
+func (m *Model) recordMerge(logID int64) {
+	if logID == 0 {
+		return
+	}
+	label := "merge"
+	if e, err := m.ml.Get(m.ctx, logID); err == nil {
+		label = truncateLabel(e.Label())
+	}
+	replay := func(redo bool) error {
+		var err error
+		if redo {
+			_, err = m.ml.Redo(m.ctx, logID)
+		} else {
+			_, err = m.ml.Undo(m.ctx, logID)
+		}
+		if errors.Is(err, model.ErrConflict) {
+			return staleError{err.Error()}
+		}
+		return err
+	}
+	m.record(label, func() error { return replay(false) }, func() error { return replay(true) })
 }
 
 // staleError means the target changed after the entry was recorded, so undo or redo is refused.

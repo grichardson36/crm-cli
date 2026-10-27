@@ -100,6 +100,8 @@ type Model struct {
 	dlr  *repo.DealRepo
 	tagr *repo.TagRepo
 	dr   *repo.DupeRepo
+	// ml is the persistent merge log: person and organization merges undo and redo through it.
+	ml *repo.MergeLogRepo
 	ntr  *repo.NoteTypeRepo
 	db   *sql.DB
 	now  func() time.Time
@@ -264,6 +266,7 @@ func New(ctx context.Context, db *sql.DB) (*Model, error) {
 		oa:         repo.NewOrgAutoRepo(db),
 		deleted:    map[string][]int64{},
 		dr:         repo.NewDupeRepo(db),
+		ml:         repo.NewMergeLogRepo(db),
 		ntr:        repo.NewNoteTypeRepo(db),
 		minLevel:   dedupe.Medium,
 		noteType:   "note",

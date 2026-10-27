@@ -25,6 +25,6 @@ crm org merge 1 2 3 --apply
 - Deal links, tasks, notes and tags move.
 - Duplicates are archived and their ids keep resolving to the survivor. Company text with the old name matches the survivor.
 
-In the terminal UI open the Organizations view, mark rows with `space`, press `M`, pick the survivor and confirm. `ctrl+z` undoes the whole merge in one step.
+In the terminal UI open the Organizations view, mark rows with `space`, press `M`, pick the survivor and confirm. `ctrl+z` undoes the whole merge in one step. The merge is also in the merge log, see merge-log.
 
-See also: orgs, convert, duplicates, links.
+See also: merge-log, orgs, convert, duplicates, links.

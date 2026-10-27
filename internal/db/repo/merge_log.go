@@ -441,13 +441,20 @@ func (p *replayer) apply(edits []RowEdit, forward bool) (int, error) {
 			}
 		}
 	}
-	skipped := 0
-	n := len(edits)
-	for i := 0; i < n; i++ {
-		e := edits[i]
-		if !forward {
-			e = edits[n-1-i]
+	ordered := make([]RowEdit, 0, len(edits))
+	for i := range edits {
+		if forward {
+			ordered = append(ordered, edits[i])
+		} else {
+			ordered = append(ordered, edits[len(edits)-1-i])
 		}
+	}
+	// Edits that free a slot (soft delete a row, clear a primary flag) run before the ones that take
+	// it, so the unique index on live primary links never sees two at once. The order inside each
+	// class stays the journal order.
+	sort.SliceStable(ordered, func(i, j int) bool { return replayClass(ordered[i], forward) < replayClass(ordered[j], forward) })
+	skipped := 0
+	for _, e := range ordered {
 		cols, err := p.columns(e.Table)
 		if err != nil {
 			return 0, err
@@ -459,6 +466,31 @@ func (p *replayer) apply(edits []RowEdit, forward bool) (int, error) {
 		skipped += s
 	}
 	return skipped, nil
+}
+
+// replayClass is 0 for an edit that frees a slot, 2 for one that takes a slot and 1 otherwise.
+func replayClass(e RowEdit, forward bool) int {
+	switch {
+	case e.Op == "insert" && !forward, e.Op == "delete" && forward:
+		return 0
+	case e.Op != "update":
+		return 2
+	}
+	to := e.Before
+	if forward {
+		to = e.After
+	}
+	del, hasDel := to["deleted_at"]
+	prim, hasPrim := to["is_primary"]
+	take := (hasDel && del == nil) || (hasPrim && sameValue(prim, 1))
+	free := (hasDel && del != nil) || (hasPrim && sameValue(prim, 0))
+	switch {
+	case take && !free:
+		return 2
+	case free && !take:
+		return 0
+	}
+	return 1
 }
 
 func (p *replayer) one(e RowEdit, cols map[string]bool, forward bool) (int, error) {

@@ -14,7 +14,7 @@ crm dupes --min high -f json
 
 ## Merge
 
-`crm person merge KEEP DROP...` merges the drop people into the keep person. The survivor keeps its own values. An empty field takes the first non-empty value from the dropped people. Emails, phones, links, tags and custom fields are combined. Interactions, tasks, deals, memberships and person links move to the survivor, exact duplicate links are dropped (two memberships with different roles both stay) and the old id is kept as an alias (see relations). Dropped people are archived with a pointer to the survivor, so you can restore them. Always preview first.
+`crm person merge KEEP DROP...` merges the drop people into the keep person. The survivor keeps its own values. An empty field takes the first non-empty value from the dropped people. Emails, phones, links, tags and custom fields are combined. Interactions, tasks, deals, memberships and person links move to the survivor, exact duplicate links are dropped (two memberships with different roles both stay) and the old id is kept as an alias (see relations). Dropped people are archived with a pointer to the survivor, so you can restore them. Every applied merge is logged and can be undone (merge-log). Always preview first.
 
 ```sh crm-example
 crm person merge 1 3 --dry-run
@@ -26,11 +26,11 @@ crm person merge 1 3 --prefer title=3
 
 ## Dismiss
 
-If two people look alike but are different, dismiss the pair. It stops appearing in `crm dupes`.
+If two people look alike but are different, dismiss the pair. It stops appearing in `crm dupes`. Organization pairs work the same way, see merge-log.
 
 ```sh crm-example
 crm dupes dismiss 1 2
 crm dupes undismiss 1 2
 ```
 
-See also: archive (restore a merged-away person), agents, tui-keys (Merge view).
+See also: merge-log (undo a merge, dismiss organization pairs), archive (restore a merged-away person), agents, tui-keys (Merge view).

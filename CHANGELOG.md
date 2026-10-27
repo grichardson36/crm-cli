@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Company text creates or reuses an organization automatically (owner decision 2026-10-27) at `person add|edit --company`, `import dex`, MCP `crm_person_create|update`, the command bar, device sync, the terminal UI person form and a phone ORG over CardDAV. Matching is the normalized name or a merge alias, near names never merge and show up in `crm org dupes` (MCP `crm_org_dupes`, "similar name" in the terminal UI). Junk strings (N/A, none, self-employed, retired ...) are ignored through an editable list: `crm org ignore add|list|remove`, MCP `crm_org_ignore_*` (migration 010, table `company_ignore`). `crm org backfill [--apply]` and MCP `crm_org_backfill` fill organizations for existing people (dry run by default, one undo step, idempotent). Emptying ORG on the phone never removes a membership.
 
+- Merges are undoable (owner decision 2026-10-27). Person and organization merges write a persistent merge log (migration 011, table `merge_log`): `crm merge log|undo|redo`, MCP `crm_merge_log|undo|redo`, a `log_id` in the merge results, and one ctrl+z step in the terminal UI. Undo works in any later session and keeps values edited after the merge.
+- Unlinking soft deletes the link, linking the same pair and kind again revives it with its old role, dates and notes. Taggings follow the same rule (they gain uuid, timestamps and deleted_at). Deleting a tag untags everything that carries it as one undo step, a tag with no live tagging leaves tag lists.
+- Organization merge candidates can be dismissed as "not a duplicate": `crm org dupes dismiss|undismiss`, `crm org dupes --dismissed`, MCP `crm_org_dupes_dismiss`, terminal UI palette action (migration 011, table `org_dupe_dismissals`).
+
+### Changed
+
+- `crm person delete` and `crm_person_delete` are the person verb. `crm person archive` and `crm_person_archive` stay as deprecated aliases. `crm_task_delete` no longer takes `restore`, use `crm_task_restore`. `crm person relate|relationships|unrelate` and `crm_person_relate` stay as deprecated aliases that point to `link`.
+
 ### Removed
 
 - The Company review screen and its keys (`c`, `l`, `e`, `s`, `x`, `A`, `enter` in that screen, `C` in Organizations), the `org-review` tag and the device-local `orgconvert.*` meta keys. `crm org convert` and `crm_org_convert_*` remain as deprecated aliases of the backfill.
