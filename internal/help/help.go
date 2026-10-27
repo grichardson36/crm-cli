@@ -16,7 +16,7 @@ var topicsFS embed.FS
 var order = []string{
 	"overview", "people", "orgs", "links", "relations", "convert", "org-merge", "merge-log", "modules", "contact-methods", "keep-in-touch", "birthdays", "tasks", "notes", "note-types", "short-syntax", "tags",
 	"duplicates", "archive", "purge", "domains", "import", "sync", "sync-inbox", "dav", "dav-server", "output", "errors", "validation", "agents",
-	"tui", "tui-keys", "tui-selection", "tui-key-changes", "keys", "theme", "install", "backup",
+	"tui", "tui-keys", "tui-selection", "tui-prompts", "tui-key-changes", "keys", "theme", "install", "backup",
 }
 
 // Topic is one help page.

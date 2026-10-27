@@ -420,10 +420,10 @@ func (o *objDef) addAction() action {
 		a.title, a.desc = "Add person", "create a contact: opens a blank form, saved when you enter a name. From the palette, or a then p"
 	}
 	if o.kind == "task" {
-		a.desc = "add a task: title | optional due date. From the palette, or a then t (same as crm task add). A highlighted object is offered as the link, tab accepts it"
+		a.desc = "add a task: title | due | people | organizations | deals | tags. From the palette, or a then t (same as crm task add). A highlighted object is the first suggestion of the matching link segment (people, organizations, deals, tags), tab accepts it"
 	}
 	if o.kind == tagKind {
-		a.desc = "add a tag: type its name, an existing name picks that tag. A highlighted object is offered as the one to put it on, tab accepts. From the palette, or a then " + addShortcut(o.kind)
+		a.desc = "add a tag: name | on, an existing name picks that tag and the objects in on get it. A highlighted object is the first suggestion of on, tab accepts. From the palette, or a then " + addShortcut(o.kind)
 	}
 	if o.kind == model.NoteKind {
 		a.when = func(m *Model) bool { return whenPerson(m) || whenObjectPage(m) }
