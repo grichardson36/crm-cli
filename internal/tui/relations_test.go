@@ -343,13 +343,11 @@ func TestDealStageSetsAndClearsClosedAtInTheTUI(t *testing.T) {
 	d, err := m.dlr.Create(ctx, model.CreateDealInput{Title: "Site", Stage: "lead"})
 	require.NoError(t, err)
 	goDeals(m)
-	runID(m, "deal-stage")
-	press(m, "5") // won
+	setChoice(t, m, "stage", "won")
 	got, err := m.dlr.FindByID(ctx, d.ID)
 	require.NoError(t, err)
 	require.NotNil(t, got.ClosedAt)
-	runID(m, "deal-stage")
-	press(m, "3") // proposal: reopened
+	setChoice(t, m, "stage", "proposal") // reopened
 	got, _ = m.dlr.FindByID(ctx, d.ID)
 	assert.Nil(t, got.ClosedAt)
 	press(m, "ctrl+z")
@@ -476,13 +474,11 @@ func TestDealMovedBetweenClosedStagesIsRestamped(t *testing.T) {
 	d, err := m.dlr.Create(ctx, model.CreateDealInput{Title: "Site", Stage: "lead"})
 	require.NoError(t, err)
 	goDeals(m)
-	runID(m, "deal-stage")
-	press(m, "5") // won
+	setChoice(t, m, "stage", "won")
 	_, err = m.db.Exec(`UPDATE deals SET closed_at = '2000-01-01 00:00:00' WHERE id = ?`, d.ID)
 	require.NoError(t, err)
 	m.afterWrite()
-	runID(m, "deal-stage")
-	press(m, "6") // lost
+	setChoice(t, m, "stage", "lost")
 	got, err := m.dlr.FindByID(ctx, d.ID)
 	require.NoError(t, err)
 	assert.Equal(t, "lost", got.Stage)

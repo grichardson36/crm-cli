@@ -347,14 +347,14 @@ type footSeg struct {
 
 var footShort = map[string]string{
 	"down": "move", "focus-detail": "edit", "mark": "mark", "contacted": "contacted",
-	"tag": "tag", "cadence": "cadence", "tier": "tier", "note": "note", "new": "new", "task": "task",
+	"tag": "tag", "cadence": "cadence", "note": "note", "new": "new", "task": "task",
 	"help": "help", "palette": "find", "edit": "edit", "add": "add", "delete": "delete", "copy": "copy",
 	"open": "open", "back": "back", "compare": "compare", "dupe-level": "level", "dismiss": "dismiss",
 	"undo-dismiss": "undo", "merge-marked": "merge", "archive": "archive", "restore": "restore", "purge": "purge",
 	"home-open": "open", "sync-now": "sync", "sync-dry": "dry-run", "inbox-accept": "accept", "inbox-attach": "attach",
 	"inbox-ignore": "ignore", "goto-view": "views", "note-retype": "type",
 	"org-add": "add", "org-edit": "edit", "org-delete": "delete",
-	"deal-add": "add", "deal-edit": "edit", "deal-delete": "delete", "deal-stage": "stage",
+	"deal-add": "add", "deal-edit": "edit", "deal-delete": "delete",
 	"cmp-left": "pick", "cmp-pick": "toggle", "cmp-survivor": "survivor", "cmp-pair": "pair", "cmp-view": "pane", "cmp-confirm": "merge", "cmp-back": "back",
 }
 
@@ -449,6 +449,16 @@ func (m *Model) hintsLine() string {
 	switch m.mode {
 	case modeEdit:
 		h := "enter save  esc cancel"
+		switch {
+		case m.edit != nil && m.edit.typed != nil && m.edit.typed.spec.Type == model.FieldChoice:
+			h = "up/down pick  enter or tab save  esc cancel"
+		case m.edit != nil && m.edit.typed != nil && m.edit.typed.spec.Type == model.FieldLongText:
+			h = "enter or tab save  alt+enter new line  esc cancel"
+		case m.edit != nil && m.edit.typed != nil:
+			h = "enter or tab save  esc cancel"
+		case m.edit != nil && m.edit.ta != nil:
+			h = "enter pick  tab complete  up/down move  esc cancel"
+		}
 		if m.edit != nil && m.edit.kind == rkHandle {
 			h += "  tab change kind"
 		}

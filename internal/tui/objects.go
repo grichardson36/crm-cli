@@ -381,9 +381,6 @@ func objectActions() []action {
 				out = append(out, o.restoreAction())
 			}
 		}
-		if o.kind == "deal" {
-			out = append(out, dealStageAction())
-		}
 	}
 	return append(out, linkActions()...)
 }
@@ -489,13 +486,6 @@ func (o *objDef) restoreAction() action {
 		a.desc = "bring back the note deleted last in this session (ctrl+z does the same for the newest change; same as crm note restore)"
 	}
 	return a
-}
-
-func dealStageAction() action {
-	return action{id: "deal-stage", title: "Set deal stage", group: "Deals",
-		desc:  "pick the stage of the selected deal: lead, prospect, proposal, negotiation, won, lost (palette; a choice field edited with enter in a later release)",
-		write: true,
-		when:  whenDealSel, run: func(m *Model) tea.Cmd { m.pickDealStage(m.selDeal()); return nil }}
 }
 
 func article(label string) string {

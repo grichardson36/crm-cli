@@ -244,14 +244,11 @@ func TestBarTaskAndDealVerbs(t *testing.T) {
 	press(m, "esc")
 	assert.Equal(t, modeOverlay, m.mode, "the bar returns after the prompt")
 	assert.Nil(t, m.barResume)
-	// The stage is a palette entry: Set deal stage opens the picker on the selected deal.
+	// The stage is a choice field of the deal page, edited in place.
 	press(m, "esc", "esc")
 	m.switchView(viewDeals)
 	m.settle()
-	m.runAction(m.actionByID("deal-stage"))
-	require.NotNil(t, m.ov, "Set deal stage opens the stage picker")
-	assert.Contains(t, m.ov.title, "stage")
-	press(m, "down", "enter") // second stage
+	setChoice(t, m, "stage", "prospect")
 	got2, err := m.dlr.FindByID(m.ctx, d.ID)
 	require.NoError(t, err)
 	assert.NotEqual(t, "lead", got2.Stage)

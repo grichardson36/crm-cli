@@ -390,8 +390,9 @@ func TestPersonPageHasAnOrganizationRowThatLinksAndOpens(t *testing.T) {
 	press(m, "tab")
 	goTo(t, m, "organization")
 	assert.True(t, m.form[m.fcur].empty)
-	press(m, "enter") // an empty row links
-	require.NotNil(t, m.ov)
+	press(m, "enter") // an empty row links, from a typeahead under the row
+	require.NotNil(t, m.edit)
+	require.NotNil(t, m.edit.ta)
 	typeText(m, "acme")
 	press(m, "enter")
 	confirmLink(m)

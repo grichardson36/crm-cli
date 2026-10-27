@@ -152,19 +152,22 @@ func (m *Model) buildOrgForm(id int64) []formRow {
 	m.formTitle = fmt.Sprintf("%s  #%d", cleanCell(o.Name), o.ID)
 
 	// Identity
+	// Identity: every declared field is a row, so an empty one can be filled in place (model.Fields).
 	var rows []formRow
-	first := true
-	for _, kv := range [][2]string{{"domain", str(o.Domain)}, {"website", str(o.Website)}, {"industry", str(o.Industry)}, {"size", str(o.Size)},
-		{"location", o.Location()}, {"linkedin", str(o.LinkedinURL)}, {"about", cleanCell(str(o.Description))}, {"logo", str(o.LogoPath)},
-		{"notes", cleanCell(str(o.Notes))}} {
-		if kv[1] == "" {
+	values := map[string]string{"name": o.Name, "domain": str(o.Domain), "website": str(o.Website), "industry": str(o.Industry), "size": str(o.Size),
+		"location": o.Location(), "linkedin": str(o.LinkedinURL), "description": str(o.Description), "notes": str(o.Notes)}
+	for _, spec := range model.FieldsOf("organization") {
+		if spec.Type == model.FieldRelation {
 			continue
 		}
-		r := infoRow(kv[0], kv[1])
-		if first {
-			r.head, first = "Identity", false
+		r := specRow(ref, spec, values[spec.Key])
+		if len(rows) == 0 {
+			r.head = "Identity"
 		}
 		rows = append(rows, r)
+	}
+	if lp := str(o.LogoPath); lp != "" {
+		rows = append(rows, infoRow("logo", lp))
 	}
 	// Now: what is open around this organization.
 	var now []formRow
@@ -222,13 +225,17 @@ func (m *Model) buildDealForm(id int64) []formRow {
 	ref := repo.Ref{Kind: "deal", ID: id}
 	m.formTitle = fmt.Sprintf("%s  #%d", cleanCell(d.Title), d.ID)
 
-	rows := []formRow{infoRow("stage", d.Stage)}
-	rows[0].head = "Identity"
-	if d.Value != nil {
-		rows = append(rows, infoRow("value", money(d.Value)))
-	}
-	if d.Notes != nil && *d.Notes != "" {
-		rows = append(rows, infoRow("notes", cleanCell(*d.Notes)))
+	values := map[string]string{"title": d.Title, "stage": d.Stage, "value": plainNumber(d.Value), "notes": str(d.Notes)}
+	var rows []formRow
+	for _, spec := range model.FieldsOf("deal") {
+		if spec.Type == model.FieldRelation {
+			continue
+		}
+		r := specRow(ref, spec, values[spec.Key])
+		if len(rows) == 0 {
+			r.head = "Identity"
+		}
+		rows = append(rows, r)
 	}
 	// Now
 	var now []formRow

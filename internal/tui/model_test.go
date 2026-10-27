@@ -806,14 +806,14 @@ func TestMarksAndBulkActions(t *testing.T) {
 		assert.Equal(t, "6 mons", str(personByID(t, pr, id).KeepInTouch))
 	}
 	press(m, "*")
-	runID(m, "tier")
-	typeText(m, "High")
-	press(m, "enter")
-	for id := int64(1); id <= 3; id++ {
-		p := personByID(t, pr, id)
-		require.NotNil(t, p.PriorityTier)
-		assert.Equal(t, 2, *p.PriorityTier)
-	}
+	// Priority is a choice field of the person page now (no palette entry), edited in place.
+	press(m, "tab")
+	setChoice(t, m, "priority", "High")
+	press(m, "esc")
+	cur := m.curPerson()
+	require.NotNil(t, personByID(t, pr, cur).PriorityTier)
+	assert.Equal(t, 2, *personByID(t, pr, cur).PriorityTier)
+	m.marked = map[int64]bool{}
 
 	// Favorite on a selection toggles all of them; marks only cover the marked people.
 	press(m, "home", " ", " ", "f")

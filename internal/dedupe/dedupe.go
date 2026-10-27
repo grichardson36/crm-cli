@@ -524,3 +524,35 @@ func Similarity(a, b string) float64 {
 	var bufA, bufB []int
 	return similarity([]rune(strings.Join(strings.Fields(fold(a)), " ")), []rune(strings.Join(strings.Fields(fold(b)), " ")), &bufA, &bufB)
 }
+
+// Ratio is the plain spelling similarity of two names, 1 minus the edit distance over the longer
+// length, after folding case, accents and punctuation. It is the measure the Fuzzy level thresholds
+// (FuzzyThreshold), here without the cutoff so a typeahead can pick its own bound.
+func Ratio(a, b string) float64 {
+	x := []rune(strings.Join(strings.Fields(fold(a)), " "))
+	y := []rune(strings.Join(strings.Fields(fold(b)), " "))
+	if len(x) == 0 && len(y) == 0 {
+		return 1
+	}
+	prev := make([]int, len(y)+1)
+	cur := make([]int, len(y)+1)
+	for j := range prev {
+		prev[j] = j
+	}
+	for i := 1; i <= len(x); i++ {
+		cur[0] = i
+		for j := 1; j <= len(y); j++ {
+			cost := 1
+			if x[i-1] == y[j-1] {
+				cost = 0
+			}
+			cur[j] = minInt(prev[j]+1, cur[j-1]+1, prev[j-1]+cost)
+		}
+		prev, cur = cur, prev
+	}
+	longest := len(x)
+	if len(y) > longest {
+		longest = len(y)
+	}
+	return 1 - float64(prev[len(y)])/float64(longest)
+}

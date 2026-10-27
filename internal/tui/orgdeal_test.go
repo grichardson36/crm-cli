@@ -172,18 +172,15 @@ func TestDealAddEditStageDeleteRestoreWithUndo(t *testing.T) {
 	press(m, "ctrl+y")
 	require.Len(t, openDeals(t, m), 1)
 
-	// Stage picker.
-	runID(m, "deal-stage")
-	require.NotNil(t, m.ov)
-	assert.Equal(t, "Deal stage", m.ov.title)
-	press(m, "5") // won
+	// The stage is a choice field edited in place on the deal page.
+	setChoice(t, m, "stage", "won")
 	assert.Equal(t, "won", openDeals(t, m)[0].Stage)
-	assert.Contains(t, m.toast.text, "deal moved to won")
 	press(m, "ctrl+z")
 	assert.Equal(t, "proposal", openDeals(t, m)[0].Stage)
 	assert.Contains(t, m.toast.text, "Undone: move deal Site redesign to won")
 
 	// Edit keeps the linked names and clears what is emptied. Undo brings every field back.
+	press(m, "esc") // back to the list from the deal page
 	press(m, "enter")
 	assert.Equal(t, "Site redesign | 12500 | proposal | Globex | Bob Baker | phase one", m.input.Value())
 	submit(m, "Site v2 | | proposal | Globex")

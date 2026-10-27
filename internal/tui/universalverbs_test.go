@@ -191,7 +191,7 @@ func TestEveryMovedFunctionIsStillReachable(t *testing.T) {
 		"cmp-survivor": "ctrl+e", "cmp-pair": "ctrl+b", "cmp-view": "ctrl+w",
 	}
 	palette := []string{ // palette entries without a key
-		"sync-now", "sync-dry", "deal-stage", "tier", "inbox-attach", "note-pick", "tag", "task-tag", "go-today",
+		"sync-now", "sync-dry", "inbox-attach", "note-pick", "tag", "task-tag", "go-today",
 		"undo-dismiss", "scroll-down", "scroll-up", "contacted", "done", "org-merge", "merge-marked",
 		"org-add", "deal-add", "task", "new", "note", "person-edit", "org-edit", "deal-edit", "task-edit",
 		"org-restore", "deal-restore", "task-restore", "note-retype", "tag-rename", "compare", "home-open", "edit", "inbox-accept",
@@ -213,9 +213,9 @@ func TestEveryMovedFunctionIsStillReachable(t *testing.T) {
 // The user can still bind a key to a function that lost its default, and the file format is unchanged.
 func TestAnOldBindingOfAPaletteOnlyActionStillWorks(t *testing.T) {
 	m, _ := newTestModel(t)
-	problems := m.applyKeys(keys.Overrides{"tier": {"p"}, "contacted": {"c"}})
+	problems := m.applyKeys(keys.Overrides{"note-pick": {"p"}, "contacted": {"c"}})
 	assert.Empty(t, problems)
-	assert.Equal(t, []string{"p"}, m.actionByID("tier").keys)
+	assert.Equal(t, []string{"p"}, m.actionByID("note-pick").keys)
 	press(m, "c")
 	assert.NotNil(t, personByID(t, m.pr, 1).LastContactedAt, "c still marks contacted for someone who bound it")
 }

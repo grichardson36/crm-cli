@@ -548,37 +548,6 @@ func pickOne(what, s string, exact, partial []int64) (*int64, error) {
 	return nil, fmt.Errorf("%d %ss match %q, use the id", len(ids), what, s)
 }
 
-func (m *Model) pickDealStage(id int64) {
-	d, err := m.dlr.FindByID(m.ctx, id)
-	if err != nil {
-		m.setStatus(err.Error(), true)
-		return
-	}
-	items := make([]overlayItem, 0, len(model.DealStages))
-	for i, st := range model.DealStages {
-		it := overlayItem{id: "stage-" + st, label: st, hint: strconv.Itoa(i + 1), value: st}
-		if st == d.Stage {
-			it.desc = "current stage"
-		}
-		items = append(items, it)
-	}
-	m.openPicker("Deal stage", items, func(m *Model, it overlayItem) {
-		if it.value == d.Stage {
-			return
-		}
-		after := *d
-		after.Stage = it.value
-		if err := m.hOverwriteDeal(id, &after); err != nil {
-			m.setStatus(err.Error(), true)
-			return
-		}
-		m.afterWrite()
-		m.setStatus("deal moved to "+it.value+" (ctrl+z undoes)", false)
-		m.pendingCmd = m.showToast("deal moved to "+it.value, false)
-	})
-	m.ov.digits = true
-}
-
 func (m *Model) dealTitle(id int64) string {
 	if d, err := m.dlr.FindByID(m.ctx, id); err == nil {
 		return d.Title

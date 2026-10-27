@@ -57,8 +57,8 @@ func TestConflictingOverrideIsSkippedAndNamesTheOtherAction(t *testing.T) {
 	assert.Contains(t, problems[0], "Mark")
 	problems = m.applyKeys(keys.Overrides{"sync-now": {"x"}})
 	require.Len(t, problems, 1, "the app scope reaches the Sync view too")
-	// A key two screens use for different things is fine: tier is for people, sync-now for the inbox.
-	problems = m.applyKeys(keys.Overrides{"sync-now": {"ctrl+g"}, "tier": {"ctrl+g"}})
+	// A key two screens use for different things is fine: note-pick is for people, sync-now for the inbox.
+	problems = m.applyKeys(keys.Overrides{"sync-now": {"ctrl+g"}, "note-pick": {"ctrl+g"}})
 	assert.Empty(t, problems, "type:inbox and type:person never show together")
 
 	// The built-in keys that overlap across screens never produce a message.
@@ -67,9 +67,9 @@ func TestConflictingOverrideIsSkippedAndNamesTheOtherAction(t *testing.T) {
 
 func TestTwoOverridesCannotClaimTheSameKey(t *testing.T) {
 	m, _ := newTestModel(t)
-	problems := m.applyKeys(keys.Overrides{"favorite": {"ctrl+g"}, "tier": {"ctrl+g"}})
+	problems := m.applyKeys(keys.Overrides{"favorite": {"ctrl+g"}, "note-pick": {"ctrl+g"}})
 	require.Len(t, problems, 1)
-	assert.Contains(t, problems[0], "keys.tier")
+	assert.Contains(t, problems[0], "keys.note-pick")
 	assert.Contains(t, problems[0], "ctrl+g is already used")
 	assert.Equal(t, []string{"ctrl+g"}, m.actionByID("favorite").keys)
 }
@@ -173,9 +173,9 @@ func TestKeysResetFlow(t *testing.T) {
 	m, _ := newTestModel(t)
 	dir := t.TempDir()
 	m.env.DataDir = dir
-	require.NoError(t, keys.Save(dir, keys.Overrides{"favorite": {"ctrl+f"}, "tier": {"ctrl+g"}}))
+	require.NoError(t, keys.Save(dir, keys.Overrides{"favorite": {"ctrl+f"}, "note-pick": {"ctrl+g"}}))
 	m.applyStartupKeys()
-	require.Equal(t, []string{"ctrl+g"}, m.actionByID("tier").keys)
+	require.Equal(t, []string{"ctrl+g"}, m.actionByID("note-pick").keys)
 
 	press(m, "ctrl+k")
 	typeText(m, "keys: reset")
@@ -184,16 +184,16 @@ func TestKeysResetFlow(t *testing.T) {
 	typeText(m, "favorite")
 	press(m, "enter")
 	assert.Equal(t, []string{"f"}, m.actionByID("favorite").keys)
-	assert.Equal(t, []string{"ctrl+g"}, m.actionByID("tier").keys)
+	assert.Equal(t, []string{"ctrl+g"}, m.actionByID("note-pick").keys)
 	o, _ := keys.Load(dir)
-	assert.Equal(t, keys.Overrides{"tier": {"ctrl+g"}}, o)
+	assert.Equal(t, keys.Overrides{"note-pick": {"ctrl+g"}}, o)
 
 	press(m, "ctrl+k")
 	typeText(m, "keys: reset")
 	press(m, "enter")
 	typeText(m, "all actions")
 	press(m, "enter")
-	assert.Empty(t, m.actionByID("tier").keys, "tier has no default key, it is a palette entry")
+	assert.Empty(t, m.actionByID("note-pick").keys, "note-pick has no default key, it is a palette entry")
 	o, _ = keys.Load(dir)
 	assert.Empty(t, o)
 

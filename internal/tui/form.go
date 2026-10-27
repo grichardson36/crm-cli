@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -21,11 +22,11 @@ const (
 	rkPhone
 	rkHandle
 	rkCadence
-	rkTier
 	rkTag
 	rkTask
 	rkNote
 	rkLinked // a link to another object: organization, related person, deal, member
+	rkTyped  // a field with a declared type (model.FieldSpec): edited in place by its type (fieldedit.go)
 )
 
 // tierNames maps priority_tier (index) to a name. Index 0 clears the tier.
@@ -51,6 +52,9 @@ type formRow struct {
 	li    *model.LinkedObject
 	other string
 	dim   bool
+	// rkTyped: the field type and the record it belongs to.
+	spec *model.FieldSpec
+	ref  repo.Ref
 }
 
 type editState struct {
@@ -62,6 +66,8 @@ type editState struct {
 	kindTouched bool
 	oldValue    string
 	origKind    string // handle kind when the edit started
+	typed       *typedEdit // a typed field edit (fieldedit.go)
+	ta          *typeahead // a relation typeahead (typeahead.go)
 }
 
 type confirmState struct {
@@ -164,7 +170,13 @@ func (m *Model) personRows(p *model.Person) []formRow {
 	section := func(kind rowKind, label string) {
 		add(formRow{kind: kind, label: label, empty: true})
 	}
-	field := func(f, label, v string) formRow { return formRow{kind: rkField, field: f, label: label, value: v} }
+	field := func(f, label, v string) formRow {
+		r := formRow{kind: rkField, field: f, label: label, value: v}
+		if spec, ok := model.FieldNamed("person", f); ok { // the declared type gives the hint while editing
+			r.spec, r.ref = &spec, repo.Ref{Kind: "person", ID: pidOf(p)}
+		}
+		return r
+	}
 
 	if p == nil {
 		add(field("name", "name", ""))
@@ -215,10 +227,14 @@ func (m *Model) personRows(p *model.Person) []formRow {
 
 	kit, tier := "", ""
 	if p != nil {
-		kit, tier = str(p.KeepInTouch), tierText(p.PriorityTier)
+		kit = str(p.KeepInTouch)
+		if p.PriorityTier != nil && *p.PriorityTier > 0 {
+			tier = strconv.Itoa(*p.PriorityTier)
+		}
 	}
 	add(formRow{kind: rkCadence, label: "keep in touch", value: kit})
-	add(formRow{kind: rkTier, label: "priority", value: tier})
+	tierSpec, _ := model.FieldNamed("person", "tier")
+	add(specRow(repo.Ref{Kind: "person", ID: pidOf(p)}, tierSpec, tier))
 	if p != nil {
 		if p.LastContactedAt != nil {
 			add(formRow{kind: rkInfo, label: "last contacted", value: *p.LastContactedAt})
@@ -394,8 +410,17 @@ func (m *Model) renderRow(i int, r formRow, w int) []string {
 		label = fit(runewidth.Truncate(r.label, labelWidth-1, "…"), labelWidth)
 	}
 
+	if m.mode == modeEdit && m.edit != nil && m.edit.row == i && m.edit.typed != nil {
+		return []string{m.typedEditLine(label, w)}
+	}
+	if m.mode == modeEdit && m.edit != nil && m.edit.row == i && m.edit.ta != nil {
+		return m.typeaheadLines(label, w)
+	}
 	if m.mode == modeEdit && m.edit != nil && m.edit.row == i {
-		line := m.st.Dim.Render(label) + m.rowInput.View()
+		line := m.st.Dim.Render(label) + strings.TrimRight(m.rowInput.View(), " ")
+		if r.spec != nil {
+			line += m.st.Dim.Render(m.fieldHint(*r.spec, m.rowInput.Value(), w-labelWidth-runewidth.StringWidth(m.rowInput.Value())-2))
+		}
 		return []string{lipgloss.NewStyle().MaxWidth(w).Render(line)}
 	}
 
@@ -404,6 +429,8 @@ func (m *Model) renderRow(i int, r formRow, w int) []string {
 	switch {
 	case r.kind == rkField:
 		first, _ = splitFirst(r.value)
+	case r.kind == rkTyped:
+		first, _ = splitFirst(typedDisplay(r))
 	case r.kind == rkNote && !r.empty:
 		first = r.key
 	}
@@ -432,7 +459,7 @@ func (m *Model) renderRow(i int, r formRow, w int) []string {
 	}
 
 	var more []string
-	if (r.kind == rkField && r.field == "notes") || (r.kind == rkNote && !r.empty) {
+	if (r.kind == rkField && r.field == "notes") || (r.kind == rkTyped && r.spec != nil && r.spec.Type == model.FieldLongText) || (r.kind == rkNote && !r.empty) {
 		_, rest := splitFirst(r.value)
 		if r.kind == rkNote {
 			rest = strings.Split(strings.TrimRight(r.value, "\n"), "\n")
@@ -485,6 +512,9 @@ func (m *Model) startEdit() tea.Cmd {
 		m.setStatus("enter a name first", true)
 		return nil
 	}
+	if r.kind == rkTyped {
+		return m.beginTyped()
+	}
 	// Task and note rows edit inline on every record page, the same path as a person's page.
 	if m.onObjectPage() && r.kind != rkTask && r.kind != rkNote {
 		m.objectPageEdit(r)
@@ -501,8 +531,6 @@ func (m *Model) startEdit() tea.Cmd {
 		return m.beginEdit(m.fcur, false)
 	case r.kind == rkCadence:
 		m.pickCadence([]int64{m.formPerson})
-	case r.kind == rkTier:
-		m.pickTier([]int64{m.formPerson})
 	default:
 		return m.beginEdit(m.fcur, false)
 	}
@@ -605,6 +633,12 @@ func (m *Model) cancelEdit() {
 }
 
 func (m *Model) handleEditKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.edit != nil && m.edit.typed != nil {
+		return m.handleTypedKey(msg)
+	}
+	if m.edit != nil && m.edit.ta != nil {
+		return m.handleTypeaheadKey(msg)
+	}
 	switch msg.String() {
 	case "esc":
 		m.cancelEdit()
@@ -702,6 +736,16 @@ func (m *Model) applyEdit(e *editState, v string) error {
 		case "notes":
 			in.Notes = &v
 		case "birthday":
+			// A birthday keeps its existing forms (YYYY-MM-DD, --MM-DD, MM-DD). Anything else may be a
+			// natural phrase, read by the date field type.
+			if _, _, _, perr := model.ParseBirthday(v); perr != nil && v != "" {
+				spec, _ := model.FieldNamed("person", "birthday")
+				nv, err := spec.Normalize(v, m.parseDateField)
+				if err != nil {
+					return perr
+				}
+				v = nv
+			}
 			if birthdayShort.MatchString(v) {
 				v = "--" + v
 			}
@@ -886,7 +930,7 @@ func (m *Model) askDelete() {
 		m.setStatus("nothing to delete here", true)
 		return
 	}
-	if m.onObjectPage() && r.kind != rkLinked && r.kind != rkTask && r.kind != rkNote {
+	if m.onObjectPage() && r.kind != rkLinked && r.kind != rkTask && r.kind != rkNote && r.kind != rkTyped {
 		m.setStatus("this row is read-only here, d unlinks a linked row", true)
 		return
 	}
@@ -920,12 +964,9 @@ func (m *Model) askDelete() {
 			_, err := m.hUpdatePerson(m.ctx, pid, model.UpdatePersonInput{KeepInTouch: &e})
 			return err
 		}
-	case rkTier:
-		what, do = "priority", func() error {
-			z := 0
-			_, err := m.hUpdatePerson(m.ctx, pid, model.UpdatePersonInput{PriorityTier: &z})
-			return err
-		}
+	case rkTyped:
+		m.clearTyped(r)
+		return
 	case rkField:
 		if r.field == "first" {
 			m.setStatus("first name cannot be cleared", true)

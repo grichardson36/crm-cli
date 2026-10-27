@@ -85,7 +85,13 @@ func linkActions() []action {
 		{id: "unlink", title: "Unlink", group: "Link", hint: "u", keys: []string{"u"},
 			desc:  "remove a link of the selected object (or a tag). ctrl+z undoes",
 			write: true, when: whenAnyObject,
-			run: func(m *Model) tea.Cmd { return m.startLinkVerb(true) }},
+			run: func(m *Model) tea.Cmd {
+				if m.focus == focusDetail && whenLinkedRow(m) { // u on a linked row removes that chip
+					m.askUnlinkRow(m.form[m.fcur])
+					return nil
+				}
+				return m.startLinkVerb(true)
+			}},
 	}
 	for _, other := range append(append([]string{}, model.ObjectKinds...), tagKind) {
 		other := other
@@ -222,6 +228,9 @@ func (m *Model) startLink(src repo.Ref, other string, unlink bool) tea.Cmd {
 		}
 		m.openPicker("Unlink "+label+" from "+m.refName(src), items, func(m *Model, it overlayItem) { m.doUnlink(src, other, it) })
 		return nil
+	}
+	if m.typeaheadOK(src, other) {
+		return m.beginTypeahead(src, other)
 	}
 	items := m.candidateItems(src, other)
 	m.openPicker("Link "+label+" to "+m.refName(src), items, func(m *Model, it overlayItem) { m.doLink(src, other, it) })

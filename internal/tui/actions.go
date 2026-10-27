@@ -253,8 +253,6 @@ func buildActions() []action {
 			write: true, run: func(m *Model) tea.Cmd { m.openTagDelete(); return nil }},
 		{id: "cadence", title: "Set keep-in-touch", group: "Contact", hint: "F", keys: []string{"F"}, desc: "pick a keep-in-touch cadence for the person or all marked",
 			write: true, foot: 32, footIn: inList, footIf: whenMarks, when: whenPerson, run: func(m *Model) tea.Cmd { m.pickCadence(m.targets()); return nil }},
-		{id: "tier", title: "Set priority tier", group: "Contact", desc: "pick a priority tier for the person or all marked (palette; a choice field edited with enter in a later release)",
-			write: true, when: whenPerson, run: func(m *Model) tea.Cmd { m.pickTier(m.targets()); return nil }},
 		{id: "done", title: "Complete task", group: "Contact", desc: "complete the selected task, or reopen it when it is done (Tasks view, or a task row). x does this on a task",
 			write: true, run: func(m *Model) tea.Cmd { m.completeTask(); return nil }},
 
@@ -597,23 +595,6 @@ func (m *Model) pickCadence(ids []int64) {
 		v := it.value
 		m.bulk(ids, "keep in touch set", "keep in touch set", func(id int64) error {
 			_, err := m.hUpdatePerson(m.ctx, id, model.UpdatePersonInput{KeepInTouch: &v})
-			return err
-		})
-	})
-}
-
-func (m *Model) pickTier(ids []int64) {
-	items := make([]overlayItem, len(tierNames))
-	for i, n := range tierNames {
-		items[i] = overlayItem{label: n, value: strconv.Itoa(i)}
-		if i == 0 {
-			items[i].desc = "clear the tier"
-		}
-	}
-	m.openPicker("Priority tier", items, func(m *Model, it overlayItem) {
-		n, _ := strconv.Atoi(it.value)
-		m.bulk(ids, "priority set", "priority set", func(id int64) error {
-			_, err := m.hUpdatePerson(m.ctx, id, model.UpdatePersonInput{PriorityTier: &n})
 			return err
 		})
 	})

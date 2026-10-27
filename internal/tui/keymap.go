@@ -235,13 +235,13 @@ var frameworkIDs = map[string]bool{
 // scopeByID narrows the scope of an action. Everything not listed is in the app scope.
 var scopeByID = map[string]string{
 	// People (Home, People, Follow-up, Birthdays)
-	"favorite": "type:person", "snooze": "type:person", "cadence": "type:person", "contacted": "type:person", "tier": "type:person",
+	"favorite": "type:person", "snooze": "type:person", "cadence": "type:person", "contacted": "type:person",
 	"tag": "type:person", "note-pick": "type:person",
 	"archive": "type:person", "restore": "type:archive", "person-edit": "type:person", "new": "type:person",
 	// Tasks, organizations, deals
 	"task-delete": "type:task", "task-edit": "type:task", "task": "type:task", "task-restore": "type:task",
 	"org-delete": "type:organization", "org-edit": "type:organization", "org-restore": "type:organization", "org-add": "type:organization", "org-mark": "type:organization",
-	"deal-delete": "type:deal", "deal-edit": "type:deal", "deal-restore": "type:deal", "deal-add": "type:deal", "deal-stage": "type:deal",
+	"deal-delete": "type:deal", "deal-edit": "type:deal", "deal-restore": "type:deal", "deal-add": "type:deal",
 	// Merge, Archived, Sync
 	"dupe-level": "type:dupes", "dismiss": "type:dupes", "undo-dismiss": "type:dupes", "compare": "type:dupes",
 	"purge": "type:archive", "purge-selected": "type:archive", "purge-all": "type:archive", "archived-type": "type:archive",
