@@ -40,7 +40,7 @@ var linkColumns = []format.ColumnDef{
 	{Header: "Link ID", Field: "link_id"},
 }
 
-const linkFields = "action,from,from_id,to,to_id,changed,created,updated,link_id,relation,demoted,removed"
+const linkFields = "action,from,from_id,to,to_id,changed,created,updated,link_id,relation,revived,demoted,removed"
 
 // linkMeta describes the generated commands for `crm schema`, --help and --dry-run.
 func linkMeta() map[string]cmdMeta {
@@ -217,12 +217,17 @@ func relationCmd(kind, other string, remove bool) *cobra.Command {
 			}
 			row["changed"], row["created"], row["updated"] = res.Changed, res.Created, res.Updated
 			row["link_id"], row["relation"] = res.LinkID, res.Relation
+			if res.Revived {
+				row["revived"] = true
+			}
 			if len(res.Demoted) > 0 {
 				row["demoted"] = res.Demoted
 			}
 			switch {
 			case !res.Changed:
 				fmt.Fprintf(os.Stderr, "%s #%d is already linked to %s #%d\n", capitalize(kind), aid, other, bid)
+			case res.Revived:
+				fmt.Fprintf(os.Stderr, "Linked %s #%d to %s #%d again (the old link came back with its role, dates and notes)\n", kind, aid, other, bid)
 			case res.Updated && !res.Created:
 				fmt.Fprintf(os.Stderr, "Updated the link of %s #%d and %s #%d\n", kind, aid, other, bid)
 			default:

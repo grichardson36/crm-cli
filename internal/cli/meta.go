@@ -105,7 +105,14 @@ var commandMeta = map[string]cmdMeta{
 	"org ignore add":    {mutates: true, noDryRun: true, examples: []string{`crm org ignore add "stay at home parent"`}},
 	"org ignore remove": {mutates: true, noDryRun: true, examples: []string{`crm org ignore remove retired`}},
 	"org dupes": {fields: "a_id,a_name,b_id,b_name,reason,merge", examples: []string{
-		`crm org dupes -f json`, `crm org dupes --limit 20`}},
+		`crm org dupes -f json`, `crm org dupes --limit 20`, `crm org dupes --dismissed`}},
+	"org dupes dismiss":   {mutates: true, noDryRun: true, examples: []string{`crm org dupes dismiss 1 2`}},
+	"org dupes undismiss": {mutates: true, noDryRun: true, examples: []string{`crm org dupes undismiss 1 2`}},
+
+	// merge log
+	"merge log":  {fields: "id,kind,survivor_id,survivor_name,loser_ids,loser_names,summary,status,created_at,undone_at", examples: []string{`crm merge log -f json`, `crm merge log --kind organization --limit 5`}},
+	"merge undo": {mutates: true, noDryRun: true, fields: "id,kind,survivor_id,loser_ids,status,skipped", examples: []string{`crm merge undo 3`}},
+	"merge redo": {mutates: true, noDryRun: true, fields: "id,kind,survivor_id,loser_ids,status,skipped", examples: []string{`crm merge redo 3`}},
 
 	"org merge": {mutates: true, noDryRun: true, fields: "keep_id,keep_name,drop_ids,drop_names,dry_run,fields,lost,moved", examples: []string{
 		`crm org merge 1 2 3 -f json`, `crm org merge 1 2 3 --apply`}},

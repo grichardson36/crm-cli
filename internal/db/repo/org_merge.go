@@ -41,7 +41,9 @@ type OrgMergeResult struct {
 	DropIDs   []int64          `json:"drop_ids"`
 	DropNames []string         `json:"drop_names"`
 	DryRun    bool             `json:"dry_run"`
-	Fields    []OrgFieldChange `json:"fields"`
+	// LogID is the merge log entry of an applied merge: `crm merge undo LogID` reverses it in any later session.
+	LogID  int64            `json:"log_id,omitempty"`
+	Fields []OrgFieldChange `json:"fields"`
 	// Lost lists fields where the duplicate had a different value than the survivor, which stays.
 	Lost  []OrgFieldChange `json:"lost,omitempty"`
 	Moved map[string]int   `json:"moved"`
@@ -156,6 +158,13 @@ func (r *OrgRepo) mergeOrgs(ctx context.Context, keepID int64, dropIDs []int64, 
 	}
 	defer func() { _ = tx.Rollback() }()
 	m := &orgMerger{ctx: ctx, tx: tx, keep: keepID, res: res}
+	specs := orgSnapSpecs(append([]int64{keepID}, dropIDs...))
+	var before rowSnap
+	if !dryRun {
+		if before, err = takeSnapshot(ctx, tx, specs); err != nil {
+			return nil, err
+		}
+	}
 	if err := m.fields(keep, drops); err != nil {
 		return nil, err
 	}
@@ -176,6 +185,15 @@ func (r *OrgRepo) mergeOrgs(ctx context.Context, keepID int64, dropIDs []int64, 
 		return res, nil
 	}
 	if err := touchOrgMembers(ctx, tx, append([]int64{keepID}, dropIDs...)); err != nil {
+		return nil, err
+	}
+	after, err := takeSnapshot(ctx, tx, specs)
+	if err != nil {
+		return nil, err
+	}
+	res.LogID, err = writeMergeLog(ctx, tx, "organization", keepID, keep.Name, dropIDs, res.DropNames,
+		map[string]any{"fields": res.Fields, "lost": res.Lost, "moved": res.Moved}, diffSnapshots(before, after, specs))
+	if err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -483,8 +501,8 @@ func (m *orgMerger) activities(d int64) error {
 
 // tags moves the duplicate's tags the survivor does not have. A tag both have stays on the archived duplicate.
 func (m *orgMerger) tags(d int64) error {
-	rows, err := m.tx.QueryContext(m.ctx, `SELECT id FROM taggings WHERE entity_type = 'organization' AND entity_id = ?
-		AND tag_id NOT IN (SELECT tag_id FROM taggings WHERE entity_type = 'organization' AND entity_id = ?) ORDER BY id`, d, m.keep)
+	rows, err := m.tx.QueryContext(m.ctx, `SELECT id FROM taggings WHERE entity_type = 'organization' AND entity_id = ? AND deleted_at IS NULL
+		AND tag_id NOT IN (SELECT tag_id FROM taggings WHERE entity_type = 'organization' AND entity_id = ? AND deleted_at IS NULL) ORDER BY id`, d, m.keep)
 	if err != nil {
 		return fmt.Errorf("list tags: %w", err)
 	}
@@ -560,11 +578,19 @@ func (m *orgMerger) alias(d int64) error {
 
 // UndoMerge puts back what a merge changed, in reverse order. It touches the members again so sync sees it.
 func (r *OrgRepo) UndoMerge(ctx context.Context, res *OrgMergeResult) error {
+	if res.LogID != 0 {
+		_, err := NewMergeLogRepo(r.db).Undo(ctx, res.LogID)
+		return err
+	}
 	return r.replayMerge(ctx, res, false)
 }
 
 // RedoMerge repeats a merge that UndoMerge reversed.
 func (r *OrgRepo) RedoMerge(ctx context.Context, res *OrgMergeResult) error {
+	if res.LogID != 0 {
+		_, err := NewMergeLogRepo(r.db).Redo(ctx, res.LogID)
+		return err
+	}
 	return r.replayMerge(ctx, res, true)
 }
 

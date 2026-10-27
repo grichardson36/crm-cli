@@ -2,8 +2,8 @@ package tui
 
 import "fmt"
 
-// Delete a tag everywhere (same as crm tag delete). The undo puts the tag back on the records
-// that had it.
+// Delete a tag everywhere (same as crm tag delete): every object that carries it is untagged as one
+// undo step, and undo puts the same taggings back. A tag is only a name on objects (X26).
 
 var taggableEntities = []string{"person", "organization", "deal", "interaction", "task"}
 
@@ -38,26 +38,15 @@ func (m *Model) openTagDelete() {
 }
 
 func (m *Model) deleteTag(name string) {
-	held := map[string][]int64{}
-	for _, e := range taggableEntities {
-		if ids, err := m.tagr.GetEntities(m.ctx, name, e); err == nil && len(ids) > 0 {
-			held[e] = ids
-		}
-	}
-	if err := m.tagr.Delete(m.ctx, name); err != nil {
+	res, err := m.tagr.DeleteTag(m.ctx, name)
+	if err != nil {
 		m.setStatus(err.Error(), true)
 		return
 	}
-	m.record("delete tag #"+name,
-		func() error {
-			for e, ids := range held {
-				for _, id := range ids {
-					_ = m.tagr.Apply(m.ctx, e, id, name)
-				}
-			}
-			return nil
-		},
-		func() error { return m.tagr.Delete(m.ctx, name) })
+	// One step: untagging every object undoes and redoes as the same taggings.
+	m.record(res.Label(),
+		func() error { return m.tagr.UndoDelete(m.ctx, res) },
+		func() error { return m.tagr.RedoDelete(m.ctx, res) })
 	m.afterWrite()
-	m.setStatus("tag #"+name+" deleted (ctrl+z undoes)", false)
+	m.setStatus("tag #"+name+" deleted from every record (ctrl+z undoes)", false)
 }

@@ -219,6 +219,9 @@ func registerObjectTools(s *server.MCPServer, db *sql.DB) {
 					}
 					out["changed"], out["created"], out["updated"] = res.Changed, res.Created, res.Updated
 					out["link_id"], out["relation"] = res.LinkID, res.Relation
+					if res.Revived {
+						out["revived"] = true
+					}
 					if len(res.Demoted) > 0 {
 						out["demoted"] = res.Demoted
 					}

@@ -28,7 +28,7 @@ func registerDedupeTools(s *server.MCPServer, db *sql.DB) {
 
 	s.AddTool(
 		gomcp.NewTool("crm_person_merge",
-			gomcp.WithDescription("Merge duplicate people into a survivor. Lists are combined, records move to the survivor, dropped people are archived with merged_into set. Use dry_run first."),
+			gomcp.WithDescription("Merge duplicate people into a survivor. Lists are combined, records move to the survivor, dropped people are archived with merged_into set. The result has a log_id: crm_merge_undo reverses the merge later. Use dry_run first."),
 			gomcp.WithNumber("keep_id", gomcp.Required(), gomcp.Description("Survivor person ID")),
 			gomcp.WithArray("drop_ids", gomcp.Required(), gomcp.Description("Person IDs to merge into the survivor"), gomcp.WithNumberItems()),
 			gomcp.WithObject("choices", gomcp.Description("Per-field person ID to take the value from, e.g. {\"title\": 7, \"linkedin\": 7}. Fields: first_name, last_name, title, company, location, notes, summary, birthday, keep_in_touch, keep_in_touch_snoozed_until, last_contacted_at, is_favorite, priority_tier, email, phone, or a handle kind")),

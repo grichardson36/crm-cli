@@ -122,6 +122,9 @@ func (r *PersonRepo) Purge(ctx context.Context, id int64) error {
 		return err
 	}
 
+	if err := tombstone("taggings", "entity_type = 'person' AND entity_id = ?", id); err != nil {
+		return err
+	}
 	if err := exec("DELETE FROM taggings WHERE entity_type = 'person' AND entity_id = ?", id); err != nil {
 		return err
 	}

@@ -138,7 +138,7 @@ func (r *TaskRepo) FindByID(ctx context.Context, id int64) (*model.Task, error) 
 func (r *TaskRepo) loadTags(ctx context.Context, t *model.Task) error {
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT tg.name FROM tags tg JOIN taggings x ON x.tag_id = tg.id
-		 WHERE x.entity_type = 'task' AND x.entity_id = ? ORDER BY tg.name`, t.ID)
+		 WHERE x.entity_type = 'task' AND x.entity_id = ? AND x.deleted_at IS NULL ORDER BY tg.name`, t.ID)
 	if err != nil {
 		return fmt.Errorf("load task tags: %w", err)
 	}
@@ -172,7 +172,7 @@ func (r *TaskRepo) FindAll(ctx context.Context, filters model.TaskFilters) ([]*m
 		args = append(args, *filters.DealID)
 	}
 	if filters.Tag != nil {
-		query += " AND id IN (SELECT x.entity_id FROM taggings x JOIN tags tg ON tg.id = x.tag_id WHERE x.entity_type = 'task' AND tg.name = ?)"
+		query += " AND id IN (SELECT x.entity_id FROM taggings x JOIN tags tg ON tg.id = x.tag_id WHERE x.entity_type = 'task' AND x.deleted_at IS NULL AND tg.name = ?)"
 		args = append(args, *filters.Tag)
 	}
 	if filters.Overdue {

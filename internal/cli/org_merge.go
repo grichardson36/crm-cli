@@ -84,7 +84,7 @@ Company text keeps working: the duplicate's name now matches the survivor as an 
 				return err
 			}
 			if apply {
-				fmt.Fprintf(os.Stderr, "Merged %v into #%d (%s)\n", drops, keep, res.KeepName)
+				fmt.Fprintf(os.Stderr, "Merged %v into #%d (%s) (undo: crm merge undo %d)\n", drops, keep, res.KeepName, res.LogID)
 			} else {
 				fmt.Fprintf(os.Stderr, "Preview only: add --apply to merge %v into #%d (%s)\n", drops, keep, res.KeepName)
 			}

@@ -14,7 +14,9 @@ type MergeResult struct {
 	KeepID  int64              `json:"keep_id"`
 	DropIDs []int64            `json:"drop_ids"`
 	DryRun  bool               `json:"dry_run"`
-	Fields  []MergeFieldChange `json:"fields"`
+	// LogID is the merge log entry of a merge that was applied: `crm merge undo LogID` reverses it in any later session.
+	LogID  int64              `json:"log_id,omitempty"`
+	Fields []MergeFieldChange `json:"fields"`
 	// Added counts attribute rows copied to the survivor: emails, phones, handles, tags, custom_fields.
 	Added map[string]int `json:"added"`
 	// Moved counts records re-pointed to the survivor: interactions, tasks, deals (deal links), relationships (person links), memberships, duplicates_dropped, aliases.

@@ -168,10 +168,11 @@ func orgIgnoreCmd() *cobra.Command {
 
 func orgDupesCmd() *cobra.Command {
 	var limit int
+	var dismissed bool
 	cmd := &cobra.Command{
 		Use:   "dupes",
 		Short: "Find organizations that may be the same one",
-		Long:  "Lists pairs of organizations with near-duplicate names (same name after normalizing, close spelling, one name starting with the other) or the same domain, best first. Company text never merges close names on its own, this is where they show up. Merge a pair with 'crm org merge <survivor> <duplicate>'.",
+		Long:  "Lists pairs of organizations with near-duplicate names (same name after normalizing, close spelling, one name starting with the other) or the same domain, best first. Company text never merges close names on its own, this is where they show up. Merge a pair with 'crm org merge <survivor> <duplicate>'. A pair that is not a duplicate is marked with 'crm org dupes dismiss <id> <id>', it stops showing up here and 'crm org dupes undismiss <id> <id>' brings it back. 'crm org dupes --dismissed' lists the dismissed pairs.",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			db, err := openDB()
@@ -179,7 +180,12 @@ func orgDupesCmd() *cobra.Command {
 				return err
 			}
 			defer db.Close()
-			c, err := repo.NewOrgRepo(db).FindOrgCandidates(cmd.Context(), limit)
+			var c []repo.OrgCandidate
+			if dismissed {
+				c, err = repo.NewOrgRepo(db).DismissedOrgCandidates(cmd.Context())
+			} else {
+				c, err = repo.NewOrgRepo(db).FindOrgCandidates(cmd.Context(), limit)
+			}
 			if err != nil {
 				return err
 			}
@@ -193,5 +199,45 @@ func orgDupesCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().IntVar(&limit, "limit", 0, "show only the first N pairs")
+	cmd.Flags().BoolVar(&dismissed, "dismissed", false, "list the pairs marked as not duplicates instead")
+	cmd.AddCommand(orgDupesDismissCmd(false), orgDupesDismissCmd(true))
 	return cmd
+}
+
+func orgDupesDismissCmd(undo bool) *cobra.Command {
+	use, short, done := "dismiss <idA> <idB>", "Mark two organizations as not duplicates", "Dismissed"
+	if undo {
+		use, short, done = "undismiss <idA> <idB>", "Make a dismissed pair a merge candidate again", "Undismissed"
+	}
+	return &cobra.Command{
+		Use:   use,
+		Short: short,
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			a, err := parseOrgIDArg(args[0])
+			if err != nil {
+				return err
+			}
+			b, err := parseOrgIDArg(args[1])
+			if err != nil {
+				return err
+			}
+			db, err := openDB()
+			if err != nil {
+				return err
+			}
+			defer db.Close()
+			r := repo.NewOrgRepo(db)
+			if undo {
+				err = r.UndismissOrgPair(cmd.Context(), a, b)
+			} else {
+				_, err = r.DismissOrgPair(cmd.Context(), a, b)
+			}
+			if err != nil {
+				return err
+			}
+			fmt.Fprintf(os.Stderr, "%s organizations #%d and #%d\n", done, a, b)
+			return nil
+		},
+	}
 }

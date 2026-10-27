@@ -80,7 +80,7 @@ func TestMergeWith_ExcludesEmailsPhonesTagsHandlesAndFields(t *testing.T) {
 	assert.ElementsMatch(t, []string{"+1 555 000 2222"}, listStrings(t, d, `SELECT phone_number FROM person_phones WHERE person_id = ?`, keep.ID))
 	assert.Equal(t, []string{"+1 555 000 2222"}, listStrings(t, d, `SELECT phone FROM people WHERE id = ?`, keep.ID), "the mirror column follows")
 	assert.Equal(t, []string{"a@x.com"}, listStrings(t, d, `SELECT email FROM people WHERE id = ?`, keep.ID))
-	assert.Equal(t, []string{"friend"}, listStrings(t, d, `SELECT t.name FROM taggings g JOIN tags t ON t.id = g.tag_id WHERE g.entity_type = 'person' AND g.entity_id = ?`, keep.ID))
+	assert.Equal(t, []string{"friend"}, listStrings(t, d, `SELECT t.name FROM taggings g JOIN tags t ON t.id = g.tag_id WHERE g.entity_type = 'person' AND g.entity_id = ? AND g.deleted_at IS NULL`, keep.ID))
 	assert.ElementsMatch(t, []string{"website=dropsite", "linkedin=li/drop"},
 		listStrings(t, d, `SELECT kind || '=' || value FROM person_handles WHERE person_id = ?`, keep.ID))
 	assert.ElementsMatch(t, []string{"pet=dog", "car=vw"},

@@ -144,7 +144,7 @@ func (r *PersonRepo) FindAll(ctx context.Context, filters model.PersonFilters) (
 
 	if filters.Tag != nil {
 		query = fmt.Sprintf(
-			"SELECT p.%s FROM people p JOIN taggings tg ON tg.entity_type = 'person' AND tg.entity_id = p.id JOIN tags t ON t.id = tg.tag_id WHERE p.archived = %d AND t.name = ?",
+			"SELECT p.%s FROM people p JOIN taggings tg ON tg.entity_type = 'person' AND tg.entity_id = p.id JOIN tags t ON t.id = tg.tag_id WHERE tg.deleted_at IS NULL AND p.archived = %d AND t.name = ?",
 			strings.ReplaceAll(personColumns, ", ", ", p."), archived,
 		)
 		args = append(args, *filters.Tag)

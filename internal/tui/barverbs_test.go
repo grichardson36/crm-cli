@@ -253,13 +253,12 @@ func TestBarTaskAndDealVerbs(t *testing.T) {
 
 func TestBarTagRowMatchesWithoutHashAndRanksFirstAmongObjects(t *testing.T) {
 	m, _ := newTestModel(t)
-	_, err := m.tagr.FindOrCreate(m.ctx, "The Well")
-	require.NoError(t, err)
-	_, err = m.tagr.FindOrCreate(m.ctx, "The Wellness Club")
-	require.NoError(t, err)
 	wanda := "The Well Co"
-	_, err = m.pr.Create(m.ctx, model.CreatePersonInput{FirstName: "Wanda", Company: &wanda})
+	w, err := m.pr.Create(m.ctx, model.CreatePersonInput{FirstName: "Wanda", Company: &wanda})
 	require.NoError(t, err)
+	// A tag is a name on objects: it only lists while something carries it.
+	require.NoError(t, m.tagr.Apply(m.ctx, "person", w.ID, "The Well"))
+	require.NoError(t, m.tagr.Apply(m.ctx, "person", w.ID, "The Wellness Club"))
 	m.afterWrite()
 
 	press(m, "ctrl+k")
@@ -356,8 +355,10 @@ func TestBarTagRowOpensItsTaggedPeopleAndHasItsOwnVerbs(t *testing.T) {
 	ids, _ = m.tagr.GetEntities(m.ctx, "friend", "person")
 	assert.Empty(t, ids)
 
-	// Delete asks first, undo puts the tag back on its records.
+	// Delete asks first, undo puts the tag back on its records. A tag nothing carries leaves the bar
+	// and comes back with undo, so the cursor is put back on it.
 	press(m, "ctrl+z")
+	cursorOnBarRow(t, m, "tag:friend")
 	press(m, "d")
 	require.Equal(t, modeConfirm, m.mode)
 	assert.Contains(t, m.confirm.prompt, "delete tag #friend")

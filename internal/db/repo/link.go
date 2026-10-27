@@ -24,8 +24,12 @@ func (r Ref) String() string { return fmt.Sprintf("%s %d", r.Kind, r.ID) }
 // LinkResult says what Link did. Undo uses it: a created link is soft-deleted, an updated link gets
 // Before written back, and Demoted links get their primary flag back.
 type LinkResult struct {
-	Changed  bool
-	Created  bool
+	Changed bool
+	// Created is true for a new row and for a revived one: undo soft-deletes it again either way.
+	Created bool
+	// Revived says an earlier unlinked row of the same pair (and kind) came back with its old
+	// attributes, instead of a new row being inserted.
+	Revived  bool
 	Updated  bool
 	Relation string
 	LinkID   int64
@@ -302,6 +306,16 @@ func (r *LinkRepo) link(ctx context.Context, a, b Ref, attrs model.LinkAttrs, fo
 		existing = same
 	}
 
+	var dead *LinkRecord
+	if len(existing) == 0 && !forceNew {
+		// Linking a pair again after an unlink brings the old row back with its role, dates, kind
+		// and notes unless new ones are given (owner decision 2026-10-27).
+		dead, err = r.deadRow(ctx, rel, ra.ID, rb.ID, kind)
+		if err != nil {
+			return LinkResult{}, err
+		}
+	}
+
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return LinkResult{}, fmt.Errorf("begin link: %w", err)
@@ -309,6 +323,22 @@ func (r *LinkRepo) link(ctx context.Context, a, b Ref, attrs model.LinkAttrs, fo
 	defer func() { _ = tx.Rollback() }()
 
 	res := LinkResult{Relation: rel.Name}
+	{
+		if dead != nil {
+			demoted, err := r.revive(ctx, tx, rel, st, *dead, attrs, kind)
+			if err != nil {
+				return LinkResult{}, err
+			}
+			res.Changed, res.Created, res.Revived, res.LinkID, res.Demoted = true, true, true, dead.ID, demoted
+			if err := r.touchBoth(ctx, tx, rel, ra.ID, rb.ID); err != nil {
+				return LinkResult{}, err
+			}
+			if err := tx.Commit(); err != nil {
+				return LinkResult{}, fmt.Errorf("commit link: %w", err)
+			}
+			return res, nil
+		}
+	}
 	switch {
 	case len(existing) == 0 || forceNew:
 		id, demoted, err := r.insert(ctx, tx, rel, st, ra.ID, rb.ID, attrs, kind)
@@ -343,6 +373,58 @@ func (r *LinkRepo) link(ctx context.Context, a, b Ref, attrs model.LinkAttrs, fo
 		return LinkResult{}, fmt.Errorf("commit link: %w", err)
 	}
 	return res, nil
+}
+
+// deadRow returns the newest unlinked row of the pair (and kind), nil when there is none.
+func (r *LinkRepo) deadRow(ctx context.Context, rel model.Relation, aID, bID int64, kind *model.RelationKind) (*LinkRecord, error) {
+	st := storeOf(rel)
+	q := fmt.Sprintf("SELECT %s FROM %s WHERE %s = ? AND %s = ? AND deleted_at IS NOT NULL%s", st.selectList(""), st.table, st.aCol, st.bCol, st.fixedWhere(""))
+	args := []any{aID, bID}
+	if kind != nil {
+		q += " AND kind_id = ?"
+		args = append(args, kind.ID)
+	}
+	q += " ORDER BY deleted_at DESC, id DESC LIMIT 1"
+	rec, err := scanRecord(rel, r.db.QueryRowContext(ctx, q, args...))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("find unlinked row: %w", err)
+	}
+	return rec, nil
+}
+
+// revive brings an unlinked row back. Its attributes stay unless new ones are given. A primary flag
+// it held is dropped when another link has taken it since.
+func (r *LinkRepo) revive(ctx context.Context, tx *sql.Tx, rel model.Relation, st store, dead LinkRecord, at model.LinkAttrs, kind *model.RelationKind) ([]int64, error) {
+	next, _ := applyAttrs(dead, at, kind)
+	if rel.PrimaryPerA {
+		switch {
+		case at.Primary != nil:
+			next.Primary = *at.Primary
+		case next.Primary:
+			has, err := r.hasVisiblePrimary(ctx, tx, rel, st, next.A)
+			if err != nil {
+				return nil, err
+			}
+			if has {
+				next.Primary = false
+			}
+		}
+	}
+	if next.StartedOn != nil && next.EndedOn != nil && *next.StartedOn > *next.EndedOn {
+		return nil, fmt.Errorf("the end date is before the start date: %w", model.ErrValidation)
+	}
+	next.Deleted = false
+	demoted, err := r.write(ctx, tx, rel, st, next)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := tx.ExecContext(ctx, fmt.Sprintf("UPDATE %s SET deleted_at = NULL WHERE id = ?", st.table), dead.ID); err != nil {
+		return nil, fmt.Errorf("revive link: %w", err)
+	}
+	return demoted, nil
 }
 
 // applyAttrs applies given attributes to a record and says whether anything changed.

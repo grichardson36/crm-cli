@@ -65,7 +65,7 @@ func TestMigration008_MovesDataAndDropsOldColumns(t *testing.T) {
 	require.NoError(t, err)
 	defer d.Close()
 
-	assert.Equal(t, 10, scalar(t, d, `PRAGMA user_version`))
+	assert.Equal(t, 11, scalar(t, d, `PRAGMA user_version`))
 
 	// Memberships: people.org_id became a primary membership.
 	assert.Equal(t, 2, scalar(t, d, `SELECT COUNT(*) FROM membership`))
@@ -209,7 +209,7 @@ func TestMigration008_FreshDatabase(t *testing.T) {
 	d, err := db.Open(":memory:")
 	require.NoError(t, err)
 	defer d.Close()
-	assert.Equal(t, 10, scalar(t, d, `PRAGMA user_version`))
+	assert.Equal(t, 11, scalar(t, d, `PRAGMA user_version`))
 	assert.Equal(t, 10, scalar(t, d, `SELECT COUNT(*) FROM relation_kind`))
 	assert.Equal(t, 0, scalar(t, d, `SELECT COUNT(*) FROM membership`))
 	var ok string

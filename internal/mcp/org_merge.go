@@ -14,7 +14,7 @@ func registerOrgMergeTool(s *server.MCPServer, db *sql.DB) {
 	or := repo.NewOrgRepo(db)
 	s.AddTool(
 		gomcp.NewTool("crm_org_merge",
-			gomcp.WithDescription("Merge duplicate organizations into a survivor. The survivor keeps its fields and empty ones are filled from the duplicates. Memberships move (only an exact duplicate row is dropped), parent links, deal links, task and interaction links and tags move, a merge that would make an organization its own parent is refused. Duplicates are archived and their ids keep resolving to the survivor. Use dry_run first"),
+			gomcp.WithDescription("Merge duplicate organizations into a survivor. The survivor keeps its fields and empty ones are filled from the duplicates. Memberships move (only an exact duplicate row is dropped), parent links, deal links, task and interaction links and tags move, a merge that would make an organization its own parent is refused. Duplicates are archived and their ids keep resolving to the survivor. The result has a log_id: crm_merge_undo reverses the merge later. Use dry_run first"),
 			gomcp.WithNumber("keep_id", gomcp.Required(), gomcp.Description("Survivor organization ID")),
 			gomcp.WithArray("drop_ids", gomcp.Required(), gomcp.Description("Organization IDs to merge into the survivor"), gomcp.WithNumberItems()),
 			gomcp.WithBoolean("dry_run", gomcp.Description("Report what would change without changing anything")),

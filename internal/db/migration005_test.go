@@ -40,7 +40,7 @@ func TestMigration005_BackfillsDexIDs(t *testing.T) {
 
 	var version, n int
 	require.NoError(t, d.QueryRow(`PRAGMA user_version`).Scan(&version))
-	assert.Equal(t, 10, version)
+	assert.Equal(t, 11, version)
 
 	require.NoError(t, d.QueryRow(`SELECT COUNT(*) FROM external_ids`).Scan(&n))
 	assert.Equal(t, 2, n)

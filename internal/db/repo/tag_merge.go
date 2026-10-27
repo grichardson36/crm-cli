@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/jdanielnd/crm-cli/internal/model"
 )
 
@@ -108,7 +109,7 @@ func touchTagged(ctx context.Context, q DBTX, tagID int64) error {
 	for entityType, table := range entityTables {
 		if _, err := q.ExecContext(ctx,
 			fmt.Sprintf(`UPDATE %s SET updated_at = datetime('now') WHERE id IN (
-				SELECT entity_id FROM taggings WHERE tag_id = ? AND entity_type = ?)`, table), tagID, entityType); err != nil {
+				SELECT entity_id FROM taggings WHERE tag_id = ? AND entity_type = ? AND deleted_at IS NULL)`, table), tagID, entityType); err != nil {
 			return fmt.Errorf("touch tagged %s: %w", entityType, err)
 		}
 	}
@@ -151,8 +152,8 @@ func (r *TagRepo) merge(ctx context.Context, source, target string, dryRun bool)
 		return nil, err
 	}
 	rows, err := tx.QueryContext(ctx, `SELECT entity_type, entity_id,
-			EXISTS (SELECT 1 FROM taggings x WHERE x.tag_id = ? AND x.entity_type = taggings.entity_type AND x.entity_id = taggings.entity_id)
-		FROM taggings WHERE tag_id = ? ORDER BY entity_type, entity_id`, tgtID, srcID)
+			EXISTS (SELECT 1 FROM taggings x WHERE x.tag_id = ? AND x.entity_type = taggings.entity_type AND x.entity_id = taggings.entity_id AND x.deleted_at IS NULL)
+		FROM taggings WHERE tag_id = ? AND deleted_at IS NULL ORDER BY entity_type, entity_id`, tgtID, srcID)
 	if err != nil {
 		return nil, fmt.Errorf("list taggings: %w", err)
 	}
@@ -179,13 +180,18 @@ func (r *TagRepo) merge(ctx context.Context, source, target string, dryRun bool)
 	if err := touchTagged(ctx, tx, srcID); err != nil {
 		return nil, err
 	}
-	if _, err := tx.ExecContext(ctx, "UPDATE taggings SET tag_id = ? WHERE tag_id = ? AND NOT EXISTS (SELECT 1 FROM taggings x WHERE x.tag_id = ? AND x.entity_type = taggings.entity_type AND x.entity_id = taggings.entity_id)", tgtID, srcID, tgtID); err != nil {
+	if _, err := tx.ExecContext(ctx, "UPDATE taggings SET tag_id = ?, updated_at = datetime('now') WHERE tag_id = ? AND deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM taggings x WHERE x.tag_id = ? AND x.entity_type = taggings.entity_type AND x.entity_id = taggings.entity_id AND x.deleted_at IS NULL)", tgtID, srcID, tgtID); err != nil {
 		return nil, fmt.Errorf("move taggings: %w", err)
+	}
+	// The source tag row goes for good, so the taggings it still owns (duplicates the target had, and
+	// soft deleted ones) leave with it. Each gets a tombstone so a sync sees them gone.
+	device, _ := DeviceID(ctx, tx)
+	if _, err := tx.ExecContext(ctx, "INSERT OR REPLACE INTO tombstones (table_name, uuid, device_id) SELECT 'taggings', uuid, ? FROM taggings WHERE tag_id = ?", device, srcID); err != nil {
+		return nil, fmt.Errorf("tombstone taggings: %w", err)
 	}
 	if _, err := tx.ExecContext(ctx, "DELETE FROM taggings WHERE tag_id = ?", srcID); err != nil {
 		return nil, fmt.Errorf("drop duplicate taggings: %w", err)
 	}
-	device, _ := DeviceID(ctx, tx)
 	if _, err := tx.ExecContext(ctx, "INSERT OR REPLACE INTO tombstones (table_name, uuid, device_id) VALUES ('tags', ?, ?)", res.sourceUUID, device); err != nil {
 		return nil, fmt.Errorf("tombstone tag: %w", err)
 	}
@@ -224,12 +230,12 @@ func (r *TagRepo) UndoMerge(ctx context.Context, res *TagMergeResult) error {
 		return fmt.Errorf("restore tag: %w", err)
 	}
 	for _, ref := range res.movedRefs {
-		if _, err := tx.ExecContext(ctx, "UPDATE taggings SET tag_id = ? WHERE tag_id = ? AND entity_type = ? AND entity_id = ?", res.sourceID, tgtID, ref.Type, ref.ID); err != nil {
+		if _, err := tx.ExecContext(ctx, "UPDATE taggings SET tag_id = ?, updated_at = datetime('now') WHERE tag_id = ? AND entity_type = ? AND entity_id = ? AND deleted_at IS NULL", res.sourceID, tgtID, ref.Type, ref.ID); err != nil {
 			return fmt.Errorf("move tagging back: %w", err)
 		}
 	}
 	for _, ref := range res.dupRefs {
-		if _, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO taggings (tag_id, entity_type, entity_id) VALUES (?, ?, ?)", res.sourceID, ref.Type, ref.ID); err != nil {
+		if _, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO taggings (uuid, tag_id, entity_type, entity_id) VALUES (?, ?, ?, ?)", uuid.New().String(), res.sourceID, ref.Type, ref.ID); err != nil {
 			return fmt.Errorf("restore tagging: %w", err)
 		}
 	}

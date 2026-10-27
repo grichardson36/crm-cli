@@ -417,7 +417,7 @@ func (r *PersonRepo) ListSummaries(ctx context.Context) ([]model.PersonSummary, 
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT p.id, p.first_name, p.last_name, p.company, p.title, p.email, p.location, p.is_favorite, p.keep_in_touch, p.updated_at, COALESCE(p.priority_tier, 0),
 		        (SELECT group_concat(t.name, ', ') FROM taggings tg JOIN tags t ON t.id = tg.tag_id
-		          WHERE tg.entity_type = 'person' AND tg.entity_id = p.id),
+		          WHERE tg.entity_type = 'person' AND tg.entity_id = p.id AND tg.deleted_at IS NULL),
 		        (SELECT group_concat(e.email, ' ') FROM person_emails e WHERE e.person_id = p.id)
 		 FROM people p WHERE p.archived = 0
 		 ORDER BY lower(COALESCE(p.last_name, p.first_name)), lower(p.first_name)`)

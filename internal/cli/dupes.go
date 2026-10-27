@@ -213,7 +213,7 @@ Fields: ` + strings.Join(repo.MergeFieldKeys(), ", ") + `, or a handle kind such
 			if dryRun {
 				fmt.Fprintf(os.Stderr, "Dry run: nothing changed. Merging %v into #%d would:\n", drops, keep)
 			} else {
-				fmt.Fprintf(os.Stderr, "Merged %v into #%d\n", drops, keep)
+				fmt.Fprintf(os.Stderr, "Merged %v into #%d (undo: crm merge undo %d)\n", drops, keep, res.LogID)
 			}
 			if resolveFormat() == format.FormatJSON {
 				return json.NewEncoder(os.Stdout).Encode(res)

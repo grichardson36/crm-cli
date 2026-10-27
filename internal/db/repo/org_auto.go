@@ -717,9 +717,21 @@ type OrgCandidate struct {
 }
 
 // FindOrgCandidates lists live organization pairs with near-duplicate names (same normalized name,
-// close spelling, one name starting with the other) or the same domain, best first. limit 0 means
-// no limit.
+// close spelling, one name starting with the other) or the same domain, best first. Pairs marked
+// "not a duplicate" (DismissOrgPair) are left out. limit 0 means no limit.
 func (r *OrgRepo) FindOrgCandidates(ctx context.Context, limit int) ([]OrgCandidate, error) {
+	return r.findOrgCandidates(ctx, limit, true)
+}
+
+// findOrgCandidates is FindOrgCandidates, with hideDismissed false it keeps dismissed pairs too.
+func (r *OrgRepo) findOrgCandidates(ctx context.Context, limit int, hideDismissed bool) ([]OrgCandidate, error) {
+	var dismissed map[[2]int64]bool
+	if hideDismissed {
+		var err error
+		if dismissed, err = r.dismissedOrgPairs(ctx); err != nil {
+			return nil, err
+		}
+	}
 	rows, err := r.db.QueryContext(ctx, `SELECT id, name, COALESCE(domain, '') FROM organizations WHERE archived = 0 ORDER BY id`)
 	if err != nil {
 		return nil, fmt.Errorf("list organizations: %w", err)
@@ -748,6 +760,9 @@ func (r *OrgRepo) FindOrgCandidates(ctx context.Context, limit int) ([]OrgCandid
 			reason, score, ok := nearName(a.key, b.key)
 			if !ok && a.d != "" && a.d == b.d {
 				reason, score, ok = "same domain "+a.d, 0.95, true
+			}
+			if ok && dismissed[[2]int64{a.id, b.id}] {
+				continue
 			}
 			if ok {
 				out = append(out, OrgCandidate{AID: a.id, AName: a.name, BID: b.id, BName: b.name, Reason: reason, Score: score})

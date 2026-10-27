@@ -125,11 +125,38 @@ func (r *PersonRepo) merge(ctx context.Context, keepID int64, dropIDs []int64, c
 			Moved:  map[string]int{"interactions": 0, "tasks": 0, "deals": 0, "relationships": 0, "memberships": 0, "duplicates_dropped": 0, "aliases": 0},
 		},
 	}
+	var specs []snapSpec
+	var before rowSnap
+	var names []string
+	if !dryRun {
+		specs = personSnapSpecs(m.all())
+		if before, err = takeSnapshot(ctx, tx, specs); err != nil {
+			return nil, err
+		}
+		for _, id := range m.all() {
+			var first string
+			var last sql.NullString
+			if err := tx.QueryRowContext(ctx, "SELECT first_name, last_name FROM people WHERE id = ?", id).Scan(&first, &last); err != nil {
+				return nil, fmt.Errorf("person %d: %w", id, model.ErrNotFound)
+			}
+			names = append(names, strings.TrimSpace(first+" "+last.String))
+		}
+	}
 	if err := m.run(); err != nil {
 		return nil, err
 	}
 	if dryRun {
 		return m.res, nil
+	}
+	after, err := takeSnapshot(ctx, tx, specs)
+	if err != nil {
+		return nil, err
+	}
+	m.res.LogID, err = writeMergeLog(ctx, tx, "person", keepID, names[0], dropIDs, names[1:],
+		map[string]any{"fields": m.res.Fields, "added": m.res.Added, "moved": m.res.Moved, "removed": m.res.Removed},
+		diffSnapshots(before, after, specs))
+	if err != nil {
+		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("commit merge: %w", err)
@@ -575,7 +602,8 @@ func (m *merger) handles() error {
 func (m *merger) copyLists() error {
 	// Excluded tags and custom fields leave the survivor first, so nothing copies them back.
 	for _, name := range m.opts.Exclude["tag"] {
-		n, err := m.exec(`DELETE FROM taggings WHERE entity_type = 'person' AND entity_id = ?
+		n, err := m.exec(`UPDATE taggings SET deleted_at = datetime('now'), updated_at = datetime('now')
+			WHERE entity_type = 'person' AND entity_id = ? AND deleted_at IS NULL
 			AND tag_id IN (SELECT id FROM tags WHERE lower(name) = lower(?))`, m.keepID, strings.TrimSpace(name))
 		if err != nil {
 			return fmt.Errorf("remove tag: %w", err)
@@ -592,7 +620,7 @@ func (m *merger) copyLists() error {
 	}
 	for _, d := range m.dropIDs {
 		n, err := m.exec(`INSERT OR IGNORE INTO taggings (tag_id, entity_type, entity_id)
-			SELECT tag_id, 'person', ? FROM taggings WHERE entity_type = 'person' AND entity_id = ?
+			SELECT tag_id, 'person', ? FROM taggings WHERE entity_type = 'person' AND entity_id = ? AND deleted_at IS NULL
 			AND tag_id NOT IN (SELECT id FROM tags WHERE lower(name) IN (`+placeholders(len(m.opts.Exclude["tag"]))+`))`,
 			append([]any{m.keepID, d}, lowerArgs(m.opts.Exclude["tag"])...)...)
 		if err != nil {

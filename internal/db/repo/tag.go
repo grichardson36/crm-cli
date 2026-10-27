@@ -39,9 +39,11 @@ func NewTagRepo(db *sql.DB) *TagRepo {
 	return &TagRepo{db: db}
 }
 
-// FindAll lists all tags.
+// FindAll lists the tags that at least one object carries. A tag is a name on objects with no record
+// lifecycle of its own (owner decision 2026-10-27), so a tag with no live tagging is not listed.
 func (r *TagRepo) FindAll(ctx context.Context) ([]*model.Tag, error) {
-	rows, err := r.db.QueryContext(ctx, "SELECT id, name FROM tags ORDER BY name")
+	rows, err := r.db.QueryContext(ctx, `SELECT t.id, t.name FROM tags t
+		WHERE EXISTS (SELECT 1 FROM taggings g WHERE g.tag_id = t.id AND g.deleted_at IS NULL) ORDER BY t.name`)
 	if err != nil {
 		return nil, fmt.Errorf("list tags: %w", err)
 	}
@@ -99,16 +101,43 @@ func (r *TagRepo) Apply(ctx context.Context, entityType string, entityID int64, 
 		return err
 	}
 
-	res, err := r.db.ExecContext(ctx,
-		"INSERT OR IGNORE INTO taggings (tag_id, entity_type, entity_id) VALUES (?, ?, ?)",
-		tag.ID, entityType, entityID)
+	changed, err := r.tagTx(ctx, tag.ID, entityType, entityID)
 	if err != nil {
-		return fmt.Errorf("apply tag: %w", err)
+		return err
 	}
-	if n, _ := res.RowsAffected(); n > 0 {
+	if changed {
 		return r.touchEntity(ctx, entityType, entityID)
 	}
 	return nil
+}
+
+// tagTx puts the tag on the entity: a live tagging stays, the newest soft deleted one is revived
+// with its old row (same uuid), else a row is inserted. It says whether anything changed.
+func (r *TagRepo) tagTx(ctx context.Context, tagID int64, entityType string, entityID int64) (bool, error) {
+	var live int
+	if err := r.db.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM taggings WHERE tag_id = ? AND entity_type = ? AND entity_id = ? AND deleted_at IS NULL",
+		tagID, entityType, entityID).Scan(&live); err != nil {
+		return false, fmt.Errorf("find tagging: %w", err)
+	}
+	if live > 0 {
+		return false, nil
+	}
+	res, err := r.db.ExecContext(ctx, `UPDATE taggings SET deleted_at = NULL, updated_at = datetime('now') WHERE id = (
+			SELECT id FROM taggings WHERE tag_id = ? AND entity_type = ? AND entity_id = ? AND deleted_at IS NOT NULL
+			ORDER BY deleted_at DESC, id DESC LIMIT 1)`, tagID, entityType, entityID)
+	if err != nil {
+		return false, fmt.Errorf("revive tagging: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n > 0 {
+		return true, nil
+	}
+	if _, err := r.db.ExecContext(ctx,
+		"INSERT INTO taggings (uuid, tag_id, entity_type, entity_id) VALUES (?, ?, ?, ?)",
+		uuid.New().String(), tagID, entityType, entityID); err != nil {
+		return false, fmt.Errorf("apply tag: %w", err)
+	}
+	return true, nil
 }
 
 // Remove removes a tag from an entity.
@@ -118,7 +147,8 @@ func (r *TagRepo) Remove(ctx context.Context, entityType string, entityID int64,
 	}
 
 	result, err := r.db.ExecContext(ctx,
-		`DELETE FROM taggings WHERE tag_id = (SELECT id FROM tags WHERE name = ?) AND entity_type = ? AND entity_id = ?`,
+		`UPDATE taggings SET deleted_at = datetime('now'), updated_at = datetime('now')
+		 WHERE tag_id = (SELECT id FROM tags WHERE name = ?) AND entity_type = ? AND entity_id = ? AND deleted_at IS NULL`,
 		tagName, entityType, entityID)
 	if err != nil {
 		return fmt.Errorf("remove tag: %w", err)
@@ -135,7 +165,7 @@ func (r *TagRepo) Remove(ctx context.Context, entityType string, entityID int64,
 func (r *TagRepo) GetForEntity(ctx context.Context, entityType string, entityID int64) ([]*model.Tag, error) {
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT t.id, t.name FROM tags t JOIN taggings tg ON tg.tag_id = t.id
-		 WHERE tg.entity_type = ? AND tg.entity_id = ? ORDER BY t.name`,
+		 WHERE tg.entity_type = ? AND tg.entity_id = ? AND tg.deleted_at IS NULL ORDER BY t.name`,
 		entityType, entityID)
 	if err != nil {
 		return nil, fmt.Errorf("get tags for %s %d: %w", entityType, entityID, err)
@@ -157,7 +187,7 @@ func (r *TagRepo) GetForEntity(ctx context.Context, entityType string, entityID 
 func (r *TagRepo) GetEntities(ctx context.Context, tagName string, entityType string) ([]int64, error) {
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT tg.entity_id FROM taggings tg JOIN tags t ON t.id = tg.tag_id
-		 WHERE t.name = ? AND tg.entity_type = ?`,
+		 WHERE t.name = ? AND tg.entity_type = ? AND tg.deleted_at IS NULL`,
 		tagName, entityType)
 	if err != nil {
 		return nil, fmt.Errorf("get entities for tag %q: %w", tagName, err)
@@ -175,30 +205,8 @@ func (r *TagRepo) GetEntities(ctx context.Context, tagName string, entityType st
 	return ids, rows.Err()
 }
 
-// Delete removes a tag and all its taggings.
+// Delete untags everything that carries the tag. See DeleteTag.
 func (r *TagRepo) Delete(ctx context.Context, tagName string) error {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("begin transaction: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	// Entities that lose the tag changed, so bump their updated_at before the taggings go.
-	for entityType, table := range entityTables {
-		if _, err := tx.ExecContext(ctx,
-			fmt.Sprintf(`UPDATE %s SET updated_at = datetime('now') WHERE id IN (
-				SELECT tg.entity_id FROM taggings tg JOIN tags t ON t.id = tg.tag_id
-				WHERE t.name = ? AND tg.entity_type = ?)`, table), tagName, entityType); err != nil {
-			return fmt.Errorf("touch tagged %s: %w", entityType, err)
-		}
-	}
-	result, err := tx.ExecContext(ctx, "DELETE FROM tags WHERE name = ?", tagName)
-	if err != nil {
-		return fmt.Errorf("delete tag: %w", err)
-	}
-	rows, _ := result.RowsAffected()
-	if rows == 0 {
-		return fmt.Errorf("tag %q: %w", tagName, model.ErrNotFound)
-	}
-	return tx.Commit()
+	_, err := r.DeleteTag(ctx, tagName)
+	return err
 }
