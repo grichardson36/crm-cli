@@ -43,7 +43,7 @@ func TestKeysListShowsDefaults(t *testing.T) {
 	assert.Equal(t, "type:person", rows["snooze"]["scope"])
 	assert.Equal(t, []any{"enter", "e"}, rows["activate"]["keys"], "enter and e are one action")
 	assert.Equal(t, []any{"a"}, rows["add-any"]["keys"])
-	assert.Equal(t, []any{}, rows["tier"]["keys"], "tier moved to the palette")
+	assert.Equal(t, []any{}, rows["note-pick"]["keys"], "note-pick is a palette entry")
 
 	stdout, _, _ = keysRun(t, home, "keys", "list", "--group", "contact", "-f", "json")
 	for _, r := range keyRows(t, stdout) {
@@ -79,7 +79,7 @@ func TestKeysSetListAndReset(t *testing.T) {
 
 	// reset --all and the no-argument error.
 	keysRun(t, home, "keys", "set", "undo", "ctrl+g")
-	keysRun(t, home, "keys", "set", "tier", "ctrl+e")
+	keysRun(t, home, "keys", "set", "note-pick", "ctrl+e")
 	_, stderr, code = keysRun(t, home, "keys", "reset")
 	assert.Equal(t, 2, code, stderr)
 	_, _, code = keysRun(t, home, "keys", "reset", "--all")
@@ -179,14 +179,14 @@ func TestKeysPath(t *testing.T) {
 }
 
 func TestKeysSetWarnsAboutChordsTerminalsSwallow(t *testing.T) {
-	for k, action := range map[string]string{"ctrl+i": "tier", "ctrl+m": "tier", "ctrl+h": "tier", "ctrl+[": "tier", "ctrl+j": "tier", "ctrl+shift+up": "home-top", "ctrl+shift+down": "home-bottom"} {
+	for k, action := range map[string]string{"ctrl+i": "note-pick", "ctrl+m": "note-pick", "ctrl+h": "note-pick", "ctrl+[": "note-pick", "ctrl+j": "note-pick", "ctrl+shift+up": "home-top", "ctrl+shift+down": "home-bottom"} {
 		home := t.TempDir()
 		_, stderr, code := keysRun(t, home, "keys", "set", action, k)
 		require.Equal(t, 0, code, "%s: %s", k, stderr)
 		assert.Contains(t, stderr, "warning: "+k+" may never reach the program", k)
 	}
 	home := t.TempDir()
-	_, stderr, code := keysRun(t, home, "keys", "set", "tier", "ctrl+g")
+	_, stderr, code := keysRun(t, home, "keys", "set", "note-pick", "ctrl+g")
 	require.Equal(t, 0, code, stderr)
 	assert.NotContains(t, stderr, "warning", "an ordinary chord has no warning")
 }
@@ -199,7 +199,7 @@ func TestKeysListReportsRemovedActionsAndTakenKeysWithoutFailing(t *testing.T) {
 [keys]
 go-to-today = "ctrl+t"
 snooze = "d"
-tier = "p"
+note-pick = "p"
 sync-now = "s"
 `), 0o600))
 	stdout, stderr, code := keysRun(t, home, "keys", "list", "-f", "json")
@@ -207,7 +207,7 @@ sync-now = "s"
 	assert.Contains(t, stderr, "keys.go-to-today: no such action")
 	assert.Contains(t, stderr, "keys.snooze: d is already used by")
 	rows := keyRows(t, stdout)
-	assert.Equal(t, []any{"p"}, rows["tier"]["keys"], "an old binding of a palette-only action still works")
+	assert.Equal(t, []any{"p"}, rows["note-pick"]["keys"], "an old binding of a palette-only action still works")
 	assert.Equal(t, []any{"s"}, rows["sync-now"]["keys"], "and s is free on the Sync screen")
 	assert.Equal(t, []any{"s"}, rows["snooze"]["keys"], "the taken key falls back to the default")
 }

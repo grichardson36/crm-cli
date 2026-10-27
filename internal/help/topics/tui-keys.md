@@ -4,7 +4,7 @@ The palette (`ctrl+k`) runs any action by name, as "Verb object" (Add organizati
 
 ## Universal verbs (same in every view)
 
-- `a` add. A picker of kinds opens with the view's own kind preselected, so `a` then `enter` adds the view's own object. Each kind shows its first letter and typing it jumps there: `a t` task, `a n` note, `a o` organization, `a p` person, `a d` deal.
+- `a` add. A picker of kinds opens with the view's own kind preselected, so `a` then `enter` adds the view's own object. Each kind shows its first letter and typing it jumps there: `a t` task, `a n` note, `a o` organization, `a p` person, `a d` deal. A highlighted object (or tag) is shown dimmed after the cursor as the link of the new object, `tab` accepts it. When nothing is highlighted or the two kinds have no link the dim text says so.
 - If an object is highlighted when you add a task or a note, the prompt shows its name dimmed after the cursor (`tab: link Bob Baker`). `tab` links the new task or note to it. Nothing is linked until you press `tab`.
 - `enter` and `e` are one action, activate: open the highlighted thing further, or edit the field under the cursor. Rename is just this.
 - `d` delete (soft, `ctrl+z` undoes). `r` restores in the Archived view, where `d` purges a person after you type the name.
@@ -22,12 +22,12 @@ The palette (`ctrl+k`) runs any action by name, as "Verb object" (Add organizati
 
 ## App keys and palette entries
 
-- `s` snooze. `F` cadence. Set priority tier, Set deal stage, Sync now, Dry-run sync, Attach inbox record, Add note (pick type), Tag and Undo dismiss are palette entries. To change a note type press `tab` in the note prompt, or `E` on a note row.
+- `s` snooze. `F` cadence. Purge selected forever, Purge all remaining forever (Archived, type the count back, for example `purge 37`), Sync now, Dry-run sync, Attach inbox record, Add note (pick type), Tag and Undo dismiss are palette entries. To change a note type press `tab` in the note prompt, or `E` on a note row.
 - With rows selected, `d`, `f`, `x`, `m` and the palette's Tag and Set keep-in-touch apply to every selected person.
 
 ## Edit pane (detail form)
 
-`enter` or `e` edits a row. `a` adds a row. `d` deletes the row (asks y/n). `y` copies the value, `o` opens a link, email or phone. `E`, the heavier twin of `e`, edits the role and dates of a linked row or picks the type of a note row. While you type in a prompt such as `title | due`, the rest of the line shows dimmed after the cursor. The hint is never submitted.
+`enter` or `e` edits a row in place by its field type: text, number and date ("next friday" works) in the row, longtext in the row (`alt+enter` is a new line), choice (deal stage, priority) with `up`/`down` or a letter, relation rows with a typeahead (`enter` picks, the last row is Create 'X', `tab` completes). `enter` or `tab` saves, `esc` cancels. `u` unlinks the focused linked row. `a` adds a row. `d` deletes the row (asks y/n). `y` copies the value, `o` opens a link, email or phone. `E`, the heavier twin of `e`, edits the role and dates of a linked row or picks the type of a note row. While you type in a prompt such as `title | due`, the rest of the line shows dimmed after the cursor. The hint is never submitted.
 
 ## Merge, archive, sync, bar
 
