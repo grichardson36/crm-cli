@@ -129,7 +129,7 @@ func TestPromptShowsTheShapeWhileTyping(t *testing.T) {
 }
 
 func (m *Model) startNotePromptForTest() {
-	press(m, "n")
+	press(m, "a", "n", "tab")
 }
 
 func TestHintIsNeverSubmittedAndHiddenWhenTheCursorIsNotAtTheEnd(t *testing.T) {

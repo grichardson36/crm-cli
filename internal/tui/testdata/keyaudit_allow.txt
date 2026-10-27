@@ -1,0 +1,3 @@
+# Deliberate key overlaps, checked by TestKeyAudit. Every line needs a reason. Keep this list minimal:
+# a line the audit no longer finds fails the test.
+shadow q cmp-back quit    # q leaves the compare screen instead of quitting the app, so a stray q cannot lose a merge

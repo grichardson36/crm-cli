@@ -78,13 +78,13 @@ func whenAnyObject(m *Model) bool { _, ok := m.cursorObject(); return ok }
 // an object can be linked to.
 func linkActions() []action {
 	out := []action{
-		{id: "link", title: "Link", group: "Link", hint: "L", keys: []string{"L"},
+		{id: "link", title: "Link", group: "Link", hint: "l", keys: []string{"l"},
 			desc:  "link the selected person, organization, deal or task to another object (or a tag). Pick or create in one step, from either side. ctrl+z undoes",
 			write: true, foot: footLink, footIn: inBoth, footLabel: "link", when: whenAnyObject,
 			run: func(m *Model) tea.Cmd { return m.startLinkVerb(false) }},
-		{id: "unlink", title: "Unlink", group: "Link", hint: "U", keys: []string{"U"},
+		{id: "unlink", title: "Unlink", group: "Link", hint: "u", keys: []string{"u"},
 			desc:  "remove a link of the selected object (or a tag). ctrl+z undoes",
-			write: true, foot: footUnlink, footIn: inBoth, footLabel: "unlink", when: whenAnyObject,
+			write: true, when: whenAnyObject,
 			run: func(m *Model) tea.Cmd { return m.startLinkVerb(true) }},
 	}
 	for _, other := range append(append([]string{}, model.ObjectKinds...), tagKind) {
@@ -110,7 +110,7 @@ func linkActions() []action {
 	return out
 }
 
-// startLinkVerb is the L and U key: ask which relation when there is more than one.
+// startLinkVerb is the l and u key: ask which relation when there is more than one.
 func (m *Model) startLinkVerb(unlink bool) tea.Cmd {
 	src, ok := m.cursorObject()
 	if !ok {

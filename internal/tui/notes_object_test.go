@@ -18,7 +18,7 @@ func pageFixture(t *testing.T, kind string) (*Model, repo.Ref) {
 	ctx := context.Background()
 	switch kind {
 	case "person":
-		press(m, "j") // Bob
+		press(m, "down") // Bob
 		require.Equal(t, int64(2), m.curPerson())
 		return m, repo.Ref{Kind: "person", ID: 2}
 	case "organization":
@@ -123,7 +123,7 @@ func TestRecordPagesShareTaskAndNoteBehavior(t *testing.T) {
 			m, ref := pageFixture(t, kind)
 
 			// t adds a task for the page object, with the same prompt and the due date after the pipe.
-			press(m, "t")
+			press(m, "a", "t", "tab")
 			require.Equal(t, modePrompt, m.mode, "t opens the task prompt on a %s page", kind)
 			assert.Equal(t, "task: ", m.input.Prompt)
 			submit(m, "Call back | 2026-12-01")
@@ -133,7 +133,7 @@ func TestRecordPagesShareTaskAndNoteBehavior(t *testing.T) {
 			assert.Equal(t, "task added", m.status)
 
 			// n adds a note to the page object.
-			press(m, "n")
+			press(m, "a", "n", "tab")
 			require.Equal(t, modePrompt, m.mode, "n opens the note prompt on a %s page", kind)
 			submit(m, "first draft")
 			notes := notesAbout(t, m, ref)
@@ -221,7 +221,7 @@ func TestRecordPagesShowAddRowsAndEnterAdds(t *testing.T) {
 func pageFixtureFresh(t *testing.T) (*Model, repo.Ref) {
 	t.Helper()
 	m, _ := newTestModel(t)
-	press(m, "j", "j")
+	press(m, "down", "down")
 	require.Equal(t, int64(3), m.curPerson())
 	return m, repo.Ref{Kind: "person", ID: 3}
 }
@@ -286,7 +286,7 @@ func TestNoteTypesStillWorkOnAnOrganizationPage(t *testing.T) {
 	m.afterWrite()
 	press(m, "tab")
 	focusRow(t, m, rkNote)
-	press(m, "t")
+	press(m, "E")
 	require.Equal(t, modeOverlay, m.mode)
 	assert.Equal(t, "Note type", m.ov.title)
 	assert.Equal(t, "call", m.ov.items[0].label, "the current type first")

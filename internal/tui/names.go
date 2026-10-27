@@ -83,9 +83,9 @@ func (m *Model) handleNamesKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			np.reopen()
 		}
 		return m, nil
-	case "j", "down", "tab":
+	case "down", "tab":
 		np.cur = clampInt(np.cur+1, 0, len(np.refs)-1)
-	case "k", "up", "shift+tab":
+	case "up", "shift+tab":
 		np.cur = clampInt(np.cur-1, 0, len(np.refs)-1)
 	case "c":
 		np.choice[np.cur] = choiceCreate
@@ -210,7 +210,7 @@ func (m *Model) namesView() string {
 	cut := lipgloss.NewStyle().MaxWidth(m.width)
 	var lines []string
 	lines = append(lines, cut.Render(st.Head.Render("Link people in this line?")+st.Dim.Render("   enter save  esc back")))
-	lines = append(lines, cut.Render(st.Dim.Render("1-9 pick a person  c create a new contact  x keep as text  A same answer for the same name  j/k move")))
+	lines = append(lines, cut.Render(st.Dim.Render("1-9 pick a person  c create a new contact  x keep as text  A same answer for the same name  up/down move")))
 	for i, ref := range np.refs {
 		var opts []string
 		for ci, c := range ref.Candidates {

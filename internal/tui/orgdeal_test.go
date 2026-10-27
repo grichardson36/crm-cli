@@ -66,7 +66,7 @@ func TestOrgAddEditDeleteRestoreWithUndo(t *testing.T) {
 	require.Equal(t, viewOrgs, m.view)
 	assert.Contains(t, m.View(), "No organizations")
 
-	press(m, "+")
+	press(m, "a", "enter")
 	require.Equal(t, modePrompt, m.mode)
 	submit(m, "Initech | initech.com | Software | Makes TPS reports")
 	list := openOrgs(t, m)
@@ -150,7 +150,7 @@ func TestDealAddEditStageDeleteRestoreWithUndo(t *testing.T) {
 	goDeals(m)
 	require.Equal(t, viewDeals, m.view)
 
-	press(m, "+")
+	press(m, "a", "enter")
 	require.Equal(t, modePrompt, m.mode)
 	submit(m, "Site redesign | $12,500 | proposal | globex | Bob Baker | phase one")
 	list := openDeals(t, m)
@@ -173,7 +173,7 @@ func TestDealAddEditStageDeleteRestoreWithUndo(t *testing.T) {
 	require.Len(t, openDeals(t, m), 1)
 
 	// Stage picker.
-	press(m, "s")
+	runID(m, "deal-stage")
 	require.NotNil(t, m.ov)
 	assert.Equal(t, "Deal stage", m.ov.title)
 	press(m, "5") // won
@@ -248,7 +248,7 @@ func TestOrgDealActionsAreReadOnlyAndViewScoped(t *testing.T) {
 	m.readOnly = true
 	runPalette(m, "organizations view")
 	require.Equal(t, viewOrgs, m.view, "viewing is allowed")
-	press(m, "+")
+	press(m, "a", "enter")
 	assert.Equal(t, modeNormal, m.mode)
 	assert.Contains(t, m.status, "read-only")
 	assert.Empty(t, openOrgs(t, m))

@@ -76,10 +76,24 @@ func TestViewSwitcherReachableByMouseOnMore(t *testing.T) {
 func TestHelpAndFooterMentionNewKeys(t *testing.T) {
 	m, _ := newTestModel(t)
 	help := m.helpText()
-	for _, want := range []string{"list the views that are on", "run the selected source", "would change, writes nothing", "create a person from the selected inbox", "attach the selected inbox", "dismiss the selected inbox", "first pending inbox record", "new type for the note", "bring back the note deleted", "open the person (People view"} {
+	for _, want := range []string{"list the views that are on", "open the highlighted thing further", "mark the highlighted thing", "an object: a picker of kinds", "merge the space-selected rows"} {
 		assert.Contains(t, help, want)
 	}
 	assert.Contains(t, m.hintsLine(), "help")
+
+	// The Sync view lists its own key, the inbox record's delete. The sync run and dry run are palette entries.
+	m.switchView(viewSync)
+	m.settle()
+	syncHelp := m.helpText()
+	assert.Contains(t, syncHelp, "dismiss the selected inbox")
+	assert.NotContains(t, syncHelp, "run the selected source")
+
+	// The Archived view shows restore and the delete that purges.
+	m.switchView(viewArchived)
+	m.settle()
+	archivedHelp := m.helpText()
+	assert.Contains(t, archivedHelp, "restore the archived object")
+	assert.Contains(t, archivedHelp, "permanently delete the archived person")
 }
 
 func TestTabBarNeverExceeds80Columns(t *testing.T) {

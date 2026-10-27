@@ -37,6 +37,13 @@ func TestKeysListShowsDefaults(t *testing.T) {
 	assert.Equal(t, false, rows["undo"]["custom"])
 	assert.Equal(t, true, rows["favorite"]["changes_data"])
 	assert.Equal(t, "App", rows["undo"]["group"])
+	assert.Equal(t, "framework", rows["undo"]["layer"])
+	assert.Equal(t, "app", rows["undo"]["scope"])
+	assert.Equal(t, "app", rows["snooze"]["layer"], "snooze is specific to this CRM")
+	assert.Equal(t, "type:person", rows["snooze"]["scope"])
+	assert.Equal(t, []any{"enter", "e"}, rows["activate"]["keys"], "enter and e are one action")
+	assert.Equal(t, []any{"a"}, rows["add-any"]["keys"])
+	assert.Equal(t, []any{}, rows["tier"]["keys"], "tier moved to the palette")
 
 	stdout, _, _ = keysRun(t, home, "keys", "list", "--group", "contact", "-f", "json")
 	for _, r := range keyRows(t, stdout) {
@@ -46,12 +53,12 @@ func TestKeysListShowsDefaults(t *testing.T) {
 
 func TestKeysSetListAndReset(t *testing.T) {
 	home := t.TempDir()
-	stdout, stderr, code := keysRun(t, home, "keys", "set", "favorite", "ctrl+f", "*", "-f", "json")
+	stdout, stderr, code := keysRun(t, home, "keys", "set", "favorite", "ctrl+f", "ctrl+e", "-f", "json")
 	require.Equal(t, 0, code, stderr)
 	var out map[string]any
 	require.NoError(t, json.Unmarshal([]byte(stdout), &out))
 	assert.Equal(t, true, out["saved"])
-	assert.Equal(t, []any{"ctrl+f", "*"}, out["keys"])
+	assert.Equal(t, []any{"ctrl+f", "ctrl+e"}, out["keys"])
 	assert.Equal(t, []any{"f"}, out["default"])
 
 	data, err := os.ReadFile(filepath.Join(home, ".crm", "config.toml"))
@@ -63,7 +70,7 @@ func TestKeysSetListAndReset(t *testing.T) {
 	rows := keyRows(t, stdout)
 	require.Len(t, rows, 1)
 	assert.Equal(t, true, rows["favorite"]["custom"])
-	assert.Equal(t, []any{"ctrl+f", "*"}, rows["favorite"]["keys"])
+	assert.Equal(t, []any{"ctrl+f", "ctrl+e"}, rows["favorite"]["keys"])
 
 	_, _, code = keysRun(t, home, "keys", "reset", "favorite")
 	require.Equal(t, 0, code)
@@ -169,4 +176,38 @@ func TestKeysPath(t *testing.T) {
 	keysRun(t, home, "keys", "set", "undo", "ctrl+g")
 	stdout, _, _ = keysRun(t, home, "keys", "path", "-f", "json")
 	assert.Contains(t, stdout, `"exists":true`)
+}
+
+func TestKeysSetWarnsAboutChordsTerminalsSwallow(t *testing.T) {
+	for k, action := range map[string]string{"ctrl+i": "tier", "ctrl+m": "tier", "ctrl+h": "tier", "ctrl+[": "tier", "ctrl+j": "tier", "ctrl+shift+up": "home-top", "ctrl+shift+down": "home-bottom"} {
+		home := t.TempDir()
+		_, stderr, code := keysRun(t, home, "keys", "set", action, k)
+		require.Equal(t, 0, code, "%s: %s", k, stderr)
+		assert.Contains(t, stderr, "warning: "+k+" may never reach the program", k)
+	}
+	home := t.TempDir()
+	_, stderr, code := keysRun(t, home, "keys", "set", "tier", "ctrl+g")
+	require.Equal(t, 0, code, stderr)
+	assert.NotContains(t, stderr, "warning", "an ordinary chord has no warning")
+}
+
+func TestKeysListReportsRemovedActionsAndTakenKeysWithoutFailing(t *testing.T) {
+	home := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(home, ".crm"), 0o700))
+	// An old file: an action that never existed, and keys the framework owns now.
+	require.NoError(t, os.WriteFile(filepath.Join(home, ".crm", "config.toml"), []byte(`
+[keys]
+go-to-today = "ctrl+t"
+snooze = "d"
+tier = "p"
+sync-now = "s"
+`), 0o600))
+	stdout, stderr, code := keysRun(t, home, "keys", "list", "-f", "json")
+	require.Equal(t, 0, code, stderr)
+	assert.Contains(t, stderr, "keys.go-to-today: no such action")
+	assert.Contains(t, stderr, "keys.snooze: d is already used by")
+	rows := keyRows(t, stdout)
+	assert.Equal(t, []any{"p"}, rows["tier"]["keys"], "an old binding of a palette-only action still works")
+	assert.Equal(t, []any{"s"}, rows["sync-now"]["keys"], "and s is free on the Sync screen")
+	assert.Equal(t, []any{"s"}, rows["snooze"]["keys"], "the taken key falls back to the default")
 }

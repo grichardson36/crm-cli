@@ -314,8 +314,8 @@ func TestUndoCoversEditsTagsBulkAndFavorites(t *testing.T) {
 	press(m, "ctrl+y")
 	assert.True(t, personByID(t, pr, 1).IsFavorite)
 
-	// Tag from the prompt, undo removes it.
-	press(m, "T")
+	// Tag from the prompt (palette entry Tag), undo removes it.
+	runID(m, "tag")
 	typeText(m, "vip")
 	press(m, "enter")
 	tags, _ := m.tagr.GetForEntity(context.Background(), "person", 1)
@@ -326,7 +326,7 @@ func TestUndoCoversEditsTagsBulkAndFavorites(t *testing.T) {
 
 	// One bulk action over marked people undoes in one step.
 	press(m, " ", " ")
-	press(m, "T")
+	runID(m, "tag")
 	typeText(m, "batch")
 	press(m, "enter")
 	for _, id := range []int64{1, 2} {
@@ -338,7 +338,7 @@ func TestUndoCoversEditsTagsBulkAndFavorites(t *testing.T) {
 	}
 
 	// An inline edit in the detail pane.
-	press(m, "g", "tab")
+	press(m, "home", "tab")
 	goTo(t, m, "company")
 	press(m, "enter")
 	replaceText(m, "Initrode")
@@ -351,10 +351,10 @@ func TestUndoCoversEditsTagsBulkAndFavorites(t *testing.T) {
 
 func TestUndoNoteDeleteAndTaskComplete(t *testing.T) {
 	m, _ := newTestModel(t)
-	press(m, "n")
+	press(m, "a", "n", "tab") // tab links the highlighted person
 	typeText(m, "a note")
 	press(m, "enter")
-	press(m, "t")
+	press(m, "a", "t", "tab")
 	typeText(m, "a task")
 	press(m, "enter")
 	require.Len(t, m.hist, 2)
@@ -530,7 +530,7 @@ func TestCommandBarMouseIsIgnoredInCommandMode(t *testing.T) {
 
 func TestNotePromptAppliesTokens(t *testing.T) {
 	m, pr := newTestModel(t)
-	press(m, "2", "n")
+	press(m, "2", "a", "n", "tab")
 	typeText(m, "met at the conference #vip @Cara_Cole remind fri every 3m")
 	press(m, "enter")
 	assert.Equal(t, "note added, #vip, reminder 2026-10-16, cadence 3 mons", m.status)
@@ -547,7 +547,7 @@ func TestNotePromptAppliesTokens(t *testing.T) {
 	assert.Equal(t, "3 mons", *personByID(t, pr, 1).KeepInTouch)
 
 	// A colon in the text is not a name.
-	press(m, "n")
+	press(m, "a", "n", "tab")
 	typeText(m, "Update: all good")
 	press(m, "enter")
 	assert.Equal(t, "note added", m.status)
@@ -555,7 +555,7 @@ func TestNotePromptAppliesTokens(t *testing.T) {
 
 	// A capitalized two-word @Name that matches nobody opens the names list and writes nothing
 	// until you answer. A single unknown @word is plain text and saves at once (next test).
-	press(m, "n")
+	press(m, "a", "n", "tab")
 	typeText(m, "hello @Nobody_Here")
 	press(m, "enter")
 	require.Equal(t, modeNames, m.mode)
@@ -567,7 +567,7 @@ func TestNotePromptAppliesTokens(t *testing.T) {
 
 func TestNotePromptKeepsTheChosenType(t *testing.T) {
 	m, _ := newTestModel(t)
-	press(m, "2", "n", "tab")
+	press(m, "2", "a", "n", "tab", "tab")
 	typeText(m, "call went well remind fri")
 	press(m, "enter")
 	assert.Contains(t, m.status, "added")
@@ -580,7 +580,7 @@ func TestNotePromptKeepsTheChosenType(t *testing.T) {
 
 func TestTaskPromptAppliesTokensAndKeepsThePipe(t *testing.T) {
 	m, _ := newTestModel(t)
-	press(m, "t")
+	press(m, "a", "t", "tab")
 	typeText(m, "send deck fri !high ~30m")
 	press(m, "enter")
 	assert.Equal(t, "task added", m.status)
@@ -591,7 +591,7 @@ func TestTaskPromptAppliesTokensAndKeepsThePipe(t *testing.T) {
 	assert.Equal(t, "high", tasks[0].Priority)
 
 	// The old "title | due" form still wins over a token, and a natural date works after the pipe.
-	press(m, "t")
+	press(m, "a", "t", "tab")
 	typeText(m, "second tue | fri")
 	press(m, "enter")
 	tasks, _ = m.tr.FindAll(context.Background(), model.TaskFilters{})
@@ -614,7 +614,7 @@ func TestShortSyntaxToggle(t *testing.T) {
 	assert.True(t, m.noSyntax)
 	assert.Contains(t, m.status, "short syntax off")
 
-	press(m, "n")
+	press(m, "a", "n", "tab")
 	typeText(m, "keep #this remind fri")
 	press(m, "enter")
 	its := allNotes(t, m)
@@ -674,7 +674,7 @@ func plain(s string) string { return ansiRE.ReplaceAllString(s, "") }
 func TestTasksCarryTagsInTheTui(t *testing.T) {
 	m, _ := newTestModel(t)
 	// A task made from the prompt reads #tag.
-	press(m, "t")
+	press(m, "a", "t", "tab")
 	typeText(m, "send deck #work")
 	press(m, "enter")
 	tasks, _ := m.tr.FindAll(context.Background(), model.TaskFilters{})
@@ -688,8 +688,8 @@ func TestTasksCarryTagsInTheTui(t *testing.T) {
 	assert.Contains(t, m.rows[0].sub, "#work")
 	assert.Contains(t, m.View(), "#work")
 
-	// T tags the task, not its person, and -name removes.
-	press(m, "T")
+	// Tag task (palette) tags the task, not its person, and -name removes.
+	runID(m, "task-tag")
 	typeText(m, "urgent")
 	press(m, "enter")
 	tasks, _ = m.tr.FindAll(context.Background(), model.TaskFilters{})
@@ -697,7 +697,7 @@ func TestTasksCarryTagsInTheTui(t *testing.T) {
 	people, _ := m.tagr.GetEntities(context.Background(), "urgent", "person")
 	assert.Empty(t, people)
 	assert.Contains(t, m.rows[0].sub, "#urgent")
-	press(m, "T")
+	runID(m, "task-tag")
 	typeText(m, "-work")
 	press(m, "enter")
 	tasks, _ = m.tr.FindAll(context.Background(), model.TaskFilters{})
@@ -709,11 +709,11 @@ func TestTasksCarryTagsInTheTui(t *testing.T) {
 	assert.Equal(t, []string{"urgent", "work"}, tasks[0].Tags)
 	assert.Contains(t, m.toast.text, "Undone: remove tag #work from task")
 
-	// In the detail pane a task row shows its tags and T tags it too.
+	// In the detail pane a task row shows its tags and Tag task tags it too.
 	press(m, "2", "tab")
 	goTo(t, m, "task")
 	assert.Contains(t, m.View(), "#urgent")
-	press(m, "T")
+	runID(m, "task-tag")
 	typeText(m, "fromdetail")
 	press(m, "enter")
 	tasks, _ = m.tr.FindAll(context.Background(), model.TaskFilters{})
@@ -772,7 +772,7 @@ func namesModel(t *testing.T) (*Model, *repo.PersonRepo) {
 
 func TestNamesListKeepAsTextIsTheDefaultForSeveralMatches(t *testing.T) {
 	m, _ := namesModel(t)
-	press(m, "n")
+	press(m, "a", "n", "tab")
 	typeText(m, "lunch with @Bob")
 	press(m, "enter")
 	require.Equal(t, modeNames, m.mode)
@@ -792,7 +792,7 @@ func TestNamesListKeepAsTextIsTheDefaultForSeveralMatches(t *testing.T) {
 
 func TestNamesListConnectToACandidate(t *testing.T) {
 	m, _ := namesModel(t)
-	press(m, "n")
+	press(m, "a", "n", "tab")
 	typeText(m, "lunch with @Bob")
 	press(m, "enter")
 	press(m, "2")
@@ -808,7 +808,7 @@ func TestNamesListConnectToACandidate(t *testing.T) {
 func TestNamesListCreateMakesANewContactOnlyWhenAsked(t *testing.T) {
 	m, pr := namesModel(t)
 	before, _ := pr.ListSummaries(context.Background())
-	press(m, "n")
+	press(m, "a", "n", "tab")
 	typeText(m, "met @Priya_Nair at the fair")
 	press(m, "enter")
 	require.Equal(t, modeNames, m.mode)
@@ -819,7 +819,7 @@ func TestNamesListCreateMakesANewContactOnlyWhenAsked(t *testing.T) {
 	require.Len(t, after, len(before))
 	assert.Len(t, allNotes(t, m), 1, "kept as text, saved")
 
-	press(m, "n")
+	press(m, "a", "n", "tab")
 	typeText(m, "met @Priya_Nair again")
 	press(m, "enter")
 	require.Equal(t, modeNames, m.mode)
@@ -860,7 +860,7 @@ func TestNamesListCreateMakesANewContactOnlyWhenAsked(t *testing.T) {
 
 func TestUnknownAtWordSavesAsPlainTextWithoutTheNamesList(t *testing.T) {
 	m, _ := namesModel(t)
-	press(m, "n")
+	press(m, "a", "n", "tab")
 	typeText(m, "hello @Qwerty")
 	press(m, "enter")
 	assert.Equal(t, modeNormal, m.mode, "no names list for an @word nobody has")
@@ -871,16 +871,16 @@ func TestUnknownAtWordSavesAsPlainTextWithoutTheNamesList(t *testing.T) {
 
 func TestNamesListSeveralNamesAndApplyToAll(t *testing.T) {
 	m, _ := namesModel(t)
-	press(m, "n")
+	press(m, "a", "n", "tab")
 	typeText(m, "@Bob then @Bob again and @Nobody_Here")
 	press(m, "enter")
 	require.Equal(t, modeNames, m.mode)
 	require.Len(t, m.names.refs, 2, "the same name is one row")
 	press(m, "1")
 	assert.Equal(t, 0, m.names.choice[0])
-	press(m, "j", "A")
+	press(m, "down", "A")
 	assert.Equal(t, choiceText, m.names.choice[1])
-	press(m, "k", "A")
+	press(m, "up", "A")
 	press(m, "enter")
 	its := allNotes(t, m)
 	require.Len(t, its, 1)
@@ -890,11 +890,11 @@ func TestNamesListSeveralNamesAndApplyToAll(t *testing.T) {
 
 func TestNamesListRemembersTheChoiceInThisSession(t *testing.T) {
 	m, _ := namesModel(t)
-	press(m, "n")
+	press(m, "a", "n", "tab")
 	typeText(m, "first @Bob")
 	press(m, "enter")
 	press(m, "2", "enter")
-	press(m, "n")
+	press(m, "a", "n", "tab")
 	typeText(m, "second @Bob")
 	press(m, "enter")
 	require.Equal(t, modeNames, m.mode)
@@ -951,7 +951,7 @@ func TestNamesListFitsTheTerminal(t *testing.T) {
 	m, _ := namesModel(t)
 	for _, size := range [][2]int{{100, 30}, {60, 12}, {40, 10}} {
 		m.Update(tea.WindowSizeMsg{Width: size[0], Height: size[1]})
-		press(m, "n")
+		press(m, "a", "n", "tab")
 		typeText(m, "a @Bob b @Nobody c @Zed d @Amy")
 		press(m, "enter")
 		require.Equal(t, modeNames, m.mode)

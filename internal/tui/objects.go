@@ -34,16 +34,15 @@ const (
 // absent, never renamed.
 var verbSet = []verb{vAdd, vOpen, vEdit, vLink, vUnlink, vDelete, vRestore, vMark, vUndo, vRedo}
 
-// verbKeys are the standard keys. They are the same in every object view (patterns/same-key-same-verb).
-// Mark is space, undo and redo are ctrl+z and ctrl+y, and open is enter.
+// verbKeys are the standard keys. They are the same in every object view (patterns/universal-verbs).
+// Add is a (the picker in globaladd.go) and Open and Edit are one action, activate (enter, e, in
+// verbs.go), so the per-object Add and Edit actions have no key of their own. Mark is space (the
+// multi-select), undo and redo are ctrl+z and ctrl+y, and restore is r on the Archived screen.
 var verbKeys = map[verb][]string{
-	vAdd:     {"a", "+"},
-	vOpen:    {"enter"},
-	vEdit:    {"enter", "e"},
-	vLink:    {"L"},
-	vUnlink:  {"U"},
+	vLink:    {"l"},
+	vUnlink:  {"u"},
 	vDelete:  {"d"},
-	vRestore: {"u"},
+	vRestore: {"r"},
 	vMark:    {" "},
 	vUndo:    {"ctrl+z"},
 	vRedo:    {"ctrl+y"},
@@ -236,7 +235,7 @@ func taskDef() *objDef {
 		// Task keys work in the Tasks view. In a person's detail form they work on a task row.
 		keyHere: func(m *Model, v verb, key string) bool {
 			if v == vAdd {
-				return m.view == viewTasks && m.focus == focusList || (key == "t" && (whenPerson(m) || whenObjectPage(m)))
+				return m.view == viewTasks && m.focus == focusList || (whenPerson(m) || whenObjectPage(m))
 			}
 			return m.view == viewTasks && m.focus == focusList || m.focus == focusDetail && v == vDelete
 		},
@@ -333,18 +332,15 @@ func personDef() *objDef {
 		keyHere: func(m *Model, v verb, key string) bool {
 			switch v {
 			case vAdd:
-				if key == "+" {
-					return m.view < numViews && m.view != viewTasks
-				}
-				// a is the Add row key in the detail form, so it adds a person only from a people list.
+				// the detail form's own a adds a row, so a person is added from a people list only.
 				switch m.view {
 				case viewHome, viewPeople, viewDue, viewBirthdays:
 					return m.focus == focusList
 				}
 				return false
 			case vDelete:
-				// # archives from any pane, d only in the list (in the detail form it deletes a row).
-				return key == "#" || m.focus == focusList
+				// d only in the list (in the detail form it deletes a row).
+				return m.focus == focusList
 			case vEdit:
 				return m.focus == focusList && (m.view == viewPeople || m.view == viewDue || m.view == viewBirthdays)
 			}
@@ -394,17 +390,12 @@ func objectActions() []action {
 
 func (o *objDef) keysFor(v verb) []string {
 	switch {
-	case o.kind == "task" && v == vAdd:
-		return []string{"a", "+", "t"}
-	case o.kind == "person" && v == vDelete:
-		return []string{"d", "#"}
+	case v == vAdd || v == vEdit:
+		return nil // a opens the add picker, enter and e are activate
+	case v == vRestore && o.kind != "person":
+		return nil // the session restore of a deleted object is ctrl+z or the palette; r restores on the Archived screen
 	case o.kind == model.NoteKind:
-		if v == vAdd {
-			return []string{"n"}
-		}
 		return nil
-	case v == vEdit && o.kind != "organization" && o.kind != "deal":
-		return []string{"enter"}
 	}
 	return append([]string{}, verbKeys[v]...)
 }
@@ -419,47 +410,39 @@ func (o *objDef) addAction() action {
 		desc += ": " + strings.Join(o.fields, " | ") + " (same as crm " + cliNoun(o.kind) + " add)"
 	}
 	a := action{
-		id: o.actionID(vAdd), title: "Add " + o.label, group: o.group, hint: "a", keys: o.keysFor(vAdd),
-		desc: desc + ". a or + in the list, or from the palette", write: true,
-		keyFor: o.keyFor(vAdd), foot: footAdd, footIn: inList, footLabel: "add",
-		footIf: func(m *Model) bool { return o.keyHere(m, vAdd, "a") },
+		id: o.actionID(vAdd), title: "Add " + o.label, group: o.group, keys: o.keysFor(vAdd),
+		desc: desc + ". From the palette, or a then " + addKindLetter(o.kind), write: true,
+		keyFor: o.keyFor(vAdd),
 		run:    func(m *Model) tea.Cmd { return o.add(m) },
 	}
 	if o.kind == "person" {
-		a.title, a.hint, a.desc = "Add person", "a", "create a contact: opens a blank form, saved when you enter a name. a or + in a people list, or from the palette"
+		a.title, a.desc = "Add person", "create a contact: opens a blank form, saved when you enter a name. From the palette, or a then p"
 	}
 	if o.kind == "task" {
-		a.desc = "add a task: title | optional due date. a or + in the Tasks view, t on a person, organization or deal, or from the palette (same as crm task add)"
+		a.desc = "add a task: title | optional due date. From the palette, or a then t (same as crm task add). A highlighted object is offered as the link, tab accepts it"
 	}
 	if o.kind == model.NoteKind {
-		a.hint, a.foot, a.footIn, a.footLabel = "n", 40, inBoth, ""
 		a.when = func(m *Model) bool { return whenPerson(m) || whenObjectPage(m) }
-		a.footIf = nil
-		a.desc = "add a note of the last used type to the person, organization or deal on screen (tab in the prompt changes the type; same as crm note add). n"
+		a.desc = "add a note of the last used type to the person, organization or deal on screen (tab in the prompt changes the type; same as crm note add). From the palette, or a then n"
 	}
 	return a
 }
 
 func (o *objDef) editAction() action {
 	a := action{
-		id: o.actionID(vEdit), title: "Edit " + o.label, group: o.group, hint: "enter", keys: o.keysFor(vEdit),
-		desc:   "edit the selected " + o.label + ", fields you empty are cleared (same as crm " + cliNoun(o.kind) + " edit). enter",
+		id: o.actionID(vEdit), title: "Edit " + o.label, group: o.group, keys: o.keysFor(vEdit),
+		desc:   "edit the selected " + o.label + ", fields you empty are cleared (same as crm " + cliNoun(o.kind) + " edit). enter or e does this in its list",
 		write:  true,
-		keyFor: o.keyFor(vEdit), foot: footEdit, footIn: inList, footLabel: "edit",
-		when: func(m *Model) bool { return o.selected(m) != 0 },
-		run:  func(m *Model) tea.Cmd { return o.edit(m, o.selected(m)) },
-	}
-	if len(a.keys) > 1 {
-		a.desc += " or e"
+		keyFor: o.keyFor(vEdit),
+		when:   func(m *Model) bool { return o.selected(m) != 0 },
+		run:    func(m *Model) tea.Cmd { return o.edit(m, o.selected(m)) },
 	}
 	if o.kind == model.NoteKind {
-		a.hint, a.foot = "enter", 0
-		a.desc = "edit the note under the cursor inline (enter on the note row; same as crm note edit)"
+		a.desc = "edit the note under the cursor inline (enter or e on the note row; same as crm note edit)"
 	}
 	if o.kind == "person" {
 		a.write = false
-		a.desc = "move into the detail form of the selected person to edit it (enter)"
-		a.foot = 0
+		a.desc = "move into the detail form of the selected person to edit it (enter or e)"
 	}
 	return a
 }
@@ -480,7 +463,7 @@ func (o *objDef) deleteAction() action {
 		a.desc = "delete the note under the cursor (asks y/n, the same soft delete as crm note delete). d on the note row, ctrl+z undoes it"
 	}
 	if o.kind == "person" {
-		a.desc = "delete (archive) the person or all marked (asks y/n, restore from the Archived view). # also"
+		a.desc = "delete (archive) the person or all marked (asks y/n, restore from the Archived view)"
 		a.footLabel = "archive"
 		a.foot = 35
 		a.footIf = whenMarks
@@ -490,31 +473,29 @@ func (o *objDef) deleteAction() action {
 
 func (o *objDef) restoreAction() action {
 	a := action{
-		id: o.actionID(vRestore), title: "Restore " + o.label, group: o.group, hint: "u", keys: o.keysFor(vRestore),
-		desc:  "bring back the " + o.label + " deleted last in this session (u in its list, ctrl+z does the same for the newest change; same as crm " + cliNoun(o.kind) + " restore)",
-		write: true, keyFor: o.keyFor(vRestore), foot: footRestore, footIn: inList, footLabel: "restore",
+		id: o.actionID(vRestore), title: "Restore " + o.label, group: o.group, keys: o.keysFor(vRestore),
+		desc:  "bring back the " + o.label + " deleted last in this session (palette; ctrl+z does the same for the newest change; same as crm " + cliNoun(o.kind) + " restore)",
+		write: true, keyFor: o.keyFor(vRestore),
 		when: func(m *Model) bool { return len(m.deleted[o.kind]) > 0 },
 		run:  func(m *Model) tea.Cmd { m.verbRestore(o); return m.takePending() },
 	}
 	if o.restoreIn != nil {
 		a.when = o.restoreIn
-		a.desc = "restore the archived person or all marked (u in the Archived view)"
-		a.foot = 20
-	} else {
-		a.footIf = func(m *Model) bool { return len(m.deleted[o.kind]) > 0 && o.keyHere(m, vRestore, "u") }
+		a.hint = "r"
+		a.desc = "restore the archived object under the cursor, or every marked person (r on the Archived screen)"
+		a.foot, a.footIn, a.footLabel = 20, inList, "restore"
 	}
 	if o.kind == model.NoteKind {
-		a.hint, a.foot = "", 0
 		a.desc = "bring back the note deleted last in this session (ctrl+z does the same for the newest change; same as crm note restore)"
 	}
 	return a
 }
 
 func dealStageAction() action {
-	return action{id: "deal-stage", title: "Set deal stage", group: "Deals", hint: "s", keys: []string{"s"},
-		desc:  "pick the stage of the selected deal: lead, prospect, proposal, negotiation, won, lost",
-		write: true, foot: 21, footIn: inList, footLabel: "stage",
-		when: whenDealSel, run: func(m *Model) tea.Cmd { m.pickDealStage(m.selDeal()); return nil }}
+	return action{id: "deal-stage", title: "Set deal stage", group: "Deals",
+		desc:  "pick the stage of the selected deal: lead, prospect, proposal, negotiation, won, lost (palette; a choice field edited with enter in a later release)",
+		write: true,
+		when:  whenDealSel, run: func(m *Model) tea.Cmd { m.pickDealStage(m.selDeal()); return nil }}
 }
 
 func article(label string) string {

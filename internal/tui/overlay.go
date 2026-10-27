@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -8,6 +9,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/jdanielnd/crm-cli/internal/keys"
 	"github.com/jdanielnd/crm-cli/internal/modules"
 	"github.com/mattn/go-runewidth"
 )
@@ -41,6 +43,7 @@ type overlay struct {
 	offset  int
 	palette bool
 	digits  bool // a number key picks the item with that hint (view switcher)
+	letters bool // a letter key picks the item whose hint is that letter (the add picker)
 	// focusResults is the bar mode where plain keys are verbs of the highlighted row (barverbs.go).
 	focusResults bool
 	// onKey sees every key first and returns true when it used it (the Modules screen). noFilter
@@ -165,8 +168,8 @@ func (m *Model) openPalette() tea.Cmd {
 	items := make([]overlayItem, 0, len(m.actions))
 	for i := range m.actions {
 		a := &m.actions[i]
-		if !m.moduleOn(a) || a.barOnly {
-			continue // an off module and the verbs of a tag row are not in the palette
+		if !m.moduleOn(a) || a.barOnly || a.mode == keyText {
+			continue // an off module, the verbs of a tag row and the keys of a text prompt are not in the palette
 		}
 		it := overlayItem{id: a.id, label: a.title, hint: a.hint, desc: a.desc}
 		switch {
@@ -358,6 +361,14 @@ func (m *Model) overlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
+	if k := msg.String(); o.letters && len(k) == 1 {
+		for i, idx := range o.shown {
+			if strings.EqualFold(o.items[idx].hint, k) {
+				return m, m.pickOverlay(i)
+			}
+		}
+		return m, nil
+	}
 	if o.noFilter {
 		return m, nil
 	}
@@ -465,49 +476,83 @@ func (m *Model) openHelp() {
 
 func (m *Model) handleHelpKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "j", "down":
+	case "down", "ctrl+n":
 		m.helpVP.LineDown(1)
-	case "k", "up":
+	case "up", "ctrl+p":
 		m.helpVP.LineUp(1)
-	case "pgdown", "ctrl+d", " ":
+	case "pgdown":
+		m.helpVP.ViewDown()
+	case "ctrl+d", " ":
 		m.helpVP.HalfViewDown()
-	case "pgup", "ctrl+u":
+	case "pgup":
+		m.helpVP.ViewUp()
+	case "ctrl+u":
 		m.helpVP.HalfViewUp()
+	case "home", "ctrl+shift+up":
+		m.helpVP.GotoTop()
+	case "end", "ctrl+shift+down":
+		m.helpVP.GotoBottom()
 	default:
 		m.help = false
 	}
 	return m, nil
 }
 
-// helpText is generated from the action registry so it matches the palette.
+// helpText is generated from the action registry. It lists the keys that work in the current view
+// and mode, grouped by layer (framework, then app). Actions without a key are in the palette.
 func (m *Model) helpText() string {
-	order := []string{"Home", "Contact", "Tasks", "Link", "Edit pane", "Bulk", "Sync", "Merge", "Compare", "Archive", "Organizations", "Tags", "Deals", "Move", "Views", "App"}
+	order := []string{"Verbs", "Home", "Contact", "Tasks", "Link", "Edit pane", "Bulk", "Sync", "Merge", "Compare", "Archive", "Organizations", "Tags", "Deals", "Move", "Views", "App"}
+	chain := m.scopeChain()
 	var b strings.Builder
-	for _, g := range order {
-		b.WriteString(m.st.Head.Render(g) + "\n")
-		for i := range m.actions {
-			a := &m.actions[i]
-			if a.group != g || a.barOnly {
+	b.WriteString(m.st.Head.Render(fmt.Sprintf("Keys in %s (normal mode)", viewNames[m.view])) + "\n")
+	b.WriteString(m.st.Dim.Render("Keys that act on a highlighted row need one. Everything else is in the palette, ctrl+k.") + "\n\n")
+	for _, layer := range []string{layerFramework, layerApp} {
+		title := "Framework: the same in every view"
+		if layer == layerApp {
+			title = "App: specific to this CRM"
+		}
+		var body strings.Builder
+		for _, g := range order {
+			var lines []string
+			for i := range m.actions {
+				a := &m.actions[i]
+				if a.group != g || a.barOnly || a.layerOf() != layer || a.mode != keyNormal || !inScopes(a, chain) {
+					continue
+				}
+				var live []string
+				for _, k := range a.keys {
+					if (a.keyIf == nil || a.keyIf(m)) && (a.keyFor == nil || a.keyFor(m, k)) && (m.cmp == nil || a.inCompare) {
+						live = append(live, keys.Display(k))
+					}
+				}
+				if len(live) == 0 {
+					continue
+				}
+				line := m.st.Name.Render(fit(strings.Join(live, ", "), 22)) + a.desc
+				if a.write {
+					line += m.st.Dim.Render("  [edits data]")
+				}
+				lines = append(lines, line)
+			}
+			if len(lines) == 0 {
 				continue
 			}
-			key := a.hint
-			if len(a.keys) > 1 {
-				key = strings.Join(a.keys, " ")
-				key = strings.ReplaceAll(key, " ", ", ")
-			}
-			if key == "" {
-				key = "palette"
-			}
-			if a.hasKey(" ") {
-				key = "space"
-			}
-			line := m.st.Name.Render(fit(key, 22)) + a.desc
-			if a.write {
-				line += m.st.Dim.Render("  [edits data]")
-			}
-			b.WriteString(line + "\n")
+			body.WriteString(m.st.Dim.Render(g) + "\n" + strings.Join(lines, "\n") + "\n")
 		}
-		b.WriteString("\n")
+		if body.Len() == 0 {
+			continue
+		}
+		b.WriteString(m.st.Head.Render(title) + "\n" + body.String() + "\n")
+	}
+	var text []string
+	for i := range m.actions {
+		a := &m.actions[i]
+		if a.mode == keyText && len(a.keys) > 0 {
+			text = append(text, m.st.Name.Render(fit(joinKeys(a.keys), 22))+a.desc)
+		}
+	}
+	if len(text) > 0 {
+		b.WriteString(m.st.Head.Render("Typing in a prompt (text mode)") + "\n" + strings.Join(text, "\n") + "\n\n")
 	}
 	b.WriteString(m.st.Head.Render("Mouse") + "\n")
 	b.WriteString(m.st.Name.Render(fit("click", 22)) + "select a row, click again on a detail row to edit it\n")
@@ -519,7 +564,7 @@ func (m *Model) helpText() string {
 // barListView draws the bar list: the group name at the start of each group, the label, the
 // description, and the key on the right.
 func (m *Model) barListView(o *overlay, end int) string {
-	const groupW, keyW = 8, 9
+	const groupW, keyW = 8, 15
 	var b strings.Builder
 	prev := ""
 	if o.offset > 0 {

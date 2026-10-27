@@ -316,7 +316,7 @@ func TestDealPageAndNoteOnAnOrganization(t *testing.T) {
 	}
 
 	// n adds a note to the deal, ctrl+z undoes it, the deal page lists it.
-	press(m, "n")
+	press(m, "a", "n", "tab")
 	require.Equal(t, modePrompt, m.mode)
 	submit(m, "sent the proposal")
 	list, err := m.ir.FindAll(ctx, model.InteractionFilters{DealID: &d.ID})
@@ -330,7 +330,7 @@ func TestDealPageAndNoteOnAnOrganization(t *testing.T) {
 
 	// Same on an organization.
 	runPalette(m, "organizations view")
-	press(m, "n")
+	press(m, "a", "n", "tab")
 	submit(m, "met the team")
 	olist, err := m.ir.FindAll(ctx, model.InteractionFilters{OrgID: &org.ID})
 	require.NoError(t, err)
@@ -343,11 +343,13 @@ func TestDealStageSetsAndClearsClosedAtInTheTUI(t *testing.T) {
 	d, err := m.dlr.Create(ctx, model.CreateDealInput{Title: "Site", Stage: "lead"})
 	require.NoError(t, err)
 	goDeals(m)
-	press(m, "s", "5") // won
+	runID(m, "deal-stage")
+	press(m, "5") // won
 	got, err := m.dlr.FindByID(ctx, d.ID)
 	require.NoError(t, err)
 	require.NotNil(t, got.ClosedAt)
-	press(m, "s", "3") // proposal: reopened
+	runID(m, "deal-stage")
+	press(m, "3") // proposal: reopened
 	got, _ = m.dlr.FindByID(ctx, d.ID)
 	assert.Nil(t, got.ClosedAt)
 	press(m, "ctrl+z")
@@ -382,7 +384,7 @@ func TestArchivedViewListsEveryKindFiltersByTypeAndRestores(t *testing.T) {
 	assert.Contains(t, m.View(), "4 archived")
 
 	// The type filter keeps one kind.
-	press(m, "T")
+	press(m, "ctrl+f")
 	require.NotNil(t, m.ov)
 	typeText(m, "deals")
 	press(m, "enter")
@@ -391,8 +393,8 @@ func TestArchivedViewListsEveryKindFiltersByTypeAndRestores(t *testing.T) {
 	assert.Contains(t, m.View(), "1 archived deals")
 	assert.Contains(t, m.detail.View(), "Site")
 
-	// u restores the deal, with ctrl+z to undo.
-	press(m, "u")
+	// r restores the deal, with ctrl+z to undo.
+	press(m, "r")
 	live, err := m.dlr.FindByID(ctx, deal.ID)
 	require.NoError(t, err)
 	assert.Equal(t, "Site", live.Title)
@@ -403,23 +405,23 @@ func TestArchivedViewListsEveryKindFiltersByTypeAndRestores(t *testing.T) {
 	require.Len(t, m.rows, 1, "the undone restore puts the deal back in the Archived list")
 
 	// Back to all types: restore the organization and its membership comes back with it.
-	press(m, "T")
+	press(m, "ctrl+f")
 	typeText(m, "all")
 	press(m, "enter")
 	m.cursorOn(func(r row) bool { return r.akind == "organization" })
-	press(m, "u")
+	press(m, "r")
 	items := linkedOrgs(t, m, 1)
 	require.Len(t, items, 1, "restoring the organization brings its links back")
 	assert.Equal(t, "CTO", *items[0].Role)
 
 	// A person restores from the same view.
 	m.cursorOn(func(r row) bool { return r.akind == "person" })
-	press(m, "u")
+	press(m, "r")
 	_, err = m.pr.FindByID(ctx, 3)
 	assert.NoError(t, err)
 	// And the task.
 	m.cursorOn(func(r row) bool { return r.akind == "task" })
-	press(m, "u")
+	press(m, "r")
 	_, err = m.tr.FindByID(ctx, task.ID)
 	assert.NoError(t, err)
 	require.Len(t, m.rows, 1, "only the deal is still archived")
@@ -474,11 +476,13 @@ func TestDealMovedBetweenClosedStagesIsRestamped(t *testing.T) {
 	d, err := m.dlr.Create(ctx, model.CreateDealInput{Title: "Site", Stage: "lead"})
 	require.NoError(t, err)
 	goDeals(m)
-	press(m, "s", "5") // won
+	runID(m, "deal-stage")
+	press(m, "5") // won
 	_, err = m.db.Exec(`UPDATE deals SET closed_at = '2000-01-01 00:00:00' WHERE id = ?`, d.ID)
 	require.NoError(t, err)
 	m.afterWrite()
-	press(m, "s", "6") // lost
+	runID(m, "deal-stage")
+	press(m, "6") // lost
 	got, err := m.dlr.FindByID(ctx, d.ID)
 	require.NoError(t, err)
 	assert.Equal(t, "lost", got.Stage)

@@ -72,13 +72,13 @@ func TestHelpTopicsFilterOpenScrollAndBack(t *testing.T) {
 
 	// Scrolling: j moves down, G goes to the end, g to the top.
 	require.Greater(t, m.tv.vp.TotalLineCount(), m.tv.vp.Height, "topic is longer than the screen")
-	press(m, "j")
+	press(m, "down")
 	assert.Equal(t, 1, m.tv.vp.YOffset)
-	press(m, "G")
+	press(m, "end")
 	assert.True(t, m.tv.vp.AtBottom())
-	press(m, "k")
+	press(m, "up")
 	assert.False(t, m.tv.vp.AtBottom())
-	press(m, "g")
+	press(m, "home")
 	assert.Equal(t, 0, m.tv.vp.YOffset)
 
 	// esc returns to the topic list with the filter kept.

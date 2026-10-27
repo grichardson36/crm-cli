@@ -18,6 +18,8 @@ type ActionInfo struct {
 	ID    string   `json:"id"`
 	Title string   `json:"title"`
 	Group string   `json:"group"`
+	Layer string   `json:"layer"`
+	Scope string   `json:"scope"`
 	Keys  []string `json:"keys"`
 	Desc  string   `json:"description"`
 	Write bool     `json:"changes_data"`
@@ -28,16 +30,27 @@ type ActionInfo struct {
 func DefaultActions() []ActionInfo {
 	var out []ActionInfo
 	for _, a := range buildActions() {
-		out = append(out, ActionInfo{ID: a.id, Title: a.title, Group: a.group, Keys: append([]string{}, a.keys...), Desc: a.desc, Write: a.write})
+		out = append(out, ActionInfo{ID: a.id, Title: a.title, Group: a.group, Layer: a.layerOf(), Scope: a.scopeOf(), Keys: append([]string{}, a.keys...), Desc: a.desc, Write: a.write})
 	}
 	return out
 }
 
-// globalGroups hold keys that work everywhere, so they collide with any other group.
-var globalGroups = map[string]bool{"App": true, "Move": true, "Views": true}
-
+// sameContext says whether two actions can be live in one effective scope: they have the same key mode
+// and their scopes are the same or one inherits from the other (keymap.go). An app scope action is live in
+// every view, so it collides with a key used anywhere. Two view types that never show together
+// (the person list and the Sync inbox) do not.
 func sameContext(a, b *action) bool {
-	return a.group == b.group || globalGroups[a.group] || globalGroups[b.group]
+	if a.mode != b.mode || !scopesOverlap(a.scopeOf(), b.scopeOf()) {
+		return false
+	}
+	// Only actions marked inCompare are live on the compare screen, so the others never meet its keys.
+	if a.scopeOf() == "compare" && b.scopeOf() != "compare" && !b.inCompare {
+		return false
+	}
+	if b.scopeOf() == "compare" && a.scopeOf() != "compare" && !a.inCompare {
+		return false
+	}
+	return true
 }
 
 // ResolveOverrides applies the overrides to a fresh action list and returns the effective keys by
@@ -78,6 +91,9 @@ func applyKeyOverrides(actions []action, o keys.Overrides) []string {
 		a.keys = nil
 		clash := ""
 		for _, k := range o[id] {
+			if a.hasKeyIn(saved, k) {
+				continue // a key the action already has by default is not a new claim
+			}
 			for i := range actions {
 				b := &actions[i]
 				if b.id == id || !b.hasKey(k) || !sameContext(a, b) {
@@ -119,6 +135,14 @@ func suggest(id string, byID map[string]*action) string {
 		near = near[:4]
 	}
 	return " (did you mean " + strings.Join(near, ", ") + "?)"
+}
+
+// StaleOverrides reports the entries of the [keys] table that the current action list cannot honor,
+// so the user can clean the file: an action id that no longer exists, or a key another action now
+// owns in the same scope. It never fails. The override file format is unchanged.
+func StaleOverrides(o keys.Overrides) []string {
+	_, problems := ResolveOverrides(o)
+	return problems
 }
 
 // ConflictFor reports why keys cannot be bound to the action id given the current overrides, or "".
@@ -235,8 +259,12 @@ func (m *Model) handleCaptureKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	title := m.captureTitle()
 	m.capture = nil
 	m.mode = modeConfirm
+	warn := ""
+	if why := SwallowedChordWarning(norm); why != "" {
+		warn = " warning: " + why + "."
+	}
 	m.confirm = &confirmState{
-		prompt: fmt.Sprintf("bind %s to %s (now %s)? y/n", title, keys.Display(norm), old),
+		prompt: fmt.Sprintf("bind %s to %s (now %s)?%s y/n", title, keys.Display(norm), old, warn),
 		yes: func() {
 			o := keys.Overrides{}
 			for k, v := range m.keyOverrides {

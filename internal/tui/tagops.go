@@ -16,8 +16,8 @@ import (
 func tagOpsActions() []action {
 	inRow := func(m *Model) bool { return m.barTag != "" }
 	return []action{
-		{id: "tag-rename", title: "Rename tag", group: "Tags", keys: []string{"r"}, keyIf: inRow, tagVerb: true, write: true, footLabel: "rename",
-			desc: "give a tag a new name. A name that exists offers a merge instead. Same as crm tag rename",
+		{id: "tag-rename", title: "Rename tag", group: "Tags", keyIf: inRow, tagVerb: true, write: true, footLabel: "rename",
+			desc: "give a tag a new name. A name that exists offers a merge instead. e on a tag row does this (rename is just activate). Same as crm tag rename",
 			run:  func(m *Model) tea.Cmd { m.askTagRename(m.barTag); return nil }},
 		{id: "tag-merge", title: "Merge tag into another", group: "Tags", keys: []string{"m"}, keyIf: inRow, tagVerb: true, write: true, footLabel: "merge",
 			desc: "move every record of this tag to another tag and remove this one (y/n). Same as crm tag merge",

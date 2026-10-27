@@ -21,7 +21,7 @@ func openBobs(t *testing.T) (*Model, *compareState) {
 	require.NoError(t, err)
 	_, err = m.db.Exec(`UPDATE people SET updated_at = '2026-02-01 10:00:00' WHERE id = 4`)
 	require.NoError(t, err)
-	press(m, "8", "j", "enter")
+	press(m, "8", "down", "enter")
 	require.NotNil(t, m.cmp)
 	return m, m.cmp
 }
@@ -117,7 +117,7 @@ func TestCompareLayoutAtSeveralWidths(t *testing.T) {
 		for page := 0; page < 3; page++ {
 			c.page = page
 			c.confirm = false
-			for _, step := range []string{"", "j", "j", "j", "j", "j", "j", "j"} {
+			for _, step := range []string{"", "down", "down", "down", "down", "down", "down", "down"} {
 				if step != "" {
 					press(m, step)
 				}
@@ -181,13 +181,11 @@ func TestCompareSinglePickKeys(t *testing.T) {
 	assert.Equal(t, "Globex", c.finalText(c.cur))
 	press(m, "right")
 	assert.Equal(t, 1, c.resolved(c.cur))
-	press(m, "1")
-	assert.Equal(t, 0, c.resolved(c.cur))
-	press(m, "2")
+	press(m, "1", "2", "h", "l") // the old aliases do nothing
 	assert.Equal(t, 1, c.resolved(c.cur))
-	press(m, "h")
+	press(m, "left")
 	assert.Equal(t, 0, c.resolved(c.cur))
-	press(m, "l")
+	press(m, "right")
 	assert.Equal(t, 1, c.resolved(c.cur))
 	press(m, " ")
 	assert.Equal(t, 0, c.resolved(c.cur), "space flips")
@@ -205,9 +203,9 @@ func TestCompareSinglePickKeys(t *testing.T) {
 		c.cur--
 	}
 	last := c.cur
-	press(m, "j")
+	press(m, "down")
 	assert.Equal(t, last, c.cur)
-	press(m, "k")
+	press(m, "up")
 	assert.Less(t, c.cur, last)
 }
 
@@ -332,7 +330,7 @@ func TestCompareFlowSummaryThenApply(t *testing.T) {
 	// Navigation keys do not edit while the summary shows.
 	press(m, "enter")
 	before := c.resolved(rowIndex(c, "company"))
-	press(m, "right", "left", " ", "s")
+	press(m, "right", "left", " ", "ctrl+e")
 	assert.Equal(t, before, c.resolved(rowIndex(c, "company")))
 	assert.Equal(t, 0, c.s)
 
@@ -362,7 +360,7 @@ func TestCompareMergeMatchesTheResultPane(t *testing.T) {
 	press(m, " ")
 	c.cur = rowIndex(c, "name")
 	press(m, "left")
-	press(m, "s")
+	press(m, "ctrl+e")
 	assert.Equal(t, 1, c.s)
 
 	var want []string
@@ -392,7 +390,7 @@ func TestCompareMergeMatchesTheResultPane(t *testing.T) {
 
 func TestCompareChangeSurvivorAndEsc(t *testing.T) {
 	m, c := openBobs(t)
-	press(m, "s")
+	press(m, "ctrl+e")
 	assert.Equal(t, 1, c.s)
 	m.Update(tea.WindowSizeMsg{Width: 140, Height: 40})
 	assert.Contains(t, ansiStrip(m.View()), "Final #4")
@@ -424,19 +422,19 @@ func TestCompareNarrowResultToggle(t *testing.T) {
 	out := ansiStrip(m.View())
 	assert.Contains(t, out, "#2 Bob Baker")
 	assert.NotContains(t, out, "Final #2", "two panes show the candidates")
-	press(m, "r")
+	press(m, "ctrl+w")
 	out = ansiStrip(m.View())
 	assert.Contains(t, out, "Final #2")
 	assert.NotContains(t, out, "#4 bob baker\n")
-	press(m, "r")
+	press(m, "ctrl+w")
 	assert.Contains(t, ansiStrip(m.View()), "#4 bob baker")
 	assert.Equal(t, 2, c.page)
 
-	// The footer offers r only when panes are hidden.
+	// The footer offers ctrl+w only when panes are hidden.
 	hints := func() string { return ansiStrip(m.hintsLine()) }
-	assert.Contains(t, hints(), "r pane")
+	assert.Contains(t, hints(), "ctrl+w pane")
 	m.Update(tea.WindowSizeMsg{Width: 160, Height: 30})
-	assert.NotContains(t, hints(), "r pane")
+	assert.NotContains(t, hints(), "ctrl+w pane")
 	assert.Contains(t, hints(), "enter merge")
 	assert.Contains(t, hints(), "esc back")
 }
@@ -485,15 +483,15 @@ func TestCompareGroupOfThreeMergesPairByPair(t *testing.T) {
 	require.Len(t, c.members, 3)
 	assert.Equal(t, []int{0, 1}, []int{c.a, c.b})
 	assert.Contains(t, ansiStrip(m.View()), "group of 3")
-	press(m, "p")
+	press(m, "ctrl+b")
 	assert.Equal(t, []int{0, 2}, []int{c.a, c.b})
 	assert.GreaterOrEqual(t, itemRow(c, "email", "bobby@elsewhere.net"), 0)
-	press(m, "p")
+	press(m, "ctrl+b")
 	assert.Equal(t, []int{1, 2}, []int{c.a, c.b})
-	press(m, "p")
+	press(m, "ctrl+b")
 	assert.Equal(t, []int{0, 1}, []int{c.a, c.b}, "wraps")
 
-	press(m, "p", "m")
+	press(m, "ctrl+b", "m")
 	assert.Nil(t, m.cmp)
 	assert.True(t, archivedIDs(t, pr)[third.ID])
 	assert.False(t, archivedIDs(t, pr)[4], "the third person is untouched")

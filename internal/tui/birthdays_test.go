@@ -88,7 +88,7 @@ func TestBirthdayViewOpensAtTodayWithThePastAbove(t *testing.T) {
 
 	// Scroll up: j/k skip the dividers, past birthdays come into view.
 	for i := 0; i < 20; i++ {
-		press(m, "k")
+		press(m, "up")
 		assert.False(t, m.rows[m.cursor].skip, "the cursor never rests on a divider or heading")
 	}
 	assert.Equal(t, "Older", m.rows[m.cursor].title, "the oldest birthday is the first row to select")
@@ -97,46 +97,132 @@ func TestBirthdayViewOpensAtTodayWithThePastAbove(t *testing.T) {
 	assert.Contains(t, m.View(), "2mo 3w 3d ago")
 
 	for i := 0; i < 20; i++ {
-		press(m, "j")
+		press(m, "down")
 		assert.False(t, m.rows[m.cursor].skip)
 	}
 	assert.Equal(t, "Past", m.rows[m.cursor].title, "the last row is next year's birthday of the person 8 days ago")
 	assert.Equal(t, "47 yrs", m.rows[m.cursor].meta)
 }
 
-func TestBirthdayGoToTodaySnapsBack(t *testing.T) {
-	for _, key := range []string{"ctrl+t", "ctrl+up"} {
+func TestBirthdayHomeDestinationIsTodayOnCtrlShiftArrows(t *testing.T) {
+	for _, key := range []string{"ctrl+shift+up", "ctrl+shift+down"} {
 		m := birthdayModel(t)
-		press(m, "g")
+		press(m, "home")
 		assert.Equal(t, "Older", m.rows[m.cursor].title)
 		press(m, key)
-		assert.Equal(t, "Ann", m.rows[m.cursor].title, "%s snaps back to today", key)
+		assert.Equal(t, "Ann", m.rows[m.cursor].title, "%s goes to today in Birthdays", key)
 		assert.Equal(t, "2026-10-13", m.rows[m.offset].title)
 	}
+}
+
+func TestHomeAndEndAlwaysGoToTheFirstAndLastRow(t *testing.T) {
 	m := birthdayModel(t)
-	assert.Contains(t, m.footerView(), "today", "the key shows in the footer")
-	assert.Contains(t, m.footerView(), "ctrl+t")
+	press(m, "home")
+	assert.Equal(t, "Older", m.rows[m.cursor].title, "home is the first row even where ctrl+shift+up has a home destination")
+	press(m, "end")
+	assert.Equal(t, "Past", m.rows[m.cursor].title)
+	assert.Equal(t, "47 yrs", m.rows[m.cursor].meta)
+}
 
-	// The key is a registry action, rebindable.
-	m.applyKeys(map[string][]string{"go-today": {"ctrl+b"}})
-	press(m, "g")
-	m.Update(tea.KeyMsg{Type: tea.KeyCtrlB})
+func TestCtrlUpAndDownJumpADayInBirthdays(t *testing.T) {
+	m := birthdayModel(t)
 	assert.Equal(t, "Ann", m.rows[m.cursor].title)
-	assert.Equal(t, []string{"ctrl+b"}, m.actionByID("go-today").keys)
+	press(m, "ctrl+down")
+	assert.Equal(t, "Bob Baker", m.rows[m.cursor].title, "the next day: 2026-10-20")
+	press(m, "ctrl+down")
+	assert.Equal(t, "Next", m.rows[m.cursor].title)
+	press(m, "ctrl+up")
+	assert.Equal(t, "Bob Baker", m.rows[m.cursor].title, "and back a day")
+	press(m, "ctrl+up")
+	assert.Equal(t, "Ann", m.rows[m.cursor].title, "the first row of the day before")
+
+	// From a later row of today, ctrl+up goes to the first row of today, then to the day before.
+	m = birthdayModel(t)
+	press(m, "down", "down") // Far
+	assert.Equal(t, "Far", m.rows[m.cursor].title)
+	press(m, "ctrl+up")
+	assert.Equal(t, "Ann", m.rows[m.cursor].title)
+	press(m, "ctrl+up")
+	assert.Equal(t, "Past", m.rows[m.cursor].title)
 }
 
-func TestTIsAddTaskInEveryModuleIncludingBirthdays(t *testing.T) {
-	m := birthdayModel(t) // Birthdays view, a person selected
-	press(m, "t")
-	assert.Equal(t, modePrompt, m.mode, "t adds a task on the person in Birthdays, as everywhere")
-	press(m, "esc")
-
-	p, _ := newTestModel(t) // People view
-	press(p, "t")
-	assert.Equal(t, modePrompt, p.mode)
+func TestCtrlUpAndDownJumpAFirstLetterGroupInPeople(t *testing.T) {
+	m, pr := newTestModel(t)
+	for _, n := range []string{"Ana", "Alma", "Barb", "Bea", "Cleo"} {
+		_, err := pr.Create(m.ctx, model.CreatePersonInput{FirstName: n})
+		require.NoError(t, err)
+	}
+	m.afterWrite()
+	press(m, "home")
+	letters := func() string { return groupLetter(m.rows[m.cursor].title) }
+	start := letters()
+	press(m, "ctrl+down")
+	assert.NotEqual(t, start, letters(), "ctrl+down lands in the next first-letter group")
+	first := m.cursor
+	press(m, "down")
+	press(m, "ctrl+up")
+	assert.Equal(t, first, m.cursor, "ctrl+up from inside a group goes to the start of that group")
+	press(m, "ctrl+up")
+	assert.Equal(t, start, letters(), "and once more to the group before")
 }
 
-func TestGoToTodayInEveryModuleWithAnAnchor(t *testing.T) {
+func TestCtrlUpAndDownJumpAPageInViewsWithoutAUnit(t *testing.T) {
+	m, pr := newTestModel(t)
+	for i := 0; i < 40; i++ {
+		_, err := pr.Create(m.ctx, model.CreatePersonInput{FirstName: "P" + strings.Repeat("q", i+1), LastName: sp("Due")})
+		require.NoError(t, err)
+	}
+	m.afterWrite()
+	m.switchView(viewDue)
+	m.settle()
+	if len(m.rows) < 5 {
+		t.Skip("no follow-up rows to page through")
+	}
+	press(m, "ctrl+down")
+	assert.Greater(t, m.cursor, 1, "a page down in a view without a unit")
+}
+
+func TestPageKeysMoveAPageAndCtrlKeysHalfAPage(t *testing.T) {
+	m, pr := newTestModel(t)
+	for i := 0; i < 60; i++ {
+		_, err := pr.Create(m.ctx, model.CreatePersonInput{FirstName: "Pg", LastName: sp(string(rune('a'+i%26)) + strings.Repeat("z", i/26))})
+		require.NoError(t, err)
+	}
+	m.afterWrite()
+	press(m, "home")
+	press(m, "ctrl+d")
+	half := m.cursor
+	press(m, "home")
+	press(m, "pgdown")
+	full := m.cursor
+	assert.Greater(t, half, 0)
+	assert.Greater(t, full, half, "pgdown moves a full page and ctrl+d half of one")
+	press(m, "pgup")
+	assert.Less(t, m.cursor, full)
+	press(m, "end")
+	press(m, "ctrl+u")
+	assert.Less(t, m.cursor, len(m.rows)-1)
+}
+
+func TestTheOldNavigationAndAddKeysAreGone(t *testing.T) {
+	for _, k := range []string{"j", "k", "h", "g", "G", "ctrl+t"} {
+		m, _ := newTestModel(t)
+		press(m, "down")
+		before := m.cursor
+		press(m, k)
+		assert.Equal(t, before, m.cursor, "%s no longer moves", k)
+		assert.Equal(t, viewPeople, m.view, k)
+		assert.Equal(t, modeNormal, m.mode, k)
+		assert.Equal(t, focusList, m.focus, k)
+	}
+	m, _ := newTestModel(t)
+	press(m, "l") // l is Link now, not "move right"
+	assert.Equal(t, focusList, m.focus)
+	require.NotNil(t, m.ov)
+	assert.Contains(t, m.ov.title, "Link")
+}
+
+func TestGoToTodayIsAPaletteEntryInEveryModuleWithAnAnchor(t *testing.T) {
 	m, pr := newTestModel(t)
 	// Tasks: the first task due today or later.
 	for _, in := range []model.CreateTaskInput{
@@ -150,8 +236,11 @@ func TestGoToTodayInEveryModuleWithAnAnchor(t *testing.T) {
 	_ = pr
 	m.afterWrite()
 	m.switchView(viewTasks)
-	press(m, "G")
-	press(m, "ctrl+t")
+	goToday := m.actionByID("go-today")
+	require.NotNil(t, goToday)
+	assert.Empty(t, goToday.keys, "ctrl+t and ctrl+up are retired")
+	press(m, "end")
+	m.runAction(goToday)
 	assert.Equal(t, "today", m.rows[m.cursor].title, "Tasks: the first task due today or later")
 
 	// Home, People and Follow-up: the top of the list.
@@ -160,8 +249,8 @@ func TestGoToTodayInEveryModuleWithAnAnchor(t *testing.T) {
 		if len(m.rows) == 0 {
 			continue
 		}
-		press(m, "G")
-		press(m, "ctrl+t")
+		press(m, "end")
+		m.runAction(goToday)
 		first := 0
 		for i, r := range m.rows {
 			if !r.skip {
@@ -169,10 +258,10 @@ func TestGoToTodayInEveryModuleWithAnAnchor(t *testing.T) {
 				break
 			}
 		}
-		assert.Equal(t, first, m.cursor, "%s: ctrl+t goes to the top", viewNames[v])
+		assert.Equal(t, first, m.cursor, "%s: Go to today goes to the top", viewNames[v])
 	}
 
-	// A module with no anchor leaves the key alone.
+	// A module with no anchor leaves the entry out.
 	for _, v := range []viewKind{viewOrgs, viewDeals, viewArchived, viewSync} {
 		m.switchView(v)
 		assert.False(t, m.actionByID("go-today").enabled(m), "%s has no anchor", viewNames[v])

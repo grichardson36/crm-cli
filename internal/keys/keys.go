@@ -4,7 +4,7 @@
 //
 //	[keys]
 //	undo = "ctrl+z"
-//	favorite = ["f", "*"]
+//	favorite = ["f", "ctrl+g"]
 //
 // The rest of config.toml (such as the theme) is kept when the table is written.
 package keys
@@ -81,7 +81,7 @@ func Normalize(key string) (string, error) {
 	default:
 		return "", fmt.Errorf("%q is not a key name (examples: a, T, ?, enter, esc, tab, up, pgdown, space, f5, ctrl+z, alt+x, shift+tab)", key)
 	}
-	if ctrl && (len(name) != 1 || name[0] < 'a' || name[0] > 'z') && !isArrowish(name) {
+	if ctrl && (len(name) != 1 || name[0] < 'a' || name[0] > 'z') && !isArrowish(name) && !isCtrlPunct(name) {
 		return "", fmt.Errorf("%q: ctrl works with a letter a to z or an arrow key", key)
 	}
 	if shift && name != "tab" && !isArrowish(name) && !isFunctionKey(name) {
@@ -118,6 +118,12 @@ func isFunctionKey(s string) bool {
 		n = n*10 + int(c-'0')
 	}
 	return n >= 1 && n <= 20
+}
+
+// isCtrlPunct reports the punctuation keys that make a control byte: ctrl+[ is esc, ctrl+] ctrl+\ ctrl+^
+// and ctrl+_ are the other control bytes. A terminal may never deliver them as typed (see tui.SwallowedChordWarning).
+func isCtrlPunct(s string) bool {
+	return len(s) == 1 && strings.ContainsRune("[]\\^_", rune(s[0]))
 }
 
 func isArrowish(s string) bool {

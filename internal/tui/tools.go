@@ -46,17 +46,21 @@ func (m *Model) openText(title, body string, back func(m *Model)) {
 func (m *Model) handleTextKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	tv := m.tv
 	switch msg.String() {
-	case "j", "down":
+	case "down", "ctrl+n":
 		tv.vp.LineDown(1)
-	case "k", "up":
+	case "up", "ctrl+p":
 		tv.vp.LineUp(1)
-	case "pgdown", "ctrl+d", " ":
+	case "pgdown":
+		tv.vp.ViewDown()
+	case "ctrl+d", " ":
 		tv.vp.HalfViewDown()
-	case "pgup", "ctrl+u":
+	case "pgup":
+		tv.vp.ViewUp()
+	case "ctrl+u":
 		tv.vp.HalfViewUp()
-	case "g", "home":
+	case "home", "ctrl+shift+up":
 		tv.vp.GotoTop()
-	case "G", "end":
+	case "end", "ctrl+shift+down":
 		tv.vp.GotoBottom()
 	case "esc", "q", "ctrl+c":
 		m.tv = nil
@@ -70,7 +74,7 @@ func (m *Model) handleTextKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m *Model) textViewRender() string {
 	cut := lipgloss.NewStyle().MaxWidth(m.width)
 	title := m.st.Head.Render(m.tv.title)
-	foot := m.st.Dim.Render("j/k scroll  g/G top/bottom  esc back  ctrl+k for every action")
+	foot := m.st.Dim.Render("up/down scroll  home/end top/bottom  esc back  ctrl+k for every action")
 	return cut.Render(title) + "\n" + m.tv.vp.View() + "\n" + cut.Render(foot)
 }
 

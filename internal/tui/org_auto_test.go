@@ -28,7 +28,7 @@ func liveOrgCount(t *testing.T, m *Model) int {
 func TestFormCompanyEditCreatesOrganizationAsOneUndoStep(t *testing.T) {
 	m, pr := newTestModel(t)
 	before := len(m.hist)
-	press(m, "g", "tab")
+	press(m, "home", "tab")
 	goTo(t, m, "company")
 	press(m, "enter")
 	replaceText(m, "Initrode")
@@ -53,7 +53,7 @@ func TestFormCompanyEditCreatesOrganizationAsOneUndoStep(t *testing.T) {
 func TestFormCompanyEditReusesAndIgnores(t *testing.T) {
 	m, _ := newTestModel(t)
 	edit := func(text string) {
-		press(m, "g", "tab")
+		press(m, "home", "tab")
 		goTo(t, m, "company")
 		press(m, "enter")
 		replaceText(m, text)
@@ -62,10 +62,10 @@ func TestFormCompanyEditReusesAndIgnores(t *testing.T) {
 	}
 	edit("Initrode Inc")
 	assert.Equal(t, 1, liveOrgCount(t, m))
-	press(m, "j")
+	press(m, "down")
 	edit("INITRODE")
 	assert.Equal(t, 1, liveOrgCount(t, m), "reused")
-	press(m, "j")
+	press(m, "down")
 	edit("N/A")
 	assert.Equal(t, 1, liveOrgCount(t, m), "junk makes none")
 }

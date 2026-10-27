@@ -71,7 +71,7 @@ func TestTaskDeleteFromTaskRowInDetailPane(t *testing.T) {
 	_, err := m.tr.Create(context.Background(), model.CreateTaskInput{Title: "call back", Priority: "medium", PersonID: ip(2)})
 	require.NoError(t, err)
 	m.afterWrite()
-	press(m, "j", "tab")
+	press(m, "down", "tab")
 	require.Equal(t, focusDetail, m.focus)
 	for i, r := range m.form {
 		if r.kind == rkTask && !r.empty {

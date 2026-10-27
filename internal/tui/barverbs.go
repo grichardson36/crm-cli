@@ -22,15 +22,15 @@ import (
 // barReserved are keys the bar keeps for itself in the results.
 var barReserved = map[string]bool{
 	"enter": true, "esc": true, "tab": true, "shift+tab": true, "up": true, "down": true, "left": true, "right": true,
-	"pgup": true, "pgdown": true, "ctrl+n": true, "ctrl+p": true, "ctrl+c": true, "ctrl+k": true, "ctrl+a": true, "j": true, "k": true,
-	":": true, "/": true, "q": true, "?": true, "a": true, "+": true,
+	"pgup": true, "pgdown": true, "ctrl+n": true, "ctrl+p": true, "ctrl+c": true, "ctrl+k": true,
+	":": true, "/": true, "q": true, "?": true, "a": true,
 }
 
 // barVerbGroups are the registry groups whose actions act on a selected object.
 var barVerbGroups = map[string]bool{"Contact": true, "Link": true, "Organizations": true, "Deals": true, "Tasks": true, "Tags": true}
 
 // barNoVerb are actions in those groups that do not act on one selected object.
-var barNoVerb = map[string]bool{"org-mark": true, "org-merge": true, "new": true, "note-pick": true, "note-types": true}
+var barNoVerb = map[string]bool{"org-mark": true, "org-merge": true, "merge-marked": true, "merge": true, "new": true, "note-pick": true, "note-types": true}
 
 // barTarget is what a bar row stands for: the kind of object and its id (or tag name).
 type barTarget struct {
@@ -87,6 +87,7 @@ type barSaved struct {
 	tag            string
 	status         string
 	statusIsErr    bool
+	kind           string
 }
 
 // barResume remembers a bar that is waiting for a verb to finish (a prompt, a confirm, a picker).
@@ -102,7 +103,8 @@ type barResume struct {
 // returns what restoreBarContext needs. Nothing is read from the database here.
 func (m *Model) enterBarContext(t barTarget) barSaved {
 	s := barSaved{view: m.view, rows: m.rows, cursor: m.cursor, offset: m.offset, focus: m.focus, query: m.query, marked: m.marked, tag: m.barTag,
-		status: m.status, statusIsErr: m.statusIsErr}
+		status: m.status, statusIsErr: m.statusIsErr, kind: m.barKind}
+	m.barKind = t.kind
 	m.query = ""
 	m.marked = map[int64]bool{}
 	m.focus = focusList
@@ -135,7 +137,7 @@ func (m *Model) enterBarContext(t barTarget) barSaved {
 
 // leaveBarContext puts the screen back and refreshes it, because the verb may have changed data.
 func (m *Model) leaveBarContext(s barSaved) {
-	m.view, m.rows, m.cursor, m.offset, m.focus, m.query, m.marked, m.barTag = s.view, s.rows, s.cursor, s.offset, s.focus, s.query, s.marked, s.tag
+	m.view, m.rows, m.cursor, m.offset, m.focus, m.query, m.marked, m.barTag, m.barKind = s.view, s.rows, s.cursor, s.offset, s.focus, s.query, s.marked, s.tag, s.kind
 	m.report(m.rebuild(true))
 }
 
@@ -153,6 +155,13 @@ func (m *Model) barVerbKeyOK(a *action, key string, tag bool) bool {
 	if a.id == "undo" || a.id == "redo" {
 		return true // ctrl+z and ctrl+y undo and redo the verb just run
 	}
+	if a.mode != keyNormal {
+		return false
+	}
+	if a.verbAll {
+		// activate and mark work on the object of any kind, but a person already opens with enter in the bar.
+		return !(a.id == "activate" && m.barKind == "person")
+	}
 	if tag {
 		return a.barOnly || a.tagVerb
 	}
@@ -169,12 +178,15 @@ type barVerb struct {
 func (m *Model) barVerbs(t barTarget) []barVerb {
 	saved := m.enterBarContext(t)
 	defer func() {
-		m.view, m.rows, m.cursor, m.offset, m.focus, m.query, m.marked, m.barTag = saved.view, saved.rows, saved.cursor, saved.offset, saved.focus, saved.query, saved.marked, saved.tag
+		m.view, m.rows, m.cursor, m.offset, m.focus, m.query, m.marked, m.barTag, m.barKind = saved.view, saved.rows, saved.cursor, saved.offset, saved.focus, saved.query, saved.marked, saved.tag, saved.kind
 	}()
 	var out []barVerb
 	seen := map[string]bool{}
 	for i := range m.actions {
 		a := &m.actions[i]
+		if !inScopes(a, m.scopeChain()) {
+			continue
+		}
 		for _, k := range a.keys {
 			if !m.barVerbKeyOK(a, k, t.kind == "tag") {
 				continue
@@ -187,10 +199,13 @@ func (m *Model) barVerbs(t barTarget) []barVerb {
 			if a.footLabel != "" {
 				label = a.footLabel
 			}
+			if a.footDyn != nil {
+				label = a.footDyn(m)
+			}
 			if label == "" {
 				label = strings.ToLower(a.title)
 			}
-			out = append(out, barVerb{id: a.id, key: keys.Display(k), label: label, write: a.write})
+			out = append(out, barVerb{id: a.id, key: keys.Display(k), label: label, write: a.writes(m)})
 			break
 		}
 	}
@@ -253,12 +268,6 @@ func (m *Model) barFocusKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 		return m, nil, true
 	case "enter", "up", "down", "pgup", "pgdown", "ctrl+n", "ctrl+p", "ctrl+c":
 		return m, nil, false
-	case "j":
-		o.move(1, m.overlayPage())
-		return m, nil, true
-	case "k":
-		o.move(-1, m.overlayPage())
-		return m, nil, true
 	}
 	return m, m.runBarVerb(msg), true
 }
@@ -278,15 +287,8 @@ func (m *Model) runBarVerb(msg tea.KeyMsg) tea.Cmd {
 		t = barTarget{kind: "none"} // only undo and redo run on a row with no verbs
 	}
 	key := msg.String()
-	var act *action
 	saved := m.enterBarContext(t)
-	for i := range m.actions {
-		a := &m.actions[i]
-		if m.barVerbKeyOK(a, key, t.kind == "tag") {
-			act = a
-			break
-		}
-	}
+	act := m.lookupKeyWith(key, keyNormal, func(a *action, key string) bool { return m.barVerbKeyOK(a, key, t.kind == "tag") })
 	if act == nil {
 		m.leaveBarContext(saved)
 		o.ensureCursor(it.id)
@@ -372,11 +374,11 @@ func barTagActions() []action {
 			desc: "delete the tag from every record (y/n). ctrl+z puts it back. Same as crm tag delete",
 			when: func(m *Model) bool { return m.barTag != "" },
 			run:  func(m *Model) tea.Cmd { m.askDeleteTag(m.barTag); return nil }},
-		{id: "bar-tag-link", title: "Tag a person", group: "Tags", hint: "L", keys: []string{"L"}, barOnly: true, write: true,
+		{id: "bar-tag-link", title: "Tag a person", group: "Tags", hint: "l", keys: []string{"l"}, barOnly: true, write: true,
 			desc: "pick a person to give this tag",
 			when: func(m *Model) bool { return m.barTag != "" },
 			run:  func(m *Model) tea.Cmd { m.pickPersonForTag(m.barTag, true); return nil }},
-		{id: "bar-tag-unlink", title: "Untag a person", group: "Tags", hint: "U", keys: []string{"U"}, barOnly: true, write: true,
+		{id: "bar-tag-unlink", title: "Untag a person", group: "Tags", hint: "u", keys: []string{"u"}, barOnly: true, write: true,
 			desc: "pick a person who has this tag to take it off",
 			when: func(m *Model) bool { return m.barTag != "" },
 			run:  func(m *Model) tea.Cmd { m.pickPersonForTag(m.barTag, false); return nil }},

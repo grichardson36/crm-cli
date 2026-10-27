@@ -17,34 +17,64 @@ func kindLabels(m *Model) []string {
 	return out
 }
 
-func TestCtrlAOpensAKindPickerBuiltFromTheRegistry(t *testing.T) {
+func kindHints(m *Model) []string {
+	var out []string
+	for _, idx := range m.ov.shown {
+		out = append(out, m.ov.items[idx].hint)
+	}
+	return out
+}
+
+func TestAOpensAKindPickerBuiltFromTheRegistry(t *testing.T) {
 	m, _ := newTestModel(t)
-	press(m, "ctrl+a")
+	press(m, "a")
 	require.Equal(t, modeOverlay, m.mode)
-	assert.Equal(t, "New", m.ov.title)
-	assert.Equal(t, []string{"Person", "Organization", "Deal", "Task", "Note"}, kindLabels(m))
-	assert.Equal(t, "1", m.ov.items[0].hint)
+	assert.Equal(t, "Add", m.ov.title)
+	assert.Equal(t, []string{"Task", "Note", "Organization", "Person", "Deal"}, kindLabels(m))
+	assert.Equal(t, []string{"t", "n", "o", "p", "d"}, kindHints(m), "each kind shows its first letter")
 	press(m, "esc")
 	assert.Equal(t, modeNormal, m.mode, "esc leaves where you were")
 	assert.Equal(t, viewPeople, m.view)
-	assert.Equal(t, "ctrl+a", m.actionByID("add-any").hint)
+	assert.Equal(t, "a", m.actionByID("add-any").hint)
 }
 
-func TestGlobalAddOrganizationFromPeopleReturnsToThePeopleList(t *testing.T) {
+func TestThePickerPreselectsTheViewsOwnKind(t *testing.T) {
+	cases := []struct {
+		view viewKind
+		want string
+	}{{viewPeople, "Person"}, {viewHome, "Person"}, {viewBirthdays, "Person"}, {viewTasks, "Task"}, {viewOrgs, "Organization"}, {viewDeals, "Deal"}}
+	for _, tc := range cases {
+		m, _ := newTestModel(t)
+		m.switchView(tc.view)
+		m.settle()
+		press(m, "a")
+		require.NotNil(t, m.ov, viewNames[tc.view])
+		assert.Equal(t, tc.want, m.ov.items[m.ov.shown[m.ov.cursor]].label, "%s preselects its own kind", viewNames[tc.view])
+		press(m, "esc")
+	}
+}
+
+func TestAThenEnterAddsTheViewsOwnObject(t *testing.T) {
 	m, _ := newTestModel(t)
-	press(m, "j")
-	cursor, who := m.cursor, m.rows[m.cursor].personID
-	press(m, "ctrl+a", "2")
+	m.switchView(viewOrgs)
+	m.settle()
+	press(m, "a", "enter")
 	require.Equal(t, modePrompt, m.mode, "the organization add flow runs")
 	submit(m, "Acme Co | acme.com | | | | | | | ")
-	assert.Equal(t, modeNormal, m.mode)
 	list, err := m.orr.FindAll(m.ctx, 0)
 	require.NoError(t, err)
 	require.Len(t, list, 1)
-	assert.Equal(t, "Acme Co", list[0].Name)
+	assert.Equal(t, viewOrgs, m.view)
+}
+
+func TestAThenALetterJumpsToThatKind(t *testing.T) {
+	m, _ := newTestModel(t)
+	press(m, "a", "o")
+	require.Equal(t, modePrompt, m.mode, "a o adds an organization from the People view")
+	submit(m, "Acme Co | acme.com | | | | | | | ")
+	list, _ := m.orr.FindAll(m.ctx, 0)
+	require.Len(t, list, 1)
 	assert.Equal(t, viewPeople, m.view, "the view is not changed")
-	assert.Equal(t, cursor, m.cursor)
-	assert.Equal(t, who, m.rows[m.cursor].personID, "and the selection is where it was")
 	assert.Contains(t, m.toast.text, "organization added")
 
 	press(m, "ctrl+z") // one undo step
@@ -52,39 +82,92 @@ func TestGlobalAddOrganizationFromPeopleReturnsToThePeopleList(t *testing.T) {
 	assert.Empty(t, list)
 }
 
+func TestATaskOffersTheHighlightedPersonAsAGrayLinkAndTabAcceptsIt(t *testing.T) {
+	m, _ := newTestModel(t)
+	press(m, "down") // Bob
+	bob := m.curPerson()
+	press(m, "a", "t")
+	require.Equal(t, modePrompt, m.mode)
+	assert.Contains(t, m.promptHint(0), "tab: link Bob Baker", "the suggestion is shown after the cursor")
+	assert.NotContains(t, m.input.Value(), "Bob", "and is never put into the text")
+	press(m, "tab")
+	assert.Contains(t, m.promptHint(0), "linked to Bob Baker")
+	assert.NotContains(t, m.promptHint(0), "tab: link")
+	typeText(m, "Send deck")
+	press(m, "enter")
+	tasks, _ := m.tr.FindAll(m.ctx, model.TaskFilters{})
+	require.Len(t, tasks, 1)
+	assert.Equal(t, []int64{bob}, tasks[0].PersonIDs)
+	assert.Equal(t, viewPeople, m.view)
+}
+
+func TestATaskWithoutTabStaysUnlinked(t *testing.T) {
+	m, _ := newTestModel(t)
+	press(m, "a", "t")
+	typeText(m, "Order flowers")
+	press(m, "enter")
+	tasks, _ := m.tr.FindAll(m.ctx, model.TaskFilters{})
+	require.Len(t, tasks, 1)
+	assert.Empty(t, tasks[0].PersonIDs, "nothing links until tab is pressed")
+}
+
+func TestANoteOfferedAnOrganizationLinksItOnTab(t *testing.T) {
+	m, _ := newTestModel(t)
+	o, err := m.orr.Create(m.ctx, model.CreateOrgInput{Name: "Acme"})
+	require.NoError(t, err)
+	m.afterWrite()
+	m.switchView(viewOrgs)
+	m.settle()
+	press(m, "a", "n")
+	require.Equal(t, modePrompt, m.mode)
+	assert.Contains(t, m.promptHint(0), "tab: link Acme")
+	press(m, "tab")
+	typeText(m, "met their CEO")
+	press(m, "enter")
+	notes, err := m.ir.FindAll(m.ctx, model.InteractionFilters{OrgID: &o.ID, Limit: 10})
+	require.NoError(t, err)
+	require.Len(t, notes, 1)
+	assert.Equal(t, "met their CEO", *notes[0].Content)
+}
+
 func TestGlobalAddTaskDealPersonAndNote(t *testing.T) {
 	m, pr := newTestModel(t)
 	m.switchView(viewBirthdays)
 
-	press(m, "ctrl+a", "4") // task: a standalone task even though a person is selected
+	press(m, "a", "t") // task: a standalone task even though a person is highlighted, until tab
 	require.Equal(t, modePrompt, m.mode)
 	submit(m, "Order flowers")
 	tasks, _ := m.tr.FindAll(m.ctx, model.TaskFilters{})
 	require.Len(t, tasks, 1)
 	assert.Equal(t, "Order flowers", tasks[0].Title)
-	assert.Empty(t, tasks[0].PersonIDs, "from anywhere it is the task's own, Link can attach it")
+	assert.Empty(t, tasks[0].PersonIDs)
 	assert.Equal(t, viewBirthdays, m.view)
 
-	press(m, "ctrl+a", "3") // deal
+	press(m, "a", "d") // deal
 	require.Equal(t, modePrompt, m.mode)
 	submit(m, "Big rollout | 5000 | lead")
 	deals, _ := m.dlr.FindAll(m.ctx, model.DealFilters{})
 	require.Len(t, deals, 1)
 	assert.Equal(t, viewBirthdays, m.view)
 
-	press(m, "ctrl+a", "1") // person: the form opens, a name saves it
+	press(m, "a", "p") // person: the form opens, a name saves it
 	require.Equal(t, modeEdit, m.mode, "the person form takes the screen")
 	typeText(m, "Zoe Quinn")
 	press(m, "enter")
-	assert.Equal(t, viewBirthdays, m.view, "and the Birthdays view is back")
+	assert.Equal(t, viewPeople, m.view, "the view's own kind is added in place and the new person shows in People")
 	people, _ := pr.FindAll(m.ctx, model.PersonFilters{})
 	var names []string
 	for _, p := range people {
 		names = append(names, p.FirstName)
 	}
 	assert.Contains(t, names, "Zoe")
+}
 
-	press(m, "ctrl+a", "5") // note: pick the person first
+func TestANoteWithNothingHighlightedAsksForThePerson(t *testing.T) {
+	m, _ := newTestModel(t)
+	m.switchView(viewSync)
+	m.settle()
+	press(m, "a", "n")
 	require.NotNil(t, m.ov)
 	assert.Equal(t, "Note for", m.ov.title)
 	typeText(m, "bob")
@@ -97,17 +180,17 @@ func TestGlobalAddTaskDealPersonAndNote(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, notes)
 	assert.Equal(t, "likes jazz", *notes[0].Content)
-	assert.Equal(t, viewBirthdays, m.view)
+	assert.Equal(t, viewSync, m.view)
 }
 
 func TestGlobalAddFromTheBarReturnsToTheBar(t *testing.T) {
 	m, _ := newTestModel(t)
-	press(m, "ctrl+k")
-	typeText(m, "bob")
-	press(m, "ctrl+a")
+	startBar(t, m, "bob", "person:2")
+	press(m, "tab", "a") // in the bar's results a opens the picker
 	require.NotNil(t, m.ov)
-	assert.Equal(t, "New", m.ov.title)
-	press(m, "3")
+	assert.Equal(t, "Add", m.ov.title)
+	assert.Equal(t, "Person", m.ov.items[m.ov.shown[m.ov.cursor]].label, "the highlighted row's kind is preselected")
+	press(m, "d")
 	require.Equal(t, modePrompt, m.mode)
 	submit(m, "Quartz | 100 | lead")
 	assert.Equal(t, modeOverlay, m.mode, "the bar comes back")
@@ -117,34 +200,40 @@ func TestGlobalAddFromTheBarReturnsToTheBar(t *testing.T) {
 	assert.Len(t, deals, 1)
 
 	// Esc in the picker also lands back in the bar.
-	press(m, "ctrl+a", "esc")
+	press(m, "a", "esc")
 	assert.Equal(t, modeOverlay, m.mode)
 	assert.True(t, m.ov.palette)
 }
 
-func TestGlobalAddIsBlockedInReadOnlyModeAndRebindable(t *testing.T) {
+func TestTypingAInTheBarInputTypesALetter(t *testing.T) {
+	m, _ := newTestModel(t)
+	press(m, "ctrl+k")
+	typeText(m, "bob a")
+	assert.Equal(t, "bob a", m.ov.filter.Value(), "a is text while the input has the focus")
+	assert.Equal(t, "Command bar", m.ov.title)
+}
+
+func TestAddIsBlockedInReadOnlyModeAndRebindable(t *testing.T) {
 	m, _ := newTestModel(t)
 	m.readOnly = true
-	press(m, "ctrl+a")
+	press(m, "a")
 	assert.Equal(t, modeNormal, m.mode)
 	assert.Contains(t, m.status, "read-only")
-	press(m, "ctrl+k", "ctrl+a")
-	assert.Equal(t, "Command bar", m.ov.title, "the bar stays")
-	assert.Contains(t, m.toast.text, "read-only")
-	press(m, "esc")
 
 	m2, _ := newTestModel(t)
 	m2.applyKeys(map[string][]string{"add-any": {"ctrl+b"}})
 	m2.Update(tea.KeyMsg{Type: tea.KeyCtrlB})
 	require.NotNil(t, m2.ov)
-	assert.Equal(t, "New", m2.ov.title)
+	assert.Equal(t, "Add", m2.ov.title)
 }
 
-func TestCtrlAAndPromptInputsKeepLineStart(t *testing.T) {
-	m, _ := newTestModel(t)
-	press(m, "t") // task prompt on a person
-	require.Equal(t, modePrompt, m.mode)
-	typeText(m, "abc")
-	press(m, "ctrl+a") // readline line start inside a text input
-	assert.Equal(t, modePrompt, m.mode, "the global chord does not fire while typing")
+func TestTheRetiredAddKeysDoNothing(t *testing.T) {
+	for _, k := range []string{"t", "n", "+", "N", "ctrl+a"} {
+		m, _ := newTestModel(t)
+		before := len(m.rows)
+		press(m, k)
+		assert.Equal(t, modeNormal, m.mode, "%s no longer opens anything", k)
+		assert.Nil(t, m.ov, k)
+		assert.Len(t, m.rows, before, k)
+	}
 }

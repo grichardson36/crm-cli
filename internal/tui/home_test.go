@@ -43,7 +43,7 @@ func moveTo(t *testing.T, m *Model, ok func(r row) bool) {
 		if ok(m.rows[m.cursor]) {
 			return
 		}
-		press(m, "j")
+		press(m, "down")
 	}
 	t.Fatalf("no row matched, rows: %v", rowTitles(m))
 }
@@ -96,19 +96,19 @@ func TestHomeCursorSkipsHeadingsAndEnterOpensThePerson(t *testing.T) {
 	assert.False(t, r.skip, "the cursor starts on an item, not a heading")
 	assert.Equal(t, int64(2), r.personID, "first item is the overdue reach out")
 
-	press(m, "j")
+	press(m, "down")
 	r, _ = m.selected()
 	assert.False(t, r.skip)
 	assert.Equal(t, "send deck", r.title)
-	press(m, "k", "k")
+	press(m, "up", "up")
 	r, _ = m.selected()
 	assert.Equal(t, "Bob Baker", r.title, "k stops at the first action")
 	assert.False(t, r.skip)
 
-	press(m, "G")
+	press(m, "end")
 	r, _ = m.selected()
 	assert.False(t, r.skip, "G lands on the last item")
-	press(m, "g")
+	press(m, "home")
 	assert.Equal(t, int64(2), m.rows[m.cursor].personID)
 
 	// A task row opens the person it belongs to.
@@ -180,7 +180,7 @@ func TestHomeActionsInPaletteAndFooter(t *testing.T) {
 	assert.Contains(t, m.hintsLine(), "contacted")
 
 	// Contact keys work on Home items.
-	press(m, "c")
+	press(m, "x")
 	assert.Equal(t, "marked as contacted", m.status)
 }
 

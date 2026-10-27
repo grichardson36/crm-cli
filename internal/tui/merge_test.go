@@ -56,22 +56,22 @@ func TestMergeViewListsGroupsHighFirstAndCyclesLevel(t *testing.T) {
 	assert.Contains(t, out, "8 Merge")
 	assert.Contains(t, out, "email cara@initech.com", "the detail pane explains the group")
 
-	// m lowers the level, wraps to high, then back to medium.
-	press(m, "m")
+	// ctrl+l lowers the level, wraps to high, then back to medium.
+	press(m, "ctrl+l")
 	assert.Equal(t, dedupe.Low, m.minLevel)
-	press(m, "m")
+	press(m, "ctrl+l")
 	assert.Equal(t, dedupe.Fuzzy, m.minLevel)
-	press(m, "m")
+	press(m, "ctrl+l")
 	assert.Equal(t, dedupe.High, m.minLevel)
 	require.Len(t, m.rows, 1)
 	assert.Contains(t, m.rows[0].title, "HIGH")
 	assert.Contains(t, m.View(), "1 groups, high+")
-	press(m, "m")
+	press(m, "ctrl+l")
 	assert.Equal(t, dedupe.Medium, m.minLevel)
 	assert.Len(t, m.rows, 2)
 
 	// Person keys do nothing on a group row.
-	press(m, "c", "f", "#")
+	press(m, "x", "f", "s")
 	assert.Equal(t, modeNormal, m.mode)
 }
 
@@ -84,27 +84,27 @@ func TestMergeViewEmptyMessage(t *testing.T) {
 
 func TestDismissAndUndoDismiss(t *testing.T) {
 	m, _ := dupeModel(t)
-	press(m, "8", "j")
+	press(m, "8", "down")
 	assert.Contains(t, m.rows[m.cursor].title, "Bob")
-	press(m, "D")
+	press(m, "d") // d is the Delete verb: it dismisses the group
 	require.Len(t, m.rows, 1)
 	assert.Contains(t, m.rows[0].title, "HIGH")
 	assert.Contains(t, m.status, "dismissed 2 people")
 	assert.Len(t, m.dismissed, 1)
 
-	press(m, "D")
+	press(m, "d")
 	assert.Empty(t, m.rows)
-	press(m, "u")
+	runID(m, "undo-dismiss") // a palette entry
 	require.Len(t, m.rows, 1, "undo brings back the last dismissed group")
 	assert.Contains(t, m.rows[0].title, "HIGH")
-	press(m, "u")
+	runID(m, "undo-dismiss")
 	assert.Len(t, m.rows, 2)
-	press(m, "u")
+	runID(m, "undo-dismiss")
 	assert.True(t, m.statusIsErr, "nothing left to undo")
 	assert.Len(t, m.rows, 2)
 
 	// Dismiss from inside the compare screen.
-	press(m, "enter", "D")
+	press(m, "enter", "d")
 	assert.Nil(t, m.cmp)
 	assert.Len(t, m.rows, 1)
 }
@@ -113,12 +113,12 @@ func TestManualMergeOfMarkedPeople(t *testing.T) {
 	m, pr := dupeModel(t)
 	// One mark is not enough.
 	press(m, " ")
-	press(m, "M")
+	press(m, "m")
 	assert.Nil(t, m.cmp)
 	assert.True(t, m.statusIsErr)
 
 	m.marked = map[int64]bool{1: true, 3: true}
-	press(m, "M")
+	press(m, "m")
 	require.NotNil(t, m.cmp)
 	assert.Equal(t, []int64{1, 3}, []int64{m.cmp.members[0].id, m.cmp.members[1].id})
 	assert.True(t, m.cmp.manual)
@@ -127,7 +127,7 @@ func TestManualMergeOfMarkedPeople(t *testing.T) {
 	assert.Nil(t, m.cmp)
 	assert.Len(t, m.markedIDs(), 2, "marks survive a cancelled compare")
 
-	press(m, "M")
+	press(m, "m")
 	row := rowIndex(m.cmp, "company")
 	require.GreaterOrEqual(t, row, 0)
 	m.cmp.cur = row
@@ -144,11 +144,11 @@ func TestManualMergeOfMarkedPeople(t *testing.T) {
 func TestReadOnlyBlocksMergeArchiveAndNoteTypes(t *testing.T) {
 	m, pr := dupeModel(t)
 	m.readOnly = true
-	press(m, "#")
+	press(m, "d")
 	assert.True(t, m.statusIsErr)
 	assert.Equal(t, modeNormal, m.mode)
 	m.marked = map[int64]bool{1: true, 3: true}
-	press(m, "M")
+	press(m, "m")
 	assert.Nil(t, m.cmp)
 	assert.True(t, m.statusIsErr)
 	m.marked = map[int64]bool{}
@@ -156,29 +156,32 @@ func TestReadOnlyBlocksMergeArchiveAndNoteTypes(t *testing.T) {
 	// Reading is fine: the compare screen opens, but merge, dismiss and undo are blocked.
 	press(m, "8", "enter")
 	require.NotNil(t, m.cmp)
-	for _, k := range []string{"m", "D"} {
+	for _, k := range []string{"m", "d"} {
 		m.setStatus("", false)
 		press(m, k)
 		assert.True(t, m.statusIsErr, k)
 		assert.NotNil(t, m.cmp, k)
 	}
 	press(m, "esc")
-	for _, k := range []string{"D", "u"} {
-		m.setStatus("", false)
-		press(m, k)
-		assert.True(t, m.statusIsErr, k)
-	}
+	m.setStatus("", false)
+	press(m, "d")
+	assert.True(t, m.statusIsErr, "d")
+	m.setStatus("", false)
+	runID(m, "undo-dismiss")
+	assert.True(t, m.statusIsErr, "undo-dismiss")
 	require.NoError(t, pr.Archive(context.Background(), 1))
 	require.NoError(t, m.reload())
 	press(m, "9")
 	require.Len(t, m.rows, 1)
-	for _, k := range []string{"u", "X"} {
+	for _, k := range []string{"r", "d"} {
 		m.setStatus("", false)
 		press(m, k)
 		assert.True(t, m.statusIsErr, k)
 		assert.Equal(t, modeNormal, m.mode)
 	}
-	press(m, "2", "N")
+	press(m, "2")
+	m.setStatus("", false)
+	runID(m, "note-pick")
 	assert.True(t, m.statusIsErr)
 	assert.Equal(t, modeNormal, m.mode)
 	assert.Equal(t, map[int64]bool{1: true}, archivedIDs(t, pr))
@@ -187,14 +190,14 @@ func TestReadOnlyBlocksMergeArchiveAndNoteTypes(t *testing.T) {
 
 func TestArchiveRestoreFlow(t *testing.T) {
 	m, pr := newTestModel(t)
-	press(m, "#")
+	press(m, "d")
 	assert.Equal(t, modeConfirm, m.mode)
 	assert.Contains(t, m.View(), "archive Zed Adams? y/n")
 	press(m, "n")
 	assert.Empty(t, archivedIDs(t, pr))
 	assert.Len(t, m.rows, 3)
 
-	press(m, "#", "y")
+	press(m, "d", "y")
 	assert.Equal(t, modeNormal, m.mode)
 	assert.True(t, archivedIDs(t, pr)[1])
 	assert.Equal(t, []string{"Bob Baker", "Cara Cole"}, names(m))
@@ -209,7 +212,7 @@ func TestArchiveRestoreFlow(t *testing.T) {
 	assert.Contains(t, out, "zed@acme.com", "the detail pane describes the archived person")
 
 	// Edit keys do not reach archived people.
-	press(m, "c", "f", "n", "t", "tab")
+	press(m, "x", "f", "s", "e", "l", "u")
 	assert.Equal(t, modeNormal, m.mode)
 	assert.Equal(t, focusList, m.focus)
 	archived, err := pr.FindAll(context.Background(), model.PersonFilters{Archived: true})
@@ -217,7 +220,7 @@ func TestArchiveRestoreFlow(t *testing.T) {
 	require.Len(t, archived, 1)
 	assert.False(t, archived[0].IsFavorite)
 
-	press(m, "u")
+	press(m, "r")
 	assert.Empty(t, m.rows)
 	assert.Contains(t, m.status, "restored Zed Adams")
 	assert.Empty(t, archivedIDs(t, pr))
@@ -227,7 +230,7 @@ func TestArchiveRestoreFlow(t *testing.T) {
 
 func TestArchiveMarkedAndRestoreMarked(t *testing.T) {
 	m, pr := newTestModel(t)
-	press(m, "*", "#")
+	press(m, "*", "d")
 	assert.Contains(t, m.View(), "archive 3 people? y/n")
 	press(m, "y")
 	assert.Len(t, archivedIDs(t, pr), 3)
@@ -238,7 +241,7 @@ func TestArchiveMarkedAndRestoreMarked(t *testing.T) {
 	require.Len(t, m.rows, 3)
 	press(m, " ", " ")
 	assert.Len(t, m.markedIDs(), 2)
-	press(m, "u")
+	press(m, "r")
 	assert.Len(t, archivedIDs(t, pr), 1)
 	assert.Contains(t, m.status, "restored: 2 people")
 }
@@ -248,7 +251,7 @@ func TestArchivedPeopleStayOutOfOtherViews(t *testing.T) {
 	// Bob (2) is due, has a birthday and is in a duplicate group.
 	press(m, "3")
 	require.Equal(t, []string{"Bob Baker"}, names(m))
-	press(m, "#", "y")
+	press(m, "d", "y")
 	assert.Empty(t, m.rows, "gone from Due")
 	press(m, "7")
 	assert.Empty(t, m.rows, "gone from Birthdays")
@@ -262,7 +265,7 @@ func TestArchivedPeopleStayOutOfOtherViews(t *testing.T) {
 
 func TestPurgeNeedsTheTypedName(t *testing.T) {
 	m, pr := newTestModel(t)
-	press(m, "#", "y", "9", "X")
+	press(m, "d", "y", "9", "d")
 	require.Equal(t, modePrompt, m.mode)
 	assert.Contains(t, m.View(), `type "Zed Adams" to delete forever`)
 
@@ -273,7 +276,7 @@ func TestPurgeNeedsTheTypedName(t *testing.T) {
 	assert.True(t, archivedIDs(t, pr)[1], "still there")
 
 	press(m, "esc") // no-op in normal mode
-	press(m, "X")
+	press(m, "d")
 	typeText(m, "  zed   ADAMS ")
 	press(m, "enter")
 	assert.False(t, m.statusIsErr, m.status)
@@ -284,7 +287,7 @@ func TestPurgeNeedsTheTypedName(t *testing.T) {
 	assert.Empty(t, m.rows)
 
 	// Esc at the prompt purges nothing.
-	press(m, "2", "#", "y", "9", "X", "esc")
+	press(m, "2", "d", "y", "9", "d", "esc")
 	assert.Equal(t, modeNormal, m.mode)
 	assert.Len(t, archivedIDs(t, pr), 1)
 }
@@ -330,10 +333,10 @@ func TestNewActionsInPaletteWithCorrectGreying(t *testing.T) {
 
 	press(m, "enter")
 	st = state()
-	for _, id := range []string{"cmp-pick", "cmp-pick-back", "cmp-survivor", "cmp-apply", "cmp-back", "dismiss", "palette", "help"} {
+	for _, id := range []string{"cmp-pick", "cmp-pick-back", "cmp-survivor", "cmp-apply", "cmp-back", "cmp-dismiss", "palette", "help"} {
 		assert.Equal(t, "", st[id], id+" in compare")
 	}
-	for _, id := range []string{"archive", "note", "contacted", "compare", "find-dupes", "view-people", "note-types"} {
+	for _, id := range []string{"archive", "note", "contacted", "compare", "dismiss", "find-dupes", "view-people", "note-types"} {
 		assert.Equal(t, "not here", st[id], id+" in compare")
 	}
 	press(m, "esc")
@@ -341,7 +344,7 @@ func TestNewActionsInPaletteWithCorrectGreying(t *testing.T) {
 	press(m, "9")
 	st = state()
 	assert.Equal(t, "not here", st["restore"], "nothing archived yet")
-	press(m, "2", "#", "y", "9")
+	press(m, "2", "d", "y", "9")
 	st = state()
 	assert.Equal(t, "", st["restore"])
 	assert.Equal(t, "", st["purge"])
@@ -435,7 +438,7 @@ func TestCompareAndNewViewsFitTerminals(t *testing.T) {
 		check("merge list")
 		press(m, "enter")
 		check("compare")
-		press(m, "j", "j", "j", "tab", "s")
+		press(m, "down", "down", "down", "tab", "s")
 		check("compare after keys")
 		press(m, "esc", "9")
 		check("archived")

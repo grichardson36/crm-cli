@@ -17,7 +17,7 @@ func noteModel(t *testing.T) (*Model, int64) {
 	m, _ := newTestModel(t)
 	n, err := m.ir.Create(context.Background(), model.CreateInteractionInput{Type: "note", Content: sp("first draft"), PersonIDs: []int64{2}})
 	require.NoError(t, err)
-	press(m, "j", "tab")
+	press(m, "down", "tab")
 	require.Equal(t, focusDetail, m.focus)
 	focusNote(t, m)
 	return m, n.ID
@@ -63,7 +63,7 @@ func TestNoteEnterEditsContentInline(t *testing.T) {
 
 func TestNoteTChangesTypeWithAPicker(t *testing.T) {
 	m, id := noteModel(t)
-	press(m, "t")
+	press(m, "E")
 	require.Equal(t, modeOverlay, m.mode)
 	assert.Equal(t, "Note type", m.ov.title)
 	assert.Equal(t, "note", m.ov.items[0].label, "the current type is first")
@@ -139,7 +139,7 @@ func TestReadOnlyBlocksNoteEditTypeDeleteRestore(t *testing.T) {
 	press(m, "enter")
 	assert.Equal(t, modeNormal, m.mode)
 	assert.Contains(t, m.status, "read-only")
-	press(m, "t")
+	press(m, "a", "t", "tab")
 	assert.Equal(t, modeNormal, m.mode, "no picker opens")
 	assert.Contains(t, m.status, "read-only")
 	press(m, "d")
@@ -180,7 +180,7 @@ func TestNoteActionsInPalette(t *testing.T) {
 	assert.Equal(t, "not here", st["note-retype"], "needs the detail pane")
 
 	// t on a person in the list still adds a task.
-	press(m, "t")
+	press(m, "a", "t", "tab")
 	assert.Equal(t, modePrompt, m.mode)
 	press(m, "esc")
 

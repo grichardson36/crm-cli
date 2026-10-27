@@ -136,3 +136,13 @@ func TestSaveCreatesTheDirectory(t *testing.T) {
 	_, err := os.Stat(ConfigFile(dir))
 	assert.NoError(t, err)
 }
+
+func TestNormalizeAcceptsCtrlPunctuationAndCtrlShiftArrows(t *testing.T) {
+	for in, want := range map[string]string{
+		"ctrl+[": "ctrl+[", "ctrl+]": "ctrl+]", "ctrl+shift+up": "ctrl+shift+up", "Ctrl+Shift+Down": "ctrl+shift+down", "shift+ctrl+up": "ctrl+shift+up",
+	} {
+		got, err := Normalize(in)
+		require.NoError(t, err, in)
+		assert.Equal(t, want, got, in)
+	}
+}

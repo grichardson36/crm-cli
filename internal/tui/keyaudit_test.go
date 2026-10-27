@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"os"
+	"sort"
 	"strings"
 	"testing"
 
@@ -10,48 +12,64 @@ import (
 
 // The key audit. For every context (a view with the list focused, the person detail form, the bar
 // results on each kind of row) it asks the registry which action each key would run, exactly as
-// handleKey does, and lists every action that answers to a key, so a key with two answers shows up.
-// Run it to regenerate the tables in patterns/audit-keybindings-2026-10.md:
+// handleKey does (most specific scope first, see keymap.go), and lists every action that answers to
+// a key, so a key with two answers shows up. Run it to regenerate the tables in
+// patterns/audit-keybindings-2026-10.md:
 //
 //	KEYS_AUDIT_OUT=audit.md go test ./internal/tui -run TestKeyAudit
 //
-// Without KEYS_AUDIT_OUT it only checks that the audit runs and that no key has two answers where
-// the owner rule forbids it (see knownTwoAnswers).
+// The test fails on a new conflict. A deliberate overlap goes in testdata/keyaudit_allow.txt, one
+// line each, with the reason after a #. See readAllowList for the kinds of line.
 
 type auditCtx struct {
 	name string
-	// answers maps a key to every action that would run for it in this context, in registry order.
+	// modal marks the compare screen, which takes over the whole keyboard: the same key may mean a
+	// different verb there, so the one-verb-per-key check skips it.
+	modal bool
+	// answers maps a key to every action that would run for it in this context, in lookup order:
+	// the most specific scope first, then registry order.
 	answers map[string][]string
+	// scopes maps an action id to its scope in this context.
+	scopes map[string]string
 }
 
-func auditAnswers(m *Model, bar bool, tag bool) map[string][]string {
+func auditAnswers(m *Model, bar bool, tag bool) (map[string][]string, map[string]string) {
 	out := map[string][]string{}
-	for i := range m.actions {
-		a := &m.actions[i]
-		if a.barOnly && !bar {
-			continue
-		}
-		for _, k := range a.keys {
-			if bar {
-				if !m.barVerbKeyOK(a, k, tag) {
-					continue
-				}
-			} else {
-				if !a.enabled(m) || (a.keyIf != nil && !a.keyIf(m)) || (a.keyFor != nil && !a.keyFor(m, k)) {
-					continue
-				}
-				if a.barOnly {
-					continue
-				}
+	scopes := map[string]string{}
+	chain := m.scopeChain()
+	for _, sc := range chain {
+		for i := range m.actions {
+			a := &m.actions[i]
+			if a.scopeOf() != sc || a.mode != keyNormal {
+				continue
 			}
-			out[k] = append(out[k], a.id)
+			if a.barOnly && !bar {
+				continue
+			}
+			for _, k := range a.keys {
+				if bar {
+					if !m.barVerbKeyOK(a, k, tag) {
+						continue
+					}
+				} else {
+					if !a.enabled(m) || (a.keyIf != nil && !a.keyIf(m)) || (a.keyFor != nil && !a.keyFor(m, k)) {
+						continue
+					}
+				}
+				out[k] = append(out[k], a.id)
+				scopes[a.id] = sc
+			}
 		}
 	}
-	return out
+	return out, scopes
 }
 
 func auditContexts(t *testing.T) []auditCtx {
 	var ctxs []auditCtx
+	add := func(name string, m *Model, bar, tag bool) {
+		a, s := auditAnswers(m, bar, tag)
+		ctxs = append(ctxs, auditCtx{name: name, answers: a, scopes: s})
+	}
 	m, _ := newTestModel(t)
 	ctx := m.ctx
 	_, err := m.orr.Create(ctx, model.CreateOrgInput{Name: "Acme"})
@@ -69,23 +87,35 @@ func auditContexts(t *testing.T) []auditCtx {
 		m.switchView(v)
 		m.focus = focusList
 		m.settle()
-		ctxs = append(ctxs, auditCtx{name: viewNames[v] + " (list)", answers: auditAnswers(m, false, false)})
+		add(viewNames[v]+" (list)", m, false, false)
 	}
-	m.switchView(viewPeople)
-	m.focus = focusDetail
-	ctxs = append(ctxs, auditCtx{name: "Person form (detail)", answers: auditAnswers(m, false, false)})
-	m.focus = focusList
+	// The detail form of a person, of an organization and of a deal.
+	for _, v := range []viewKind{viewPeople, viewOrgs, viewDeals} {
+		m.switchView(v)
+		m.settle()
+		m.focus = focusDetail
+		add(viewNames[v]+" (detail form)", m, false, false)
+		m.focus = focusList
+	}
 
 	mm, _ := dupeModel(t)
 	mm.switchView(viewMerge)
 	mm.settle()
-	ctxs = append(ctxs, auditCtx{name: "Merge (list)", answers: auditAnswers(mm, false, false)})
+	add("Merge (list)", mm, false, false)
+	press(mm, "enter")
+	if mm.cmp != nil {
+		add("Merge compare screen", mm, false, false)
+		ctxs[len(ctxs)-1].modal = true
+		press(mm, "esc")
+	}
 
 	// Bar results: the verbs of each kind of row.
+	m.switchView(viewPeople)
+	m.focus = focusList
 	for _, tc := range []struct{ name, kind string }{{"Bar: person", "person"}, {"Bar: organization", "org"}, {"Bar: deal", "deal"}, {"Bar: task", "task"}, {"Bar: tag", "tag"}} {
 		tg := barTarget{kind: tc.kind, id: 1, name: "friend"}
 		saved := m.enterBarContext(tg)
-		ctxs = append(ctxs, auditCtx{name: tc.name, answers: auditAnswers(m, true, tc.kind == "tag")})
+		add(tc.name, m, true, tc.kind == "tag")
 		m.leaveBarContext(saved)
 	}
 	return ctxs
@@ -106,4 +136,42 @@ func keyOrder(k string) string {
 		return "6" + k
 	}
 	return "5" + k
+}
+
+// readAllowList reads testdata/keyaudit_allow.txt, the deliberate overlaps. Each line is
+//
+//	same-scope <key> <scope> <action> <action>   two actions share a key in one scope and context
+//	shadow <key> <winner> <loser>                a narrower scope answers a key a wider one also answers
+//	verbs <key> <family>_/_<family>              one key means different verb families in different contexts
+//	static <key> <scope> <action> <action>       two actions list one key in one scope and mode
+//	layer <key> <action>                         an app action uses a key a framework action owns
+//
+// A line may end with "# reason". A line the audit no longer finds is reported, so the list stays minimal.
+func readAllowList(t *testing.T) map[string]bool {
+	t.Helper()
+	data, err := os.ReadFile("testdata/keyaudit_allow.txt")
+	if os.IsNotExist(err) {
+		return map[string]bool{}
+	}
+	require.NoError(t, err)
+	out := map[string]bool{}
+	for _, line := range strings.Split(string(data), "\n") {
+		if i := strings.Index(line, "#"); i >= 0 {
+			line = line[:i]
+		}
+		line = strings.Join(strings.Fields(line), " ")
+		if line != "" {
+			out[line] = true
+		}
+	}
+	return out
+}
+
+func sortedKeys(m map[string]bool) []string {
+	var out []string
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
 }

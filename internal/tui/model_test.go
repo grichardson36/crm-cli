@@ -57,7 +57,10 @@ func newTestModel(t *testing.T) (*Model, *repo.PersonRepo) {
 var specialKeys = map[string]tea.KeyType{
 	"enter": tea.KeyEnter, "esc": tea.KeyEsc, "tab": tea.KeyTab, "shift+tab": tea.KeyShiftTab,
 	"ctrl+d": tea.KeyCtrlD, "ctrl+k": tea.KeyCtrlK, "ctrl+u": tea.KeyCtrlU, "ctrl+z": tea.KeyCtrlZ, "ctrl+y": tea.KeyCtrlY,
-	"left": tea.KeyLeft, "right": tea.KeyRight, "up": tea.KeyUp, "down": tea.KeyDown, "ctrl+up": tea.KeyCtrlUp, "ctrl+t": tea.KeyCtrlT, "ctrl+a": tea.KeyCtrlA,
+	"left": tea.KeyLeft, "right": tea.KeyRight, "up": tea.KeyUp, "down": tea.KeyDown, "ctrl+up": tea.KeyCtrlUp, "ctrl+down": tea.KeyCtrlDown,
+	"ctrl+shift+up": tea.KeyCtrlShiftUp, "ctrl+shift+down": tea.KeyCtrlShiftDown, "home": tea.KeyHome, "end": tea.KeyEnd,
+	"pgup": tea.KeyPgUp, "pgdown": tea.KeyPgDown, "ctrl+r": tea.KeyCtrlR, "ctrl+o": tea.KeyCtrlO, "ctrl+l": tea.KeyCtrlL, "ctrl+f": tea.KeyCtrlF,
+	"ctrl+b": tea.KeyCtrlB, "ctrl+e": tea.KeyCtrlE, "ctrl+w": tea.KeyCtrlW, "ctrl+n": tea.KeyCtrlN, "ctrl+p": tea.KeyCtrlP, "ctrl+a": tea.KeyCtrlA,
 }
 
 func press(m *Model, keys ...string) {
@@ -88,7 +91,7 @@ func names(m *Model) []string {
 func goTo(t *testing.T, m *Model, label string) {
 	t.Helper()
 	for i := 0; i < 80 && m.form[m.fcur].label != label; i++ {
-		press(m, "j")
+		press(m, "down")
 	}
 	require.Equal(t, label, m.form[m.fcur].label)
 }
@@ -153,17 +156,17 @@ func TestViewFitsTerminal(t *testing.T) {
 
 func TestNavigation(t *testing.T) {
 	m, _ := newTestModel(t)
-	press(m, "j")
+	press(m, "down")
 	assert.Equal(t, 1, m.cursor)
 	assert.Contains(t, m.View(), "bob@globex.com")
 	assert.Contains(t, m.View(), "bob@home.org", "all emails appear in the detail pane")
-	press(m, "G")
+	press(m, "end")
 	assert.Equal(t, 2, m.cursor)
-	press(m, "j")
+	press(m, "down")
 	assert.Equal(t, 2, m.cursor, "stops at the end")
-	press(m, "g")
+	press(m, "home")
 	assert.Equal(t, 0, m.cursor)
-	press(m, "k")
+	press(m, "up")
 	assert.Equal(t, 0, m.cursor, "stops at the top")
 }
 
@@ -263,7 +266,7 @@ func TestMarkContactedRemovesFromDue(t *testing.T) {
 	m.now = time.Now // the due query uses the database clock, so the app clock must be the real one
 	press(m, "3")
 	require.Len(t, m.rows, 1)
-	press(m, "c")
+	press(m, "x")
 	assert.Empty(t, m.rows, "contacted people are no longer due")
 	assert.Equal(t, "marked as contacted", m.status)
 
@@ -287,13 +290,13 @@ func TestSnoozeFavoriteNoteAndTask(t *testing.T) {
 	// Favorite Zed, add a note and a task.
 	press(m, "2", "f")
 	assert.Contains(t, m.rows[0].title, "★")
-	press(m, "n")
+	press(m, "a", "n", "tab")
 	typeText(m, "met at the conference")
 	press(m, "enter")
 	assert.Equal(t, "note added", m.status)
 	assert.Contains(t, m.View(), "met at the conference")
 
-	press(m, "t")
+	press(m, "a", "t", "tab")
 	typeText(m, "send deck | 2026-12-01")
 	press(m, "enter")
 	assert.Equal(t, "task added", m.status)
@@ -311,7 +314,7 @@ func TestSnoozeFavoriteNoteAndTask(t *testing.T) {
 	assert.NotNil(t, p.KeepInTouchSnoozedUntil)
 
 	// An empty prompt or esc changes nothing.
-	press(m, "2", "n", "esc")
+	press(m, "2", "a", "n", "tab", "esc")
 	assert.Equal(t, modeNormal, m.mode)
 	press(m, "s")
 	typeText(m, "abc")
@@ -321,7 +324,7 @@ func TestSnoozeFavoriteNoteAndTask(t *testing.T) {
 
 func TestCompleteOutsideTasksViewIsRejected(t *testing.T) {
 	m, _ := newTestModel(t)
-	press(m, "x")
+	runID(m, "done") // x marks a person contacted there, Complete task is a palette entry
 	assert.True(t, m.statusIsErr)
 }
 
@@ -387,30 +390,38 @@ func TestFooterButtonsAndStatusTap(t *testing.T) {
 	press(m, "esc")
 	assert.Equal(t, modeNormal, m.mode)
 
-	// A footer button runs its action: "n note" opens the note prompt.
+	// A footer button runs its action: "a add" opens the add picker.
 	for _, s := range m.footerSegs() {
-		if s.id == "note" {
+		if s.id == "add-any" {
 			click(m, s.x0, m.height-1)
 		}
 	}
-	assert.Equal(t, modePrompt, m.mode)
+	assert.Equal(t, modeOverlay, m.mode)
+	assert.Equal(t, "Add", m.ov.title)
 }
 
 func TestHelpOverlay(t *testing.T) {
 	m, _ := newTestModel(t)
 	press(m, "?")
-	assert.Contains(t, m.View(), "mark contacted")
+	assert.Contains(t, m.View(), "Keys in People")
+	assert.Contains(t, m.View(), "Framework")
 	press(m, "x") // any other key closes it and is swallowed
 	assert.False(t, m.help)
 	assert.NotContains(t, m.View(), "press any key")
 
-	// Every action with a key appears in the help text.
+	// The help text lists the keys that work in this view and mode, framework first, then the app.
 	text := m.helpText()
+	assert.Less(t, strings.Index(text, "Framework"), strings.Index(text, "App: specific"))
+	chain := m.scopeChain()
 	for _, a := range m.actions {
-		if a.barOnly {
-			continue // the verbs of a tag row are listed by the bar footer
+		if a.barOnly || a.mode != keyNormal || len(a.keys) == 0 {
+			continue
 		}
-		assert.Contains(t, text, a.desc, "help lists %s", a.id)
+		if inScopes(&a, chain) {
+			assert.Contains(t, text, a.desc, "help lists %s", a.id)
+		} else {
+			assert.NotContains(t, text, a.desc, "help leaves out %s: its scope %s is not live in People", a.id, a.scopeOf())
+		}
 	}
 }
 
@@ -418,7 +429,7 @@ func TestSortToggleAndReload(t *testing.T) {
 	m, pr := newTestModel(t)
 	_, err := pr.Update(context.Background(), 3, model.UpdatePersonInput{Title: sp("CEO")})
 	require.NoError(t, err)
-	press(m, "r")
+	press(m, "ctrl+r")
 	assert.Equal(t, "reloaded", m.status)
 
 	// updated_at only has one-second resolution, so set it directly to get a stable order.
@@ -427,17 +438,17 @@ func TestSortToggleAndReload(t *testing.T) {
 			m.people[i].UpdatedAt = "2099-01-01 00:00:00"
 		}
 	}
-	press(m, "o")
+	press(m, "ctrl+o")
 	assert.True(t, m.sortRecent)
 	assert.Equal(t, "Cara Cole", names(m)[0], "most recently updated first")
-	press(m, "o")
+	press(m, "ctrl+o")
 	assert.Equal(t, "Zed Adams", names(m)[0])
 }
 
 func TestReadOnlyBlocksWrites(t *testing.T) {
 	m, pr := newTestModel(t)
 	m.readOnly = true
-	for _, k := range []string{"c", "f", "n", "t", "s", "x", "+", "T", "F", "p", "e"} {
+	for _, k := range []string{"x", "f", "a", "s", "d", "F"} {
 		press(m, k)
 		assert.Equal(t, modeNormal, m.mode, "key %s must not open a prompt", k)
 		assert.True(t, m.statusIsErr, "key %s", k)
@@ -451,7 +462,7 @@ func TestReadOnlyBlocksWrites(t *testing.T) {
 	// Reading still works.
 	press(m, "/")
 	assert.Equal(t, modeOverlay, m.mode)
-	press(m, "esc", "j")
+	press(m, "esc", "down")
 
 	// The detail pane is read-only too: enter, a and d are blocked, copy still works.
 	press(m, "tab")
@@ -474,26 +485,26 @@ func TestReadOnlyBlocksWrites(t *testing.T) {
 func TestFocusSwitch(t *testing.T) {
 	m, _ := newTestModel(t)
 	assert.Equal(t, focusList, m.focus)
-	for _, into := range []string{"tab", "right", "l", "shift+tab"} {
-		for _, back := range []string{"esc", "left", "h", "tab", "shift+tab"} {
+	for _, into := range []string{"tab", "right", "shift+tab"} {
+		for _, back := range []string{"esc", "left", "tab", "shift+tab"} {
 			press(m, into)
 			assert.Equal(t, focusDetail, m.focus, into)
 			press(m, back)
 			assert.Equal(t, focusList, m.focus, "%s then %s", into, back)
 		}
 	}
-	// j/k move the form cursor, not the list, while the detail has focus.
+	// up and down move the form cursor, not the list, while the detail has focus.
 	press(m, "tab")
 	cur := m.cursor
-	press(m, "j")
+	press(m, "down")
 	assert.Equal(t, cur, m.cursor)
 	assert.Equal(t, 1, m.fcur)
-	press(m, "k")
+	press(m, "up")
 	assert.Equal(t, 0, m.fcur)
-	press(m, "G")
+	press(m, "end")
 	assert.Equal(t, len(m.form)-1, m.fcur)
 	press(m, "esc")
-	press(m, "j")
+	press(m, "down")
 	assert.Equal(t, cur+1, m.cursor, "list moves again after leaving the pane")
 }
 
@@ -533,7 +544,7 @@ func TestInlineEditCommitAndCancel(t *testing.T) {
 	assert.Equal(t, "03-09", formatBirthdayParts(personByID(t, pr, 1)))
 
 	// First name cannot be emptied.
-	press(m, "g", "enter")
+	press(m, "home", "enter")
 	replaceText(m, "")
 	press(m, "enter")
 	assert.Equal(t, modeEdit, m.mode)
@@ -544,7 +555,7 @@ func TestInlineEditCommitAndCancel(t *testing.T) {
 
 func TestAddAndDeleteEmail(t *testing.T) {
 	m, pr := newTestModel(t)
-	press(m, "j", "tab") // Bob, two emails
+	press(m, "down", "tab") // Bob, two emails
 	goTo(t, m, "email")
 	press(m, "a")
 	require.Equal(t, modeEdit, m.mode)
@@ -669,13 +680,13 @@ func TestCopyAndOpen(t *testing.T) {
 	var copied, opened string
 	m.clip = func(s string) { copied = s }
 	m.open = func(u string) error { opened = u; return nil }
-	press(m, "j", "tab")
+	press(m, "down", "tab")
 	goTo(t, m, "email")
 	press(m, "y")
 	assert.Equal(t, "bob@globex.com", copied)
 	press(m, "o")
 	assert.Equal(t, "mailto:bob@globex.com", opened)
-	press(m, "g")
+	press(m, "home")
 	goTo(t, m, "company")
 	opened = ""
 	press(m, "o")
@@ -691,7 +702,7 @@ func TestCreateContact(t *testing.T) {
 	m, pr := newTestModel(t)
 
 	// Esc abandons it, nothing is inserted.
-	press(m, "+")
+	press(m, "a", "enter")
 	assert.Equal(t, modeEdit, m.mode)
 	assert.Equal(t, focusDetail, m.focus)
 	assert.Contains(t, m.View(), "New contact")
@@ -703,7 +714,7 @@ func TestCreateContact(t *testing.T) {
 	assert.Len(t, all, 3)
 
 	// An empty name is rejected and the box stays open.
-	press(m, "+", "enter")
+	press(m, "a", "enter", "enter")
 	assert.Equal(t, modeEdit, m.mode)
 	assert.True(t, m.statusIsErr)
 
@@ -760,8 +771,8 @@ func TestMarksAndBulkActions(t *testing.T) {
 	assert.Contains(t, m.View(), "2 marked")
 	assert.Contains(t, m.View(), "✓ Zed Adams")
 
-	// Tag all marked, marks clear afterwards.
-	press(m, "T")
+	// Tag all marked (the palette's Tag), marks clear afterwards.
+	runID(m, "tag")
 	assert.Equal(t, modePrompt, m.mode)
 	typeText(m, "#vip")
 	press(m, "enter")
@@ -794,7 +805,8 @@ func TestMarksAndBulkActions(t *testing.T) {
 	for id := int64(1); id <= 3; id++ {
 		assert.Equal(t, "6 mons", str(personByID(t, pr, id).KeepInTouch))
 	}
-	press(m, "*", "p")
+	press(m, "*")
+	runID(m, "tier")
 	typeText(m, "High")
 	press(m, "enter")
 	for id := int64(1); id <= 3; id++ {
@@ -804,7 +816,7 @@ func TestMarksAndBulkActions(t *testing.T) {
 	}
 
 	// Favorite on a selection toggles all of them; marks only cover the marked people.
-	press(m, "g", " ", " ", "f")
+	press(m, "home", " ", " ", "f")
 	assert.True(t, personByID(t, pr, 1).IsFavorite)
 	assert.True(t, personByID(t, pr, 2).IsFavorite)
 	assert.False(t, personByID(t, pr, 3).IsFavorite)
@@ -826,7 +838,7 @@ func TestPaletteFilterAndRun(t *testing.T) {
 	require.Equal(t, modeOverlay, m.mode)
 	on := 0
 	for i := range m.actions {
-		if m.moduleOn(&m.actions[i]) && !m.actions[i].barOnly {
+		if m.moduleOn(&m.actions[i]) && !m.actions[i].barOnly && m.actions[i].mode != keyText {
 			on++
 		}
 	}
@@ -897,7 +909,7 @@ func TestRegistryHasUniqueIDsAndEveryActionIsInThePalette(t *testing.T) {
 	seen := map[string]bool{}
 	for _, a := range m.actions {
 		assert.False(t, seen[a.id], "duplicate id %s", a.id)
-		if !m.moduleOn(&a) || a.barOnly {
+		if !m.moduleOn(&a) || a.barOnly || a.mode == keyText {
 			continue // an off module and the verbs of a tag row are not in the palette
 		}
 		seen[a.id] = true

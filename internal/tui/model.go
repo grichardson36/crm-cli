@@ -225,6 +225,10 @@ type Model struct {
 	barResume *barResume
 	// addResume remembers where a global add (ctrl+a) came from (globaladd.go).
 	addResume *addReturn
+	// addSugg is the highlighted object offered as the link of a new task or note (globaladd.go).
+	addSugg *addSuggestion
+	// barKind is the kind of the bar row whose verb is running (enterBarContext), "" outside the bar.
+	barKind string
 	// mods is the module arrangement (modules.go): which views are on and in what order.
 	mods modules.Arrangement
 	keyProblems  []string
@@ -337,7 +341,7 @@ func (m *Model) afterWrite() {
 func (m *Model) rebuild(keep bool) error {
 	var keepPerson, keepTask, keepOrg, keepDeal int64
 	oldCursor := m.cursor
-	if keep && m.cursor < len(m.rows) {
+	if keep && m.cursor >= 0 && m.cursor < len(m.rows) {
 		keepPerson, keepTask = m.rows[m.cursor].personID, m.rows[m.cursor].taskID
 		keepOrg, keepDeal = m.rows[m.cursor].orgID, m.rows[m.cursor].dealID
 	}
@@ -756,12 +760,7 @@ func (m *Model) switchView(v viewKind) {
 
 // handleKey dispatches a key in normal mode through the action registry.
 func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	key := msg.String()
-	for i := range m.actions {
-		a := &m.actions[i]
-		if !a.hasKey(key) || !a.enabled(m) || (a.keyIf != nil && !a.keyIf(m)) || (a.keyFor != nil && !a.keyFor(m, key)) {
-			continue
-		}
+	if a := m.lookupKey(msg.String(), keyNormal); a != nil {
 		return m, m.runAction(a)
 	}
 	return m, nil
@@ -807,12 +806,14 @@ func (m *Model) handlePromptKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		m.mode = modeNormal
 		m.input.Blur()
+		m.addSugg = nil
 		return m, nil
 	case "enter":
 		value := strings.TrimSpace(m.input.Value())
 		kind := m.promptKind
 		m.mode = modeNormal
 		m.input.Blur()
+		m.addSugg = nil
 		m.pendingCmd = nil
 		if value != "" || kind == "link-attrs" {
 			m.runPrompt(kind, value)
@@ -821,13 +822,9 @@ func (m *Model) handlePromptKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.pendingCmd = nil
 		return m, cmd
 	case "tab", "shift+tab":
-		if m.promptKind == "note" || m.promptKind == "note-object" {
-			m.cycleNoteType(msg.String() == "tab")
-			return m, nil
-		}
-		if m.promptKind == "link-attrs" && msg.String() == "tab" {
-			m.completeRole()
-			return m, nil
+		// The text-entry keys come from the registry (prompt-tab, prompt-tab-back in verbs.go).
+		if a := m.lookupKey(msg.String(), keyText); a != nil {
+			return m, m.runAction(a)
 		}
 	}
 	var cmd tea.Cmd
@@ -903,6 +900,9 @@ func (m *Model) runPrompt(kind, value string) {
 		return
 	case "note-object":
 		m.saveObjectNote(value)
+		return
+	case "note-free":
+		m.saveFreeNote(value)
 		return
 	case "task-new":
 		m.runTaskLine(0, value, "task-new")

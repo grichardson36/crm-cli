@@ -79,9 +79,10 @@ func (m *Model) snapBirthdays() {
 	m.offset = max(0, min(m.bdTop, len(m.rows)-m.bodyHeight()))
 }
 
-// todayActions is Go to today, one action for every module that has an anchor. Ctrl keys move the
-// view and bare keys move the object (pattern ctrl-moves-the-view-bare-moves-the-object), so it is
-// ctrl+t everywhere and t stays Add task. Birthdays also answers to ctrl+up. The anchor of each module:
+// todayActions is Go to today, one action for every module that has an anchor. It has no key: ctrl+t
+// and ctrl+up are retired. ctrl+shift+up and ctrl+shift+down go to the home destination a view
+// declares (today in Birthdays, navunits.go), and the palette keeps this entry for the Tasks anchor.
+// The anchor of each module:
 //   - Birthdays: today's divider, with the past above
 //   - Tasks: the first task due today or later, else the top
 //   - Home, People, Follow-up: the top of the list
@@ -89,11 +90,10 @@ func (m *Model) snapBirthdays() {
 // Modules without an anchor (Organizations, Deals, Merge, Archived, Sync) leave it out.
 func todayActions() []action {
 	return []action{
-		{id: "go-today", title: "Go to today", group: "Views", hint: "ctrl+t", keys: []string{"ctrl+t", "ctrl+up"},
-			desc: "jump to today in this view: today's day in Birthdays (past birthdays are above), the first task dated today or later in Tasks, the top in Home, People and Follow-up. Also ctrl+up",
-			foot: 18, footIn: inList, footLabel: "today", when: hasTodayAnchor,
-			footIf: func(m *Model) bool { return m.view == viewBirthdays }, // elsewhere the palette shows the key
-			run: func(m *Model) tea.Cmd { m.goToday(); return nil }},
+		{id: "go-today", title: "Go to today", group: "Views",
+			desc: "jump to today in this view: today's day in Birthdays (past birthdays are above, ctrl+shift+up and ctrl+shift+down do the same), the first task dated today or later in Tasks, the top in Home, People and Follow-up",
+			when: hasTodayAnchor,
+			run:  func(m *Model) tea.Cmd { m.goToday(); return nil }},
 	}
 }
 

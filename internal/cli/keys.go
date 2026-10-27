@@ -14,7 +14,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const keysListFields = "id,title,group,default,keys,custom,changes_data"
+const keysListFields = "id,title,group,layer,scope,default,keys,custom,changes_data"
 
 func registerKeysCommands(rootCmd *cobra.Command) {
 	cmd := &cobra.Command{
@@ -75,7 +75,7 @@ func keysListCmd() *cobra.Command {
 					continue
 				}
 				rows = append(rows, map[string]any{
-					"id": a.ID, "title": a.Title, "group": a.Group, "default": keyList(a.Keys),
+					"id": a.ID, "title": a.Title, "group": a.Group, "layer": a.Layer, "scope": a.Scope, "default": keyList(a.Keys),
 					"keys": keyList(eff[a.ID]), "custom": applied, "changes_data": a.Write,
 				})
 			}
@@ -142,6 +142,11 @@ func keysSetCmd() *cobra.Command {
 			}
 			if why := tui.ConflictFor(c.overrides, a.ID, norm); why != "" {
 				return model.NewExitError(model.ErrConflict, "%s", why)
+			}
+			for _, k := range norm {
+				if why := tui.SwallowedChordWarning(k); why != "" {
+					fmt.Fprintf(os.Stderr, "warning: %s may never reach the program: %s. The binding is saved, pick another key if it does not work\n", keys.Display(k), why)
+				}
 			}
 			c.overrides[a.ID] = norm
 			if !dryRun {

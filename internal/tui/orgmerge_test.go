@@ -32,7 +32,7 @@ func TestNewOrganizationThatExistsAsksUseCreateOrCancel(t *testing.T) {
 	require.NoError(t, err)
 	runPalette(m, "organizations view")
 
-	press(m, "a")
+	press(m, "a", "enter")
 	submit(m, "BLUE ORIGIN |  |  | ")
 	require.NotNil(t, m.ov, "a prompt asks what to do")
 	assert.Contains(t, m.ov.title, "already exists")
@@ -44,12 +44,12 @@ func TestNewOrganizationThatExistsAsksUseCreateOrCancel(t *testing.T) {
 	press(m, "esc")
 	assert.Len(t, openOrgs(t, m), 1, "cancel creates nothing")
 
-	press(m, "a")
+	press(m, "a", "enter")
 	submit(m, "blue origin, Inc. |  |  | ")
 	press(m, "enter") // use the existing one
 	assert.Len(t, openOrgs(t, m), 1, "using the existing one creates nothing")
 
-	press(m, "a")
+	press(m, "a", "enter")
 	submit(m, "Blue Origin |  |  | ")
 	press(m, "down", "enter") // create anyway
 	assert.Len(t, openOrgs(t, m), 2)
@@ -72,14 +72,14 @@ func TestMergeMarkedOrganizationsIsOneUndoStep(t *testing.T) {
 	runPalette(m, "organizations view")
 	require.Len(t, m.rows, 3)
 
-	press(m, "M")
+	press(m, "m")
 	assert.Nil(t, m.ov, "nothing to merge without marks")
 	assert.Contains(t, m.status, "mark two")
 
 	press(m, " ", " ") // marks the first two rows, the cursor moves down
 	assert.Len(t, m.markedOrgIDs(), 2)
 	assert.Contains(t, m.View(), "✓")
-	press(m, "M")
+	press(m, "m")
 	require.NotNil(t, m.ov)
 	assert.Contains(t, m.ov.title, "Keep which")
 	press(m, "enter")
@@ -105,7 +105,7 @@ func TestOrgEditLineCarriesNativeFieldsAndOldLineStillWorks(t *testing.T) {
 	require.NoError(t, err)
 	runPalette(m, "organizations view")
 
-	press(m, "a")
+	press(m, "a", "enter")
 	submit(m, "Globex | globex.com | Energy | 51-200 | Austin, TX, US | https://globex.com | https://linkedin.com/company/globex | Makes things | notes here")
 	var g *model.Organization
 	for _, x := range openOrgs(t, m) {

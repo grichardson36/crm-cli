@@ -50,12 +50,12 @@ func (m *Model) toggleOrgMark() {
 func orgMergeActions() []action {
 	return []action{
 		{id: "org-mark", title: "Mark organization", group: "Organizations", hint: "space", keys: []string{" "},
-			desc: "mark or unmark the organization, then M merges the marked ones",
+			desc: "mark or unmark the organization, then m merges the marked ones",
 			foot: 25, footIn: inList, footLabel: "mark", when: func(m *Model) bool { return whenOrgsList(m) && m.selOrg() != 0 },
 			run: func(m *Model) tea.Cmd { m.toggleOrgMark(); return nil }},
-		{id: "org-merge", title: "Merge marked organizations", group: "Organizations", hint: "M", keys: []string{"M"},
+		{id: "org-merge", title: "Merge marked organizations", group: "Organizations",
 			desc: "merge the marked organizations into one you pick: people, parent links, deals, notes and tags move, the others are archived and ctrl+z undoes it. Same as crm org merge",
-			write: true, foot: 34, footIn: inList, footLabel: "merge", footIf: func(m *Model) bool { return len(m.markedOrgIDs()) >= 2 },
+			write: true,
 			when: whenOrgsList, run: func(m *Model) tea.Cmd { m.askOrgMerge(); return nil }},
 		// Palette only, no key (the owner is redesigning keys).
 		{id: "org-not-duplicate", title: "Not a duplicate (organization)", group: "Organizations",

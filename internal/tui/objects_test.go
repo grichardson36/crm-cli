@@ -47,38 +47,38 @@ func TestRelationsInTheRegistryMatchTheModel(t *testing.T) {
 
 // --- standard keys ---
 
-func TestAddAndRestoreKeysAreTheSameInEveryObjectView(t *testing.T) {
+func TestAddAndDeleteKeysAreTheSameInEveryObjectView(t *testing.T) {
 	m, _ := newTestModel(t)
 	ctx := context.Background()
 
-	// Organizations: a adds (+ is an alias), d deletes, u restores.
+	// Organizations: a then enter adds, d deletes, ctrl+z brings it back.
 	runPalette(m, "organizations view")
-	press(m, "a")
+	press(m, "a", "enter")
 	require.Equal(t, modePrompt, m.mode)
 	submit(m, "Globex")
-	press(m, "+")
-	require.Equal(t, modePrompt, m.mode, "+ is an alias of a")
+	press(m, "a", "enter")
+	require.Equal(t, modePrompt, m.mode)
 	submit(m, "Initech")
 	require.Len(t, openOrgs(t, m), 2)
 	press(m, "d", "y")
 	require.Len(t, openOrgs(t, m), 1)
-	press(m, "u")
-	assert.Len(t, openOrgs(t, m), 2, "u restores in the Organizations view")
+	press(m, "ctrl+z")
+	assert.Len(t, openOrgs(t, m), 2, "ctrl+z restores in the Organizations view")
 
 	// Deals.
 	goDeals(m)
-	press(m, "a")
+	press(m, "a", "enter")
 	require.Equal(t, modePrompt, m.mode)
 	submit(m, "Site redesign")
 	require.Len(t, openDeals(t, m), 1)
 	press(m, "d", "y")
 	assert.Empty(t, openDeals(t, m))
-	press(m, "u")
-	assert.Len(t, openDeals(t, m), 1, "u restores in the Deals view")
+	press(m, "ctrl+z")
+	assert.Len(t, openDeals(t, m), 1, "ctrl+z restores in the Deals view")
 
 	// Tasks.
 	press(m, "4")
-	press(m, "a")
+	press(m, "a", "enter")
 	require.Equal(t, modePrompt, m.mode)
 	assert.Equal(t, "task-new", m.promptKind)
 	submit(m, "Call back")
@@ -88,15 +88,14 @@ func TestAddAndRestoreKeysAreTheSameInEveryObjectView(t *testing.T) {
 	assert.Empty(t, tasks[0].PersonIDs, "a task added in the Tasks view has no person until it is linked")
 	press(m, "d", "y")
 	assert.Empty(t, openTasks(t, m))
-	press(m, "u")
-	assert.Len(t, openTasks(t, m), 1, "u restores in the Tasks view")
-	assert.Contains(t, m.status, "task restored")
+	press(m, "ctrl+z")
+	assert.Len(t, openTasks(t, m), 1, "ctrl+z restores in the Tasks view")
 
-	// People: a adds, d deletes (archives), u restores in the Archived view.
+	// People: a then enter adds, d deletes (archives), r restores in the Archived view.
 	press(m, "2")
 	before := len(m.people)
-	press(m, "a")
-	require.Equal(t, focusDetail, m.focus, "a opens the blank contact form")
+	press(m, "a", "enter")
+	require.Equal(t, focusDetail, m.focus, "a then enter opens the blank contact form")
 	typeText(m, "Dana Fox")
 	press(m, "enter")
 	assert.Len(t, m.people, before+1)
@@ -106,14 +105,14 @@ func TestAddAndRestoreKeysAreTheSameInEveryObjectView(t *testing.T) {
 	press(m, "y")
 	assert.Len(t, m.people, before)
 	press(m, "9") // Archived
-	press(m, "u")
-	assert.Len(t, m.people, before+1, "u restores in the Archived view")
+	press(m, "r")
+	assert.Len(t, m.people, before+1, "r restores in the Archived view")
 }
 
 func TestRestoreKeyDoesNothingWithoutADeletedObject(t *testing.T) {
 	m, _ := newTestModel(t)
 	runPalette(m, "organizations view")
-	press(m, "u")
+	press(m, "r")
 	assert.Equal(t, modeNormal, m.mode)
 	assert.Empty(t, openOrgs(t, m))
 }
@@ -177,7 +176,7 @@ func confirmLink(m *Model) {
 func TestLinkPersonToANewOrganizationAndUndo(t *testing.T) {
 	m, _ := newTestModel(t)
 	// Zed Adams (id 1) is under the cursor.
-	linkVia(m, "L", "organization", "Globex")
+	linkVia(m, "l", "organization", "Globex")
 	require.NotNil(t, m.ov)
 	last := m.ov.items[m.ov.shown[len(m.ov.shown)-1]]
 	assert.Equal(t, "create", last.id, "the last row is Create typed text")
@@ -277,14 +276,14 @@ func TestLinkFromTheOrganizationSide(t *testing.T) {
 	o, err := m.orr.Create(ctx, model.CreateOrgInput{Name: "Acme"})
 	require.NoError(t, err)
 	runPalette(m, "organizations view")
-	linkVia(m, "L", "person", "bob")
+	linkVia(m, "l", "person", "bob")
 	press(m, "enter")
 	confirmLink(m)
 	assert.Equal(t, o.ID, *personOrg(t, m, 2), "Bob Baker belongs to Acme")
 	assert.Contains(t, m.detail.View(), "Bob Baker", "the organization page lists its people")
 
 	// Unlink from the same side.
-	press(m, "U")
+	press(m, "u")
 	typeText(m, "person")
 	press(m, "enter")
 	assert.Nil(t, personOrg(t, m, 2))
@@ -344,7 +343,7 @@ func TestLinkTagToAnything(t *testing.T) {
 	require.NoError(t, err)
 
 	// A person.
-	linkVia(m, "L", "tag", "vip")
+	linkVia(m, "l", "tag", "vip")
 	press(m, "enter")
 	assert.True(t, m.hasTag(ctx, "person", 1, "vip"))
 	press(m, "ctrl+z")
@@ -352,7 +351,7 @@ func TestLinkTagToAnything(t *testing.T) {
 
 	// An organization.
 	runPalette(m, "organizations view")
-	linkVia(m, "L", "tag", "hot")
+	linkVia(m, "l", "tag", "hot")
 	press(m, "enter")
 	assert.True(t, m.hasTag(ctx, "organization", openOrgs(t, m)[0].ID, "hot"))
 	runPalette(m, "unlink tag")
@@ -362,7 +361,7 @@ func TestLinkTagToAnything(t *testing.T) {
 func TestLinkIsBlockedInReadOnlyMode(t *testing.T) {
 	m, _ := newTestModel(t)
 	m.readOnly = true
-	press(m, "L")
+	press(m, "l")
 	assert.Equal(t, modeNormal, m.mode)
 	assert.Contains(t, m.status, "read-only")
 	runPalette(m, "link organization")

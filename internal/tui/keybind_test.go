@@ -35,7 +35,7 @@ func TestOverrideReplacesTheDefaultKeysAndTheHint(t *testing.T) {
 
 func TestOverrideCanBindSeveralKeysAndSpace(t *testing.T) {
 	m, pr := newTestModel(t)
-	assert.Empty(t, m.applyKeys(keys.Overrides{"favorite": {"f", "*", " "}}))
+	assert.Empty(t, m.applyKeys(keys.Overrides{"favorite": {"f", "ctrl+g"}, "mark": {" ", "ctrl+b"}}))
 	assert.Equal(t, "f", m.actionByID("favorite").hint)
 	press(m, "f")
 	assert.True(t, personByID(t, pr, 1).IsFavorite)
@@ -50,12 +50,16 @@ func TestConflictingOverrideIsSkippedAndNamesTheOtherAction(t *testing.T) {
 	assert.Contains(t, problems[0], "keys.undo: q is already used by")
 	assert.Equal(t, []string{"ctrl+z"}, m.actionByID("undo").keys, "the default stays")
 
-	// Two actions of one group cannot share a key either; a different group may.
-	problems = m.applyKeys(keys.Overrides{"favorite": {"c"}})
-	require.Len(t, problems, 1, "c is Mark contacted, also in the Contact group")
-	assert.Contains(t, problems[0], "Mark contacted")
-	problems = m.applyKeys(keys.Overrides{"sync-now": {"c"}})
-	assert.Empty(t, problems, "Sync actions work on another screen than Contact actions")
+	// An action cannot take a key another action has in an overlapping scope: x is the Mark verb, live
+	// in every view, so no other action may use it.
+	problems = m.applyKeys(keys.Overrides{"favorite": {"x"}})
+	require.Len(t, problems, 1, "x is Mark, a framework verb of the app scope")
+	assert.Contains(t, problems[0], "Mark")
+	problems = m.applyKeys(keys.Overrides{"sync-now": {"x"}})
+	require.Len(t, problems, 1, "the app scope reaches the Sync view too")
+	// A key two screens use for different things is fine: tier is for people, sync-now for the inbox.
+	problems = m.applyKeys(keys.Overrides{"sync-now": {"ctrl+g"}, "tier": {"ctrl+g"}})
+	assert.Empty(t, problems, "type:inbox and type:person never show together")
 
 	// The built-in keys that overlap across screens never produce a message.
 	assert.Empty(t, m.applyKeys(keys.Overrides{}))
@@ -123,10 +127,10 @@ func TestKeysCustomizeFlowSavesTheBinding(t *testing.T) {
 	assert.Contains(t, m.View(), "press the new key for Toggle favorite")
 
 	// A key that is taken is refused and the capture stays open.
-	m.Update(keyMsg("c"))
+	m.Update(keyMsg("x"))
 	assert.Equal(t, modeCapture, m.mode)
 	assert.True(t, m.toast.isErr)
-	assert.Contains(t, m.toast.text, "Mark contacted")
+	assert.Contains(t, m.toast.text, "Mark")
 
 	m.Update(keyMsg("ctrl+f"))
 	require.Equal(t, modeConfirm, m.mode)
@@ -161,7 +165,7 @@ func TestKeysCustomizeFlowSavesTheBinding(t *testing.T) {
 	typeText(m, "undo")
 	press(m, "enter")
 	m.Update(keyMsg("ctrl+g"))
-	press(m, "n")
+	press(m, "a", "n", "tab")
 	assert.Equal(t, []string{"ctrl+z"}, m.actionByID("undo").keys)
 }
 
@@ -189,7 +193,7 @@ func TestKeysResetFlow(t *testing.T) {
 	press(m, "enter")
 	typeText(m, "all actions")
 	press(m, "enter")
-	assert.Equal(t, []string{"p"}, m.actionByID("tier").keys)
+	assert.Empty(t, m.actionByID("tier").keys, "tier has no default key, it is a palette entry")
 	o, _ = keys.Load(dir)
 	assert.Empty(t, o)
 
@@ -244,7 +248,7 @@ func TestNoLegacyUndoRedoKeys(t *testing.T) {
 	m, pr := newTestModel(t)
 	press(m, "f")
 	assert.True(t, personByID(t, pr, 1).IsFavorite)
-	press(m, "U")
+	press(m, "u")
 	assert.True(t, personByID(t, pr, 1).IsFavorite, "U is Unlink now, not undo")
 	press(m, "esc") // U opened the unlink picker
 	m.Update(keyMsg("ctrl+r"))

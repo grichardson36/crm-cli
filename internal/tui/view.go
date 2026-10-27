@@ -255,7 +255,7 @@ func (m *Model) listView(w, h int) string {
 		case m.view == viewBirthdays:
 			return m.st.Dim.Render("No birthdays in the next 90 days.")
 		case m.view == viewTasks:
-			return m.st.Dim.Render("No open tasks. a adds one, or press t on a person.")
+			return m.st.Dim.Render("No open tasks. a then enter adds one.")
 		case m.view == viewMerge:
 			return m.st.Dim.Render("No duplicates at " + m.minLevel.String() + " confidence or above. m lowers the level.")
 		case m.view == viewArchived:
@@ -369,7 +369,7 @@ func (m *Model) footerSegs() []footSeg {
 		if a.footIf != nil && !a.footIf(m) {
 			continue
 		}
-		if a.write && m.readOnly {
+		if a.writes(m) && m.readOnly {
 			continue
 		}
 		acts = append(acts, a)
@@ -386,8 +386,11 @@ func (m *Model) footerSegs() []footSeg {
 		if a.footLabel != "" {
 			label = a.footLabel
 		}
+		if a.footDyn != nil {
+			label = a.footDyn(m)
+		}
 		if a.id == "down" {
-			hint = "j/k"
+			hint = "↑/↓"
 		}
 		if a.id == "focus-detail" && m.readOnly {
 			label = "detail"
@@ -472,7 +475,7 @@ func (m *Model) hintsLine() string {
 
 func (m *Model) helpView() string {
 	title := m.st.Head.Render("Keys") + m.st.Dim.Render("   generated from the same action list as the palette (ctrl+k)")
-	foot := m.st.Dim.Render("j/k scroll  any other key closes  ctrl+k for every action")
+	foot := m.st.Dim.Render("up/down scroll  any other key closes  ctrl+k for every action")
 	cut := lipgloss.NewStyle().MaxWidth(m.width)
 	return cut.Render(title) + "\n" + m.helpVP.View() + "\n" + cut.Render(foot)
 }

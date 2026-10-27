@@ -132,7 +132,17 @@ func (m *Model) promptHint(used int) string {
 	if m.input.Position() < len([]rune(val)) {
 		return ""
 	}
-	return cutHint(pipeHint(m.promptFieldsFor(m.promptKind), val), m.width-used)
+	h := pipeHint(m.promptFieldsFor(m.promptKind), val)
+	if sug := m.suggestionHint(); sug != "" {
+		// The offered link follows the syntax hint in the same dim text.
+		if h != "" {
+			h += "   "
+		} else {
+			h = hintSpacing(val)
+		}
+		h += sug
+	}
+	return cutHint(h, m.width-used)
 }
 
 // barSyntaxHint is the dim text after the command bar line: the shape of the verb typed first.

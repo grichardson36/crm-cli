@@ -76,7 +76,8 @@ func syncModel(t *testing.T) *Model {
 func syncedModel(t *testing.T) *Model {
 	t.Helper()
 	m := syncModel(t)
-	pressRun(m, "0", "s")
+	press(m, "0")
+	runIDCmd(m, "sync-now")
 	require.Empty(t, m.busy)
 	require.Contains(t, m.status, "fake: ok")
 	return m
@@ -109,14 +110,14 @@ func TestSyncViewListsSourcesAndRunsInTheBackground(t *testing.T) {
 	assert.Contains(t, m.View(), "never run")
 	assert.Contains(t, m.View(), "cursor", "the detail pane shows the cursor")
 
-	// s starts the run and returns at once: the model is busy and the spinner shows.
-	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")})
+	// Sync now (a palette entry) starts the run and returns at once: the model is busy and the spinner shows.
+	cmd := runID(m, "sync-now")
 	require.NotNil(t, cmd)
 	assert.Equal(t, "syncing fake", m.busy)
 	assert.Contains(t, m.View(), "syncing fake...")
 
 	// A second run is refused while one is in flight.
-	press(m, "s")
+	runID(m, "sync-now")
 	assert.True(t, m.statusIsErr)
 	assert.Contains(t, m.status, "already running")
 
@@ -148,7 +149,8 @@ func TestSyncViewListsSourcesAndRunsInTheBackground(t *testing.T) {
 
 func TestSyncDryRunWritesNothing(t *testing.T) {
 	m := syncModel(t)
-	pressRun(m, "0", "d")
+	press(m, "0")
+	runIDCmd(m, "sync-dry")
 	assert.Equal(t, "dry run fake: ok, 0 created, 1 updated, 0 skipped, 2 in inbox, 0 errors (nothing written)", m.status)
 	assert.Empty(t, inboxRows(m))
 	run, err := m.runner.Overview(context.Background())
@@ -164,20 +166,21 @@ func TestSyncFailureShowsTheError(t *testing.T) {
 	fake, err := m.registry.Get("fake")
 	require.NoError(t, err)
 	fake.(*crmsync.FakeAdapter).FailAfter = 1
-	pressRun(m, "0", "s")
+	press(m, "0")
+	runIDCmd(m, "sync-now")
 	assert.True(t, m.statusIsErr)
 	assert.Contains(t, m.status, "simulated failure")
 }
 
 func TestInboxAcceptCreatesAPerson(t *testing.T) {
 	m := syncedModel(t)
-	press(m, "j") // from the source to the first inbox record (headings are skipped)
+	press(m, "down") // from the source to the first inbox record (headings are skipped)
 	e := m.selectedEntry()
 	require.NotNil(t, e)
 	assert.Equal(t, "Nina North", e.Summary)
 	assert.Contains(t, m.View(), "nina@north.org", "the detail pane shows the record")
 
-	press(m, "a")
+	press(m, "enter") // enter on an inbox record accepts it
 	assert.Contains(t, m.status, "accepted as person #4")
 	assert.Len(t, m.people, 4)
 	assert.Len(t, inboxRows(m), 1)
@@ -189,9 +192,9 @@ func TestInboxAcceptCreatesAPerson(t *testing.T) {
 
 func TestInboxAttachSearchesForThePerson(t *testing.T) {
 	m := syncedModel(t)
-	press(m, "j")
+	press(m, "down")
 	e := *m.selectedEntry()
-	press(m, "p")
+	runID(m, "inbox-attach")
 	require.Equal(t, modeOverlay, m.mode)
 	assert.Contains(t, m.ov.title, "Attach inbox")
 	assert.Len(t, m.ov.shown, 3, "everyone can be searched")
@@ -215,7 +218,7 @@ func TestInboxAttachSearchesForThePerson(t *testing.T) {
 
 func TestInboxIgnoreDismissesTheRecord(t *testing.T) {
 	m := syncedModel(t)
-	press(m, "j", "i")
+	press(m, "down", "d") // d is the Delete verb
 	assert.Contains(t, m.status, "ignored")
 	assert.Len(t, inboxRows(m), 1)
 	pending, err := m.inbox.List(context.Background(), model.InboxPending, 0)
@@ -227,29 +230,31 @@ func TestInboxIgnoreDismissesTheRecord(t *testing.T) {
 func TestInboxKeysOnlyApplyToInboxRows(t *testing.T) {
 	m := syncedModel(t)
 	require.Equal(t, "fake", m.rows[m.cursor].title)
-	press(m, "a")
-	assert.Len(t, inboxRows(m), 2, "a does nothing on a source row")
-	press(m, "p")
+	press(m, "enter")
+	assert.Len(t, inboxRows(m), 2, "enter does nothing on a source row")
+	runID(m, "inbox-attach")
 	assert.Equal(t, modeNormal, m.mode)
-	press(m, "i")
+	press(m, "d")
 	assert.Len(t, inboxRows(m), 2)
 }
 
 func TestReadOnlyBlocksSyncWritesButNotDryRun(t *testing.T) {
 	m := syncedModel(t)
 	m.readOnly = true
-	press(m, "s")
+	runID(m, "sync-now")
 	assert.Contains(t, m.status, "read-only")
 	assert.Empty(t, m.busy)
-	press(m, "j")
-	for _, k := range []string{"a", "p", "i"} {
+	press(m, "down")
+	for _, k := range []string{"enter", "d"} {
 		press(m, k)
 		assert.Contains(t, m.status, "read-only", k)
 		assert.Equal(t, modeNormal, m.mode)
 	}
+	runID(m, "inbox-attach")
+	assert.Contains(t, m.status, "read-only")
 	assert.Len(t, inboxRows(m), 2)
-	press(m, "k")
-	pressRun(m, "d")
+	press(m, "up")
+	runIDCmd(m, "sync-dry")
 	assert.Contains(t, m.status, "dry run", "a dry run is read-only safe")
 }
 
@@ -319,7 +324,7 @@ func TestSyncViewFitsTerminals(t *testing.T) {
 	for _, size := range [][2]int{{80, 24}, {60, 12}, {40, 10}, {120, 50}} {
 		m.Update(tea.WindowSizeMsg{Width: size[0], Height: size[1]})
 		press(m, "0")
-		for _, k := range []string{"j", "p"} {
+		for _, k := range []string{"down", "ctrl+down"} {
 			press(m, k)
 			lines := strings.Split(m.View(), "\n")
 			assert.LessOrEqual(t, len(lines), size[1], "%v height", size)

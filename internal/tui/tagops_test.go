@@ -24,9 +24,9 @@ func TestTagRenameAndMergeFromTheBarAndPalette(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, m.tagr.Apply(m.ctx, "person", 3, "pal"))
 
-	// Rename from the tag row: r opens a prompt, the bar returns.
+	// Rename from the tag row: e opens a prompt (rename is just activate), the bar returns.
 	startBar(t, m, "pal", "tag:pal")
-	press(m, "tab", "r")
+	press(m, "tab", "e")
 	require.Equal(t, modePrompt, m.mode)
 	m.input.SetValue("buddy")
 	press(m, "enter")
@@ -38,7 +38,7 @@ func TestTagRenameAndMergeFromTheBarAndPalette(t *testing.T) {
 	// A name that exists offers the merge instead.
 	press(m, "esc", "esc")
 	startBar(t, m, "pal", "tag:pal")
-	press(m, "tab", "r")
+	press(m, "tab", "e")
 	m.input.SetValue("FRIEND")
 	press(m, "enter")
 	require.Equal(t, modeConfirm, m.mode)
@@ -82,7 +82,7 @@ func TestTagRenameAndMergeAreBlockedInReadOnlyMode(t *testing.T) {
 	startBar(t, m, "friend", "tag:friend")
 	press(m, "tab")
 	assert.NotContains(t, barFooter(m), "rename")
-	press(m, "r")
+	press(m, "e")
 	assert.NotEqual(t, modePrompt, m.mode)
 	assert.Contains(t, m.toast.text, "read-only")
 }

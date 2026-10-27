@@ -65,7 +65,7 @@ func TestBarTabMovesFocusToTheResultsAndBack(t *testing.T) {
 	press(m, "tab")
 	assert.True(t, m.ov.focusResults, "Tab on an object row moves the focus to the results")
 	assert.Contains(t, barFooter(m), "contacted", "the footer lists the object's verbs with their keys")
-	assert.Contains(t, barFooter(m), "c contacted")
+	assert.Contains(t, barFooter(m), "x contacted")
 	press(m, "esc")
 	assert.False(t, m.ov.focusResults, "Esc returns to the input")
 	assert.Equal(t, modeOverlay, m.mode, "the bar stays open")
@@ -99,10 +99,10 @@ func TestBarPersonHotkeysActLikeThePeopleView(t *testing.T) {
 	startBar(t, m, "bob", "person:2")
 	press(m, "tab")
 
-	press(m, "c") // mark contacted
+	press(m, "x") // mark contacted
 	assert.Equal(t, modeOverlay, m.mode, "the verb ran without leaving the bar")
 	assert.True(t, m.ov.focusResults, "and the focus stays on the results")
-	assert.Equal(t, "Mark contacted: Bob Baker", m.toast.text, "the toast names the action and the target")
+	assert.Equal(t, "Mark: Bob Baker", m.toast.text, "the toast names the action and the target")
 	p := personByID(t, pr, 2)
 	require.NotNil(t, p.LastContactedAt)
 	assert.Equal(t, "2026-10-13 12:00:00", *p.LastContactedAt)
@@ -129,7 +129,7 @@ func TestBarPersonHotkeysActLikeThePeopleView(t *testing.T) {
 func TestBarNoteVerbTakesTheScreenAndTheBarComesBack(t *testing.T) {
 	m, pr := newTestModel(t)
 	startBar(t, m, "bob", "person:2")
-	press(m, "tab", "n")
+	press(m, "tab", "a", "n", "tab") // a, the note kind, then tab accepts the highlighted person as the link
 	require.Equal(t, modePrompt, m.mode, "a verb with a prompt shows the prompt")
 	typeText(m, "met at the bar")
 	press(m, "enter")
@@ -146,7 +146,7 @@ func TestBarNoteVerbTakesTheScreenAndTheBarComesBack(t *testing.T) {
 	assert.Equal(t, viewPeople, m.view)
 
 	// Esc in the prompt cancels and the bar still returns.
-	press(m, "n")
+	press(m, "a", "n", "tab")
 	require.Equal(t, modePrompt, m.mode)
 	press(m, "esc")
 	assert.Equal(t, modeOverlay, m.mode)
@@ -179,16 +179,14 @@ func TestBarVerbsDifferPerKindAndAreHiddenWhenNotApplicable(t *testing.T) {
 		return false
 	}
 	assert.True(t, has(person, "contacted"), "%v", person)
-	assert.True(t, has(person, "note"), "%v", person)
 	assert.False(t, has(person, "stage"))
 	require.NotEmpty(t, org, "org row has verbs")
 	assert.False(t, has(org, "contacted"), "a person verb is hidden on an organization: %v", org)
-	assert.True(t, has(org, "note"), "n adds a note on an organization row, the same key as a person: %v", org)
-	assert.True(t, has(org, "add"), "t adds a task on an organization row, the same key as a person: %v", org)
-	assert.True(t, has(org, "edit"), "%v", org)
+	assert.True(t, has(org, "edit"), "e edits an organization row: %v", org)
 	assert.True(t, has(org, "delete"), "%v", org)
 	require.NotEmpty(t, deal)
-	assert.True(t, has(deal, "stage"), "stage is a deal verb: %v", deal)
+	assert.True(t, has(deal, "edit"), "%v", deal)
+	assert.False(t, has(deal, "stage"), "the stage is a palette entry now: %v", deal)
 	assert.False(t, has(deal, "contacted"))
 	require.NotEmpty(t, tk)
 	assert.True(t, has(tk, "delete"), "%v", tk)
@@ -196,7 +194,7 @@ func TestBarVerbsDifferPerKindAndAreHiddenWhenNotApplicable(t *testing.T) {
 
 	// A key that is not a verb of the kind does nothing but say so.
 	cursorOnBarRow(t, m, "org:"+itoa64(o.ID))
-	press(m, "tab", "c")
+	press(m, "tab", "s")
 	assert.Contains(t, m.toast.text, "no verb")
 	assert.Equal(t, modeOverlay, m.mode)
 	assert.Nil(t, personByID(t, m.pr, 1).LastContactedAt)
@@ -241,12 +239,19 @@ func TestBarTaskAndDealVerbs(t *testing.T) {
 	m.afterWrite()
 	press(m, "esc", "esc")
 	startBar(t, m, "quartz", "deal:"+itoa64(d.ID))
-	press(m, "tab", "s")
-	require.NotNil(t, m.ov, "s opens the stage picker")
+	press(m, "tab", "e")
+	require.Equal(t, modePrompt, m.mode, "e edits the deal as one line")
+	press(m, "esc")
+	assert.Equal(t, modeOverlay, m.mode, "the bar returns after the prompt")
+	assert.Nil(t, m.barResume)
+	// The stage is a palette entry: Set deal stage opens the picker on the selected deal.
+	press(m, "esc", "esc")
+	m.switchView(viewDeals)
+	m.settle()
+	m.runAction(m.actionByID("deal-stage"))
+	require.NotNil(t, m.ov, "Set deal stage opens the stage picker")
 	assert.Contains(t, m.ov.title, "stage")
 	press(m, "down", "enter") // second stage
-	assert.Equal(t, modeOverlay, m.mode, "the bar returns after the picker")
-	assert.Nil(t, m.barResume)
 	got2, err := m.dlr.FindByID(m.ctx, d.ID)
 	require.NoError(t, err)
 	assert.NotEqual(t, "lead", got2.Stage)
@@ -327,7 +332,7 @@ func TestBarTagNameDoesNotMixTaggedPeopleIntoTheResults(t *testing.T) {
 func TestBarTagRowOpensItsTaggedPeopleAndHasItsOwnVerbs(t *testing.T) {
 	m, _ := newTestModel(t)
 	startBar(t, m, "friend", "tag:friend")
-	assert.Equal(t, []string{"d delete tag", "L tag a person", "U untag a person", "r rename", "m merge", "ctrl+z undo", "ctrl+y redo"}, barVerbLabelsFor(m, "tag:friend"), "tag verbs, not person verbs")
+	assert.Equal(t, []string{"d delete tag", "l tag a person", "u untag a person", "m merge", "e rename", "ctrl+z undo", "ctrl+y redo"}, barVerbLabelsFor(m, "tag:friend"), "tag verbs, not person verbs")
 
 	// Enter opens the tag: the People view filtered by #friend, as # does.
 	press(m, "enter")
@@ -338,7 +343,7 @@ func TestBarTagRowOpensItsTaggedPeopleAndHasItsOwnVerbs(t *testing.T) {
 	// Link: pick Cara to give her the tag, from the bar, then undo it.
 	m.query = ""
 	startBar(t, m, "friend", "tag:friend")
-	press(m, "tab", "L")
+	press(m, "tab", "l")
 	require.NotNil(t, m.ov, "L opens a picker of people who can take the tag")
 	typeText(m, "cara")
 	press(m, "enter")
@@ -350,7 +355,7 @@ func TestBarTagRowOpensItsTaggedPeopleAndHasItsOwnVerbs(t *testing.T) {
 	assert.Equal(t, []int64{2}, ids)
 
 	// Unlink Bob.
-	press(m, "U")
+	press(m, "u")
 	require.NotNil(t, m.ov)
 	press(m, "enter")
 	ids, _ = m.tagr.GetEntities(m.ctx, "friend", "person")
@@ -381,7 +386,7 @@ func TestBarVerbsFollowReadOnlyMode(t *testing.T) {
 	startBar(t, m, "bob", "person:2")
 	press(m, "tab")
 	assert.NotContains(t, barFooter(m), "contacted", "write verbs are not offered in read-only mode")
-	press(m, "c")
+	press(m, "x")
 	assert.Contains(t, *personByID(t, pr, 2).LastContactedAt, "2020-01-01", "and do not run")
 	assert.Contains(t, strings.ToLower(m.toast.text), "read-only")
 	assert.Equal(t, modeOverlay, m.mode)
@@ -389,11 +394,11 @@ func TestBarVerbsFollowReadOnlyMode(t *testing.T) {
 
 func TestBarVerbsFollowKeyRebinding(t *testing.T) {
 	m, pr := newTestModel(t)
-	m.applyKeys(map[string][]string{"contacted": {"ctrl+g"}})
+	m.applyKeys(map[string][]string{"mark-state": {"ctrl+g"}})
 	startBar(t, m, "bob", "person:2")
 	press(m, "tab")
 	assert.Contains(t, barFooter(m), "ctrl+g contacted")
-	press(m, "c")
+	press(m, "x")
 	assert.Contains(t, *personByID(t, pr, 2).LastContactedAt, "2020-01-01", "the old key no longer runs the verb")
 	m.Update(tea.KeyMsg{Type: tea.KeyCtrlG})
 	assert.Contains(t, *personByID(t, pr, 2).LastContactedAt, "2026-10-13")
