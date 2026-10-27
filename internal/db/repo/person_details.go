@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/validate"
 )
 
 func nullIfEmpty(s string) any {
@@ -113,9 +114,14 @@ func (r *PersonRepo) mustExist(ctx context.Context, id int64) error {
 
 // AddEmail adds an email address. The first address, or one added with primary, becomes people.email.
 func (r *PersonRepo) AddEmail(ctx context.Context, id int64, email string, label *string, primary bool) error {
-	email = strings.TrimSpace(email)
-	if !strings.Contains(email, "@") {
-		return fmt.Errorf("invalid email %q: %w", email, model.ErrValidation)
+	spec, _ := model.FieldNamed("person", "email")
+	fr := validate.Field(spec, email, validate.Options{Kind: "person"})
+	if err := fr.Err(); err != nil {
+		return err
+	}
+	email = fr.Value
+	if email == "" {
+		return validate.Fail(validate.Issue{Code: validate.CodeFieldRequired, Field: spec.Label, Expected: "a value is required", Fix: "give an email address"})
 	}
 	if err := r.mustExist(ctx, id); err != nil {
 		return err
@@ -180,9 +186,14 @@ func (r *PersonRepo) RemoveEmail(ctx context.Context, id int64, email string) er
 
 // AddPhone adds a phone number. The first number, or one added with primary, becomes people.phone.
 func (r *PersonRepo) AddPhone(ctx context.Context, id int64, phone string, label *string, primary bool) error {
-	phone = strings.TrimSpace(phone)
+	spec, _ := model.FieldNamed("person", "phone")
+	fr := validate.Field(spec, phone, validate.Options{Kind: "person"})
+	if err := fr.Err(); err != nil {
+		return err
+	}
+	phone = fr.Value
 	if phone == "" {
-		return fmt.Errorf("phone number is empty: %w", model.ErrValidation)
+		return validate.Fail(validate.Issue{Code: validate.CodeFieldRequired, Field: spec.Label, Expected: "a value is required", Fix: "give a phone number"})
 	}
 	if err := r.mustExist(ctx, id); err != nil {
 		return err

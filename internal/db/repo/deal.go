@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/validate"
 )
 
 // DealRepo handles deal database operations.
@@ -97,8 +98,11 @@ func closedStage(stage string) bool { return stage == "won" || stage == "lost" }
 
 // Create inserts a new deal.
 func (r *DealRepo) Create(ctx context.Context, input model.CreateDealInput) (*model.Deal, error) {
-	if !model.ValidDealStage(input.Stage) {
-		return nil, fmt.Errorf("invalid deal stage %q: %w", input.Stage, model.ErrValidation)
+	if err := validate.DealCreate(&input).Err(); err != nil {
+		return nil, err
+	}
+	if _, err := validate.OneOf("stage", input.Stage, model.DealStages); err != nil {
+		return nil, err
 	}
 
 	id := uuid.New().String()
@@ -188,6 +192,9 @@ func (r *DealRepo) FindAll(ctx context.Context, filters model.DealFilters) ([]*m
 
 // Update modifies a deal.
 func (r *DealRepo) Update(ctx context.Context, id int64, input model.UpdateDealInput) (*model.Deal, error) {
+	if err := validate.DealUpdate(&input).Err(); err != nil {
+		return nil, err
+	}
 	var setClauses []string
 	var args []any
 
@@ -200,9 +207,6 @@ func (r *DealRepo) Update(ctx context.Context, id int64, input model.UpdateDealI
 		args = append(args, *input.Value)
 	}
 	if input.Stage != nil {
-		if !model.ValidDealStage(*input.Stage) {
-			return nil, fmt.Errorf("invalid deal stage %q: %w", *input.Stage, model.ErrValidation)
-		}
 		setClauses = append(setClauses, "stage = ?")
 		args = append(args, *input.Stage)
 		// closed_at follows the stage (Salesforce): re-stamped to now on every move into won or
@@ -347,8 +351,8 @@ func (r *DealRepo) Restore(ctx context.Context, id int64) error {
 // Overwrite sets every editable field to the values of d, including empty ones. Undo and redo
 // use it so a field that was empty goes back to empty.
 func (r *DealRepo) Overwrite(ctx context.Context, id int64, d *model.Deal) error {
-	if !model.ValidDealStage(d.Stage) {
-		return fmt.Errorf("invalid deal stage %q: %w", d.Stage, model.ErrValidation)
+	if _, err := validate.OneOf("stage", d.Stage, model.DealStages); err != nil {
+		return err
 	}
 	result, err := r.db.ExecContext(ctx,
 		`UPDATE deals SET title = ?, value = ?, stage = ?, notes = ?, closed_at = ?,

@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/validate"
 )
 
 // PersonRepo handles person database operations.
@@ -45,6 +46,9 @@ func scanPerson(row interface{ Scan(...any) error }) (*model.Person, error) {
 
 // Create inserts a new person after checking for duplicates.
 func (r *PersonRepo) Create(ctx context.Context, input model.CreatePersonInput) (*model.Person, error) {
+	if err := validate.PersonCreate(&input).Err(); err != nil {
+		return nil, err
+	}
 	// Check for duplicate: same first_name + last_name, or same email
 	if err := r.checkDuplicate(ctx, input); err != nil {
 		return nil, err
@@ -193,6 +197,9 @@ func (r *PersonRepo) FindAll(ctx context.Context, filters model.PersonFilters) (
 
 // Update modifies a person's fields.
 func (r *PersonRepo) Update(ctx context.Context, id int64, input model.UpdatePersonInput) (*model.Person, error) {
+	if err := validate.PersonUpdate(&input).Err(); err != nil {
+		return nil, err
+	}
 	var setClauses []string
 	var args []any
 
@@ -248,8 +255,8 @@ func (r *PersonRepo) Update(ctx context.Context, id int64, input model.UpdatePer
 	if input.KeepInTouch != nil {
 		if *input.KeepInTouch == "" || *input.KeepInTouch == "unset" {
 			setClauses = append(setClauses, "keep_in_touch = NULL", "keep_in_touch_set_at = NULL")
-		} else if !model.ValidCadence(*input.KeepInTouch) {
-			return nil, fmt.Errorf("invalid keep-in-touch cadence %q (must be one of: %s): %w", *input.KeepInTouch, strings.Join(model.KeepInTouchCadences, ", "), model.ErrValidation)
+		} else if _, err := validate.OneOf("keep in touch", *input.KeepInTouch, model.KeepInTouchCadences); err != nil {
+			return nil, err
 		} else {
 			// Restart the first-due clock only when the cadence actually changes.
 			setClauses = append(setClauses,

@@ -6,6 +6,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/validate"
 )
 
 // Set field on selected (patterns/bulk-actions-always). One palette action covers every field with a
@@ -109,8 +110,9 @@ func (m *Model) runSetField(value string) {
 	if st == nil {
 		return
 	}
-	v, err := st.spec.Normalize(value, m.parseDateField)
-	if err != nil {
+	res := validate.Field(st.spec, value, validate.Options{ParseDate: m.parseDateField})
+	v := res.Value
+	if err := res.Err(); err != nil {
 		m.setStatus(err.Error(), true)
 		m.setField = st
 		m.startInput("set-field", fmt.Sprintf("set %s on %s: ", st.spec.Label, nouns(refKinds(st.refs), len(st.refs))), value)

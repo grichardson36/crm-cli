@@ -2,11 +2,11 @@ package cli
 
 import (
 	"os"
-	"strings"
 
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/format"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/validate"
 	"github.com/spf13/cobra"
 )
 
@@ -39,9 +39,6 @@ func noteAddCmd() *cobra.Command {
 			if in.Content == nil && in.Subject == nil {
 				return model.NewExitError(model.ErrValidation, "a note needs text or --subject")
 			}
-			if direction != "" && !model.ValidInteractionDirection(direction) {
-				return model.NewExitError(model.ErrValidation, "invalid direction: %s (must be one of: %s)", direction, strings.Join(model.InteractionDirections, ", "))
-			}
 			if at != "" {
 				d, err := normalizeOccurredAt(at)
 				if err != nil {
@@ -54,6 +51,7 @@ func noteAddCmd() *cobra.Command {
 				return err
 			}
 			defer db.Close()
+			reportHints(cmd, validate.InteractionCreate(&in))
 			n, err := repo.NewInteractionRepo(db).Create(cmd.Context(), in)
 			if err != nil {
 				return err

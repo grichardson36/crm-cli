@@ -8,6 +8,7 @@ import (
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/format"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/validate"
 	"github.com/jdanielnd/crm-cli/internal/shortsyntax"
 	"github.com/spf13/cobra"
 )
@@ -145,6 +146,7 @@ func personAddCmd() *cobra.Command {
 			}
 
 			r := repo.NewPersonRepo(db)
+			reportHints(cmd, validate.PersonCreate(&input))
 			person, err := r.Create(cmd.Context(), input)
 			if err != nil {
 				return err
@@ -326,6 +328,7 @@ func personEditCmd() *cobra.Command {
 			}
 
 			r := repo.NewPersonRepo(db)
+			reportHints(cmd, validate.PersonUpdate(&input))
 			person, err := r.Update(cmd.Context(), id, input)
 			if err != nil {
 				return err

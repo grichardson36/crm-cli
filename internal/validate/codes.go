@@ -1,0 +1,74 @@
+// Package validate is the one validation framework (patterns/one-validation-framework). It checks,
+// sanitizes and suggests corrections for every value that enters the CRM, driven by the field types
+// in model.Fields. The CLI, MCP, TUI, importers, DAV and device sync all call it, and each decides
+// only how to show the result. A rule is added here once.
+package validate
+
+// Stable error codes. The strings are part of the interface: the CLI prints them, MCP returns them
+// and scripts match them, so they never change meaning. Add new ones to Codes below.
+const (
+	CodeFieldRequired    = "E_FIELD_REQUIRED"
+	CodeFieldTooLong     = "E_FIELD_TOO_LONG"
+	CodeFieldUnknown     = "E_FIELD_UNKNOWN"
+	CodeEmailInvalid     = "E_EMAIL_INVALID"
+	CodeURLInvalid       = "E_URL_INVALID"
+	CodePhoneInvalid     = "E_PHONE_INVALID"
+	CodeDomainInvalid    = "E_DOMAIN_INVALID"
+	CodeDateInvalid      = "E_DATE_INVALID"
+	CodeDateOrder        = "E_DATE_ORDER"
+	CodeChoiceInvalid    = "E_CHOICE_INVALID"
+	CodeNumberInvalid    = "E_NUMBER_INVALID"
+	CodeNumberTooLow     = "E_NUMBER_TOO_LOW"
+	CodePrimaryMultiple  = "E_PRIMARY_MEMBERSHIP_MULTIPLE"
+	CodeOrgParentCycle   = "E_ORG_PARENT_CYCLE"
+	CodeEncodingDamaged  = "W_ENCODING_DAMAGED"
+	CodePhoneInTextField = "S_PHONE_IN_TEXT_FIELD"
+	CodeEmailInTextField = "S_EMAIL_IN_TEXT_FIELD"
+	CodeURLInTextField   = "S_URL_IN_TEXT_FIELD"
+)
+
+// Kinds of code. E_ codes fail the write, W_ codes warn and S_ codes suggest. Only errors fail.
+const (
+	KindError      = "error"
+	KindWarning    = "warning"
+	KindSuggestion = "suggestion"
+)
+
+// CodeInfo describes one code for the help topic and the docs.
+type CodeInfo struct {
+	Code    string
+	Kind    string
+	Meaning string
+}
+
+// Codes is the whole vocabulary, in one place.
+var Codes = []CodeInfo{
+	{CodeFieldRequired, KindError, "a required field is empty"},
+	{CodeFieldTooLong, KindError, "a value is longer than the field allows"},
+	{CodeFieldUnknown, KindError, "the object has no such field"},
+	{CodeEmailInvalid, KindError, "the text is not shaped like an email address"},
+	{CodeURLInvalid, KindError, "the text is not shaped like a web address"},
+	{CodePhoneInvalid, KindError, "the text is not shaped like a phone number"},
+	{CodeDomainInvalid, KindError, "the text is not a domain such as example.com"},
+	{CodeDateInvalid, KindError, "the text is not a date the date parser understands"},
+	{CodeDateOrder, KindError, "an end date is before its start date"},
+	{CodeChoiceInvalid, KindError, "the value is not one of the field's options"},
+	{CodeNumberInvalid, KindError, "the text is not a number"},
+	{CodeNumberTooLow, KindError, "a number is below the field's minimum"},
+	{CodePrimaryMultiple, KindError, "a person would have more than one primary membership"},
+	{CodeOrgParentCycle, KindError, "an organization would become its own ancestor"},
+	{CodeEncodingDamaged, KindWarning, "the text holds U+FFFD, the mark of a damaged encoding"},
+	{CodePhoneInTextField, KindSuggestion, "phone-like text sits in a field that is not a phone"},
+	{CodeEmailInTextField, KindSuggestion, "email-like text sits in a field that is not an email"},
+	{CodeURLInTextField, KindSuggestion, "web-address-like text sits in a field that is not a web address"},
+}
+
+// KindOf returns the kind of a code ("" when unknown).
+func KindOf(code string) string {
+	for _, c := range Codes {
+		if c.Code == code {
+			return c.Kind
+		}
+	}
+	return ""
+}

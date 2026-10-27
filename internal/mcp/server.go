@@ -12,6 +12,7 @@ import (
 
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/validate"
 	gomcp "github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -456,6 +457,9 @@ func mcpError(err error) (*gomcp.CallToolResult, error) {
 	case errors.Is(err, model.ErrConflict):
 		return gomcp.NewToolResultError("conflict: " + err.Error()), nil
 	case errors.Is(err, model.ErrValidation):
+		if ve, ok := validate.As(err); ok {
+			return validationResult(ve), nil
+		}
 		return gomcp.NewToolResultError("validation error: " + err.Error()), nil
 	default:
 		return gomcp.NewToolResultError("internal error"), nil
