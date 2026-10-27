@@ -98,9 +98,14 @@ var commandMeta = map[string]cmdMeta{
 	"org edit":   {mutates: true, fields: orgFields, target: "organization", targetArgs: "first", examples: []string{`crm org edit 1 --domain acme.io`}},
 	"org delete": {mutates: true, target: "organization", targetArgs: "first", examples: []string{`crm org delete 1`}},
 
-	"org convert": {mutates: true, noDryRun: true, fields: convertFields + "," + convertPlanFields, examples: []string{
-		`crm org convert --limit 20 -f json`, `crm org convert --stats`,
-		`crm org convert --accept-exact --apply`, `crm org convert --create acme="Acme Corp" --skip mystery --apply`}},
+	"org backfill": {mutates: true, noDryRun: true, fields: "applied,counts,groups", examples: []string{
+		`crm org backfill -f json`, `crm org backfill --limit 20`, `crm org backfill --apply`}},
+	"org convert":       {mutates: true, noDryRun: true, fields: "applied,counts,groups", examples: []string{`crm org convert -f json`}},
+	"org ignore list":   {fields: "text,source,active", examples: []string{`crm org ignore list -f json`}},
+	"org ignore add":    {mutates: true, noDryRun: true, examples: []string{`crm org ignore add "stay at home parent"`}},
+	"org ignore remove": {mutates: true, noDryRun: true, examples: []string{`crm org ignore remove retired`}},
+	"org dupes": {fields: "a_id,a_name,b_id,b_name,reason,merge", examples: []string{
+		`crm org dupes -f json`, `crm org dupes --limit 20`}},
 
 	"org merge": {mutates: true, noDryRun: true, fields: "keep_id,keep_name,drop_ids,drop_names,dry_run,fields,lost,moved", examples: []string{
 		`crm org merge 1 2 3 -f json`, `crm org merge 1 2 3 --apply`}},

@@ -86,7 +86,7 @@ func (m *Model) snapBirthdays() {
 //   - Tasks: the first task due today or later, else the top
 //   - Home, People, Follow-up: the top of the list
 //
-// Modules without an anchor (Organizations, Deals, Merge, Archived, Sync, Company review) leave it out.
+// Modules without an anchor (Organizations, Deals, Merge, Archived, Sync) leave it out.
 func todayActions() []action {
 	return []action{
 		{id: "go-today", title: "Go to today", group: "Views", hint: "ctrl+t", keys: []string{"ctrl+t", "ctrl+up"},

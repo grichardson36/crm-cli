@@ -177,6 +177,12 @@ func (m *Model) buildOrgForm(id int64) []formRow {
 		}
 		now = append(now, infoRow("next task", v))
 	}
+	for i, c := range m.similarOrgs()[id] {
+		if i == 3 {
+			break
+		}
+		now = append(now, infoRow("similar name", fmt.Sprintf("%s #%d (%s), space marks, M merges", cleanCell(c.name), c.id, c.reason)))
+	}
 	if len(now) > 0 {
 		now[0].head = "Now"
 		rows = append(rows, now...)

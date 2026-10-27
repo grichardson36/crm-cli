@@ -365,7 +365,7 @@ func NewServer(db *sql.DB, version string, opts ...Option) *server.MCPServer {
 	)
 
 	registerRelationTools(s, db)
-	registerConvertTools(s, db)
+	registerOrgAutoTools(s, db)
 	registerOrgMergeTool(s, db)
 	registerTagMergeTools(s, db)
 	registerModuleTools(s, o.dataDir)
@@ -505,7 +505,7 @@ func personCreateHandler(pr *repo.PersonRepo) server.ToolHandlerFunc {
 		if err != nil {
 			return mcpError(err)
 		}
-		return jsonResult(person)
+		return personWithOrg(ctx, pr, person, input.OrgID == nil, req.GetString("company", ""))
 	}
 }
 
@@ -569,7 +569,8 @@ func personUpdateHandler(pr *repo.PersonRepo) server.ToolHandlerFunc {
 		if err != nil {
 			return mcpError(err)
 		}
-		return jsonResult(person)
+		company, setCompany := argString(args, "company")
+		return personWithOrg(ctx, pr, person, setCompany && input.OrgID == nil, company)
 	}
 }
 
@@ -1235,4 +1236,21 @@ func statsHandler(db *sql.DB) server.ToolHandlerFunc {
 
 		return jsonResult(stats)
 	}
+}
+
+// personWithOrg applies the company-text rule (company text creates or reuses an organization and
+// becomes the primary membership) and returns the person, with an "organization" entry when the text
+// was handled. Ignored and empty text do nothing.
+func personWithOrg(ctx context.Context, pr *repo.PersonRepo, person *model.Person, apply bool, company string) (*gomcp.CallToolResult, error) {
+	if !apply || company == "" {
+		return jsonResult(person)
+	}
+	ch, err := repo.NewOrgAutoRepo(pr.DB()).ApplyCompany(ctx, person.ID, company, repo.ModePrimary)
+	if err != nil {
+		return mcpError(err)
+	}
+	return jsonResult(struct {
+		*model.Person
+		Organization *repo.CompanyChange `json:"organization,omitempty"`
+	}{person, &ch})
 }

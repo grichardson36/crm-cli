@@ -247,6 +247,9 @@ func (s *dbSink) createPerson(ctx context.Context, source, externalID string, pa
 	if err != nil {
 		return nil, err
 	}
+	if _, err := repo.NewOrgAutoRepo(s.people.DB()).ApplyCompany(ctx, p.ID, strDeref(in.Company), repo.ModePrimary); err != nil {
+		return nil, err
+	}
 	if _, err := s.applyPatch(ctx, p.ID, PersonPatch{Emails: patch.Emails, Phones: patch.Phones, Handles: patch.Handles}, false); err != nil {
 		return nil, err
 	}
@@ -339,6 +342,11 @@ func (s *dbSink) applyPatch(ctx context.Context, id int64, patch PersonPatch, ov
 	if in != (model.UpdatePersonInput{}) {
 		if _, err := s.people.Update(ctx, id, in); err != nil {
 			return false, err
+		}
+		if in.Company != nil {
+			if _, err := repo.NewOrgAutoRepo(s.people.DB()).ApplyCompany(ctx, id, *in.Company, repo.ModePrimary); err != nil {
+				return false, err
+			}
 		}
 	}
 	for _, e := range newEmails {

@@ -53,7 +53,7 @@ The survivor keeps its own fields and an empty one takes the first value from th
 Memberships all move to the survivor, only a row identical to one the survivor already has (same person, role, start and end) is dropped.
 Parent links move, a link that becomes a self link or a duplicate is dropped, and a merge that would make an organization its own parent is refused.
 Deal links, task and interaction links and tags move too. Each duplicate is archived and its id and uuid keep resolving to the survivor (merge alias).
-The company review keeps working: the duplicate's name now matches the survivor as an alias.`,
+Company text keeps working: the duplicate's name now matches the survivor as an alias, so a person typed with the old name joins the survivor. Find merge candidates with 'crm org dupes'.`,
 		Args: cobra.MinimumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			keep, err := parseOrgIDArg(args[0])

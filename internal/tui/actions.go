@@ -391,7 +391,7 @@ func buildActions() []action {
 			break
 		}
 	}
-	out := append(append(append(append(append(barTagActions(), tagOpsActions()...), todayActions()...), globalAddActions()...), convertActions()...), acts[:at]...)
+	out := append(append(append(append(append(barTagActions(), tagOpsActions()...), todayActions()...), globalAddActions()...), orgAutoActions()...), acts[:at]...)
 	out = append(out, objectActions()...)
 	out = append(out, acts[at:]...)
 	out = append(out, orgMergeActions()...)

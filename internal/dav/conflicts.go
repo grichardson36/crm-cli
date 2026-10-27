@@ -95,6 +95,11 @@ func UndoConflict(ctx context.Context, db *sql.DB, id int64) (*model.SyncConflic
 		if _, err := people.Update(ctx, p.ID, in); err != nil {
 			return nil, err
 		}
+		if c.Field == fieldCompany && loserVal != "" {
+			if _, err := repo.NewOrgAutoRepo(db).ApplyCompany(ctx, p.ID, loserVal, repo.ModeRepoint); err != nil {
+				return nil, err
+			}
+		}
 	}
 	if err := davRepo.MarkConflictUndone(ctx, id); err != nil {
 		return nil, err

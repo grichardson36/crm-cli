@@ -61,12 +61,45 @@ func (m *Model) orgRows() ([]row, error) {
 		return nil, err
 	}
 	m.orgs = map[int64]*model.Organization{}
+	m.orgSimilar = nil
+	similar := m.similarOrgs()
 	rows := make([]row, 0, len(list))
 	for _, o := range list {
 		m.orgs[o.ID] = o
-		rows = append(rows, row{orgID: o.ID, title: cleanCell(o.Name), sub: cleanCell(str(o.Industry)), meta: cleanCell(str(o.Domain))})
+		sub := cleanCell(str(o.Industry))
+		if c := similar[o.ID]; len(c) > 0 { // a near-duplicate name: space marks both, M merges
+			if sub != "" {
+				sub += "  "
+			}
+			sub += "~ " + cleanCell(c[0].name)
+		}
+		rows = append(rows, row{orgID: o.ID, title: cleanCell(o.Name), sub: sub, meta: cleanCell(str(o.Domain))})
 	}
 	return rows, nil
+}
+
+// orgNear is an organization with a near-duplicate name to another one.
+type orgNear struct {
+	id     int64
+	name   string
+	reason string
+}
+
+// similarOrgs maps an organization id to the organizations whose name is close to it (merge
+// candidates, never merged on their own). It is cached until the next write.
+func (m *Model) similarOrgs() map[int64][]orgNear {
+	if m.orgSimilar != nil {
+		return m.orgSimilar
+	}
+	out := map[int64][]orgNear{}
+	if c, err := m.orr.FindOrgCandidates(m.ctx, 0); err == nil {
+		for _, x := range c {
+			out[x.AID] = append(out[x.AID], orgNear{x.BID, x.BName, x.Reason})
+			out[x.BID] = append(out[x.BID], orgNear{x.AID, x.AName, x.Reason})
+		}
+	}
+	m.orgSimilar = out
+	return out
 }
 
 func (m *Model) dealRows() ([]row, error) {

@@ -16,16 +16,13 @@ func TestPaletteHasOneEntryPerAdvancedScreen(t *testing.T) {
 	for _, a := range buildActions() {
 		lower := strings.ToLower(a.title)
 		switch {
-		case lower == "company review" || lower == "company review view":
-			count["company"]++
-			assert.Equal(t, "Company review", a.title)
 		case lower == "organizations view" || lower == "organizations":
 			count["orgs"]++
 		case lower == "deals view" || lower == "deals":
 			count["deals"]++
 		}
 	}
-	assert.Equal(t, map[string]int{"company": 1, "orgs": 1, "deals": 1}, count)
+	assert.Equal(t, map[string]int{"orgs": 1, "deals": 1}, count)
 }
 
 func TestNewOrganizationThatExistsAsksUseCreateOrCancel(t *testing.T) {

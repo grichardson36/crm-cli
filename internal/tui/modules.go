@@ -19,7 +19,7 @@ var moduleViews = map[string]viewKind{
 	"birthdays": viewBirthdays, "merge": viewMerge, "archived": viewArchived, "sync": viewSync, "deals": viewDeals,
 }
 
-// moduleOf is the module id of a view. Company review is a screen, not a module.
+// moduleOf is the module id of a view. Every view here is a module or opens from a link.
 func moduleOf(v viewKind) (string, bool) {
 	for id, vv := range moduleViews {
 		if vv == v {
@@ -54,7 +54,7 @@ func (m *Model) viewPosition(v viewKind) int {
 }
 
 // nextView is the visible view after v in the cycle of [ and ]. From a view that is off (opened
-// from a link) or from Company review, ] goes to the first visible view and [ to the last.
+// from a link) ] goes to the first visible view and [ to the last.
 func (m *Model) nextView(v viewKind, dir int) viewKind {
 	vis := m.visibleViews()
 	if len(vis) == 0 {

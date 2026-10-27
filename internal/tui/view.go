@@ -133,9 +133,6 @@ func (m *Model) tabLayout() []tabSeg {
 			total += runewidth.StringWidth(labelAt(level, i, it)) + 2
 		}
 		need := total
-		if m.view == viewConvert { // the review's progress line must stay visible
-			need += runewidth.StringWidth(m.countText()) + 1
-		}
 		if need <= m.width {
 			break
 		}
@@ -213,8 +210,6 @@ func (m *Model) countText() string {
 		return fmt.Sprintf("%d organizations", len(m.rows))
 	case viewDeals:
 		return fmt.Sprintf("%d deals", len(m.rows))
-	case viewConvert:
-		return m.convProgress()
 	case viewSync:
 		sources, inbox := 0, 0
 		for _, r := range m.rows {
@@ -274,8 +269,6 @@ func (m *Model) listView(w, h int) string {
 			return m.st.Dim.Render("No organizations. a adds one.")
 		case m.view == viewDeals:
 			return m.st.Dim.Render("No deals. a adds one.")
-		case m.view == viewConvert:
-			return m.st.Dim.Render("Nothing to review. Every company text is converted or skipped. crm org convert --all lists the skipped ones.")
 		}
 		return m.st.Dim.Render("Nothing here yet.")
 	}

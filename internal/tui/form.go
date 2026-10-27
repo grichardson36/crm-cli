@@ -335,9 +335,6 @@ func (m *Model) refreshDetail(force bool) {
 	if m.view == viewOrgs || m.view == viewDeals {
 		key += fmt.Sprintf("/%d/%d", r.orgID, r.dealID)
 	}
-	if m.view == viewConvert {
-		key += "/" + r.convKey + fmt.Sprint(len(m.convStaged))
-	}
 	if m.view == viewMerge || m.view == viewSync {
 		key += fmt.Sprintf("/%d", m.cursor)
 	}

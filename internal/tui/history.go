@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/jdanielnd/crm-cli/internal/quick"
 )
@@ -199,7 +200,42 @@ func (m *Model) entityLabel(entity string, id int64) string {
 
 // --- recorded writes ---
 
+// hUpdatePerson updates a person and records it for undo. When it sets company text, the text also
+// creates or reuses an organization and the person's primary membership points to it. The update and
+// the organization change undo as one step.
 func (m *Model) hUpdatePerson(ctx context.Context, id int64, in model.UpdatePersonInput) (*model.Person, error) {
+	if in.Company == nil || strings.TrimSpace(*in.Company) == "" {
+		return m.hUpdatePersonFields(ctx, id, in)
+	}
+	m.beginGroup()
+	defer m.endGroup("")
+	p, err := m.hUpdatePersonFields(ctx, id, in)
+	if err != nil {
+		return p, err
+	}
+	return p, m.recordCompanyOrg(ctx, id, *in.Company)
+}
+
+// recordCompanyOrg applies the company-text rule to a person and records it for undo and redo.
+func (m *Model) recordCompanyOrg(ctx context.Context, id int64, company string) error {
+	ch, err := m.oa.ApplyCompany(ctx, id, company, repo.ModePrimary)
+	if err != nil {
+		return err
+	}
+	if ch.Empty() {
+		return nil
+	}
+	label := "link " + m.personLabel(id) + " to " + ch.OrgName
+	if ch.OrgCreated {
+		label = "create organization " + ch.OrgName
+	}
+	m.record(label,
+		func() error { return m.oa.Undo(m.ctx, ch) },
+		func() error { return m.oa.Redo(m.ctx, ch) })
+	return nil
+}
+
+func (m *Model) hUpdatePersonFields(ctx context.Context, id int64, in model.UpdatePersonInput) (*model.Person, error) {
 	before, _ := m.pr.FindByID(ctx, id)
 	p, err := m.pr.Update(ctx, id, in)
 	if err != nil || before == nil {
@@ -578,4 +614,4 @@ func (m *Model) tagTask(value string) {
 		m.setStatus("task tagged #"+name, false)
 	}
 	m.afterWrite()
-}
+}

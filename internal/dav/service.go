@@ -335,6 +335,10 @@ func (s *Service) create(ctx context.Context, davID string, contact *Contact, ex
 	if err != nil {
 		return nil, err
 	}
+	if _, err := repo.NewOrgAutoRepo(s.DB).ApplyCompany(ctx, p.ID, contact.Company, repo.ModeRepoint); err != nil {
+		_ = s.People.Archive(ctx, p.ID)
+		return nil, err
+	}
 	if _, err := s.Ext.Upsert(ctx, repo.ExternalIDInput{Entity: "person", LocalID: p.ID, LocalUUID: p.UUID,
 		Source: repo.DavSource, ExternalID: davID}); err != nil {
 		_ = s.People.Archive(ctx, p.ID)
@@ -465,77 +469,31 @@ func (s *Service) nameAmong(ctx context.Context, ids []int64, nf, nl string) (in
 	return 0, nil
 }
 
-// ReviewTag is the tag that queues a person for the company conversion screen: the phone sent an
-// ORG that matches no organization, so people.company holds the text and no organization was made.
-const ReviewTag = "org-review"
-
-// matchOrg finds the organization a phone's ORG text names: a live one by name (case-insensitive),
-// else the survivor of an archived organization of that name that was merged (merge_alias).
-func (s *Service) matchOrg(ctx context.Context, name string) (int64, bool, error) {
-	var id int64
-	err := s.DB.QueryRowContext(ctx, `SELECT id FROM organizations WHERE archived = 0 AND lower(name) = lower(?) ORDER BY id LIMIT 1`, name).Scan(&id)
-	if err == nil {
-		return id, true, nil
-	}
-	if !errors.Is(err, sql.ErrNoRows) {
-		return 0, false, fmt.Errorf("match organization: %w", err)
-	}
-	err = s.DB.QueryRowContext(ctx, `SELECT sv.id FROM organizations o
-		JOIN merge_alias a ON a.kind = 'organization' AND a.old_id = o.id AND a.deleted_at IS NULL
-		JOIN organizations sv ON sv.id = a.survivor_id AND sv.archived = 0
-		WHERE lower(o.name) = lower(?) ORDER BY sv.id LIMIT 1`, name).Scan(&id)
-	if err == nil {
-		return id, true, nil
-	}
-	if errors.Is(err, sql.ErrNoRows) {
-		return 0, false, nil
-	}
-	return 0, false, fmt.Errorf("match organization alias: %w", err)
-}
-
-// applyDeviceOrg applies an ORG value the phone changed. It returns true when the organization
-// link took it, false when the caller must store the text in people.company.
-//   - A matching organization: the person's primary membership moves to it in place (role and dates
-//     stay). A person with no primary membership gets one.
-//   - No match: no organization is created (Q21). The primary membership stays, the text goes to
-//     people.company and the person gets ReviewTag for the conversion screen.
-//   - An emptied ORG never removes a primary membership.
+// applyDeviceOrg applies an ORG value the phone changed (owner decision 2026-10-27, replaces the
+// org-review queue). It returns true when the caller must leave people.company alone, false when the
+// caller stores the phone's text there (people.company stays the source text).
+//   - A text that names an organization (normalized name, or the name of a merged-away one): the
+//     person's primary membership moves to it in place, role and dates stay. A person with no
+//     primary membership gets one.
+//   - A text that matches no organization creates it and does the same.
+//   - A junk text (the ignore list: N/A, none, retired ...) creates nothing and changes no membership.
+//   - EMPTYING ORG NEVER REMOVES A MEMBERSHIP. The phone clearing the field only means "no company
+//     text there", the organization link is the CRM's own data. The primary membership stays, so the
+//     next GET shows the organization name again.
 func (s *Service) applyDeviceOrg(ctx context.Context, personID int64, value string) (bool, error) {
 	name := strings.TrimSpace(value)
-	var memID, curOrg int64
-	err := s.DB.QueryRowContext(ctx, `SELECT id, org_id FROM membership WHERE person_id = ? AND is_primary = 1 AND deleted_at IS NULL`, personID).Scan(&memID, &curOrg)
-	hasPrimary := err == nil
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return false, fmt.Errorf("find primary membership: %w", err)
-	}
 	if name == "" {
-		return hasPrimary, nil
-	}
-	orgID, ok, err := s.matchOrg(ctx, name)
-	if err != nil {
-		return false, err
-	}
-	if !ok {
-		if err := repo.NewTagRepo(s.DB).Apply(ctx, "person", personID, ReviewTag); err != nil {
-			return false, err
+		var n int
+		err := s.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM membership WHERE person_id = ? AND is_primary = 1 AND deleted_at IS NULL`, personID).Scan(&n)
+		if err != nil {
+			return false, fmt.Errorf("find primary membership: %w", err)
 		}
-		return false, nil
+		return n > 0, nil
 	}
-	if !hasPrimary {
-		yes := true
-		_, err := repo.NewLinkRepo(s.DB).Link(ctx, repo.Ref{Kind: "person", ID: personID}, repo.Ref{Kind: "organization", ID: orgID}, model.LinkAttrs{Primary: &yes})
-		return err == nil, err
-	}
-	if curOrg == orgID {
-		return true, nil
-	}
-	if _, err := s.DB.ExecContext(ctx, `UPDATE membership SET org_id = ?, updated_at = datetime('now') WHERE id = ?`, orgID, memID); err != nil {
-		return false, fmt.Errorf("move primary membership: %w", err)
-	}
-	if _, err := s.DB.ExecContext(ctx, `UPDATE people SET updated_at = datetime('now') WHERE id = ?`, personID); err != nil {
+	if _, err := repo.NewOrgAutoRepo(s.DB).ApplyCompany(ctx, personID, name, repo.ModeRepoint); err != nil {
 		return false, err
 	}
-	return true, nil
+	return false, nil
 }
 
 // --- merge -------------------------------------------------------------------------------
@@ -579,9 +537,9 @@ func (s *Service) mergeInto(ctx context.Context, p *model.Person, st *model.DavS
 	}
 
 	// Scalars. ORG is the primary organization (E4). An ORG edit on the phone is applied by
-	// applyDeviceOrg: it moves the primary membership to the organization of that name, or keeps the
-	// text and queues the person for the company conversion screen. When both sides changed ORG
-	// since the last sync the usual last-write-wins conflict path decides.
+	// applyDeviceOrg: it moves the primary membership to the organization of that name, creating the
+	// organization when none matches. Emptying ORG never removes a membership. When both sides
+	// changed ORG since the last sync the usual last-write-wins conflict path decides.
 	decisions := mergeScalars(base.scalars(), crmView.scalars(), dev.scalars(), changedAt, now, mode)
 	var in model.UpdatePersonInput
 	for _, d := range decisions {

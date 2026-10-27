@@ -256,6 +256,8 @@ func Undo(ctx context.Context, r Repos, changes []Change) error {
 			keep(r.Interactions.Archive(ctx, c.ID))
 		case c.Op == "create" && c.Entity == "task":
 			keep(r.Tasks.Archive(ctx, c.ID))
+		case c.Op == "org" && c.Org != nil:
+			keep(repo.NewOrgAutoRepo(r.People.DB()).Undo(ctx, *c.Org))
 		case c.Op == "tag":
 			keep(r.Tags.Remove(ctx, c.Entity, c.ID, c.New))
 		case c.Op == "untag":
@@ -306,6 +308,8 @@ func Redo(ctx context.Context, r Repos, changes []Change) error {
 			keep(r.Interactions.Restore(ctx, c.ID))
 		case c.Op == "create" && c.Entity == "task":
 			keep(r.Tasks.Restore(ctx, c.ID))
+		case c.Op == "org" && c.Org != nil:
+			keep(repo.NewOrgAutoRepo(r.People.DB()).Redo(ctx, *c.Org))
 		case c.Op == "tag":
 			keep(r.Tags.Apply(ctx, c.Entity, c.ID, c.New))
 		case c.Op == "untag":
@@ -353,6 +357,10 @@ func Summarize(changes []Change) string {
 			parts = append(parts, "tag #"+c.New)
 		case c.Op == "untag":
 			parts = append(parts, "remove tag #"+c.New)
+		case c.Op == "org":
+			if c.Org != nil && c.Org.OrgCreated {
+				parts = append(parts, "create organization "+c.New)
+			}
 		case c.Op == "update" && c.Entity == "person":
 			if _, ok := fields[c.ID]; !ok {
 				fieldOrder = append(fieldOrder, c.ID)
@@ -519,6 +527,11 @@ func (c Change) Describe() string {
 		return fmt.Sprintf("removed #%s from %s %s", c.New, c.Entity, labelOrID(c))
 	case "update":
 		return fmt.Sprintf("%s %s: %s -> %s", c.Label, c.Field, orEmpty(c.Old), orEmpty(c.New))
+	case "org":
+		if c.Org != nil && c.Org.OrgCreated {
+			return fmt.Sprintf("created organization %s for %s", c.New, c.Label)
+		}
+		return fmt.Sprintf("%s works at %s", c.Label, c.New)
 	}
 	return strings.TrimSpace(c.Op + " " + c.Entity)
 }

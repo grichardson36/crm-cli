@@ -149,6 +149,11 @@ func personAddCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if !cmd.Flags().Changed("org") {
+				if err := autoOrgForCompany(cmd.Context(), db, person.ID, company); err != nil {
+					return err
+				}
+			}
 
 			extra := model.UpdatePersonInput{}
 			if birthday != "" {
@@ -324,6 +329,11 @@ func personEditCmd() *cobra.Command {
 			person, err := r.Update(cmd.Context(), id, input)
 			if err != nil {
 				return err
+			}
+			if cmd.Flags().Changed("company") && !cmd.Flags().Changed("org") {
+				if err := autoOrgForCompany(cmd.Context(), db, id, company); err != nil {
+					return err
+				}
 			}
 
 			data := []map[string]any{personToMap(person)}

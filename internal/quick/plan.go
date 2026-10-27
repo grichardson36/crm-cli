@@ -102,6 +102,9 @@ type Change struct {
 	Field  string `json:"field,omitempty"`
 	Old    string `json:"old,omitempty"`
 	New    string `json:"new,omitempty"`
+	// Org is set on Op "org": the organization the company text created or reused and the
+	// membership it made. Undo and redo use it.
+	Org *repo.CompanyChange `json:"org,omitempty"`
 }
 
 // Plan is what a line would do.
@@ -1101,7 +1104,19 @@ func (b *builder) set(rest string, off int) {
 				if _, err := r.People.Update(ctx, subj.ID, in); err != nil {
 					return nil, err
 				}
-				return changes, nil
+				if in.Company == nil || *in.Company == "" {
+					return changes, nil
+				}
+				// Company text creates or reuses an organization (undone with the same step).
+				oc, err := repo.NewOrgAutoRepo(r.People.DB()).ApplyCompany(ctx, subj.ID, *in.Company, repo.ModePrimary)
+				if err != nil {
+					return nil, err
+				}
+				out := append([]Change{}, changes...)
+				if !oc.Empty() {
+					out = append(out, Change{Op: "org", Entity: "person", ID: subj.ID, Label: subj.Name, Field: "organization", New: oc.OrgName, Org: &oc})
+				}
+				return out, nil
 			},
 		})
 	}

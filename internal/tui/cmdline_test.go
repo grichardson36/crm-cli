@@ -242,10 +242,12 @@ func TestCommandBarUndoAndRedo(t *testing.T) {
 	openBar(m, "set company=Zorg")
 	press(m, "enter")
 	assert.Equal(t, "Zorg", *personByID(t, pr, 1).Company)
+	assert.Equal(t, 1, liveOrgCount(t, m), "the company text created the organization")
 	require.Len(t, m.hist, 2)
 
 	press(m, "ctrl+z")
-	assert.Contains(t, plain(m.View()), "Undone: set company on Zed Adams")
+	assert.Contains(t, plain(m.View()), "Undone: create organization Zorg, set company on Zed Adams")
+	assert.Equal(t, 0, liveOrgCount(t, m), "one undo step takes the organization back too")
 	assert.Equal(t, "Acme", *personByID(t, pr, 1).Company)
 	assert.Len(t, allNotes(t, m), 1)
 
@@ -288,7 +290,7 @@ func TestUndoIsRefusedWhenTheTargetChangedSince(t *testing.T) {
 	require.NoError(t, err)
 	press(m, "ctrl+z")
 	assert.True(t, m.toast.isErr)
-	assert.Contains(t, m.toast.text, "Cannot undo set company on Zed Adams")
+	assert.Contains(t, m.toast.text, "Cannot undo create organization Zorg, set company on Zed Adams")
 	assert.Contains(t, m.toast.text, "company of Zed Adams changed since")
 	assert.Equal(t, "Elsewhere", *personByID(t, pr, 1).Company, "nothing was written")
 	assert.Len(t, m.hist, 1, "the entry stays, so it can be retried")

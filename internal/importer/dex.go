@@ -44,6 +44,10 @@ type DexReport struct {
 	// are names in that column that matched nobody (or several people), so no link was made.
 	RelatedLinks      int `json:"related_links"`
 	RelatedUnresolved int `json:"related_unresolved"`
+	// OrgsCreated and OrgsLinked count the organizations made from company text and the people
+	// given a membership (junk strings on the ignore list make nothing).
+	OrgsCreated int `json:"orgs_created"`
+	OrgsLinked  int `json:"orgs_linked"`
 }
 
 var (
@@ -153,6 +157,7 @@ func ImportDex(ctx context.Context, db *sql.DB, contactsPath, notesPath string, 
 	}
 	byDexID := map[string]int64{}
 	related := map[int64]string{} // new person -> Dex related contacts text
+	var companies []repo.PersonCompany
 	extIDs := repo.NewExternalIDRepo(tx)
 
 	for _, row := range contacts.rows {
@@ -177,6 +182,9 @@ func ImportDex(ctx context.Context, db *sql.DB, contactsPath, notesPath string, 
 			return nil, fmt.Errorf("contact %s: %w", dexID, err)
 		}
 		byDexID[dexID] = pid
+		if c := contacts.get(row, "company"); c != "" {
+			companies = append(companies, repo.PersonCompany{PersonID: pid, Text: c})
+		}
 		if r := contacts.get(row, "dex_related_contacts"); r != "" {
 			related[pid] = r
 		}
@@ -195,7 +203,16 @@ func ImportDex(ctx context.Context, db *sql.DB, contactsPath, notesPath string, 
 	if opts.DryRun {
 		return rep, nil
 	}
-	return rep, tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return rep, err
+	}
+	// Company text creates or reuses an organization (after the commit: the batch has its own writes).
+	ch, err := repo.NewOrgAutoRepo(db).ApplyCompanies(ctx, companies, repo.ModePrimary)
+	if err != nil {
+		return rep, fmt.Errorf("organizations from company text: %w", err)
+	}
+	rep.OrgsCreated, rep.OrgsLinked = ch.OrgsCreated, ch.Linked
+	return rep, nil
 }
 
 // linkRelated turns the Dex related contacts column into mutual "related" person links. Each item

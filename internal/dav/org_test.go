@@ -6,8 +6,7 @@ import (
 	"time"
 
 	"github.com/emersion/go-vcard"
-	"github.com/jdanielnd/crm-cli/internal/dav"
-	"github.com/jdanielnd/crm-cli/internal/db/repo"
+		"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -85,7 +84,7 @@ func TestPhoneOrgEditMatchingAnOrganizationMovesThePrimaryMembership(t *testing.
 	var n int
 	require.NoError(t, e.db.QueryRow(`SELECT COUNT(*) FROM membership WHERE person_id = ? AND deleted_at IS NULL`, p.ID).Scan(&n))
 	assert.Equal(t, 1, n)
-	assert.Equal(t, "Old Text Co", *e.reload(p.ID).Company, "people.company is untouched")
+	assert.Equal(t, "GLOBEX", *e.reload(p.ID).Company, "people.company is the source text the phone sent")
 
 	// A name that only an archived, merged organization had resolves to its survivor.
 	e.bump(p.ID)
@@ -97,23 +96,59 @@ func TestPhoneOrgEditMatchingAnOrganizationMovesThePrimaryMembership(t *testing.
 	assert.Equal(t, merged.ID, org)
 }
 
-func TestPhoneOrgEditMatchingNothingKeepsTheMembershipAndQueuesReview(t *testing.T) {
-	e, p, orgs, _, acme := orgFixture(t)
+func TestPhoneOrgEditMatchingNothingCreatesTheOrganizationAndRepointsThePrimary(t *testing.T) {
+	e, p, orgs, _, _ := orgFixture(t)
 	card, etag := e.pull(e.reload(p.ID))
 	card.SetValue(vcard.FieldOrganization, "Brand New Startup")
 	_, err := e.push(e.davID(p), card, etagHeader(etag))
 	require.NoError(t, err)
 
 	org, role := primaryOf(t, e, p.ID)
-	assert.Equal(t, acme.ID, org, "the primary membership is unchanged")
-	assert.Equal(t, "CTO", role)
+	created, err := orgs.FindByID(context.Background(), org)
+	require.NoError(t, err)
+	assert.Equal(t, "Brand New Startup", created.Name, "the phone text created the organization")
+	assert.Equal(t, "CTO", role, "the primary membership was repointed in place, role kept")
 	list, err := orgs.FindAll(context.Background(), 0)
 	require.NoError(t, err)
-	assert.Len(t, list, 1, "no organization is created from phone text (Q21)")
-	assert.Equal(t, "Brand New Startup", *e.reload(p.ID).Company, "the text is kept on the person")
+	assert.Len(t, list, 2)
+	assert.Equal(t, "Brand New Startup", *e.reload(p.ID).Company, "people.company is the source text")
 	var n int
-	require.NoError(t, e.db.QueryRow(`SELECT COUNT(*) FROM taggings tg JOIN tags t ON t.id = tg.tag_id WHERE t.name = ? AND tg.entity_type = 'person' AND tg.entity_id = ?`, dav.ReviewTag, p.ID).Scan(&n))
-	assert.Equal(t, 1, n, "the person is queued for the company conversion screen")
+	require.NoError(t, e.db.QueryRow(`SELECT COUNT(*) FROM taggings tg JOIN tags t ON t.id = tg.tag_id WHERE t.name = 'org-review'`).Scan(&n))
+	assert.Equal(t, 0, n, "the org-review tag is gone")
+	card, _ = e.pull(e.reload(p.ID))
+	assert.Equal(t, "Brand New Startup", card.PreferredValue(vcard.FieldOrganization), "the next GET shows the text the phone sent (X19)")
+}
+
+// Owner decision 2026-10-27 (5): emptying ORG on the phone never removes a membership.
+func TestEmptyingOrgOnThePhoneNeverRemovesAMembership(t *testing.T) {
+	e, p, _, _, acme := orgFixture(t)
+	card, etag := e.pull(e.reload(p.ID))
+	card.SetValue(vcard.FieldOrganization, "")
+	_, err := e.push(e.davID(p), card, etagHeader(etag))
+	require.NoError(t, err)
+	org, role := primaryOf(t, e, p.ID)
+	assert.Equal(t, acme.ID, org)
+	assert.Equal(t, "CTO", role)
+	var n int
+	require.NoError(t, e.db.QueryRow(`SELECT COUNT(*) FROM membership WHERE person_id = ? AND deleted_at IS NULL`, p.ID).Scan(&n))
+	assert.Equal(t, 1, n)
+}
+
+func TestPhoneOrgJunkTextCreatesNothing(t *testing.T) {
+	for _, junk := range []string{"N/A", "none", "Self-Employed", "-"} {
+		t.Run(junk, func(t *testing.T) {
+			e, p, orgs, _, acme := orgFixture(t)
+			card, etag := e.pull(e.reload(p.ID))
+			card.SetValue(vcard.FieldOrganization, junk)
+			_, err := e.push(e.davID(p), card, etagHeader(etag))
+			require.NoError(t, err)
+			org, _ := primaryOf(t, e, p.ID)
+			assert.Equal(t, acme.ID, org, "membership untouched")
+			list, err := orgs.FindAll(context.Background(), 0)
+			require.NoError(t, err)
+			assert.Len(t, list, 1, "no organization for junk")
+		})
+	}
 }
 
 func TestPhoneOrgEditForAPersonWithoutAPrimaryMembership(t *testing.T) {
@@ -133,7 +168,7 @@ func TestPhoneOrgEditForAPersonWithoutAPrimaryMembership(t *testing.T) {
 	org, _ := primaryOf(t, e, p.ID)
 	assert.Equal(t, globex.ID, org, "a primary membership was created")
 
-	// No match and no membership: the text is stored and the person is queued.
+	// No match and no membership: the organization and the membership are created.
 	q, err := e.people.Create(ctx, model.CreatePersonInput{FirstName: "Quinn"})
 	require.NoError(t, err)
 	card, etag = e.pull(e.reload(q.ID))
@@ -141,9 +176,10 @@ func TestPhoneOrgEditForAPersonWithoutAPrimaryMembership(t *testing.T) {
 	_, err = e.push(e.davID(q), card, etagHeader(etag))
 	require.NoError(t, err)
 	assert.Equal(t, "Nowhere Ltd", *e.reload(q.ID).Company)
-	var n int
-	require.NoError(t, e.db.QueryRow(`SELECT COUNT(*) FROM membership WHERE person_id = ?`, q.ID).Scan(&n))
-	assert.Equal(t, 0, n)
+	org, _ = primaryOf(t, e, q.ID)
+	created, err := orgs.FindByID(ctx, org)
+	require.NoError(t, err)
+	assert.Equal(t, "Nowhere Ltd", created.Name)
 }
 
 func TestOrgChangedOnBothSidesIsAConflictDecidedByLastWrite(t *testing.T) {

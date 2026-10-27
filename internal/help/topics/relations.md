@@ -12,7 +12,7 @@ crm person link org 2 1 --role Advisor --from 2023 --new
 crm roles
 ```
 
-The vCard ORG on a phone is the primary organization, TITLE stays the person's title. An ORG you edit on the phone moves the primary membership to the organization of that name. A name that matches nothing stays as company text and tags the person `org-review` for the conversion screen. `people.company` stays as text until it is converted.
+The vCard ORG on a phone is the primary organization, TITLE stays the person's title. An ORG you edit on the phone moves the primary membership to the organization of that name (case, punctuation and Inc/LLC endings ignored, merge aliases followed). A name that matches nothing creates the organization and then does the same, a person without a primary membership gets one, and a junk text such as `N/A` creates nothing. `people.company` takes the phone's text. Emptying ORG on the phone never removes a membership. See convert.
 
 ## Kinds between people
 

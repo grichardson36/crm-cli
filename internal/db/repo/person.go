@@ -21,6 +21,9 @@ func NewPersonRepo(db *sql.DB) *PersonRepo {
 	return &PersonRepo{db: db}
 }
 
+// DB returns the database the repository works on.
+func (r *PersonRepo) DB() *sql.DB { return r.db }
+
 var personColumns = "id, uuid, first_name, last_name, email, phone, title, company, location, notes, summary, created_at, updated_at, birthday_month, birthday_day, birthday_year, keep_in_touch, keep_in_touch_snoozed_until, last_contacted_at, is_favorite, priority_tier"
 
 func scanPerson(row interface{ Scan(...any) error }) (*model.Person, error) {

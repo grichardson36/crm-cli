@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Company text creates or reuses an organization automatically (owner decision 2026-10-27) at `person add|edit --company`, `import dex`, MCP `crm_person_create|update`, the command bar, device sync, the terminal UI person form and a phone ORG over CardDAV. Matching is the normalized name or a merge alias, near names never merge and show up in `crm org dupes` (MCP `crm_org_dupes`, "similar name" in the terminal UI). Junk strings (N/A, none, self-employed, retired ...) are ignored through an editable list: `crm org ignore add|list|remove`, MCP `crm_org_ignore_*` (migration 010, table `company_ignore`). `crm org backfill [--apply]` and MCP `crm_org_backfill` fill organizations for existing people (dry run by default, one undo step, idempotent). Emptying ORG on the phone never removes a membership.
+
+### Removed
+
+- The Company review screen and its keys (`c`, `l`, `e`, `s`, `x`, `A`, `enter` in that screen, `C` in Organizations), the `org-review` tag and the device-local `orgconvert.*` meta keys. `crm org convert` and `crm_org_convert_*` remain as deprecated aliases of the backfill.
+
 - Relations (schema 8): a person belongs to many organizations with a role, dates and a primary flag. Person to person and organization to organization links carry a kind with an inverse (`crm relation-kind`). Deals link to several people and organizations. Tasks and notes attach to people, organizations and deals. Merging people re-points every link and keeps an alias. `crm roles`, `--org` and `--deal` on `log add`, `task edit --clear-due`, `crm doctor` link check. MCP tools `crm_relation_kind_*`, `crm_links`, `crm_link_roles`, `crm_task_update`.
 - Company review: `crm org convert` groups people by normalized company text, suggests the matching organization and applies per-group decisions in one batch with one undo step (create, link, skip, accept exact matches). MCP `crm_org_convert_list` / `crm_org_convert_apply`, terminal UI "Company review view". Nothing is created without a decision, `people.company` stays.
 - Terminal UI: the Link form asks the kind and a role | from | to | primary | notes line, `E` edits a link, organizations and deals open as record pages, the Archived view lists every object kind with a type filter.

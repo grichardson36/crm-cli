@@ -19,13 +19,13 @@ func seedTemplate(t *testing.T) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "template.db")
 	steps := [][]string{
+		{"org", "add", "Acme Corp", "--domain", "acme.com"}, // before Jane: her company text then reuses it
 		{"person", "add", "Jane Smith", "--email", "jane@example.com", "--company", "Acme Corp", "--keep-in-touch", "14 days", "--birthday", "1985-03-14"},
 		{"person", "add", "Bob Jones", "--email", "bob@example.com"},
 		{"person", "add", "Janet Smyth", "--email", "janet@work.example"},
 		{"person", "email", "add", "3", "jane@example.com"},
 		{"person", "add", "Old Contact"},
 		{"person", "archive", "4"},
-		{"org", "add", "Acme Corp", "--domain", "acme.com"},
 		{"task", "add", "Send proposal", "--person", "1", "--due", "2026-11-01"},
 		{"deal", "add", "Website Redesign", "--value", "15000", "--person", "1", "--stage", "proposal"},
 		{"log", "note", "1", "--subject", "Intro", "--content", "Met at ReactConf"},

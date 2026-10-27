@@ -176,3 +176,42 @@ func TestImportDexLinksRelatedContacts(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 0, rep.RelatedLinks)
 }
+
+// Company text creates or reuses an organization, junk strings make none, and a dry run writes nothing.
+func TestImportDexCompanyCreatesOrganizations(t *testing.T) {
+	csv := `first_name,last_name,company,id
+Ann,One,Acme Inc,a1
+Bob,Two,ACME,a2
+Cy,Three,N/A,a3
+Di,Four,Globex,a4
+`
+	path := filepath.Join(t.TempDir(), "contacts.csv")
+	require.NoError(t, os.WriteFile(path, []byte(csv), 0o600))
+
+	d, err := db.Open(":memory:")
+	require.NoError(t, err)
+	defer d.Close()
+	count := func(q string) (n int) {
+		require.NoError(t, d.QueryRow(q).Scan(&n))
+		return
+	}
+
+	rep, err := importer.ImportDex(context.Background(), d, path, "", importer.DexOptions{DryRun: true})
+	require.NoError(t, err)
+	assert.Equal(t, 0, rep.OrgsCreated)
+	assert.Equal(t, 0, count(`SELECT COUNT(*) FROM organizations`))
+
+	rep, err = importer.ImportDex(context.Background(), d, path, "", importer.DexOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, 4, rep.ContactsImported)
+	assert.Equal(t, 2, rep.OrgsCreated, "acme and globex, N/A is junk")
+	assert.Equal(t, 3, rep.OrgsLinked)
+	assert.Equal(t, 2, count(`SELECT COUNT(*) FROM organizations WHERE archived = 0`))
+	assert.Equal(t, 3, count(`SELECT COUNT(*) FROM membership WHERE is_primary = 1`))
+
+	// Importing again skips the known contacts and creates nothing.
+	rep, err = importer.ImportDex(context.Background(), d, path, "", importer.DexOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, 0, rep.OrgsCreated)
+	assert.Equal(t, 2, count(`SELECT COUNT(*) FROM organizations WHERE archived = 0`))
+}
