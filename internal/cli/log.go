@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	"strings"
 
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/format"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/validate"
 	"github.com/spf13/cobra"
 )
 
@@ -97,9 +97,6 @@ func logTypeCmd(interactionType string) *cobra.Command {
 			}
 			defer db.Close()
 
-			if direction != "" && !model.ValidInteractionDirection(direction) {
-				return model.NewExitError(model.ErrValidation, "invalid direction: %s (must be one of: %s)", direction, strings.Join(model.InteractionDirections, ", "))
-			}
 
 			input := model.CreateInteractionInput{
 				Type:      interactionType,
@@ -115,6 +112,7 @@ func logTypeCmd(interactionType string) *cobra.Command {
 			}
 
 			r := repo.NewInteractionRepo(db)
+			reportHints(cmd, validate.InteractionCreate(&input))
 			interaction, err := r.Create(cmd.Context(), input)
 			if err != nil {
 				return err

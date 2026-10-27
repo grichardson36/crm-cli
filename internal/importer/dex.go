@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/validate"
 )
 
 // DexSource is the external_ids source name for Dex records.
@@ -48,6 +49,17 @@ type DexReport struct {
 	// given a membership (junk strings on the ignore list make nothing).
 	OrgsCreated int `json:"orgs_created"`
 	OrgsLinked  int `json:"orgs_linked"`
+	// Issues and Suggestions are what the shared validation framework found in the imported rows
+	// (internal/validate): damaged encodings, bad emails, a phone number in the company column.
+	// Nothing is dropped or rewritten for them, the report lets the user review and fix.
+	Issues      []DexIssue            `json:"validation_issues,omitempty"`
+	Suggestions []validate.Suggestion `json:"validation_suggestions,omitempty"`
+}
+
+// DexIssue is a validation finding with the Dex id of the row it came from.
+type DexIssue struct {
+	DexID string `json:"dex_id"`
+	validate.Issue
 }
 
 var (
@@ -268,6 +280,20 @@ func linkRelated(ctx context.Context, tx *sql.Tx, related map[int64]string, byDe
 	return nil
 }
 
+func ptrOrNil(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+func deref(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return *p
+}
+
 func nullable(s string) any {
 	if s == "" {
 		return nil
@@ -368,6 +394,27 @@ func insertContact(ctx context.Context, tx *sql.Tx, t *table, row []string, rep 
 		}
 	}
 
+	// The shared validation framework cleans the text and reports what it finds. An import keeps
+	// every row, so a failed check is reported and the typed value is kept.
+	vin := model.CreatePersonInput{FirstName: first, LastName: ptrOrNil(last), Title: ptrOrNil(t.get(row, "job_title")),
+		Company: ptrOrNil(t.get(row, "company")), Location: ptrOrNil(t.get(row, "location")), Notes: ptrOrNil(t.get(row, "description"))}
+	if len(emails) > 0 {
+		vin.Email = &emails[0]
+	}
+	if len(phones) > 0 {
+		vin.Phone = &phones[0]
+	}
+	clean := vin
+	vres := validate.PersonCreate(&clean)
+	for _, i := range vres.Issues {
+		rep.Issues = append(rep.Issues, DexIssue{DexID: t.get(row, "id"), Issue: i})
+	}
+	rep.Suggestions = append(rep.Suggestions, vres.Suggestions...)
+	if vres.OK() {
+		vin = clean
+		first, last = vin.FirstName, deref(vin.LastName)
+	}
+
 	var primaryEmail, primaryPhone any
 	if len(emails) > 0 {
 		primaryEmail = emails[0]
@@ -395,8 +442,8 @@ func insertContact(ctx context.Context, tx *sql.Tx, t *table, row []string, rep 
 		   birthday_month, birthday_day, birthday_year, keep_in_touch, keep_in_touch_set_at, last_contacted_at, is_favorite, created_at, updated_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CASE WHEN ? IS NULL THEN NULL ELSE datetime('now') END, ?, ?, ?, ?)`,
 		uuid.NewString(), first, nullable(last), primaryEmail, primaryPhone,
-		nullable(t.get(row, "job_title")), nullable(t.get(row, "company")), nullable(t.get(row, "location")),
-		nullable(t.get(row, "description")), bm, bd, by,
+		nullable(deref(vin.Title)), nullable(deref(vin.Company)), nullable(deref(vin.Location)),
+		nullable(deref(vin.Notes)), bm, bd, by,
 		kit, kit,
 		nullable(sqliteTime(t.get(row, "last_seen_at"))), fav, created, updated)
 	if err != nil {

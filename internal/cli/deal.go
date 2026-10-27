@@ -9,6 +9,7 @@ import (
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/format"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/validate"
 	"github.com/spf13/cobra"
 )
 
@@ -102,9 +103,6 @@ func dealAddCmd() *cobra.Command {
 			}
 			defer db.Close()
 
-			if !model.ValidDealStage(stage) {
-				return model.NewExitError(model.ErrValidation, "invalid stage: %s (must be one of: %s)", stage, strings.Join(model.DealStages, ", "))
-			}
 
 			input := model.CreateDealInput{
 				Title: args[0],
@@ -122,6 +120,7 @@ func dealAddCmd() *cobra.Command {
 			}
 
 			r := repo.NewDealRepo(db)
+			reportHints(cmd, validate.DealCreate(&input))
 			deal, err := r.Create(cmd.Context(), input)
 			if err != nil {
 				return err
@@ -244,9 +243,6 @@ func dealEditCmd() *cobra.Command {
 				input.Value = &value
 			}
 			if cmd.Flags().Changed("stage") {
-				if !model.ValidDealStage(stage) {
-					return model.NewExitError(model.ErrValidation, "invalid stage: %s (must be one of: %s)", stage, strings.Join(model.DealStages, ", "))
-				}
 				input.Stage = &stage
 			}
 			if cmd.Flags().Changed("person") {
@@ -263,6 +259,7 @@ func dealEditCmd() *cobra.Command {
 			}
 
 			r := repo.NewDealRepo(db)
+			reportHints(cmd, validate.DealUpdate(&input))
 			deal, err := r.Update(cmd.Context(), id, input)
 			if err != nil {
 				return err

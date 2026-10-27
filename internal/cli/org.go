@@ -9,6 +9,7 @@ import (
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/format"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/validate"
 	"github.com/spf13/cobra"
 )
 
@@ -140,6 +141,7 @@ func orgAddCmd() *cobra.Command {
 			input.OrgNativeFields = native.fields(cmd, false)
 
 			r := repo.NewOrgRepo(db)
+			reportHints(cmd, validate.OrgCreate(&input))
 			org, err := r.Create(cmd.Context(), input)
 			if err != nil {
 				return err
@@ -267,6 +269,7 @@ func orgEditCmd() *cobra.Command {
 			input.OrgNativeFields = native.fields(cmd, true)
 
 			r := repo.NewOrgRepo(db)
+			reportHints(cmd, validate.OrgUpdate(&input))
 			org, err := r.Update(cmd.Context(), id, input)
 			if err != nil {
 				return err

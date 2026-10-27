@@ -9,6 +9,7 @@ import (
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/format"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/validate"
 	"github.com/jdanielnd/crm-cli/internal/quick"
 	"github.com/jdanielnd/crm-cli/internal/shortsyntax"
 	"github.com/spf13/cobra"
@@ -108,9 +109,6 @@ func taskAddCmd() *cobra.Command {
 			}
 			defer db.Close()
 
-			if !model.ValidPriority(priority) {
-				return model.NewExitError(model.ErrValidation, "invalid priority: %s (must be one of: %s)", priority, strings.Join(model.Priorities, ", "))
-			}
 
 			in, err := parseInline(cmd.Context(), db, args[0], noSyntax, true, shortsyntax.KindCadence)
 			if err != nil {
@@ -172,6 +170,7 @@ func taskAddCmd() *cobra.Command {
 			}
 
 			r := repo.NewTaskRepo(db)
+			reportHints(cmd, validate.TaskCreate(&input))
 			task, err := r.Create(cmd.Context(), input)
 			if err != nil {
 				return err
@@ -313,9 +312,6 @@ func taskEditCmd() *cobra.Command {
 				input.DueAt = &empty
 			}
 			if cmd.Flags().Changed("priority") {
-				if !model.ValidPriority(priority) {
-					return model.NewExitError(model.ErrValidation, "invalid priority: %s (must be one of: %s)", priority, strings.Join(model.Priorities, ", "))
-				}
 				input.Priority = &priority
 			}
 			if cmd.Flags().Changed("person") {
@@ -329,6 +325,7 @@ func taskEditCmd() *cobra.Command {
 			}
 
 			r := repo.NewTaskRepo(db)
+			reportHints(cmd, validate.TaskUpdate(&input))
 			task, err := r.Update(cmd.Context(), id, input)
 			if err != nil {
 				return err

@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/validate"
 )
 
 // errorBody is the object printed to stderr when -f json is set.
@@ -20,6 +21,10 @@ type errorDetail struct {
 	Code     string `json:"code"`
 	Message  string `json:"message"`
 	ExitCode int    `json:"exit_code"`
+	// Issues and Suggestions are the structured validation result (internal/validate): stable code,
+	// field, expected, received and fix per issue.
+	Issues      []validate.Issue      `json:"issues,omitempty"`
+	Suggestions []validate.Suggestion `json:"suggestions,omitempty"`
 }
 
 // ErrorCode names the class of an error: not_found, validation, conflict, database, usage or unknown.
@@ -97,10 +102,19 @@ func ReportError(w io.Writer, err error, args []string) int {
 	}
 	code := ExitCodeFor(err)
 	if WantsJSONErrors(args) {
-		b, _ := json.Marshal(errorBody{Error: errorDetail{Code: ErrorCode(err), Message: err.Error(), ExitCode: code}})
+		d := errorDetail{Code: ErrorCode(err), Message: err.Error(), ExitCode: code}
+		if ve, ok := validate.As(err); ok {
+			d.Issues, d.Suggestions = ve.Issues, ve.Suggestions
+		}
+		b, _ := json.Marshal(errorBody{Error: d})
 		fmt.Fprintln(w, string(b))
 		return code
 	}
 	fmt.Fprintf(w, "crm: error: %s\n", err.Error())
+	if ve, ok := validate.As(err); ok {
+		for _, sg := range ve.Suggestions {
+			fmt.Fprintf(w, "crm: hint: %s %s: %s (%q)\n", sg.Code, sg.Field, sg.Message, sg.Value)
+		}
+	}
 	return code
 }

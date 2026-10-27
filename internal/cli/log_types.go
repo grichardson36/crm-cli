@@ -8,6 +8,7 @@ import (
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/format"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/validate"
 	"github.com/jdanielnd/crm-cli/internal/quick"
 	"github.com/jdanielnd/crm-cli/internal/shortsyntax"
 	"github.com/spf13/cobra"
@@ -79,9 +80,6 @@ func logAddCmd() *cobra.Command {
 			if text == "" {
 				text = content
 			}
-			if direction != "" && !model.ValidInteractionDirection(direction) {
-				return model.NewExitError(model.ErrValidation, "invalid direction: %s (must be one of: %s)", direction, strings.Join(model.InteractionDirections, ", "))
-			}
 
 			db, err := openDB()
 			if err != nil {
@@ -141,6 +139,7 @@ func logAddCmd() *cobra.Command {
 				}
 				return printInlineDryRun(plan)
 			}
+			reportHints(cmd, validate.InteractionCreate(&input))
 			interaction, err := repo.NewInteractionRepo(db).Create(cmd.Context(), input)
 			if err != nil {
 				return err
