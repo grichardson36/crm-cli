@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jdanielnd/crm-cli/internal/help"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/jdanielnd/crm-cli/internal/validate"
 	"github.com/stretchr/testify/assert"
@@ -309,4 +310,12 @@ func TestBusinessRules(t *testing.T) {
 	v, err := validate.OneOf("direction", "INBOUND", model.InteractionDirections)
 	assert.NoError(t, err)
 	assert.Equal(t, "inbound", v)
+}
+
+func TestHelpTopicListsEveryCode(t *testing.T) {
+	topic, ok := help.Get("validation")
+	require.True(t, ok)
+	for _, c := range validate.Codes {
+		assert.Contains(t, topic.Body, c.Code)
+	}
 }
