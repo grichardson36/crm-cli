@@ -128,5 +128,5 @@ func overlayAt(base string, x int, text string, width int) string {
 		left += strings.Repeat(" ", pad)
 	}
 	right := ansi.TruncateLeft(base, x+w, "")
-	return left + "\x1b[0m" + text + "\x1b[0m" + right
+	return left + ansi.ResetStyle + text + ansi.ResetStyle + right
 }

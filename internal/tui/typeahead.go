@@ -8,8 +8,8 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/jdanielnd/crm-cli/internal/alias"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
-	sg "github.com/jdanielnd/crm-cli/internal/suggest"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	sg "github.com/jdanielnd/crm-cli/internal/suggest"
 	"github.com/mattn/go-runewidth"
 )
 
