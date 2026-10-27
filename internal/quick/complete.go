@@ -4,7 +4,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/jdanielnd/crm-cli/internal/shortsyntax"
+	"github.com/jdanielnd/crm-cli/internal/suggest"
 )
 
 // Completion is a set of ways to finish the word before the cursor. Replace line[Start:End] with a
@@ -16,10 +16,7 @@ type Completion struct {
 }
 
 // Presets offered after @ and !.
-var datePresets = []string{
-	"today", "tomorrow", "mon", "tue", "wed", "thu", "fri", "sat", "sun",
-	"next week", "next month", "+1w", "+2w", "+1m", "9am", "noon", "3pm", "5pm",
-}
+var datePresets = suggest.DatePhrases
 
 // CadencePresets are offered after *.
 var CadencePresets = []string{"day", "weekday", "week", "month", "year", "1w", "2w", "6w", "1m", "3m", "6m", "1y", "mon", "tue", "wed", "thu", "fri"}
@@ -214,21 +211,7 @@ func prefixed(prefix string, list []string) []string {
 }
 
 // matchFold returns the items that start with prefix (ignoring case and accents), in the order given.
+// It is suggest.Prefix, the matching shared with the relation typeahead and the pipe-line popup.
 func matchFold(items []string, prefix string) []string {
-	f := shortsyntax.Fold(prefix)
-	var out []string
-	seen := map[string]bool{}
-	for _, it := range items {
-		if seen[it] {
-			continue
-		}
-		if f == "" || strings.HasPrefix(shortsyntax.Fold(it), f) {
-			seen[it] = true
-			out = append(out, it)
-		}
-	}
-	if len(out) > maxCandidates {
-		out = out[:maxCandidates]
-	}
-	return out
+	return suggest.Prefix(items, prefix, maxCandidates)
 }

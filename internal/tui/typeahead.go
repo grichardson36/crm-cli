@@ -2,14 +2,13 @@ package tui
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/jdanielnd/crm-cli/internal/alias"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
-	"github.com/jdanielnd/crm-cli/internal/dedupe"
+	sg "github.com/jdanielnd/crm-cli/internal/suggest"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/mattn/go-runewidth"
 )
@@ -21,12 +20,7 @@ import (
 // through the shared aliases (Zach finds Zachary) and forgive a typo (Zachery), which plain search
 // does not. A linked row is a chip, u unlinks it.
 
-const (
-	taMax        = 5    // rows of matches shown
-	taTypoWord   = 0.75 // spelling ratio of a typed word to a word of a name
-	taTypoFull   = 0.80 // spelling ratio of the typed text to the whole name
-	taMinTypoLen = 3
-)
+const taMax = 5 // rows of matches shown
 
 // typeahead is the state of an open relation typeahead.
 type typeahead struct {
@@ -66,107 +60,10 @@ func (m *Model) beginTypeahead(src repo.Ref, other string) tea.Cmd {
 	return m.rowInput.Focus()
 }
 
-// taMatches ranks the candidates for the typed text. Direct matches (the text, or an alias of a typed
-// word, inside the name) come first. Names that are one typo away follow while there is room.
+// taMatches ranks the candidates for the typed text with the matching every autocomplete shares
+// (sg.Rank): aliases, word prefixes and a forgiven typo.
 func taMatches(all []overlayItem, text string, tbl *alias.Table) []overlayItem {
-	text = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(text), "#"))
-	if text == "" {
-		out := append([]overlayItem(nil), all...)
-		if len(out) > taMax {
-			out = out[:taMax]
-		}
-		return out
-	}
-	low := strings.ToLower(text)
-	words := strings.Fields(low)
-	type scored struct {
-		it    overlayItem
-		score int
-	}
-	var direct, typo []scored
-	for _, it := range all {
-		name := strings.ToLower(strings.TrimPrefix(it.label, "#"))
-		sc := taScore(name, low, words, tbl)
-		if sc >= 0 {
-			direct = append(direct, scored{it, sc})
-			continue
-		}
-		if len([]rune(low)) >= taMinTypoLen && taTypo(name, low, words) {
-			typo = append(typo, scored{it, 9})
-		}
-	}
-	sort.SliceStable(direct, func(i, j int) bool { return direct[i].score < direct[j].score })
-	var out []overlayItem
-	for _, s := range direct {
-		out = append(out, s.it)
-	}
-	for _, s := range typo {
-		out = append(out, s.it)
-	}
-	if len(out) > taMax {
-		out = out[:taMax]
-	}
-	return out
-}
-
-// taScore is 0 for an exact name, 1 for a prefix, 2 for a word prefix, 3 for any other substring, and
-// -1 for no match. Every word typed must match, each through its aliases.
-func taScore(name, low string, words []string, tbl *alias.Table) int {
-	if name == low {
-		return 0
-	}
-	if strings.HasPrefix(name, low) {
-		return 1
-	}
-	best := 3
-	for _, w := range words {
-		ok := false
-		for _, n := range tbl.Expand(w) {
-			switch {
-			case strings.HasPrefix(name, n):
-				ok = true
-			case strings.Contains(" "+name, " "+n):
-				ok = true
-				if best > 2 {
-					best = 2
-				}
-			case strings.Contains(name, n):
-				ok = true
-			}
-			if ok {
-				break
-			}
-		}
-		if !ok {
-			return -1
-		}
-	}
-	return best
-}
-
-// taTypo says whether the text is a misspelling of the name: the whole text close to the whole name,
-// or each typed word close to a word of the name (existing similarity scoring, dedupe.Ratio).
-func taTypo(name, low string, words []string) bool {
-	if dedupe.Ratio(low, name) >= taTypoFull {
-		return true
-	}
-	parts := strings.Fields(name)
-	for _, w := range words {
-		if len([]rune(w)) < taMinTypoLen {
-			return false
-		}
-		hit := false
-		for _, p := range parts {
-			if dedupe.Ratio(w, p) >= taTypoWord {
-				hit = true
-				break
-			}
-		}
-		if !hit {
-			return false
-		}
-	}
-	return len(words) > 0
+	return sg.Rank(all, text, func(it overlayItem) string { return it.label }, sg.Options{Aliases: tbl, Limit: taMax})
 }
 
 // taRefresh recomputes the match rows for the text in the input.
