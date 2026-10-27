@@ -30,11 +30,18 @@ type addReturn struct {
 	label  string
 }
 
-// addSuggestion is the highlighted object offered as the link of a new task or note.
+// addSuggestion is the highlighted object offered as the link of the new object, for any pair of
+// kinds the relation registry (model.Relations) joins, and a highlighted tag as a tag for any kind.
+// reason is set when nothing can be offered: it is shown in the grayscale hint instead.
 type addSuggestion struct {
 	ref      repo.Ref
+	tag      string // set instead of ref when the highlighted object is a tag
 	label    string
 	accepted bool
+	reason   string
+	// generic suggestions are linked after the new object is created (afterCreate). The task or note
+	// offered a person, organization or deal keeps the older flow that borrows that object's page.
+	generic bool
 }
 
 func globalAddActions() []action {
@@ -115,9 +122,9 @@ func barKindAddKind(kind string) string {
 	return "person"
 }
 
-// suggestableKind says whether a highlighted object of this kind can be the link of a new task or note.
+// suggestableKind says whether a highlighted object of this kind can be offered as a link.
 func suggestableKind(kind string) bool {
-	return kind == "person" || kind == "organization" || kind == "deal"
+	return kind == "person" || kind == "organization" || kind == "deal" || kind == taskKindName || kind == model.NoteKind
 }
 
 // addContext reads what the picker needs from the screen: the kind to preselect and the highlighted
@@ -134,7 +141,7 @@ func (m *Model) addContext(bar *overlay) (string, *addSuggestion) {
 		}
 		def := barKindAddKind(t.kind)
 		if t.kind == "tag" {
-			return def, nil
+			return def, &addSuggestion{tag: t.name, label: "#" + t.name}
 		}
 		ref := repo.Ref{Kind: def, ID: t.id}
 		if !suggestableKind(def) {
@@ -152,6 +159,7 @@ func (m *Model) addContext(bar *overlay) (string, *addSuggestion) {
 
 // openGlobalAdd shows the kind picker. bar is the bar to bring back afterwards, if it was open.
 func (m *Model) openGlobalAdd(bar *overlay) tea.Cmd {
+	m.addLinkPending = nil
 	def, sugg := m.addContext(bar)
 	m.addResume = &addReturn{bar: bar, opened: true}
 	m.addSugg = sugg
@@ -167,12 +175,37 @@ func (m *Model) openGlobalAdd(bar *overlay) tea.Cmd {
 	return nil
 }
 
-// suggestionFor returns the pending suggestion when the kind can take a link.
+// suggestionFor settles what the highlighted object offers to a new object of this kind. It returns
+// the suggestion to link, or nil when nothing can be linked, and then m.addSugg holds a reason the
+// prompt shows in grayscale ("nothing highlighted", "a deal has no link to a note").
 func (m *Model) suggestionFor(kind string) *addSuggestion {
-	if m.addSugg == nil || (kind != taskKindName && kind != model.NoteKind) {
+	s := m.addSugg
+	if s == nil {
+		m.addSugg = &addSuggestion{reason: "nothing highlighted to link"}
 		return nil
 	}
-	return m.addSugg
+	if s.reason != "" {
+		return nil
+	}
+	cp := *s
+	switch {
+	case cp.tag != "":
+		if !model.ValidTaggable(kind) {
+			cp = addSuggestion{reason: "a " + relationLabel(kind) + " cannot take a tag"}
+		}
+	default:
+		if _, ok := model.RelationBetween(kind, cp.ref.Kind); !ok {
+			cp = addSuggestion{reason: "no link between " + article(relationLabel(kind)) + " " + relationLabel(kind) + " and " + article(relationLabel(cp.ref.Kind)) + " " + relationLabel(cp.ref.Kind)}
+		}
+	}
+	legacy := (kind == taskKindName || kind == model.NoteKind) && cp.tag == "" && cp.ref.Kind != "" &&
+		(cp.ref.Kind == "person" || cp.ref.Kind == "organization" || cp.ref.Kind == "deal")
+	cp.generic = !legacy
+	m.addSugg = &cp
+	if cp.reason != "" {
+		return nil
+	}
+	return &cp
 }
 
 // startGlobalAdd runs the add flow of a kind in the borrowed empty view of that kind.
@@ -183,9 +216,7 @@ func (m *Model) startGlobalAdd(kind string) tea.Cmd {
 		m.addResume = ret
 	}
 	sugg := m.suggestionFor(kind)
-	if !(kind == taskKindName || kind == model.NoteKind) {
-		m.addSugg = nil
-	}
+	m.addLinkPending = nil
 	if kind == model.NoteKind {
 		if sugg == nil {
 			// Nothing is highlighted: a note needs a person, so ask which.
@@ -238,7 +269,15 @@ func (m *Model) acceptSuggestion() tea.Cmd {
 	if s == nil || s.accepted {
 		return nil
 	}
+	if s.reason != "" {
+		m.setStatus(s.reason, true)
+		return nil
+	}
 	s.accepted = true
+	if s.generic {
+		m.addLinkPending = s // linked once the new object exists (afterCreate)
+		return nil
+	}
 	bk := s.ref.Kind
 	if bk == "organization" {
 		bk = "org"
@@ -285,6 +324,9 @@ func (m *Model) suggestionHint() string {
 	if s == nil {
 		return ""
 	}
+	if s.reason != "" {
+		return s.reason
+	}
 	if s.accepted {
 		return "linked to " + s.label
 	}
@@ -295,7 +337,7 @@ func (m *Model) suggestionHint() string {
 func (m *Model) finishGlobalAdd() tea.Cmd {
 	r := m.addResume
 	m.addResume = nil
-	m.addSugg = nil
+	m.addSugg, m.addLinkPending = nil, nil
 	if r.saved != nil {
 		m.leaveBarContext(*r.saved)
 	}
@@ -319,3 +361,42 @@ func (m *Model) globalAddKeyInBar(key string) bool {
 
 // taskKindName is the object kind of a task.
 const taskKindName = "task"
+
+// afterCreate links a new object to the suggestion the user accepted with tab in the add picker
+// (owner decision 2026-10-28). The pair comes from the relation registry, a tag from the tag
+// relation. The create and the link are one undo step. A failed link leaves the object created and
+// says so.
+func (m *Model) afterCreate(kind string, id int64) {
+	p := m.addLinkPending
+	if p == nil || !p.accepted {
+		return
+	}
+	m.addLinkPending = nil
+	// Fold the entry the create just recorded into the same step as the link.
+	var created *histEntry
+	if m.grpDepth == 0 && len(m.hist) > 0 {
+		e := m.hist[len(m.hist)-1]
+		m.hist = m.hist[:len(m.hist)-1]
+		created = &e
+	}
+	m.beginGroup()
+	if created != nil {
+		m.grp = append(m.grp, *created)
+	}
+	ref := repo.Ref{Kind: kind, ID: id}
+	var err error
+	if p.tag != "" {
+		err = m.hTagApply(m.ctx, kind, id, p.tag)
+	} else {
+		err = m.recordLinkChange("link new "+relationLabel(kind)+" to "+p.label, ref, p.ref, func() error {
+			_, e := m.links.Link(m.ctx, ref, p.ref)
+			return e
+		})
+	}
+	label := "add " + relationLabel(kind) + " and link it to " + p.label
+	m.endGroup(label)
+	if err != nil {
+		m.setStatus("created, but could not link to "+p.label+": "+err.Error(), true)
+		return
+	}
+}

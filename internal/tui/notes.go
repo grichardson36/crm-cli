@@ -75,6 +75,7 @@ func (m *Model) hCreateNote(in model.CreateInteractionInput) (*model.Interaction
 	m.record("add "+n.Type+" "+truncateLabel(noteLabel(n)),
 		func() error { return m.ir.Archive(m.ctx, id) },
 		func() error { return m.ir.Restore(m.ctx, id) })
+	m.afterCreate(model.NoteKind, id)
 	return n, nil
 }
 

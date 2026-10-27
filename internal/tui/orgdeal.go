@@ -581,6 +581,7 @@ func (m *Model) hCreateOrg(in model.CreateOrgInput) (*model.Organization, error)
 	m.record("add organization "+truncateLabel(o.Name),
 		func() error { return m.orr.Archive(m.ctx, id) },
 		func() error { return m.orr.Restore(m.ctx, id) })
+	m.afterCreate("organization", id)
 	return o, nil
 }
 
@@ -652,6 +653,7 @@ func (m *Model) hCreateDeal(in model.CreateDealInput) (*model.Deal, error) {
 	m.record("add deal "+truncateLabel(d.Title),
 		func() error { return m.dlr.Archive(m.ctx, id) },
 		func() error { return m.dlr.Restore(m.ctx, id) })
+	m.afterCreate("deal", id)
 	return d, nil
 }
 

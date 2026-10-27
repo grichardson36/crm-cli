@@ -134,13 +134,13 @@ func (m *Model) promptHint(used int) string {
 	}
 	h := pipeHint(m.promptFieldsFor(m.promptKind), val)
 	if sug := m.suggestionHint(); sug != "" {
-		// The offered link follows the syntax hint in the same dim text.
-		if h != "" {
-			h += "   "
+		// The offered link follows the syntax hint in the same dim text. When both do not fit the
+		// offer wins, the syntax is shown again once the offer is taken or the line is longer.
+		if h != "" && runewidth.StringWidth(h+"   "+sug) <= m.width-used {
+			h += "   " + sug
 		} else {
-			h = hintSpacing(val)
+			h = hintSpacing(val) + sug
 		}
-		h += sug
 	}
 	return cutHint(h, m.width-used)
 }

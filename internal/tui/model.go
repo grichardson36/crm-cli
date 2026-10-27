@@ -156,6 +156,8 @@ type Model struct {
 	orgCreateAnyway bool
 	// aliases is the name alias table, read once from the database (aliasTable).
 	aliases *alias.Table
+	// addLinkPending is the accepted suggestion of an add that links after the object is created.
+	addLinkPending *addSuggestion
 	// purgeIDs are the archived people a bulk purge is waiting to confirm (archive.go).
 	purgeIDs []int64
 	detail      viewport.Model
@@ -821,7 +823,7 @@ func (m *Model) handlePromptKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		m.mode = modeNormal
 		m.input.Blur()
-		m.addSugg = nil
+		m.addSugg, m.addLinkPending = nil, nil
 		return m, nil
 	case "enter":
 		value := strings.TrimSpace(m.input.Value())

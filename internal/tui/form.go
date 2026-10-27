@@ -418,7 +418,9 @@ func (m *Model) renderRow(i int, r formRow, w int) []string {
 	}
 	if m.mode == modeEdit && m.edit != nil && m.edit.row == i {
 		line := m.st.Dim.Render(label) + strings.TrimRight(m.rowInput.View(), " ")
-		if r.spec != nil {
+		if sug := m.suggestionHint(); sug != "" && m.creating {
+			line += m.st.Dim.Render(cutHint(hintSpacing(m.rowInput.Value())+sug, w-labelWidth-runewidth.StringWidth(m.rowInput.Value())-2))
+		} else if r.spec != nil {
 			line += m.st.Dim.Render(m.fieldHint(*r.spec, m.rowInput.Value(), w-labelWidth-runewidth.StringWidth(m.rowInput.Value())-2))
 		}
 		return []string{lipgloss.NewStyle().MaxWidth(w).Render(line)}
@@ -620,6 +622,9 @@ func (m *Model) addRow(k rowKind) tea.Cmd {
 
 func (m *Model) cancelEdit() {
 	creating := m.creating
+	if creating {
+		m.addSugg, m.addLinkPending = nil, nil
+	}
 	m.mode = modeNormal
 	m.edit = nil
 	m.rowInput.Blur()
@@ -647,6 +652,10 @@ func (m *Model) handleEditKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.commitEdit()
 		return m, nil
 	case "tab", "shift+tab":
+		if m.creating && msg.String() == "tab" && m.addSugg != nil && !m.addSugg.accepted {
+			m.pendingCmd = m.acceptSuggestion() // the grayscale link offered by the add picker
+			return m, m.takePending()
+		}
 		if m.edit != nil && m.edit.kind == rkHandle {
 			m.cycleHandleKind(msg.String() == "tab")
 		}
@@ -882,6 +891,7 @@ func (m *Model) createPerson(name string) error {
 		return err
 	}
 	m.creating = false
+	m.addSugg = nil
 	m.mode = modeNormal
 	m.edit = nil
 	m.rowInput.Blur()

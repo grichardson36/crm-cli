@@ -299,6 +299,7 @@ func (m *Model) hCreateTask(in model.CreateTaskInput) (*model.Task, error) {
 	m.record("add task "+truncateLabel(t.Title),
 		func() error { return m.tr.Archive(m.ctx, id) },
 		func() error { return m.tr.Restore(m.ctx, id) })
+	m.afterCreate("task", id)
 	return t, nil
 }
 

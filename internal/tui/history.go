@@ -311,6 +311,7 @@ func (m *Model) hCreatePerson(ctx context.Context, in model.CreatePersonInput) (
 	m.record("create "+fullName(p),
 		func() error { return m.pr.Archive(m.ctx, id) },
 		func() error { return m.pr.Restore(m.ctx, id) })
+	m.afterCreate("person", id)
 	return p, nil
 }
 
