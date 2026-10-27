@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/validate"
 	"github.com/mattn/go-runewidth"
 )
 
@@ -749,11 +750,11 @@ func (m *Model) applyEdit(e *editState, v string) error {
 			// natural phrase, read by the date field type.
 			if _, _, _, perr := model.ParseBirthday(v); perr != nil && v != "" {
 				spec, _ := model.FieldNamed("person", "birthday")
-				nv, err := spec.Normalize(v, m.parseDateField)
-				if err != nil {
+				res := validate.Field(spec, v, validate.Options{Kind: "person", ParseDate: m.parseDateField})
+				if !res.OK() {
 					return perr
 				}
-				v = nv
+				v = res.Value
 			}
 			if birthdayShort.MatchString(v) {
 				v = "--" + v

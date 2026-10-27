@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/validate"
 )
 
 // Ref names one object: its kind (person, organization, deal, task, interaction) and id.
@@ -355,8 +356,8 @@ func (r *LinkRepo) link(ctx context.Context, a, b Ref, attrs model.LinkAttrs, fo
 		if !changed {
 			return res, nil
 		}
-		if next.StartedOn != nil && next.EndedOn != nil && *next.StartedOn > *next.EndedOn {
-			return LinkResult{}, fmt.Errorf("the end date is before the start date: %w", model.ErrValidation)
+		if err := validate.DateOrder("start date", strDeref(next.StartedOn), "end date", strDeref(next.EndedOn)); err != nil {
+			return LinkResult{}, err
 		}
 		before := *cur
 		res.Before = &before
@@ -413,8 +414,8 @@ func (r *LinkRepo) revive(ctx context.Context, tx *sql.Tx, rel model.Relation, s
 			}
 		}
 	}
-	if next.StartedOn != nil && next.EndedOn != nil && *next.StartedOn > *next.EndedOn {
-		return nil, fmt.Errorf("the end date is before the start date: %w", model.ErrValidation)
+	if err := validate.DateOrder("start date", strDeref(next.StartedOn), "end date", strDeref(next.EndedOn)); err != nil {
+		return nil, err
 	}
 	next.Deleted = false
 	demoted, err := r.write(ctx, tx, rel, st, next)
@@ -659,8 +660,8 @@ func (r *LinkRepo) Update(ctx context.Context, relation string, id int64, attrs 
 	if !changed {
 		return res, nil
 	}
-	if next.StartedOn != nil && next.EndedOn != nil && *next.StartedOn > *next.EndedOn {
-		return LinkResult{}, fmt.Errorf("the end date is before the start date: %w", model.ErrValidation)
+	if err := validate.DateOrder("start date", strDeref(next.StartedOn), "end date", strDeref(next.EndedOn)); err != nil {
+		return LinkResult{}, err
 	}
 	before, _ := r.Get(ctx, relation, id)
 	res.Before = before
@@ -818,10 +819,7 @@ func (r *LinkRepo) checkOrgCycle(ctx context.Context, parentKindID, aID, bID int
 	if err != nil {
 		return fmt.Errorf("check cycle: %w", err)
 	}
-	if n > 0 {
-		return fmt.Errorf("organization %d is already above organization %d, so this parent link would make a cycle: %w", bID, aID, model.ErrValidation)
-	}
-	return nil
+	return validate.OrgParentCycle(bID, aID, n > 0)
 }
 
 // Linked lists the links of a to objects of otherKind, live links to live objects only, with the
@@ -1002,4 +1000,11 @@ func PrimaryOrgName(ctx context.Context, q DBTX, personID int64) (string, error)
 		return "", fmt.Errorf("primary organization: %w", err)
 	}
 	return name, nil
+}
+
+func strDeref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }

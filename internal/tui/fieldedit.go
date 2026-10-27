@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/validate"
 	"github.com/jdanielnd/crm-cli/internal/shortsyntax"
 	"github.com/mattn/go-runewidth"
 )
@@ -170,11 +171,13 @@ func (m *Model) commitTyped() {
 	} else {
 		raw = strings.ReplaceAll(m.rowInput.Value(), "⏎", "\n")
 	}
-	v, err := t.spec.Normalize(raw, m.parseDateField)
-	if err != nil {
+	res := validate.Field(t.spec, raw, validate.Options{Kind: t.ref.Kind, ParseDate: m.parseDateField})
+	if err := res.Err(); err != nil {
 		m.setStatus(err.Error(), true)
 		return
 	}
+	v := res.Value
+	hint := suggestionLine(res)
 	if t.spec.Type == model.FieldChoice && t.spec.Clear != "" && v == t.spec.Clear {
 		v = ""
 	}
@@ -183,14 +186,26 @@ func (m *Model) commitTyped() {
 		return
 	}
 	m.beginGroup()
-	err = m.saveTyped(t.ref, t.spec, v)
+	err := m.saveTyped(t.ref, t.spec, v)
 	m.endGroup("")
 	if err != nil {
 		m.setStatus(err.Error(), true)
 		return
 	}
 	m.finishEdit()
-	m.setStatus("saved "+t.spec.Label+" (ctrl+z undoes)", false)
+	m.setStatus("saved "+t.spec.Label+" (ctrl+z undoes)"+hint, false)
+}
+
+// suggestionLine is the first warning or suggestion of a check, to show beside the saved message. It is
+// shown and never applied.
+func suggestionLine(res validate.Result) string {
+	if len(res.Suggestions) > 0 {
+		return ". " + res.Suggestions[0].Message
+	}
+	if w := res.Warnings(); len(w) > 0 {
+		return ". " + w[0].Code + ": " + w[0].Fix
+	}
+	return ""
 }
 
 // saveTyped writes one typed field of a record through its recorded hook, so it is one undo step.
@@ -327,9 +342,9 @@ func (m *Model) fieldHint(spec model.FieldSpec, typed string, room int) string {
 	if typed != "" {
 		h = ""
 		if spec.Type == model.FieldDate || spec.Type == model.FieldNumber {
-			if v, err := spec.Normalize(typed, m.parseDateField); err == nil && v != typed {
-				h = "-> " + v
-			} else if err != nil {
+			if res := validate.Field(spec, typed, validate.Options{ParseDate: m.parseDateField}); res.OK() && res.Value != typed {
+				h = "-> " + res.Value
+			} else if !res.OK() {
 				h = "? " + spec.DefaultHint()
 			}
 		}

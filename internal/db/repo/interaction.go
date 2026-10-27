@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/validate"
 )
 
 // InteractionRepo handles interaction database operations.
@@ -37,8 +38,8 @@ func scanInteraction(row interface{ Scan(...any) error }) (*model.Interaction, e
 
 // Create inserts a new interaction and links it to people.
 func (r *InteractionRepo) Create(ctx context.Context, input model.CreateInteractionInput) (*model.Interaction, error) {
-	if input.Direction != nil && *input.Direction != "" && !model.ValidInteractionDirection(*input.Direction) {
-		return nil, fmt.Errorf("invalid direction %q: %w", *input.Direction, model.ErrValidation)
+	if err := validate.InteractionCreate(&input).Err(); err != nil {
+		return nil, err
 	}
 
 	tx, err := r.db.BeginTx(ctx, nil)
@@ -96,6 +97,9 @@ func (r *InteractionRepo) Create(ctx context.Context, input model.CreateInteract
 // Update edits an active interaction. The type must be an active note type.
 // Subject, Content and Direction accept "" to clear. FTS follows through the update trigger.
 func (r *InteractionRepo) Update(ctx context.Context, id int64, input model.UpdateInteractionInput) (*model.Interaction, error) {
+	if err := validate.InteractionUpdate(&input).Err(); err != nil {
+		return nil, err
+	}
 	var sets []string
 	var args []any
 
@@ -122,9 +126,6 @@ func (r *InteractionRepo) Update(ctx context.Context, id int64, input model.Upda
 		args = append(args, nullIfEmpty(*input.Content))
 	}
 	if input.Direction != nil {
-		if *input.Direction != "" && !model.ValidInteractionDirection(*input.Direction) {
-			return nil, fmt.Errorf("invalid direction %q: %w", *input.Direction, model.ErrValidation)
-		}
 		sets = append(sets, "direction = ?")
 		args = append(args, nullIfEmpty(*input.Direction))
 	}

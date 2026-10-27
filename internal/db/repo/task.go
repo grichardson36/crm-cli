@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/validate"
 )
 
 // TaskRepo handles task database operations.
@@ -69,8 +70,11 @@ func (r *TaskRepo) linkTargets(ctx context.Context, taskID int64, people, orgs, 
 
 // Create inserts a new task.
 func (r *TaskRepo) Create(ctx context.Context, input model.CreateTaskInput) (*model.Task, error) {
-	if !model.ValidPriority(input.Priority) {
-		return nil, fmt.Errorf("invalid priority %q: %w", input.Priority, model.ErrValidation)
+	if err := validate.TaskCreate(&input).Err(); err != nil {
+		return nil, err
+	}
+	if _, err := validate.OneOf("priority", input.Priority, model.Priorities); err != nil {
+		return nil, err
 	}
 
 	if input.Recurrence != nil {
@@ -271,6 +275,9 @@ func (r *TaskRepo) Complete(ctx context.Context, id int64) (*model.Task, error) 
 
 // Update modifies a task.
 func (r *TaskRepo) Update(ctx context.Context, id int64, input model.UpdateTaskInput) (*model.Task, error) {
+	if err := validate.TaskUpdate(&input).Err(); err != nil {
+		return nil, err
+	}
 	var setClauses []string
 	var args []any
 
@@ -298,9 +305,6 @@ func (r *TaskRepo) Update(ctx context.Context, id int64, input model.UpdateTaskI
 		}
 	}
 	if input.Priority != nil {
-		if !model.ValidPriority(*input.Priority) {
-			return nil, fmt.Errorf("invalid priority %q: %w", *input.Priority, model.ErrValidation)
-		}
 		setClauses = append(setClauses, "priority = ?")
 		args = append(args, *input.Priority)
 	}

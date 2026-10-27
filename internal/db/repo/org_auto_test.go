@@ -2,6 +2,7 @@ package repo_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
@@ -75,7 +76,7 @@ func TestApplyCompanyCreateReuseIgnore(t *testing.T) {
 			assert.Equal(t, tt.wantIgnored, ch.Ignored)
 			assert.Equal(t, tt.wantOrgs, f.liveOrgs(t))
 			assert.Equal(t, tt.wantPrimary, f.primaryOrgName(t, pid))
-			assert.Equal(t, tt.text, *mustPerson(t, f, pid).Company, "people.company stays the source text")
+			assert.Equal(t, strings.TrimSpace(tt.text), *mustPerson(t, f, pid).Company, "people.company stays the source text, trimmed on write by the validation framework")
 		})
 	}
 }

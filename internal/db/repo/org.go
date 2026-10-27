@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/validate"
 )
 
 // OrgRepo handles organization database operations.
@@ -45,6 +46,9 @@ func (r *OrgRepo) DB() *sql.DB { return r.db }
 // name (case, punctuation, and/&, a leading "the" and trailing Inc, LLC and the like ignored, the
 // same as NormalizeCompany) or the same normalized domain, and returns a *DuplicateOrgError.
 func (r *OrgRepo) Create(ctx context.Context, input model.CreateOrgInput) (*model.Organization, error) {
+	if err := validate.OrgCreate(&input).Err(); err != nil {
+		return nil, err
+	}
 	if !input.AllowDuplicate {
 		dup, reason, err := r.FindDuplicate(ctx, input.Name, input.Domain)
 		if err != nil {
@@ -118,6 +122,9 @@ func (r *OrgRepo) FindAll(ctx context.Context, limit int) ([]*model.Organization
 
 // Update modifies an organization's fields.
 func (r *OrgRepo) Update(ctx context.Context, id int64, input model.UpdateOrgInput) (*model.Organization, error) {
+	if err := validate.OrgUpdate(&input).Err(); err != nil {
+		return nil, err
+	}
 	var setClauses []string
 	var args []any
 
