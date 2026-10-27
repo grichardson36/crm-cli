@@ -290,14 +290,14 @@ func TestSnoozeFavoriteNoteAndTask(t *testing.T) {
 	// Favorite Zed, add a note and a task.
 	press(m, "2", "f")
 	assert.Contains(t, m.rows[0].title, "★")
-	press(m, "a", "n", "tab")
-	typeText(m, "met at the conference")
+	press(m, "a", "n")
+	typeLinked(m, "met at the conference")
 	press(m, "enter")
 	assert.Equal(t, "note added", m.status)
 	assert.Contains(t, m.View(), "met at the conference")
 
-	press(m, "a", "t", "tab")
-	typeText(m, "send deck | 2026-12-01")
+	press(m, "a", "t")
+	typeLinked(m, "send deck | 2026-12-01")
 	press(m, "enter")
 	assert.Equal(t, "task added", m.status)
 
@@ -314,7 +314,7 @@ func TestSnoozeFavoriteNoteAndTask(t *testing.T) {
 	assert.NotNil(t, p.KeepInTouchSnoozedUntil)
 
 	// An empty prompt or esc changes nothing.
-	press(m, "2", "a", "n", "tab", "esc")
+	press(m, "2", "a", "n", "esc")
 	assert.Equal(t, modeNormal, m.mode)
 	press(m, "s")
 	typeText(m, "abc")

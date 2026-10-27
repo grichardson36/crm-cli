@@ -18,18 +18,18 @@ func notesOf(t *testing.T, m *Model, pid int64) []*model.Interaction {
 
 func TestNotePromptDefaultsToNoteAndRemembersType(t *testing.T) {
 	m, _ := newTestModel(t)
-	press(m, "a", "n", "tab")
+	press(m, "a", "n")
 	require.Equal(t, modePrompt, m.mode)
 	assert.Equal(t, "note: ", m.input.Prompt)
 	assert.Contains(t, m.View(), "tab type")
-	typeText(m, "plain note")
+	typeLinked(m, "plain note")
 	press(m, "enter")
 	assert.Equal(t, "note added", m.status)
 
 	// Tab switches the type (types are sorted by name: call, email, meeting, message, note).
-	press(m, "a", "n", "tab", "tab")
+	press(m, "a", "n", "tab")
 	assert.Equal(t, "call: ", m.input.Prompt)
-	typeText(m, "talked about the trip")
+	typeLinked(m, "talked about the trip")
 	press(m, "enter")
 	assert.Equal(t, "call added", m.status)
 	ns := notesOf(t, m, 1)
@@ -42,7 +42,7 @@ func TestNotePromptDefaultsToNoteAndRemembersType(t *testing.T) {
 	assert.Equal(t, "plain note", types["note"])
 
 	// The last used type is remembered by the next prompt, and shift+tab goes back.
-	press(m, "a", "n", "tab")
+	press(m, "a", "n")
 	assert.Equal(t, "call: ", m.input.Prompt)
 	press(m, "shift+tab")
 	assert.Equal(t, "note: ", m.input.Prompt)
@@ -162,6 +162,6 @@ func TestArchivedRememberedTypeFallsBackToNote(t *testing.T) {
 	m, _ := newTestModel(t)
 	m.noteType = "meeting"
 	require.NoError(t, m.ntr.Archive(context.Background(), "meeting"))
-	press(m, "a", "n", "tab")
+	press(m, "a", "n")
 	assert.Equal(t, "note: ", m.input.Prompt)
 }

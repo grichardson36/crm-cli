@@ -4,14 +4,14 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/jdanielnd/crm-cli/internal/model"
 )
 
 // Tags are objects (owner decision 2026-10-28), so the add picker offers them with the other kinds:
 // a then g. The flow is a name prompt in the pick-or-create style: the name of an existing tag picks
-// it, a new name creates it. A tag exists only as a name on objects (patterns/universal-verbs), so a
-// highlighted object is offered as the one to put the tag on (the grayscale "tab: link ..." hint) and
-// tab accepts it. Without it the tag is created and is listed once an object carries it.
+// it, a new name creates it. A tag exists only as a name on objects (patterns/universal-verbs), so the
+// prompt is a pipe line, name | on: the "on" segment names the objects to put the tag on, and a
+// highlighted object is its first suggestion (tab accepts it). Without one the tag is created and is
+// listed once an object carries it.
 
 func tagDef() *objDef {
 	return &objDef{
@@ -31,15 +31,16 @@ func (m *Model) startTagAdd() tea.Cmd {
 }
 
 // saveNewTag is the enter of the tag name prompt: find the tag by name or create it, and put it on the
-// object the user accepted with tab.
+// objects named in the "on" segment (pipelink.go resolved them already).
 func (m *Model) saveNewTag(value string) {
 	name := strings.TrimLeft(strings.TrimSpace(value), "#")
 	if name == "" {
 		m.setStatus("enter a tag name", true)
 		return
 	}
-	p := m.addLinkPending
-	m.addLinkPending = nil
+	links := m.pipeLinks
+	m.pipeLinks, m.pipeObj = nil, ""
+	m.pipeRes = map[string]pendingLink{}
 	existed := false
 	if tags, err := m.tagr.FindAll(m.ctx); err == nil {
 		for _, t := range tags {
@@ -48,14 +49,25 @@ func (m *Model) saveNewTag(value string) {
 			}
 		}
 	}
-	if p != nil && p.accepted && p.tag == "" && p.ref.ID != 0 {
-		if err := m.hTagApply(m.ctx, p.ref.Kind, p.ref.ID, name); err != nil {
-			m.setStatus(err.Error(), true)
-			return
+	if len(links) > 0 {
+		var labels []string
+		m.beginGroup()
+		for _, l := range links {
+			if l.ref.ID == 0 {
+				continue
+			}
+			if err := m.hTagApply(m.ctx, l.ref.Kind, l.ref.ID, name); err != nil {
+				m.endGroup("")
+				m.setStatus(err.Error(), true)
+				return
+			}
+			labels = append(labels, l.label)
 		}
+		m.endGroup("tag #" + name + " on " + strings.Join(labels, ", "))
 		m.afterWrite()
-		m.setStatus("tagged "+p.label+" #"+name+" (ctrl+z undoes)", false)
-		m.pendingCmd = m.showToast("tagged "+p.label+" #"+name+" · ctrl+z undoes", false)
+		msg := "tagged " + strings.Join(labels, ", ") + " #" + name + " (ctrl+z undoes)"
+		m.setStatus(msg, false)
+		m.pendingCmd = m.showToast("tagged "+strings.Join(labels, ", ")+" #"+name+" · ctrl+z undoes", false)
 		return
 	}
 	if _, err := m.tagr.FindOrCreate(m.ctx, name); err != nil {
@@ -69,20 +81,4 @@ func (m *Model) saveNewTag(value string) {
 	}
 	m.setStatus(msg, false)
 	m.pendingCmd = m.showToast(msg, false)
-}
-
-// tagSuggestion settles what the highlighted object offers to a new tag: itself, as the object to put
-// the tag on, when its kind can take a tag.
-func tagSuggestion(s *addSuggestion) *addSuggestion {
-	cp := *s
-	switch {
-	case cp.reason != "":
-		return &cp
-	case cp.tag != "":
-		return &addSuggestion{reason: "a tag cannot be put on a tag"}
-	case !model.ValidTaggable(cp.ref.Kind):
-		return &addSuggestion{reason: "a " + relationLabel(cp.ref.Kind) + " cannot take a tag"}
-	}
-	cp.generic = true
-	return &cp
 }

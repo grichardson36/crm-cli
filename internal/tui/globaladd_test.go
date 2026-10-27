@@ -84,21 +84,21 @@ func TestAThenALetterJumpsToThatKind(t *testing.T) {
 	assert.Empty(t, list)
 }
 
-func TestATaskOffersTheHighlightedPersonAsAGrayLinkAndTabAcceptsIt(t *testing.T) {
+func TestATaskOffersTheHighlightedPersonInThePeopleSegmentAndTabAcceptsIt(t *testing.T) {
 	m, _ := newTestModel(t)
 	press(m, "down") // Bob
 	bob := m.curPerson()
 	press(m, "a", "t")
 	require.Equal(t, modePrompt, m.mode)
-	assert.Contains(t, m.promptHint(0), "tab: link Bob Baker", "the suggestion is shown after the cursor")
-	assert.NotContains(t, m.input.Value(), "Bob", "and is never put into the text")
+	typeText(m, "Send deck||")
+	assert.Contains(t, m.View(), "Bob Baker", "the popup under the people segment leads with the highlighted person")
+	assert.NotContains(t, m.promptHint(0), "tab: link", "the old grayscale offer is gone")
 	press(m, "tab")
-	assert.Contains(t, m.promptHint(0), "linked to Bob Baker")
-	assert.NotContains(t, m.promptHint(0), "tab: link")
-	typeText(m, "Send deck")
+	assert.Equal(t, "Send deck|| Bob Baker, ", m.input.Value(), "the name goes into the segment, a comma follows for the next one")
 	press(m, "enter")
 	tasks, _ := m.tr.FindAll(m.ctx, model.TaskFilters{})
 	require.Len(t, tasks, 1)
+	assert.Equal(t, "Send deck", tasks[0].Title)
 	assert.Equal(t, []int64{bob}, tasks[0].PersonIDs)
 	assert.Equal(t, viewPeople, m.view)
 }
@@ -110,7 +110,7 @@ func TestATaskWithoutTabStaysUnlinked(t *testing.T) {
 	press(m, "enter")
 	tasks, _ := m.tr.FindAll(m.ctx, model.TaskFilters{})
 	require.Len(t, tasks, 1)
-	assert.Empty(t, tasks[0].PersonIDs, "nothing links until tab is pressed")
+	assert.Empty(t, tasks[0].PersonIDs, "nothing links until a name is accepted or typed")
 }
 
 func TestANoteOfferedAnOrganizationLinksItOnTab(t *testing.T) {
@@ -122,10 +122,9 @@ func TestANoteOfferedAnOrganizationLinksItOnTab(t *testing.T) {
 	m.settle()
 	press(m, "a", "n")
 	require.Equal(t, modePrompt, m.mode)
-	assert.Contains(t, m.promptHint(0), "tab: link Acme")
-	press(m, "tab")
-	typeText(m, "met their CEO")
-	press(m, "enter")
+	typeText(m, "met their CEO||")
+	assert.Contains(t, m.View(), "Acme")
+	press(m, "tab", "enter")
 	notes, err := m.ir.FindAll(m.ctx, model.InteractionFilters{OrgID: &o.ID, Limit: 10})
 	require.NoError(t, err)
 	require.Len(t, notes, 1)
@@ -289,8 +288,8 @@ func TestATagThroughTheAddPickerCreatesAndTagsTheHighlightedObject(t *testing.T)
 	press(m, "a", "g")
 	require.Equal(t, modePrompt, m.mode)
 	assert.Equal(t, "tag-new", m.promptKind)
-	typeText(m, "vip")
-	assert.Contains(t, m.View(), "tab: link", "the highlighted person is offered")
+	typeText(m, "vip|")
+	assert.Contains(t, m.View(), "Zed Adams", "the highlighted person is the first suggestion of the on segment")
 	press(m, "tab", "enter")
 	assert.Equal(t, modeNormal, m.mode)
 	p := personByID(t, pr, 1)
@@ -300,7 +299,7 @@ func TestATagThroughTheAddPickerCreatesAndTagsTheHighlightedObject(t *testing.T)
 	require.Len(t, tags, 1)
 	assert.Equal(t, "vip", tags[0].Name)
 
-	// Without tab the tag is created on its own and a second use of the name finds it.
+	// Without a name in the on segment the tag is created on its own and a second use of the name finds it.
 	press(m, "a", "g")
 	typeText(m, "later")
 	press(m, "enter")

@@ -129,9 +129,9 @@ func TestBarPersonHotkeysActLikeThePeopleView(t *testing.T) {
 func TestBarNoteVerbTakesTheScreenAndTheBarComesBack(t *testing.T) {
 	m, pr := newTestModel(t)
 	startBar(t, m, "bob", "person:2")
-	press(m, "tab", "a", "n", "tab") // a, the note kind, then tab accepts the highlighted person as the link
+	press(m, "tab", "a", "n") // a, the note kind, then tab accepts the highlighted person as the link
 	require.Equal(t, modePrompt, m.mode, "a verb with a prompt shows the prompt")
-	typeText(m, "met at the bar")
+	typeLinked(m, "met at the bar")
 	press(m, "enter")
 	assert.Equal(t, modeOverlay, m.mode, "the bar returns when the prompt is done")
 	require.NotNil(t, m.ov)
@@ -146,7 +146,7 @@ func TestBarNoteVerbTakesTheScreenAndTheBarComesBack(t *testing.T) {
 	assert.Equal(t, viewPeople, m.view)
 
 	// Esc in the prompt cancels and the bar still returns.
-	press(m, "a", "n", "tab")
+	press(m, "a", "n")
 	require.Equal(t, modePrompt, m.mode)
 	press(m, "esc")
 	assert.Equal(t, modeOverlay, m.mode)

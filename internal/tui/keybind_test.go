@@ -165,7 +165,7 @@ func TestKeysCustomizeFlowSavesTheBinding(t *testing.T) {
 	typeText(m, "undo")
 	press(m, "enter")
 	m.Update(keyMsg("ctrl+g"))
-	press(m, "a", "n", "tab")
+	press(m, "a", "n")
 	assert.Equal(t, []string{"ctrl+z"}, m.actionByID("undo").keys)
 }
 

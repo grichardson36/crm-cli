@@ -105,15 +105,10 @@ var barExtraShapes = map[string][]hintField{
 // extraPromptFields are pipe prompts that belong to no object.
 var extraPromptFields = map[string][]string{"notetype-add": {"name", "contact"}}
 
-// promptFieldsFor lists the fields of a pipe prompt: the fields of the object that registered the
-// prompt kind, the attributes of the link being made, or an extra prompt.
+// promptFieldsFor lists the fields of a pipe prompt: the segments of its pipe line (pipeline.go), the attributes of the link being made, or an extra prompt.
 func (m *Model) promptFieldsFor(kind string) []string {
-	for _, o := range objectDefs() {
-		for _, k := range o.prompts {
-			if k == kind {
-				return o.fields
-			}
-		}
+	if pl := m.pipeFor(kind); pl != nil {
+		return pl.labels()
 	}
 	if kind == "link-attrs" && m.draft != nil {
 		var labels []string
@@ -133,15 +128,6 @@ func (m *Model) promptHint(used int) string {
 		return ""
 	}
 	h := pipeHint(m.promptFieldsFor(m.promptKind), val)
-	if sug := m.suggestionHint(); sug != "" {
-		// The offered link follows the syntax hint in the same dim text. When both do not fit the
-		// offer wins, the syntax is shown again once the offer is taken or the line is longer.
-		if h != "" && runewidth.StringWidth(h+"   "+sug) <= m.width-used {
-			h += "   " + sug
-		} else {
-			h = hintSpacing(val) + sug
-		}
-	}
 	return cutHint(h, m.width-used)
 }
 

@@ -129,7 +129,7 @@ func verbActions() []action {
 			when:   func(m *Model) bool { return m.whenMerge() },
 			run:    func(m *Model) tea.Cmd { return m.runMerge() }},
 		{id: "prompt-tab", title: "Prompt: tab", group: "Verbs", hint: "tab", keys: []string{"tab"}, mode: keyText,
-			desc: "in a footer prompt: accept the grayscale link suggestion, else change the note type, else complete a role",
+			desc: "in a footer prompt: accept the highlighted suggestion of the popup, else change the note type, else complete a role",
 			when: func(m *Model) bool { return m.mode == modePrompt },
 			run:  func(m *Model) tea.Cmd { return m.promptTab(true) }},
 		{id: "prompt-tab-back", title: "Prompt: shift+tab", group: "Verbs", hint: "shift+tab", keys: []string{"shift+tab"}, mode: keyText,
@@ -142,9 +142,6 @@ func verbActions() []action {
 // promptTab handles tab and shift+tab in a footer prompt. It returns nil when the key does nothing,
 // and the text input then gets it.
 func (m *Model) promptTab(forward bool) tea.Cmd {
-	if forward && m.addSugg != nil && !m.addSugg.accepted {
-		return m.acceptSuggestion()
-	}
 	switch {
 	case m.promptKind == "note" || m.promptKind == "note-object" || m.promptKind == "note-free":
 		m.cycleNoteType(forward)

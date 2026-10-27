@@ -89,7 +89,7 @@ func (m *Model) runTaskLine(pid int64, value, kind string) {
 	}
 	_, err := m.runLineAsk("task "+strings.TrimSpace(title), env,
 		func() {
-			m.startInput(kind, prompt, value)
+			m.startInput(kind, prompt, m.reopenLine(value))
 			_ = m.input.Focus()
 		},
 		func(plan *quick.Plan) tea.Cmd {

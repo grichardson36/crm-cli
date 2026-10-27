@@ -335,7 +335,9 @@ func (m *Model) overlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if o.onCancel != nil {
 			o.onCancel(m)
 		}
-		m.closeOverlay()
+		if m.ov == o { // onCancel may have closed the overlay itself and opened a prompt (pipelink.go)
+			m.closeOverlay()
+		}
 		return m, nil
 	case "enter":
 		return m, m.pickOverlay(o.cursor)

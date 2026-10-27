@@ -78,7 +78,7 @@ func (m *Model) baseView() string {
 	detail := lipgloss.NewStyle().Width(detailW).Height(bodyH).MaxHeight(bodyH).PaddingLeft(1).Render(m.detail.View())
 	body := lipgloss.JoinHorizontal(lipgloss.Top, list, sep, detail)
 
-	return m.tabsView() + "\n" + body + "\n" + m.footerView()
+	return m.tabsView() + "\n" + m.overlayStack(body) + "\n" + m.footerView()
 }
 
 // tabSeg is one tab in the tab bar with its screen columns [x0, x1). A segment with more set is
@@ -468,7 +468,10 @@ func (m *Model) hintsLine() string {
 	case modeCapture:
 		return m.st.Dim.Render("any key binds, esc cancel")
 	case modePrompt:
-		if m.promptKind == "note" || m.promptKind == "note-object" {
+		if s := m.pipeRefresh(); s != nil && s.ac.Open() {
+			return m.st.Dim.Render(runewidth.Truncate("enter confirm  tab accept  up/down choose  esc close the list", m.width, "…"))
+		}
+		if m.promptKind == "note" || m.promptKind == "note-object" || m.promptKind == "note-free" {
 			return m.st.Dim.Render("enter save  tab type  esc cancel")
 		}
 		return m.st.Dim.Render("enter confirm  esc cancel")

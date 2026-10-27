@@ -149,7 +149,7 @@ func TestReadOnlyBlocksNoteEditTypeDeleteRestore(t *testing.T) {
 	press(m, "enter")
 	assert.Equal(t, modeNormal, m.mode)
 	assert.Contains(t, m.status, "read-only")
-	press(m, "a", "t", "tab")
+	press(m, "a", "t")
 	assert.Equal(t, modeNormal, m.mode, "no picker opens")
 	assert.Contains(t, m.status, "read-only")
 	press(m, "d")
@@ -189,7 +189,7 @@ func TestNoteActionsInPalette(t *testing.T) {
 	st = state()
 
 	// t on a person in the list still adds a task.
-	press(m, "a", "t", "tab")
+	press(m, "a", "t")
 	assert.Equal(t, modePrompt, m.mode)
 	press(m, "esc")
 

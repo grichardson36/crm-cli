@@ -221,13 +221,19 @@ func (m *Model) startDealEdit(id int64) tea.Cmd {
 		return nil
 	}
 	m.lineID = id
-	org, person := "", ""
+	var orgs, people []string
 	if d.OrgID != nil {
-		org = m.orgName(*d.OrgID)
+		orgs = append(orgs, m.orgName(*d.OrgID))
 	}
-	if len(d.PersonIDs) > 0 {
-		person = m.personLabel(d.PersonIDs[0])
+	for _, id := range d.OrgIDs {
+		if d.OrgID == nil || id != *d.OrgID {
+			orgs = append(orgs, m.orgName(id))
+		}
 	}
+	for _, id := range d.PersonIDs {
+		people = append(people, m.personLabel(id))
+	}
+	org, person := strings.Join(orgs, ", "), strings.Join(people, ", ")
 	line := strings.Join([]string{d.Title, plainNumber(d.Value), d.Stage, org, person, cleanCell(str(d.Notes))}, " | ")
 	m.startInput("deal-edit", dealPrompt(), strings.TrimRight(line, " |"))
 	return m.input.Focus()
@@ -373,13 +379,9 @@ func (m *Model) saveDealAdd(line string) (string, error) {
 	if !model.ValidDealStage(stage) {
 		return "", fmt.Errorf("stage must be one of: %s", strings.Join(model.DealStages, ", "))
 	}
+	// The organization and person segments hold several names: pipePrepare resolved them and
+	// afterCreate links them, the first organization as the primary one (pipelink.go).
 	in := model.CreateDealInput{Title: f[0], Value: val, Stage: stage, Notes: optional(f[5])}
-	if in.OrgID, err = m.resolveOrg(f[3], nil); err != nil {
-		return "", err
-	}
-	if in.PersonID, err = m.resolvePerson(f[4], nil); err != nil {
-		return "", err
-	}
 	d, err := m.hCreateDeal(in)
 	if err != nil {
 		return "", err
@@ -412,18 +414,6 @@ func (m *Model) saveDealEdit(id int64, line string) (string, error) {
 	if !model.ValidDealStage(after.Stage) {
 		return "", fmt.Errorf("stage must be one of: %s", strings.Join(model.DealStages, ", "))
 	}
-	newOrg, err := m.resolveOrg(f[3], before.OrgID)
-	if err != nil {
-		return "", err
-	}
-	var curPerson *int64
-	if len(before.PersonIDs) > 0 {
-		curPerson = &before.PersonIDs[0]
-	}
-	newPerson, err := m.resolvePerson(f[4], curPerson)
-	if err != nil {
-		return "", err
-	}
 	after.Notes = optional(f[5])
 	// The fields and the two links undo as one step.
 	m.beginGroup()
@@ -432,39 +422,16 @@ func (m *Model) saveDealEdit(id int64, line string) (string, error) {
 		return "", err
 	}
 	deal := repo.Ref{Kind: "deal", ID: id}
-	if err := m.setDealLink(deal, "organization", before.OrgID, newOrg, true); err != nil {
-		return "", err
-	}
-	if err := m.setDealLink(deal, "person", curPerson, newPerson, false); err != nil {
-		return "", err
-	}
-	return "deal saved (ctrl+z undoes)", nil
-}
-
-// setDealLink makes the deal line's organization or person the one linked: it links the new one
-// (primary for an organization) and unlinks the old one. An emptied field unlinks.
-func (m *Model) setDealLink(deal repo.Ref, other string, old, now *int64, primary bool) error {
-	if eqInt(old, now) {
-		return nil
-	}
-	if old != nil {
-		if err := m.unlinkRecorded(deal, repo.Ref{Kind: other, ID: *old}, 0); err != nil {
-			return err
+	// The organization and person segments are the whole set of links: names taken out are unlinked.
+	links := m.pipeLinks
+	m.pipeLinks, m.pipeObj = nil, ""
+	m.pipeRes = map[string]pendingLink{}
+	for _, kind := range []string{"organization", "person"} {
+		if err := m.syncLinks(deal, kind, links); err != nil {
+			return "", err
 		}
 	}
-	if now == nil {
-		return nil
-	}
-	target := repo.Ref{Kind: other, ID: *now}
-	attrs := model.LinkAttrs{}
-	if primary {
-		yes := true
-		attrs.Primary = &yes
-	}
-	return m.recordLinkChange("link "+m.refName(deal)+" to "+m.refName(target), deal, target, func() error {
-		_, err := m.links.Link(m.ctx, deal, target, attrs)
-		return err
-	})
+	return "deal saved (ctrl+z undoes)", nil
 }
 
 // parseMoney reads a deal value such as 12500, $12,500 or 99.5. Empty means no value.
@@ -478,76 +445,6 @@ func parseMoney(s string) (*float64, error) {
 		return nil, fmt.Errorf("value %q is not a number", s)
 	}
 	return &v, nil
-}
-
-// resolveOrg turns an id or a name into an organization id. Empty means none. The name of the
-// organization the deal has now keeps it, even when other organizations share that name.
-func (m *Model) resolveOrg(s string, current *int64) (*int64, error) {
-	if s == "" {
-		return nil, nil
-	}
-	if current != nil && strings.EqualFold(s, m.orgName(*current)) {
-		return current, nil
-	}
-	if id, err := strconv.ParseInt(s, 10, 64); err == nil {
-		if _, err := m.orr.FindByID(m.ctx, id); err != nil {
-			return nil, fmt.Errorf("no organization with id %d", id)
-		}
-		return &id, nil
-	}
-	list, err := m.orr.FindAll(m.ctx, 0)
-	if err != nil {
-		return nil, err
-	}
-	var exact, partial []int64
-	for _, o := range list {
-		switch {
-		case strings.EqualFold(o.Name, s):
-			exact = append(exact, o.ID)
-		case strings.Contains(strings.ToLower(o.Name), strings.ToLower(s)):
-			partial = append(partial, o.ID)
-		}
-	}
-	return pickOne("organization", s, exact, partial)
-}
-
-func (m *Model) resolvePerson(s string, current *int64) (*int64, error) {
-	if s == "" {
-		return nil, nil
-	}
-	if current != nil && strings.EqualFold(s, m.personLabel(*current)) {
-		return current, nil
-	}
-	if id, err := strconv.ParseInt(s, 10, 64); err == nil {
-		if _, err := m.pr.FindByID(m.ctx, id); err != nil {
-			return nil, fmt.Errorf("no person with id %d", id)
-		}
-		return &id, nil
-	}
-	var exact, partial []int64
-	for _, p := range m.people {
-		switch {
-		case strings.EqualFold(p.Name, s):
-			exact = append(exact, p.ID)
-		case strings.Contains(strings.ToLower(p.Name), strings.ToLower(s)):
-			partial = append(partial, p.ID)
-		}
-	}
-	return pickOne("person", s, exact, partial)
-}
-
-func pickOne(what, s string, exact, partial []int64) (*int64, error) {
-	ids := exact
-	if len(ids) == 0 {
-		ids = partial
-	}
-	switch len(ids) {
-	case 0:
-		return nil, fmt.Errorf("no %s matches %q", what, s)
-	case 1:
-		return &ids[0], nil
-	}
-	return nil, fmt.Errorf("%d %ss match %q, use the id", len(ids), what, s)
 }
 
 func (m *Model) dealTitle(id int64) string {

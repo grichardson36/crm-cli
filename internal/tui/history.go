@@ -120,6 +120,12 @@ func (m *Model) recordQuick(_ string, changes []quick.Change) {
 			}
 			return quick.Redo(m.ctx, r, changes)
 		})
+	// A pipe line that made a task or a note writes its links now that the object exists (pipelink.go).
+	for _, c := range changes {
+		if c.Op == "create" && c.ID != 0 && (c.Entity == "task" || c.Entity == model.NoteKind) {
+			m.afterCreate(c.Entity, c.ID)
+		}
+	}
 }
 
 // recordMerge puts a logged merge (person or organization) on the undo stack. Undo and redo go

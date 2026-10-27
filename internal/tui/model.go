@@ -162,8 +162,15 @@ type Model struct {
 	orgCreateAnyway bool
 	// aliases is the name alias table, read once from the database (aliasTable).
 	aliases *alias.Table
-	// addLinkPending is the accepted suggestion of an add that links after the object is created.
-	addLinkPending *addSuggestion
+	// The pipe line being typed (pipeline.go): its popup session, the answers given to unresolved names
+	// (pipeRes), and the links to write once the object is saved (pipeLinks, of the object kind pipeObj).
+	pipe      *pipeSession
+	pipeRes   map[string]pendingLink
+	pipeLinks []pendingLink
+	pipeObj   string
+	// pipeFull is the whole line being saved, link segments included: a prompt that has to open again
+	// (the names list was cancelled) puts this back, not the object's own part of it.
+	pipeFull string
 	// typed is the destructive bulk verb waiting for its confirmation word (bulk.go).
 	typed *typedConfirm
 	// linkAlso are the other selected objects of a bulk link, taken by the link form (linkmany.go).
@@ -244,7 +251,7 @@ type Model struct {
 	barResume   *barResume
 	// addResume remembers where a global add (ctrl+a) came from (globaladd.go).
 	addResume *addReturn
-	// addSugg is the highlighted object offered as the link of a new task or note (globaladd.go).
+	// addSugg is the highlighted object the add flow started from, the first suggestion of the link segment that takes its kind (globaladd.go).
 	addSugg *addSuggestion
 	// barKind is the kind of the bar row whose verb is running (enterBarContext), "" outside the bar.
 	barKind string
@@ -270,6 +277,7 @@ func New(ctx context.Context, db *sql.DB) (*Model, error) {
 	ri.Prompt = ""
 	registry := crmsync.DefaultRegistry(os.Getenv)
 	m := &Model{
+		pipeRes:    map[string]pendingLink{},
 		ctx:        ctx,
 		db:         db,
 		registry:   registry,
@@ -818,17 +826,12 @@ func (m *Model) startInput(kind, prompt, initial string) {
 
 func (m *Model) handlePromptKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "esc":
-		m.mode = modeNormal
-		m.input.Blur()
-		m.addSugg, m.addLinkPending = nil, nil
-		return m, nil
 	case "enter":
 		value := strings.TrimSpace(m.input.Value())
 		kind := m.promptKind
 		m.mode = modeNormal
 		m.input.Blur()
-		m.addSugg = nil
+		m.addSugg, m.pipe = nil, nil
 		m.pendingCmd = nil
 		if value != "" || kind == "link-attrs" {
 			m.runPrompt(kind, value)
@@ -836,6 +839,18 @@ func (m *Model) handlePromptKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		cmd := m.pendingCmd
 		m.pendingCmd = nil
 		return m, cmd
+	}
+	// The pipe line sees up, down, tab and esc first while its popup is open (pipecomplete.go).
+	if m.pipeKey(msg) {
+		return m, nil
+	}
+	switch msg.String() {
+	case "esc":
+		m.mode = modeNormal
+		m.input.Blur()
+		m.addSugg, m.pipe = nil, nil
+		m.pipeRes, m.pipeLinks = map[string]pendingLink{}, nil
+		return m, nil
 	case "tab", "shift+tab":
 		// The text-entry keys come from the registry (prompt-tab, prompt-tab-back in verbs.go).
 		if a := m.lookupKey(msg.String(), keyText); a != nil {
@@ -844,6 +859,7 @@ func (m *Model) handlePromptKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	var cmd tea.Cmd
 	m.input, cmd = m.input.Update(msg)
+	m.pipeRefresh()
 	return m, cmd
 }
 
@@ -901,6 +917,33 @@ func (m *Model) bulk(ids []int64, single, plural string, fn func(id int64) error
 }
 
 func (m *Model) runPrompt(kind, value string) {
+	if kind == personAddKind {
+		// A picker for a name of the new person's line ended: back to the name row, which saves again.
+		if m.creating && m.edit != nil {
+			m.mode = modeEdit
+			_ = m.rowInput.Focus()
+			m.commitEdit()
+		}
+		return
+	}
+	// A pipe line is checked and its link segments resolved first (pipelink.go). The save code below
+	// reads only the object's own segments.
+	if pl := m.pipeFor(kind); pl != nil {
+		prompt, full := m.input.Prompt, value
+		m.pipeFull = full
+		reopen := func() { m.startInput(kind, prompt, full); _ = m.input.Focus() }
+		if !m.pipePrepare(kind, value, reopen) {
+			return
+		}
+		value = pl.coreLine(value)
+		defer func() {
+			// A save that failed puts the line back: keep the link segments in it.
+			if m.mode == modePrompt && m.promptKind == kind && m.input.Value() == value && full != value {
+				m.input.SetValue(full)
+				m.input.CursorEnd()
+			}
+		}()
+	}
 	if kind == "tag-rename" {
 		m.runTagRename(value)
 		return
@@ -985,28 +1028,44 @@ func (m *Model) runPrompt(kind, value string) {
 			m.setStatus("no person selected", true)
 			return
 		}
-		// The note goes through the same reader as the command bar: #tag tags the note, +Name
-		// links people, remind fri makes a reminder and every 3m sets the cadence.
-		typ := m.currentNoteType()
-		env := m.quickEnvFor(pid)
-		env.NoteType = typ
-		_, err := m.runLineAsk("note "+value, env,
-			func() { m.startInput("note", typ+": ", value); _ = m.input.Focus() },
-			func(plan *quick.Plan) tea.Cmd {
-				m.noteType = typ
-				m.setStatus(typ+" added"+extras(plan), false)
-				return m.showToast(typ+" added"+extras(plan), false)
-			})
-		if err != nil {
-			m.setStatus(err.Error(), true)
-			return
-		}
+		m.runNoteAs(pid, value, "note")
+		return
 	case "task":
 		if pid == 0 {
 			m.setStatus("no person selected", true)
 			return
 		}
 		m.runTaskLine(pid, value, "task")
+		return
+	}
+	m.afterWrite()
+}
+
+// reopenLine is the text to put back into a prompt that opens again: the whole line when the prompt is a
+// pipe line, else the text given.
+func (m *Model) reopenLine(value string) string {
+	if m.pipeFull != "" && strings.HasPrefix(m.pipeFull, value) {
+		return m.pipeFull
+	}
+	return value
+}
+
+// runNoteAs saves a note line for a person through the same reader as the command bar: #tag tags the
+// note, @Name links people, remind fri makes a reminder and every 3m sets the cadence. kind is the prompt
+// the line is typed in, to open it again when the names list is cancelled.
+func (m *Model) runNoteAs(pid int64, value, kind string) {
+	typ := m.currentNoteType()
+	env := m.quickEnvFor(pid)
+	env.NoteType = typ
+	_, err := m.runLineAsk("note "+value, env,
+		func() { m.startInput(kind, typ+": ", m.reopenLine(value)); _ = m.input.Focus() },
+		func(plan *quick.Plan) tea.Cmd {
+			m.noteType = typ
+			m.setStatus(typ+" added"+extras(plan), false)
+			return m.showToast(typ+" added"+extras(plan), false)
+		})
+	if err != nil {
+		m.setStatus(err.Error(), true)
 		return
 	}
 	m.afterWrite()

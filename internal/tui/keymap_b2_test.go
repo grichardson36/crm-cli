@@ -447,7 +447,7 @@ func TestCtrlCCopiesAFocusedFieldAndOtherwiseQuits(t *testing.T) {
 	assert.Contains(t, m.status, "copied")
 	// In a prompt it cancels.
 	press(m, "esc")
-	press(m, "a", "t", "tab")
+	press(m, "a", "t")
 	require.Equal(t, modePrompt, m.mode)
 	press(m, "esc")
 	// y is not a key any more.

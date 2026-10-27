@@ -74,7 +74,9 @@ func TestEveryRegisteredPromptHasItsFieldsFromTheRegistry(t *testing.T) {
 		for _, kind := range o.prompts {
 			t.Run(kind, func(t *testing.T) {
 				require.NotEmpty(t, o.fields, "%s registers a prompt and needs fields", o.kind)
-				assert.Equal(t, o.fields, m.promptFieldsFor(kind))
+				got := m.promptFieldsFor(kind)
+				require.GreaterOrEqual(t, len(got), len(o.fields))
+				assert.Equal(t, o.fields, got[:len(o.fields)], "the object's own fields come first, link segments follow")
 			})
 		}
 	}
@@ -129,7 +131,7 @@ func TestPromptShowsTheShapeWhileTyping(t *testing.T) {
 }
 
 func (m *Model) startNotePromptForTest() {
-	press(m, "a", "n", "tab")
+	press(m, "a", "n")
 }
 
 func TestHintIsNeverSubmittedAndHiddenWhenTheCursorIsNotAtTheEnd(t *testing.T) {
@@ -228,7 +230,7 @@ func TestHintIsRenderedWithTheDimStyle(t *testing.T) {
 	t.Cleanup(func() { lipgloss.SetColorProfile(prev) })
 
 	m, _ := newTestModel(t)
-	m.width = 120
+	m.width = 400
 	m.startInput("org-add", orgPrompt(), "")
 	m.input.SetValue("Acme")
 	m.input.CursorEnd()

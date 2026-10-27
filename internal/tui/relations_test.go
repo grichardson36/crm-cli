@@ -340,9 +340,9 @@ func TestDealPageAndNoteOnAnOrganization(t *testing.T) {
 	}
 
 	// n adds a note to the deal, ctrl+z undoes it, the deal page lists it.
-	press(m, "a", "n", "tab")
+	press(m, "a", "n")
 	require.Equal(t, modePrompt, m.mode)
-	submit(m, "sent the proposal")
+	submitLinked(m, "sent the proposal")
 	list, err := m.ir.FindAll(ctx, model.InteractionFilters{DealID: &d.ID})
 	require.NoError(t, err)
 	require.Len(t, list, 1)
@@ -354,8 +354,8 @@ func TestDealPageAndNoteOnAnOrganization(t *testing.T) {
 
 	// Same on an organization.
 	runPalette(m, "organizations view")
-	press(m, "a", "n", "tab")
-	submit(m, "met the team")
+	press(m, "a", "n")
+	submitLinked(m, "met the team")
 	olist, err := m.ir.FindAll(ctx, model.InteractionFilters{OrgID: &org.ID})
 	require.NoError(t, err)
 	assert.Len(t, olist, 1)

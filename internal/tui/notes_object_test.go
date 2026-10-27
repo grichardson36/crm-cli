@@ -123,19 +123,19 @@ func TestRecordPagesShareTaskAndNoteBehavior(t *testing.T) {
 			m, ref := pageFixture(t, kind)
 
 			// t adds a task for the page object, with the same prompt and the due date after the pipe.
-			press(m, "a", "t", "tab")
+			press(m, "a", "t")
 			require.Equal(t, modePrompt, m.mode, "t opens the task prompt on a %s page", kind)
 			assert.Equal(t, "task: ", m.input.Prompt)
-			submit(m, "Call back | 2026-12-01")
+			submitLinked(m, "Call back | 2026-12-01")
 			tasks := tasksOf(t, m, ref)
 			require.Len(t, tasks, 1)
 			assert.Equal(t, "Call back", tasks[0].Title)
 			assert.Equal(t, "task added", m.status)
 
 			// n adds a note to the page object.
-			press(m, "a", "n", "tab")
+			press(m, "a", "n")
 			require.Equal(t, modePrompt, m.mode, "n opens the note prompt on a %s page", kind)
-			submit(m, "first draft")
+			submitLinked(m, "first draft")
 			notes := notesAbout(t, m, ref)
 			require.Len(t, notes, 1)
 			assert.Equal(t, "first draft", str(notes[0].Content))

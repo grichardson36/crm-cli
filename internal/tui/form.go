@@ -434,8 +434,8 @@ func (m *Model) renderRow(i int, r formRow, w int) []string {
 	}
 	if m.mode == modeEdit && m.edit != nil && m.edit.row == i {
 		line := m.st.Dim.Render(label) + strings.TrimRight(m.rowInput.View(), " ")
-		if sug := m.suggestionHint(); sug != "" && m.creating {
-			line += m.st.Dim.Render(cutHint(hintSpacing(m.rowInput.Value())+sug, w-labelWidth-runewidth.StringWidth(m.rowInput.Value())-2))
+		if m.creating {
+			line += m.st.Dim.Render(cutHint(hintSpacing(m.rowInput.Value())+pipeHint(m.pipeFor(personAddKind).labels(), m.rowInput.Value()), w-labelWidth-runewidth.StringWidth(m.rowInput.Value())-2))
 		} else if r.spec != nil {
 			line += m.st.Dim.Render(m.fieldHint(*r.spec, m.rowInput.Value(), w-labelWidth-runewidth.StringWidth(m.rowInput.Value())-2))
 		}
@@ -661,7 +661,8 @@ func (m *Model) addRow(k rowKind) tea.Cmd {
 func (m *Model) cancelEdit() {
 	creating := m.creating
 	if creating {
-		m.addSugg, m.addLinkPending = nil, nil
+		m.addSugg, m.pipe = nil, nil
+		m.pipeRes, m.pipeLinks = map[string]pendingLink{}, nil
 	}
 	m.mode = modeNormal
 	m.edit = nil
@@ -682,6 +683,10 @@ func (m *Model) handleEditKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.edit != nil && m.edit.ta != nil {
 		return m.handleTypeaheadKey(msg)
 	}
+	// The name row of a new person is a pipe line: name | organizations | ... (pipeline.go).
+	if m.creating && m.pipeKey(msg) {
+		return m, nil
+	}
 	switch msg.String() {
 	case "esc":
 		m.cancelEdit()
@@ -690,10 +695,6 @@ func (m *Model) handleEditKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.commitEdit()
 		return m, nil
 	case "tab", "shift+tab":
-		if m.creating && msg.String() == "tab" && m.addSugg != nil && !m.addSugg.accepted {
-			m.pendingCmd = m.acceptSuggestion() // the grayscale link offered by the add picker
-			return m, m.takePending()
-		}
 		if m.edit != nil && m.edit.kind == rkHandle {
 			m.cycleHandleKind(msg.String() == "tab")
 		}
@@ -701,6 +702,9 @@ func (m *Model) handleEditKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	var cmd tea.Cmd
 	m.rowInput, cmd = m.rowInput.Update(msg)
+	if m.creating {
+		m.pipeRefresh()
+	}
 	m.syncDetail()
 	return m, cmd
 }
@@ -752,7 +756,7 @@ func (m *Model) applyEdit(e *editState, v string) error {
 	m.beginGroup() // an edit that adds then removes a value undoes as one step
 	defer m.endGroup("")
 	if m.creating {
-		return m.createPerson(v)
+		return m.submitPersonLine(v)
 	}
 	if v == "" && e.kind != rkField {
 		m.cancelEdit()
@@ -909,6 +913,22 @@ func (m *Model) applyEdit(e *editState, v string) error {
 		m.cancelEdit()
 	}
 	return nil
+}
+
+// submitPersonLine is enter on the name row of a new person: the line is checked, its link segments
+// are resolved (an unresolved name opens pick-or-create and comes back here), then the person is made
+// and the links written by afterCreate.
+func (m *Model) submitPersonLine(line string) error {
+	reopen := func() {
+		if m.creating && m.edit != nil {
+			m.mode = modeEdit
+			_ = m.rowInput.Focus()
+		}
+	}
+	if !m.pipePrepare(personAddKind, line, reopen) {
+		return nil
+	}
+	return m.createPerson(personAddLine().coreLine(line))
 }
 
 // createPerson inserts the person on the first successful save of a name.

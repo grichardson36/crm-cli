@@ -254,7 +254,7 @@ func noteDef() *objDef {
 		kind: model.NoteKind, label: "note", short: "note", group: "Contact", view: viewPeople, shortcut: "n",
 		fields:    []string{"text"},
 		cols:      []string{"date", "type and subject", "text"},
-		prompts:   []string{"note", "note-object"},
+		prompts:   []string{"note", "note-object", "note-free"},
 		barVerb:   "note",
 		barFields: []hintField{{Label: "text"}, {Label: "@person", Marker: "@"}, {Label: "#tag", Marker: "#"}, {Label: "remind fri", Marker: "remind "}},
 		can:       map[verb]bool{vAdd: true, vEdit: true, vLink: true, vUnlink: true, vDelete: true, vRestore: true},
