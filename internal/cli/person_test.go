@@ -241,7 +241,7 @@ func TestPurgeArchivedCommand(t *testing.T) {
 
 	_, _, code = crm(t, dbPath, "purge")
 	assert.Equal(t, 2, code, "--archived is required")
-	_, _, code = crm(t, dbPath, "purge", "--archived", "--type", "task")
+	_, _, code = crm(t, dbPath, "purge", "--archived", "--type", "widget")
 	assert.Equal(t, 2, code)
 
 	out, _, code := crm(t, dbPath, "purge", "--archived", "-f", "json")

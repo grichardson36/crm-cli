@@ -241,7 +241,7 @@ func (m *Model) purgeMany(typed string) {
 		m.setStatus(fmt.Sprintf("did not match %q, nothing deleted", bulkPurgeWord(len(ids))), true)
 		return
 	}
-	res, err := m.pr.PurgeArchived(m.ctx, repo.PurgeArchivedOptions{Kind: "person", IDs: ids, Apply: true})
+	res, err := repo.PurgeArchived(m.ctx, m.db, repo.PurgeArchivedOptions{Kind: "person", IDs: ids, Apply: true})
 	m.marked = map[int64]bool{}
 	m.afterWrite()
 	switch {

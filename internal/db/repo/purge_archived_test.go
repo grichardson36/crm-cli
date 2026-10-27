@@ -40,22 +40,28 @@ func TestPurgeArchived(t *testing.T) {
 		{"dry run changes nothing", func(ids []int64, _ int64) repo.PurgeArchivedOptions { return repo.PurgeArchivedOptions{} }, 3, 3, 0, false},
 		{"apply all", func(ids []int64, _ int64) repo.PurgeArchivedOptions { return repo.PurgeArchivedOptions{Apply: true} }, 3, 0, 0, false},
 		{"apply some ids", func(ids []int64, _ int64) repo.PurgeArchivedOptions {
-			return repo.PurgeArchivedOptions{Apply: true, IDs: ids[:2]}
+			return repo.PurgeArchivedOptions{Kind: "person", Apply: true, IDs: ids[:2]}
 		}, 2, 1, 0, false},
 		{"live and unknown ids are skipped", func(ids []int64, live int64) repo.PurgeArchivedOptions {
-			return repo.PurgeArchivedOptions{Apply: true, IDs: []int64{ids[0], live, 999}}
+			return repo.PurgeArchivedOptions{Kind: "person", Apply: true, IDs: []int64{ids[0], live, 999}}
 		}, 1, 2, 2, false},
 		{"type person is accepted", func(ids []int64, _ int64) repo.PurgeArchivedOptions {
 			return repo.PurgeArchivedOptions{Kind: "person", Apply: true}
 		}, 3, 0, 0, false},
-		{"other types are refused", func(ids []int64, _ int64) repo.PurgeArchivedOptions {
-			return repo.PurgeArchivedOptions{Kind: "task", Apply: true}
+		{"unknown types are refused", func(ids []int64, _ int64) repo.PurgeArchivedOptions {
+			return repo.PurgeArchivedOptions{Kind: "widget", Apply: true}
 		}, 0, 3, 0, true},
+		{"ids need a type", func(ids []int64, _ int64) repo.PurgeArchivedOptions {
+			return repo.PurgeArchivedOptions{IDs: ids[:1], Apply: true}
+		}, 0, 3, 0, true},
+		{"another type leaves people alone", func(ids []int64, _ int64) repo.PurgeArchivedOptions {
+			return repo.PurgeArchivedOptions{Kind: "task", Apply: true}
+		}, 0, 3, 0, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			pr, ids, live := setup(t)
-			res, err := pr.PurgeArchived(ctx, tt.opts(ids, live))
+			res, err := repo.PurgeArchived(ctx, pr.DB(), tt.opts(ids, live))
 			if tt.wantErr {
 				assert.ErrorIs(t, err, model.ErrValidation)
 			} else {
