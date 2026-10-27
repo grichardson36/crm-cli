@@ -293,6 +293,10 @@ func buildActions() []action {
 		// Archive.
 		{id: "purge", title: "Purge forever", group: "Archive", hint: "d", keys: []string{"d"}, desc: "permanently delete the archived person after typing the name (d is the Delete verb)",
 			write: true, foot: 21, footIn: inList, when: whenArchivedPerson, run: func(m *Model) tea.Cmd { return m.askPurge() }},
+		{id: "purge-selected", title: "Purge selected forever", group: "Archive", desc: "permanently delete the space-selected archived people after typing the count back, for example purge 37 (palette, no key). Same tombstones as a single purge",
+			write: true, when: whenBulkPurgeSelected, run: func(m *Model) tea.Cmd { return m.askPurgeMany(false) }},
+		{id: "purge-all", title: "Purge all remaining forever", group: "Archive", desc: "permanently delete every archived person in the current type filter after typing the count back, for example purge 37 (palette, no key). Only people can be purged",
+			write: true, when: whenBulkPurgeAll, run: func(m *Model) tea.Cmd { return m.askPurgeMany(true) }},
 		{id: "archived-type", title: "Filter archived by type", group: "Archive", hint: "ctrl+f", keys: []string{"ctrl+f"}, desc: "show only archived people, organizations, deals or tasks (Archived view). r restores the one under the cursor",
 			foot: 22, footIn: inList, footLabel: "type", when: func(m *Model) bool { return m.view == viewArchived && m.focus == focusList },
 			run: func(m *Model) tea.Cmd { m.pickArchivedType(); return nil }},

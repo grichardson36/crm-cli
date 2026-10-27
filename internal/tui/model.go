@@ -156,6 +156,8 @@ type Model struct {
 	orgCreateAnyway bool
 	// aliases is the name alias table, read once from the database (aliasTable).
 	aliases *alias.Table
+	// purgeIDs are the archived people a bulk purge is waiting to confirm (archive.go).
+	purgeIDs []int64
 	detail      viewport.Model
 	detailKey   string
 	input       textinput.Model
@@ -931,6 +933,9 @@ func (m *Model) runPrompt(kind, value string) {
 		return
 	case "purge":
 		m.purgeCurrent(value)
+		return
+	case "purge-bulk":
+		m.purgeMany(value)
 		return
 	case "tasktag":
 		m.tagTask(value)

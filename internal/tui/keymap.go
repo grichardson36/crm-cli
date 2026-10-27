@@ -244,7 +244,7 @@ var scopeByID = map[string]string{
 	"deal-delete": "type:deal", "deal-edit": "type:deal", "deal-restore": "type:deal", "deal-add": "type:deal", "deal-stage": "type:deal",
 	// Merge, Archived, Sync
 	"dupe-level": "type:dupes", "dismiss": "type:dupes", "undo-dismiss": "type:dupes", "compare": "type:dupes",
-	"purge": "type:archive", "archived-type": "type:archive",
+	"purge": "type:archive", "purge-selected": "type:archive", "purge-all": "type:archive", "archived-type": "type:archive",
 	"sync-now": "type:inbox", "sync-dry": "type:inbox", "inbox-accept": "type:inbox", "inbox-attach": "type:inbox", "inbox-ignore": "type:inbox",
 	// Tags in the bar
 	"bar-tag-delete": "type:tag", "bar-tag-link": "type:tag", "bar-tag-unlink": "type:tag", "tag-rename": "type:tag", "tag-merge": "type:tag",

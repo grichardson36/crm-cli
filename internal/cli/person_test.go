@@ -229,3 +229,38 @@ func TestAliasCommands(t *testing.T) {
 	_, _, code = crm(t, dbPath, "alias", "remove", "zeke")
 	assert.Equal(t, 3, code)
 }
+
+func TestPurgeArchivedCommand(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "purge.db")
+	for _, n := range []string{"Ann", "Bea", "Cy"} {
+		_, _, code := crm(t, dbPath, "person", "add", n)
+		require.Equal(t, 0, code)
+	}
+	_, _, code := crm(t, dbPath, "person", "archive", "1", "2")
+	require.Equal(t, 0, code)
+
+	_, _, code = crm(t, dbPath, "purge")
+	assert.Equal(t, 2, code, "--archived is required")
+	_, _, code = crm(t, dbPath, "purge", "--archived", "--type", "task")
+	assert.Equal(t, 2, code)
+
+	out, _, code := crm(t, dbPath, "purge", "--archived", "-f", "json")
+	require.Equal(t, 0, code)
+	assert.Contains(t, out, "would purge")
+	out, _, _ = crm(t, dbPath, "person", "list", "--archived", "-f", "json")
+	assert.Contains(t, out, "Ann", "dry run deletes nothing")
+
+	_, _, code = crm(t, dbPath, "purge", "--archived", "--ids", "1", "--apply")
+	require.Equal(t, 0, code)
+	_, _, code = crm(t, dbPath, "person", "show", "1")
+	assert.Equal(t, 3, code)
+	_, _, code = crm(t, dbPath, "person", "show", "2")
+	assert.Equal(t, 3, code, "archived person 2 still hidden")
+	out, _, code = crm(t, dbPath, "purge", "--archived", "--apply", "-f", "json")
+	require.Equal(t, 0, code)
+	assert.Contains(t, out, "purged")
+	out, _, _ = crm(t, dbPath, "purge", "--archived", "-f", "json")
+	assert.NotContains(t, out, "would purge", "nothing archived remains")
+	_, _, code = crm(t, dbPath, "person", "show", "3")
+	assert.Equal(t, 0, code, "live people are untouched")
+}

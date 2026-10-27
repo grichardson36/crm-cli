@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 	"sort"
+
+	"github.com/jdanielnd/crm-cli/internal/model"
 )
 
 // ArchivedItem is one soft-deleted object of any kind, for the Archived view.
@@ -53,4 +55,87 @@ func ListArchived(ctx context.Context, db *sql.DB, kind string) ([]ArchivedItem,
 	// Newest first across kinds.
 	sort.SliceStable(out, func(i, j int) bool { return out[i].UpdatedAt > out[j].UpdatedAt })
 	return out, nil
+}
+
+// PurgeArchivedOptions selects what a bulk purge removes. Only people can be purged, the other
+// archived kinds have no purge. Kind limits the selection ("" or "person"), IDs limits it to those
+// archived people (empty means every archived person). Apply false only reports.
+type PurgeArchivedOptions struct {
+	Kind  string
+	IDs   []int64
+	Apply bool
+}
+
+// PurgeSkip is a requested id that was not purged and why.
+type PurgeSkip struct {
+	ID     int64  `json:"id"`
+	Reason string `json:"reason"`
+}
+
+// PurgeArchivedResult is the plan (Apply false) or the outcome (Apply true) of a bulk purge.
+type PurgeArchivedResult struct {
+	Applied bool        `json:"applied"`
+	Count   int         `json:"count"`
+	People  []PurgeItem `json:"people"`
+	Skipped []PurgeSkip `json:"skipped,omitempty"`
+	Purged  int         `json:"purged"`
+	Errors  []PurgeSkip `json:"errors,omitempty"`
+}
+
+// PurgeItem is one person in a bulk purge.
+type PurgeItem struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+}
+
+// PurgeArchived permanently deletes archived people, each one exactly as PersonRepo.Purge does
+// (same dependents, same tombstones, one transaction per person). Without Apply nothing is written
+// and the result lists who would go. A person that fails stays and is listed in Errors, the rest
+// still purge.
+func (r *PersonRepo) PurgeArchived(ctx context.Context, opts PurgeArchivedOptions) (PurgeArchivedResult, error) {
+	res := PurgeArchivedResult{Applied: opts.Apply}
+	if opts.Kind != "" && opts.Kind != "person" {
+		return res, fmt.Errorf("only archived people can be purged, not %s: %w", opts.Kind, model.ErrValidation)
+	}
+	items, err := ListArchived(ctx, r.db, "person")
+	if err != nil {
+		return res, err
+	}
+	byID := map[int64]string{}
+	var all []int64
+	for _, it := range items {
+		byID[it.ID] = it.Name
+		all = append(all, it.ID)
+	}
+	want := all
+	if len(opts.IDs) > 0 {
+		want = nil
+		seen := map[int64]bool{}
+		for _, id := range opts.IDs {
+			if seen[id] {
+				continue
+			}
+			seen[id] = true
+			if _, ok := byID[id]; !ok {
+				res.Skipped = append(res.Skipped, PurgeSkip{ID: id, Reason: "not an archived person"})
+				continue
+			}
+			want = append(want, id)
+		}
+	}
+	for _, id := range want {
+		res.People = append(res.People, PurgeItem{ID: id, Name: byID[id]})
+	}
+	res.Count = len(res.People)
+	if !opts.Apply {
+		return res, nil
+	}
+	for _, p := range res.People {
+		if err := r.Purge(ctx, p.ID); err != nil {
+			res.Errors = append(res.Errors, PurgeSkip{ID: p.ID, Reason: err.Error()})
+			continue
+		}
+		res.Purged++
+	}
+	return res, nil
 }

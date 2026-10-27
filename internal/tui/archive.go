@@ -172,3 +172,84 @@ func (m *Model) purgeCurrent(typed string) {
 	m.afterWrite()
 	m.setStatus("deleted "+name+" forever", false)
 }
+
+// Bulk purge (owner decision 2026-10-28). Two palette actions, no bare key: "Purge selected forever"
+// for the space-selected rows and "Purge all remaining" for every archived person in the current type
+// filter. Both ask for the count typed back ("purge 37") and then write exactly what the single purge
+// writes, one person at a time, tombstones included. Only people have a purge, so other archived
+// kinds in the list are left alone and the prompt counts people only.
+
+// bulkPurgeWord is what the user types to confirm: "purge N".
+func bulkPurgeWord(n int) string { return fmt.Sprintf("purge %d", n) }
+
+// whenBulkPurgeSelected is true in the Archived view while archived people are space-selected.
+func whenBulkPurgeSelected(m *Model) bool {
+	return m.view == viewArchived && len(m.bulkPurgeSelected()) > 0
+}
+
+// whenBulkPurgeAll is true in the Archived view when the type filter can hold people.
+func whenBulkPurgeAll(m *Model) bool {
+	return m.view == viewArchived && (m.archKind == "" || m.archKind == "person")
+}
+
+// bulkPurgeSelected lists the space-selected archived people.
+func (m *Model) bulkPurgeSelected() []int64 {
+	var ids []int64
+	for _, id := range m.markedIDs() {
+		if m.arch[id] != nil {
+			ids = append(ids, id)
+		}
+	}
+	return ids
+}
+
+// bulkPurgeAll lists every archived person in the current type filter.
+func (m *Model) bulkPurgeAll() []int64 {
+	var ids []int64
+	for _, r := range m.rows {
+		if r.akind == "person" && r.personID != 0 {
+			ids = append(ids, r.personID)
+		}
+	}
+	return ids
+}
+
+// askPurgeMany opens the typed confirmation for the selected rows or for all remaining people.
+func (m *Model) askPurgeMany(all bool) tea.Cmd {
+	ids := m.bulkPurgeSelected()
+	what := "selected"
+	if all {
+		ids, what = m.bulkPurgeAll(), "remaining"
+	}
+	if len(ids) == 0 {
+		m.setStatus("no archived people to purge in this list (only people can be purged)", true)
+		return nil
+	}
+	m.purgeIDs = ids
+	m.startInput("purge-bulk", fmt.Sprintf("type %q to delete %d %s people forever: ", bulkPurgeWord(len(ids)), len(ids), what), "")
+	return m.input.Focus()
+}
+
+// purgeMany deletes the people chosen by askPurgeMany when the typed words match the count.
+func (m *Model) purgeMany(typed string) {
+	ids := m.purgeIDs
+	m.purgeIDs = nil
+	if len(ids) == 0 {
+		return
+	}
+	if !sameName(typed, bulkPurgeWord(len(ids))) {
+		m.setStatus(fmt.Sprintf("did not match %q, nothing deleted", bulkPurgeWord(len(ids))), true)
+		return
+	}
+	res, err := m.pr.PurgeArchived(m.ctx, repo.PurgeArchivedOptions{Kind: "person", IDs: ids, Apply: true})
+	m.marked = map[int64]bool{}
+	m.afterWrite()
+	switch {
+	case err != nil:
+		m.setStatus(err.Error(), true)
+	case len(res.Errors) > 0:
+		m.setStatus(fmt.Sprintf("deleted %d of %d forever, %d failed: %s", res.Purged, res.Count, len(res.Errors), res.Errors[0].Reason), true)
+	default:
+		m.setStatus(fmt.Sprintf("deleted %d people forever", res.Purged), false)
+	}
+}
