@@ -56,7 +56,8 @@ func TestPersonCompanyCreatesOrReusesOrganization(t *testing.T) {
 				_, stderr, code := crm(t, dbPath, s...)
 				require.Equal(t, 0, code, "%v: %s", s, stderr)
 			}
-			assert.Equal(t, tt.wantOrgs, orgNames(t, dbPath))
+			// org list orders by updated_at, which ties inside one second, so compare as a set
+			assert.ElementsMatch(t, tt.wantOrgs, orgNames(t, dbPath))
 		})
 	}
 }
