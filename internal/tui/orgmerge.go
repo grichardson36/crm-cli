@@ -10,60 +10,32 @@ import (
 )
 
 // Organization merge (open discrepancy X18) and the duplicate prompt for new organizations.
-// Marks in the Organizations view use the same m.marked map as people (it is cleared when the view
-// changes), space marks, M merges the marked organizations.
+// Selected organizations use the same m.marked set as every other object (selection.go): space or
+// shift+arrows select, m merges the selected organizations.
 
 // errPromptOpened is returned by a save that opened a follow-up prompt instead of finishing.
 var errPromptOpened = errors.New("prompt opened")
 
 func whenOrgsList(m *Model) bool { return m.view == viewOrgs && m.focus == focusList }
 
-// markedOrgIDs lists the marked organizations in list order.
-func (m *Model) markedOrgIDs() []int64 {
-	if m.view != viewOrgs || len(m.marked) == 0 {
-		return nil
-	}
-	var ids []int64
-	for _, r := range m.rows {
-		if r.orgID != 0 && m.marked[r.orgID] {
-			ids = append(ids, r.orgID)
-		}
-	}
-	return ids
-}
+// markedOrgIDs lists the selected organizations in list order.
+func (m *Model) markedOrgIDs() []int64 { return m.markedOfKind("organization") }
 
 func whenOrgMarks(m *Model) bool { return whenOrgsList(m) && len(m.markedOrgIDs()) >= 2 }
 
-func (m *Model) toggleOrgMark() {
-	id := m.selOrg()
-	if id == 0 {
-		return
-	}
-	if m.marked[id] {
-		delete(m.marked, id)
-	} else {
-		m.marked[id] = true
-	}
-	m.move(1)
-}
-
 func orgMergeActions() []action {
 	return []action{
-		{id: "org-mark", title: "Mark organization", group: "Organizations", hint: "space", keys: []string{" "},
-			desc: "mark or unmark the organization, then m merges the marked ones",
-			foot: 25, footIn: inList, footLabel: "mark", when: func(m *Model) bool { return whenOrgsList(m) && m.selOrg() != 0 },
-			run: func(m *Model) tea.Cmd { m.toggleOrgMark(); return nil }},
 		{id: "org-merge", title: "Merge marked organizations", group: "Organizations",
-			desc: "merge the marked organizations into one you pick: people, parent links, deals, notes and tags move, the others are archived and ctrl+z undoes it. Same as crm org merge",
+			desc:  "merge the marked organizations into one you pick: people, parent links, deals, notes and tags move, the others are archived and ctrl+z undoes it. Same as crm org merge",
 			write: true,
-			when: whenOrgsList, run: func(m *Model) tea.Cmd { m.askOrgMerge(); return nil }},
+			when:  whenOrgsList, run: func(m *Model) tea.Cmd { m.askOrgMerge(); return nil }},
 		// Palette only, no key (the owner is redesigning keys).
 		{id: "org-not-duplicate", title: "Not a duplicate (organization)", group: "Organizations",
-			desc: "tell the program the selected organization and the one with a close name are different organizations: the pair stops showing as a merge candidate. Stored as data, ctrl+z undoes it. Same as crm org dupes dismiss",
+			desc:  "tell the program the selected organization and the one with a close name are different organizations: the pair stops showing as a merge candidate. Stored as data, ctrl+z undoes it. Same as crm org dupes dismiss",
 			write: true, when: func(m *Model) bool { return whenOrgsList(m) && len(m.similarOrgs()[m.selOrg()]) > 0 },
 			run: func(m *Model) tea.Cmd { m.askNotDuplicate(); return nil }},
 		{id: "org-undismiss", title: "Show dismissed organization pairs", group: "Organizations",
-			desc: "list the organization pairs marked as not duplicates and pick one to make a merge candidate again. Same as crm org dupes undismiss",
+			desc:  "list the organization pairs marked as not duplicates and pick one to make a merge candidate again. Same as crm org dupes undismiss",
 			write: true, when: whenOrgsList, run: func(m *Model) tea.Cmd { m.askUndismissOrgs(); return nil }},
 	}
 }

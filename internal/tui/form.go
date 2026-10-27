@@ -55,6 +55,8 @@ type formRow struct {
 	// rkTyped: the field type and the record it belongs to.
 	spec *model.FieldSpec
 	ref  repo.Ref
+	// cells are the attribute cells of a linked row or a note row (cells.go).
+	cells []rowCell
 }
 
 type editState struct {
@@ -65,7 +67,7 @@ type editState struct {
 	handleKind  string
 	kindTouched bool
 	oldValue    string
-	origKind    string // handle kind when the edit started
+	origKind    string     // handle kind when the edit started
 	typed       *typedEdit // a typed field edit (fieldedit.go)
 	ta          *typeahead // a relation typeahead (typeahead.go)
 }
@@ -345,9 +347,15 @@ func (m *Model) refreshDetail(force bool) {
 	}
 	if changed {
 		m.fcur = m.firstSelectable()
+		m.fcol = 0
 		m.detail.GotoTop()
 	}
 	m.fcur = clampInt(m.fcur, 0, len(m.form)-1)
+	if m.fcur >= 0 && m.fcur < len(m.form) {
+		m.fcol = clampInt(m.fcol, 0, len(m.form[m.fcur].cells))
+	} else {
+		m.fcol = 0
+	}
 	if len(m.form) == 0 {
 		m.focus = focusList
 	}
@@ -380,7 +388,11 @@ func (m *Model) syncDetail() {
 			if len(lines) > 0 && lines[len(lines)-1] != "" {
 				push("", -1)
 			}
-			push(m.st.Head.Render(runewidth.Truncate(r.head, max(1, w), "…")), -1)
+			if len(r.cells) > 0 && !r.empty {
+				push(m.cellHeader(i, r, w), -1)
+			} else {
+				push(m.st.Head.Render(runewidth.Truncate(r.head, max(1, w), "…")), -1)
+			}
 		}
 		m.rowStart[i] = len(lines)
 		for _, l := range m.renderRow(i, r, w) {
@@ -411,6 +423,9 @@ func (m *Model) renderRow(i int, r formRow, w int) []string {
 	}
 
 	if m.mode == modeEdit && m.edit != nil && m.edit.row == i && m.edit.typed != nil {
+		if ce := m.edit.typed.cell; ce != nil {
+			label = fit(ce.cell.label, labelWidth)
+		}
 		return []string{m.typedEditLine(label, w)}
 	}
 	if m.mode == modeEdit && m.edit != nil && m.edit.row == i && m.edit.ta != nil {
@@ -424,6 +439,25 @@ func (m *Model) renderRow(i int, r formRow, w int) []string {
 			line += m.st.Dim.Render(m.fieldHint(*r.spec, m.rowInput.Value(), w-labelWidth-runewidth.StringWidth(m.rowInput.Value())-2))
 		}
 		return []string{lipgloss.NewStyle().MaxWidth(w).Render(line)}
+	}
+
+	if len(r.cells) > 0 && !r.empty {
+		out := []string{m.renderCellRow(i, r, w)}
+		if r.kind == rkNote && r.value != "" {
+			rest := strings.Split(strings.TrimRight(r.value, "\n"), "\n")
+			if len(rest) > 1 {
+				rest = rest[1:]
+			} else {
+				rest = nil
+			}
+			if len(rest) > 3 {
+				rest = append(rest[:3], "…")
+			}
+			for _, l := range rest {
+				out = append(out, m.st.Dim.Render(fit(strings.Repeat(" ", labelWidth)+runewidth.Truncate(l, max(1, w-labelWidth), "…"), w)))
+			}
+		}
+		return out
 	}
 
 	first := r.value
@@ -513,6 +547,9 @@ func (m *Model) startEdit() tea.Cmd {
 	if m.creating && !isNameRow(r) {
 		m.setStatus("enter a name first", true)
 		return nil
+	}
+	if m.fcol > 0 && len(r.cells) > 0 && !r.empty {
+		return m.beginCell()
 	}
 	if r.kind == rkTyped {
 		return m.beginTyped()
@@ -957,13 +994,13 @@ func (m *Model) askDelete() {
 	case rkTag:
 		what, do = "tag "+r.value, func() error { return m.hTagRemove(m.ctx, "person", pid, r.value) }
 	case rkTask:
-		m.verbDelete(objectByKind("task"))
+		m.pendingCmd = m.verbDelete(objectByKind("task"))
 		return
 	case rkLinked:
 		m.askUnlinkRow(r)
 		return
 	case rkNote:
-		m.verbDelete(objectByKind(model.NoteKind))
+		m.pendingCmd = m.verbDelete(objectByKind(model.NoteKind))
 		return
 	case rkInfo:
 		m.setStatus("this row is read-only", true)
@@ -1026,6 +1063,9 @@ func (m *Model) copyRow() {
 		return
 	}
 	v := r.value
+	if c, ok := m.focusedCell(); ok {
+		v = c.value
+	}
 	if r.kind == rkNote && strings.TrimSpace(v) == "" {
 		v = r.key
 	}
@@ -1067,26 +1107,6 @@ func linkFor(r formRow) string {
 		return "https://" + v
 	}
 	return ""
-}
-
-func (m *Model) openRow() {
-	r, ok := m.rowFocused()
-	if !ok {
-		return
-	}
-	u := linkFor(r)
-	if u == "" {
-		m.setStatus("nothing to open on this row", true)
-		return
-	}
-	if m.open == nil {
-		return
-	}
-	if err := m.open(u); err != nil {
-		m.setStatus("open failed: "+err.Error(), true)
-		return
-	}
-	m.setStatus("opened "+runewidth.Truncate(u, 50, "…"), false)
 }
 
 // inferHandleKind guesses the handle kind from a URL or username.

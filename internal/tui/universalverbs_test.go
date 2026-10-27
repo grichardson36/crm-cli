@@ -104,7 +104,6 @@ func TestXMarksTheOneMeaningOfEachType(t *testing.T) {
 	assert.True(t, got.Completed, "and ctrl+z undoes the reopen")
 }
 
-
 func TestDeleteLinkUnlinkRestoreAreOneKeyInEveryObjectView(t *testing.T) {
 	m, _ := newTestModel(t)
 	_, err := m.orr.Create(m.ctx, model.CreateOrgInput{Name: "Acme"})
@@ -187,14 +186,13 @@ func TestSpaceSelectsRowsInEveryListThatHasPeople(t *testing.T) {
 func TestEveryMovedFunctionIsStillReachable(t *testing.T) {
 	m, _ := newTestModel(t)
 	chords := map[string]string{ // action id -> its new ctrl chord
-		"sort": "ctrl+o", "dupe-level": "ctrl+l", "archived-type": "ctrl+f", "reload": "ctrl+r",
-		"cmp-survivor": "ctrl+e", "cmp-pair": "ctrl+b", "cmp-view": "ctrl+w",
+		"options": "ctrl+o", "reload": "ctrl+r", "cmp-survivor": "ctrl+e",
 	}
 	palette := []string{ // palette entries without a key
 		"sync-now", "sync-dry", "inbox-attach", "note-pick", "tag", "task-tag", "go-today",
 		"undo-dismiss", "scroll-down", "scroll-up", "contacted", "done", "org-merge", "merge-marked",
 		"org-add", "deal-add", "task", "new", "note", "person-edit", "org-edit", "deal-edit", "task-edit",
-		"org-restore", "deal-restore", "task-restore", "note-retype", "tag-rename", "compare", "home-open", "edit", "inbox-accept",
+		"org-restore", "deal-restore", "task-restore", "tag-rename", "cadence", "cmp-pair", "cmp-view", "modules-reset", "compare", "home-open", "edit", "inbox-accept",
 	}
 	for id, key := range chords {
 		a := m.actionByID(id)
@@ -257,12 +255,14 @@ func TestCtrlShiftArrowsHaveTheNamesTheRegistryUses(t *testing.T) {
 // A view declares its jump unit and home destination in one place, viewNavs. A view not listed
 // inherits a page and no home.
 func TestViewsInheritTheDefaultNavigation(t *testing.T) {
-	for _, v := range []viewKind{viewHome, viewDue, viewTasks, viewDeals, viewMerge, viewArchived, viewSync} {
+	for _, v := range []viewKind{viewHome, viewDue, viewTasks, viewDeals, viewArchived, viewSync} {
 		nav := navOf(v)
 		assert.Equal(t, unitPage, nav.unit, viewNames[v])
 		assert.Nil(t, nav.home, viewNames[v])
 	}
-	assert.Equal(t, unitDay, navOf(viewBirthdays).unit)
+	assert.Equal(t, unitGroup, navOf(viewBirthdays).unit)
+	assert.Equal(t, unitGroup, navOf(viewMerge).unit, "Merge jumps by confidence level")
+	assert.Nil(t, navOf(viewMerge).home)
 	assert.NotNil(t, navOf(viewBirthdays).home, "Birthdays declares today as its home")
 	assert.Equal(t, unitLetter, navOf(viewPeople).unit)
 	assert.Equal(t, unitLetter, navOf(viewOrgs).unit)

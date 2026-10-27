@@ -46,9 +46,9 @@ func (m *Model) openText(title, body string, back func(m *Model)) {
 func (m *Model) handleTextKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	tv := m.tv
 	switch msg.String() {
-	case "down", "ctrl+n":
+	case "down":
 		tv.vp.LineDown(1)
-	case "up", "ctrl+p":
+	case "up":
 		tv.vp.LineUp(1)
 	case "pgdown":
 		tv.vp.ViewDown()
@@ -62,7 +62,7 @@ func (m *Model) handleTextKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		tv.vp.GotoTop()
 	case "end", "ctrl+shift+down":
 		tv.vp.GotoBottom()
-	case "esc", "q", "ctrl+c":
+	case "esc", "ctrl+c":
 		m.tv = nil
 		if tv.back != nil {
 			tv.back(m)

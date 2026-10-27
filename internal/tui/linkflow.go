@@ -29,6 +29,8 @@ type linkDraft struct {
 	addNew   bool
 	existing *model.LinkedObject
 	prompted bool
+	// also are more objects linked to the same target in one step (a link of the selection).
+	also []repo.Ref
 	// allowDup: the user chose Create anyway for a new organization that matched an existing one.
 	allowDup bool
 }
@@ -65,6 +67,7 @@ func (m *Model) beginLinkDraft(src repo.Ref, other string, it overlayItem) tea.C
 		}
 	}
 	d.allowDup = m.orgCreateAnyway
+	d.also, m.linkAlso = m.linkAlso, nil
 	if it.id == "create" {
 		d.create, d.target.ID = it.value, 0
 	}
@@ -79,7 +82,7 @@ func (m *Model) beginLinkDraft(src repo.Ref, other string, it overlayItem) tea.C
 	}
 	// A pair may be linked under several kinds (friend and colleague), so a kind relation asks its
 	// kind first. Link then keeps one link per kind. Edit link (E) changes an existing one.
-	if rel.Kinded {
+	if rel.Kinded || len(d.also) > 0 {
 		return m.nextLinkStep()
 	}
 	existing := m.linksBetween(src, d.target)
@@ -130,25 +133,6 @@ func (m *Model) linksBetween(a, b repo.Ref) []model.LinkedObject {
 		}
 	}
 	return out
-}
-
-// editLink edits the attributes of one stored link of src.
-func (m *Model) editLink(src repo.Ref, li model.LinkedObject) tea.Cmd {
-	rel, ok := model.RelationNamed(li.Relation)
-	if !ok {
-		return nil
-	}
-	if len(rel.AskAttrs()) == 0 && !rel.Kinded {
-		m.setStatus("this link has no attributes to edit", true)
-		return nil
-	}
-	d := &linkDraft{src: src, other: li.Kind, rel: rel, target: repo.Ref{Kind: li.Kind, ID: li.ID}}
-	m.useExisting(d, li)
-	m.draft = d
-	if rel.Kinded {
-		return m.pickKind(d)
-	}
-	return m.nextLinkStep()
 }
 
 // nextLinkStep asks the next thing the form needs, or writes the link.
@@ -323,6 +307,9 @@ func (m *Model) finishLink(d *linkDraft) tea.Cmd {
 	label := "link " + name + " to " + targetName
 	if d.editID != 0 {
 		label = "edit link of " + name + " and " + targetName
+	}
+	if len(d.also) > 0 {
+		return m.finishLinkMany(d, targetName)
 	}
 	err := m.recordLinkChange(label, src, d.target, func() error {
 		var err error

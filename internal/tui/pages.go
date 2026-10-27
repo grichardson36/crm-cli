@@ -77,9 +77,13 @@ func (m *Model) rowsFromLinks(items []model.LinkedObject, srcKind, other, head, 
 		return []formRow{{kind: rkLinked, label: label, empty: true, other: other}}
 	}
 	var rows []formRow
+	kc := m.kindChoices()
 	for i, li := range items {
 		li := li
 		r := formRow{kind: rkLinked, label: label, value: li.Name, id: li.ID, suffix: m.linkSuffix(li), li: &li, other: other, dim: !li.Current}
+		if cells := m.linkCells(li, kc); len(cells) > 0 {
+			r.cells, r.suffix = cells, ""
+		}
 		if li.Label != "" {
 			r.label = li.Label
 		}
@@ -104,12 +108,14 @@ func (m *Model) timelineRows(f model.InteractionFilters) []formRow {
 		return []formRow{{kind: rkNote, label: "note", empty: true, head: "Recent"}}
 	}
 	var rows []formRow
+	cells := m.noteCells("")
 	for i, it := range ints {
 		val := it.Type
 		if it.Subject != nil && *it.Subject != "" {
 			val += ": " + *it.Subject
 		}
 		r := formRow{kind: rkNote, label: shortDate(it.OccurredAt), key: val, value: str(it.Content), id: it.ID, typ: it.Type}
+		r.cells = []rowCell{{key: "type", label: "type", value: it.Type, spec: cells[0].spec}}
 		if i == 0 {
 			r.head = "Recent"
 		}

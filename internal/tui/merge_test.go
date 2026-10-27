@@ -28,8 +28,20 @@ func dupeModel(t *testing.T) (*Model, *repo.PersonRepo) {
 	require.NoError(t, pr.AddEmail(ctx, karen.ID, "cara@initech.com", nil, false))
 	require.Equal(t, int64(4), bob2.ID)
 	require.Equal(t, int64(5), karen.ID)
+	m.minLevel = dedupe.Medium // most tests want the two groups above; the default lists every level (TestMergeViewGroupsByLevel)
 	require.NoError(t, m.reload())
 	return m, pr
+}
+
+// groupRowsOf lists the selectable rows of the list: the dividers between groups are left out.
+func groupRowsOf(m *Model) []row {
+	var out []row
+	for _, r := range m.rows {
+		if !r.skip {
+			out = append(out, r)
+		}
+	}
+	return out
 }
 
 func archivedIDs(t *testing.T, pr *repo.PersonRepo) map[int64]bool {
@@ -43,36 +55,75 @@ func archivedIDs(t *testing.T, pr *repo.PersonRepo) map[int64]bool {
 	return out
 }
 
-func TestMergeViewListsGroupsHighFirstAndCyclesLevel(t *testing.T) {
+func TestMergeViewListsGroupsHighFirstUnderLevelDividers(t *testing.T) {
 	m, _ := dupeModel(t)
 	press(m, "8")
 	assert.Equal(t, viewMerge, m.view)
-	require.Len(t, m.rows, 2)
-	assert.True(t, strings.HasPrefix(m.rows[0].title, "HIGH"), m.rows[0].title)
-	assert.Contains(t, m.rows[0].title, "Cara Cole | Karen Cole")
-	assert.True(t, strings.HasPrefix(m.rows[1].title, "MED"), m.rows[1].title)
+	rows := groupRowsOf(m)
+	require.Len(t, rows, 2)
+	assert.True(t, strings.HasPrefix(rows[0].title, "HIGH"), rows[0].title)
+	assert.Contains(t, rows[0].title, "Cara Cole | Karen Cole")
+	assert.True(t, strings.HasPrefix(rows[1].title, "MED"), rows[1].title)
 	out := m.View()
 	assert.Contains(t, out, "2 groups, medium+")
 	assert.Contains(t, out, "8 Merge")
 	assert.Contains(t, out, "email cara@initech.com", "the detail pane explains the group")
-
-	// ctrl+l lowers the level, wraps to high, then back to medium.
-	press(m, "ctrl+l")
-	assert.Equal(t, dedupe.Low, m.minLevel)
-	press(m, "ctrl+l")
-	assert.Equal(t, dedupe.Fuzzy, m.minLevel)
-	press(m, "ctrl+l")
-	assert.Equal(t, dedupe.High, m.minLevel)
-	require.Len(t, m.rows, 1)
-	assert.Contains(t, m.rows[0].title, "HIGH")
-	assert.Contains(t, m.View(), "1 groups, high+")
-	press(m, "ctrl+l")
-	assert.Equal(t, dedupe.Medium, m.minLevel)
-	assert.Len(t, m.rows, 2)
+	assert.Contains(t, out, "HIGH confidence")
+	assert.Contains(t, out, "MEDIUM confidence")
 
 	// Person keys do nothing on a group row.
 	press(m, "x", "f", "s")
 	assert.Equal(t, modeNormal, m.mode)
+}
+
+// The default lists every candidate, grouped by level with a divider heading per level, in the style
+// of the Birthdays day dividers (owner decision 2026-10-28).
+func TestMergeViewGroupsByLevel(t *testing.T) {
+	m, _ := dupeModel(t)
+	m.minLevel = dedupe.Fuzzy
+	require.NoError(t, m.reload())
+	press(m, "8")
+	assert.Equal(t, "confidence level", groupField(viewMerge))
+	var heads []string
+	prev := dedupe.High + 1
+	for _, r := range m.rows {
+		if r.rule {
+			assert.True(t, r.skip, "a divider is never selected")
+			heads = append(heads, strings.Fields(r.title)[0])
+			assert.Contains(t, r.meta, "group")
+			continue
+		}
+		require.True(t, r.dupe > 0 && !r.skip, "a row between dividers is a group")
+		lvl := m.groups[r.dupe-1].Level
+		assert.LessOrEqual(t, int(lvl), int(prev), "high groups come first")
+		prev = lvl
+	}
+	require.GreaterOrEqual(t, len(heads), 2)
+	assert.Equal(t, "HIGH", heads[0])
+	assert.Equal(t, "MEDIUM", heads[1])
+	// The cursor starts on a group, not on a divider, and ctrl+down jumps to the next level.
+	assert.False(t, m.rows[m.cursor].skip)
+	assert.Equal(t, viewMerge, m.view)
+	first := m.cursor
+	press(m, "ctrl+down")
+	assert.Greater(t, m.cursor, first)
+	assert.False(t, m.rows[m.cursor].skip)
+	assert.Equal(t, "MED", strings.Fields(m.rows[m.cursor].title)[0])
+
+	// The view options overlay narrows the minimum level.
+	press(m, "ctrl+o")
+	require.Equal(t, modeOverlay, m.mode)
+	assert.Contains(t, m.ov.title, "View options")
+	for i := 0; i < 3; i++ { // fuzzy, low, medium, high
+		press(m, "right")
+	}
+	press(m, "esc")
+	assert.Equal(t, dedupe.High, m.minLevel)
+	rows := groupRowsOf(m)
+	require.Len(t, rows, 1)
+	assert.Contains(t, rows[0].title, "HIGH")
+	assert.Contains(t, m.View(), "1 groups, high+")
+	assert.Empty(t, m.actionByID("options").keys[1:], "ctrl+o is the only key of the options overlay")
 }
 
 func TestMergeViewEmptyMessage(t *testing.T) {
@@ -87,26 +138,26 @@ func TestDismissAndUndoDismiss(t *testing.T) {
 	press(m, "8", "down")
 	assert.Contains(t, m.rows[m.cursor].title, "Bob")
 	press(m, "d") // d is the Delete verb: it dismisses the group
-	require.Len(t, m.rows, 1)
-	assert.Contains(t, m.rows[0].title, "HIGH")
+	require.Len(t, groupRowsOf(m), 1)
+	assert.Contains(t, groupRowsOf(m)[0].title, "HIGH")
 	assert.Contains(t, m.status, "dismissed 2 people")
 	assert.Len(t, m.dismissed, 1)
 
 	press(m, "d")
-	assert.Empty(t, m.rows)
+	assert.Empty(t, groupRowsOf(m))
 	runID(m, "undo-dismiss") // a palette entry
-	require.Len(t, m.rows, 1, "undo brings back the last dismissed group")
-	assert.Contains(t, m.rows[0].title, "HIGH")
+	require.Len(t, groupRowsOf(m), 1, "undo brings back the last dismissed group")
+	assert.Contains(t, groupRowsOf(m)[0].title, "HIGH")
 	runID(m, "undo-dismiss")
-	assert.Len(t, m.rows, 2)
+	assert.Len(t, groupRowsOf(m), 2)
 	runID(m, "undo-dismiss")
 	assert.True(t, m.statusIsErr, "nothing left to undo")
-	assert.Len(t, m.rows, 2)
+	assert.Len(t, groupRowsOf(m), 2)
 
 	// Dismiss from inside the compare screen.
 	press(m, "enter", "d")
 	assert.Nil(t, m.cmp)
-	assert.Len(t, m.rows, 1)
+	assert.Len(t, groupRowsOf(m), 1)
 }
 
 func TestManualMergeOfMarkedPeople(t *testing.T) {
@@ -131,7 +182,7 @@ func TestManualMergeOfMarkedPeople(t *testing.T) {
 	row := rowIndex(m.cmp, "company")
 	require.GreaterOrEqual(t, row, 0)
 	m.cmp.cur = row
-	press(m, "tab")
+	press(m, " ")
 	press(m, "m")
 	assert.Nil(t, m.cmp)
 	assert.Empty(t, m.marked)
@@ -230,9 +281,10 @@ func TestArchiveRestoreFlow(t *testing.T) {
 
 func TestArchiveMarkedAndRestoreMarked(t *testing.T) {
 	m, pr := newTestModel(t)
-	press(m, "*", "d")
-	assert.Contains(t, m.View(), "archive 3 people? y/n")
-	press(m, "y")
+	press(m, "ctrl+a", "d")
+	assert.Contains(t, m.View(), `type "archive 3" to archive 3 people`)
+	typeText(m, "archive 3")
+	press(m, "enter")
 	assert.Len(t, archivedIDs(t, pr), 3)
 	assert.Empty(t, m.rows)
 	assert.Empty(t, m.marked)
@@ -243,7 +295,7 @@ func TestArchiveMarkedAndRestoreMarked(t *testing.T) {
 	assert.Len(t, m.markedIDs(), 2)
 	press(m, "r")
 	assert.Len(t, archivedIDs(t, pr), 1)
-	assert.Contains(t, m.status, "restored: 2 people")
+	assert.Contains(t, m.status, "restored 2 people")
 }
 
 func TestArchivedPeopleStayOutOfOtherViews(t *testing.T) {
@@ -256,8 +308,8 @@ func TestArchivedPeopleStayOutOfOtherViews(t *testing.T) {
 	press(m, "7")
 	assert.Empty(t, m.rows, "gone from Birthdays")
 	press(m, "8")
-	require.Len(t, m.rows, 1, "gone from Merge")
-	assert.Contains(t, m.rows[0].title, "HIGH")
+	require.Len(t, groupRowsOf(m), 1, "gone from Merge")
+	assert.Contains(t, groupRowsOf(m)[0].title, "HIGH")
 	press(m, "2")
 	assert.NotContains(t, names(m), "Bob Baker")
 	assert.True(t, archivedIDs(t, pr)[2])
@@ -303,8 +355,8 @@ func TestNewActionsInPaletteWithCorrectGreying(t *testing.T) {
 		press(m, "esc")
 		return out
 	}
-	newIDs := []string{"find-dupes", "compare", "dupe-level", "dismiss", "undo-dismiss", "merge-marked", "archive", "restore", "purge",
-		"cmp-pick", "cmp-pick-back", "cmp-survivor", "cmp-apply", "cmp-back", "note-pick", "note-types", "view-merge", "view-archived"}
+	newIDs := []string{"find-dupes", "compare", "options", "dismiss", "undo-dismiss", "merge-marked", "archive", "restore", "purge",
+		"cmp-pick", "cmp-field", "cmp-survivor", "cmp-apply", "cmp-back", "note-pick", "note-types", "view-merge", "view-archived"}
 
 	st := state()
 	for _, id := range newIDs {
@@ -315,7 +367,7 @@ func TestNewActionsInPaletteWithCorrectGreying(t *testing.T) {
 	assert.Equal(t, "", st["archive"])
 	assert.Equal(t, "", st["note-types"])
 	assert.Equal(t, "", st["note-pick"])
-	for _, id := range []string{"compare", "dupe-level", "dismiss", "undo-dismiss", "merge-marked", "restore", "purge", "cmp-apply", "cmp-pick", "cmp-survivor", "cmp-back"} {
+	for _, id := range []string{"compare", "dismiss", "undo-dismiss", "merge-marked", "restore", "purge", "cmp-apply", "cmp-pick", "cmp-survivor", "cmp-back"} {
 		assert.Equal(t, "not here", st[id], id+" in People")
 	}
 
@@ -325,7 +377,7 @@ func TestNewActionsInPaletteWithCorrectGreying(t *testing.T) {
 	press(m, "8")
 	st = state()
 	assert.Equal(t, "", st["compare"])
-	assert.Equal(t, "", st["dupe-level"])
+	assert.Equal(t, "", st["options"])
 	assert.Equal(t, "", st["dismiss"])
 	assert.Equal(t, "", st["undo-dismiss"], "undo is offered in the Merge view")
 	assert.Equal(t, "not here", st["archive"], "group rows are not people")
@@ -333,7 +385,7 @@ func TestNewActionsInPaletteWithCorrectGreying(t *testing.T) {
 
 	press(m, "enter")
 	st = state()
-	for _, id := range []string{"cmp-pick", "cmp-pick-back", "cmp-survivor", "cmp-apply", "cmp-back", "cmp-dismiss", "palette", "help"} {
+	for _, id := range []string{"cmp-pick", "cmp-field", "cmp-survivor", "cmp-apply", "cmp-back", "cmp-dismiss", "palette", "help"} {
 		assert.Equal(t, "", st[id], id+" in compare")
 	}
 	for _, id := range []string{"archive", "note", "contacted", "compare", "dismiss", "find-dupes", "view-people", "note-types"} {

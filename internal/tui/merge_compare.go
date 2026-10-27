@@ -447,6 +447,19 @@ func (c *compareState) move(delta int) {
 	c.cur = cur
 }
 
+// cycle is tab: the next field, and from the last one back to the first.
+func (c *compareState) cycle() {
+	if len(c.rows) == 0 {
+		return
+	}
+	for i := 1; i <= len(c.rows); i++ {
+		j := (c.cur + i) % len(c.rows)
+		if c.rows[j].kind != rowInfo {
+			c.cur = j
+			return
+		}
+	}
+}
 
 // take sets the current row from candidate j: a single row takes its value, a list item goes in.
 // It reports false when the candidate has nothing for the row.

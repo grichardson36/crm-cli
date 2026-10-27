@@ -1,3 +1,5 @@
 # Deliberate key overlaps, checked by TestKeyAudit. Every line needs a reason. Keep this list minimal:
 # a line the audit no longer finds fails the test.
-shadow q cmp-back quit    # q leaves the compare screen instead of quitting the app, so a stray q cannot lose a merge
+shadow ctrl+c copy quit    # owner decision 2026-10-28: ctrl+c copies the focused field in the detail pane and keeps quitting everywhere else
+verbs ctrl+c copy_/_quit    # the same decision: copy when a field is focused, quit or cancel otherwise, documented in help
+shadow tab cell-next back    # owner decision 2026-10-28: tab moves across the cells of a linked row, and from the last cell it goes back to the list as before

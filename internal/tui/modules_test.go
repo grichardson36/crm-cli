@@ -89,7 +89,7 @@ func TestModulesScreenTogglesMovesResetsAndSaves(t *testing.T) {
 	press(m, " ")
 	assert.Equal(t, 0, m.mods.Position("home"))
 	assert.Equal(t, "1", m.ov.items[1].hint, "People is now key 1")
-	press(m, "down", "down", "K")
+	press(m, "down", "down", "shift+up")
 	assert.Equal(t, "follow-up", m.mods.Normalize().Order[1], "the cursor row moved up")
 	data, err := os.ReadFile(modules.ConfigFile(m.env.DataDir))
 	require.NoError(t, err)
@@ -100,7 +100,10 @@ func TestModulesScreenTogglesMovesResetsAndSaves(t *testing.T) {
 	assert.NotZero(t, m.mods.Position("people"), "People stays on")
 	assert.True(t, m.statusIsErr)
 
-	press(m, "r")
+	press(m, "r") // r is no longer a key of the screen
+	assert.False(t, m.mods.IsDefault())
+	press(m, "esc")
+	runID(m, "modules-reset") // the palette entry puts the default arrangement back
 	assert.True(t, m.mods.IsDefault())
 	_, err = os.Stat(modules.ConfigFile(m.env.DataDir))
 	require.NoError(t, err)

@@ -201,13 +201,13 @@ func (m *Model) handleTypeaheadKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		m.cancelEdit()
 		return m, nil
-	case "up", "ctrl+p", "shift+tab":
+	case "up", "shift+tab":
 		if rows > 0 {
 			ta.cur = (ta.cur + rows - 1) % rows
 		}
 		m.syncDetail()
 		return m, nil
-	case "down", "ctrl+n":
+	case "down":
 		if rows > 0 {
 			ta.cur = (ta.cur + 1) % rows
 		}

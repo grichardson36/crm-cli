@@ -22,15 +22,6 @@ func whenArchivedRows(m *Model) bool {
 	return m.view == viewArchived && m.focus == focusList && len(m.rows) > 0
 }
 
-// whenArchivedPerson is true on an archived person (purge and mark apply to people only).
-func whenArchivedPerson(m *Model) bool {
-	if !whenArchivedRows(m) {
-		return false
-	}
-	r, ok := m.selected()
-	return ok && r.akind == "person"
-}
-
 // levelBadge is the short label shown in the list.
 func levelBadge(l dedupe.Level) string {
 	switch l {
@@ -44,6 +35,45 @@ func levelBadge(l dedupe.Level) string {
 		return "FUZZY"
 	}
 	return "?"
+}
+
+// mergeRows lists the candidate groups under one divider per confidence level (the grouped list of
+// grouped.go, group field "confidence level"). A level with no groups gets no divider.
+func (m *Model) mergeRows(groups []dedupe.Group) []row {
+	type item struct {
+		i int
+		g dedupe.Group
+	}
+	counts := map[dedupe.Level]int{}
+	items := make([]item, len(groups))
+	for i, g := range groups {
+		items[i] = item{i, g}
+		counts[g.Level]++
+	}
+	return groupRows(items, func(it item) []groupHead {
+		n := counts[it.g.Level]
+		meta := fmt.Sprintf("%d groups", n)
+		if n == 1 {
+			meta = "1 group"
+		}
+		return []groupHead{{key: it.g.Level.String(), title: strings.ToUpper(it.g.Level.String()) + " confidence", meta: meta, rule: true}}
+	}, func(it item) row {
+		r := groupRow(it.g)
+		r.dupe = it.i + 1
+		return r
+	}).rows
+}
+
+// cursorGroup is the duplicate group under the cursor in the Merge view.
+func (m *Model) cursorGroup() (dedupe.Group, bool) {
+	if m.view != viewMerge || m.cursor < 0 || m.cursor >= len(m.rows) {
+		return dedupe.Group{}, false
+	}
+	i := m.rows[m.cursor].dupe - 1
+	if i < 0 || i >= len(m.groups) {
+		return dedupe.Group{}, false
+	}
+	return m.groups[i], true
 }
 
 func groupRow(g dedupe.Group) row {
@@ -84,22 +114,11 @@ func (m *Model) nameOf(id int64) string {
 
 // --- list actions ---
 
-func (m *Model) cycleLevel() {
-	next := m.minLevel - 1
-	if next < dedupe.Fuzzy {
-		next = dedupe.High
-	}
-	m.minLevel = next
-	m.cursor, m.offset = 0, 0
-	m.report(m.rebuild(false))
-	m.setStatus("duplicates: "+m.minLevel.String()+" confidence and above", false)
-}
-
 func (m *Model) openGroupCompare() {
-	if m.cursor < 0 || m.cursor >= len(m.groups) {
+	g, ok := m.cursorGroup()
+	if !ok {
 		return
 	}
-	g := m.groups[m.cursor]
 	m.openCompare(g.IDs(), g.Level, g.Reasons, false)
 }
 
@@ -121,33 +140,59 @@ func (m *Model) groupIDs() []int64 {
 		}
 		return ids
 	}
-	if m.cursor >= 0 && m.cursor < len(m.groups) && m.view == viewMerge {
-		return m.groups[m.cursor].IDs()
+	if g, ok := m.cursorGroup(); ok {
+		return g.IDs()
+	}
+	return nil
+}
+
+// groupIDSets are the groups a dismiss applies to: the open compare, else the selected groups of the
+// Merge view (bulk actions are always available), else the group under the cursor.
+func (m *Model) groupIDSets() [][]int64 {
+	if m.cmp == nil && m.view == viewMerge && m.focus == focusList {
+		var sets [][]int64
+		for _, ref := range m.markedRefs() {
+			if ref.Kind == groupKind && int(ref.ID) <= len(m.groups) {
+				sets = append(sets, m.groups[ref.ID-1].IDs())
+			}
+		}
+		if len(sets) > 0 {
+			return sets
+		}
+	}
+	if ids := m.groupIDs(); len(ids) > 1 {
+		return [][]int64{ids}
 	}
 	return nil
 }
 
 func (m *Model) dismissGroup() {
-	ids := m.groupIDs()
-	if len(ids) < 2 {
+	sets := m.groupIDSets()
+	if len(sets) == 0 {
 		return
 	}
-	for i := 0; i < len(ids); i++ {
-		for j := i + 1; j < len(ids); j++ {
-			if err := m.dr.Dismiss(m.ctx, ids[i], ids[j]); err != nil {
-				m.setStatus(err.Error(), true)
-				return
+	for _, ids := range sets {
+		for i := 0; i < len(ids); i++ {
+			for j := i + 1; j < len(ids); j++ {
+				if err := m.dr.Dismiss(m.ctx, ids[i], ids[j]); err != nil {
+					m.setStatus(err.Error(), true)
+					return
+				}
 			}
 		}
+		m.dismissed = append(m.dismissed, ids)
 	}
-	m.dismissed = append(m.dismissed, ids)
 	manual := m.cmp != nil && m.cmp.manual
 	m.cmp = nil
-	if manual {
+	if manual || len(sets) > 1 {
 		m.marked = map[int64]bool{}
 	}
 	m.afterWrite()
-	m.setStatus(fmt.Sprintf("dismissed %d people as not duplicates (u undoes)", len(ids)), false)
+	if len(sets) > 1 {
+		m.setStatus(fmt.Sprintf("dismissed %d groups as not duplicates (undo dismiss in the palette brings them back one by one)", len(sets)), false)
+		return
+	}
+	m.setStatus(fmt.Sprintf("dismissed %d people as not duplicates (u undoes)", len(sets[0])), false)
 }
 
 func (m *Model) undoDismiss() {
@@ -190,10 +235,10 @@ func (m *Model) emptyDetail() string {
 	case viewDeals:
 		return m.dealDetail(r)
 	case viewMerge:
-		if m.cursor >= len(m.groups) {
+		g, ok := m.cursorGroup()
+		if !ok {
 			return ""
 		}
-		g := m.groups[m.cursor]
 		b.WriteString(m.st.Name.Render(fmt.Sprintf("%s confidence, %d people", levelBadge(g.Level), len(g.Members))) + "\n")
 		for _, reason := range g.Reasons {
 			b.WriteString(m.st.Dim.Render(line(reason)) + "\n")
@@ -221,16 +266,16 @@ func (m *Model) emptyDetail() string {
 				}
 			}
 		}
-		b.WriteString("\n" + m.st.Dim.Render("enter compares and merges, D dismisses"))
+		b.WriteString("\n" + m.st.Dim.Render("enter compares and merges, d dismisses"))
 	case viewArchived:
 		if r.akind != "" && r.akind != "person" {
 			it := m.archItems[fmt.Sprintf("%s:%d", r.akind, archivedRowID(r))]
 			b.WriteString(m.st.Name.Render(line(cleanCell(it.Name))) + m.st.Dim.Render("  archived "+dateOnly(it.UpdatedAt)) + "\n\n")
-			b.WriteString(m.st.Dim.Render(fit("type", labelWidth)) + it.Kind + "\n")
+			b.WriteString(m.st.Dim.Render(fit("type", labelWidth)) + cliNoun(it.Kind) + "\n")
 			if it.Detail != "" {
 				b.WriteString(m.st.Dim.Render(fit("detail", labelWidth)) + line(cleanCell(it.Detail)) + "\n")
 			}
-			b.WriteString("\n" + m.st.Dim.Render("u restores, T filters by type"))
+			b.WriteString("\n" + m.st.Dim.Render("r restores, ctrl+o filters by type"))
 			return b.String()
 		}
 		p := m.arch[r.personID]
@@ -250,7 +295,7 @@ func (m *Model) emptyDetail() string {
 		for _, ph := range p.Phones {
 			b.WriteString(m.st.Dim.Render(fit("phone", labelWidth)) + line(ph.PhoneNumber) + "\n")
 		}
-		b.WriteString("\n" + m.st.Dim.Render("u restores, X purges forever, T filters by type"))
+		b.WriteString("\n" + m.st.Dim.Render("r restores, d purges forever, ctrl+o filters by type"))
 	default:
 		return m.st.Dim.Render("Nothing selected.")
 	}

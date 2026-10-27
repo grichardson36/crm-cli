@@ -135,11 +135,6 @@ func whenLinkedRow(m *Model) bool {
 	return whenDetail(m) && m.form[m.fcur].kind == rkLinked && !m.form[m.fcur].empty
 }
 
-func whenMarkable(m *Model) bool {
-	r, ok := m.selected()
-	return m.focus == focusList && ok && r.personID != 0
-}
-
 // buildActions returns the full action registry in key-resolution order.
 func buildActions() []action {
 	viewAction := func(v viewKind) action {
@@ -168,20 +163,20 @@ func buildActions() []action {
 
 	acts := []action{
 		// Merge compare screen. These come first so their keys win while the screen is open.
-		{id: "cmp-left", title: "Use candidate 1", group: "Compare", hint: "←/→", keys: []string{"left"}, desc: "compare: the field takes the left person's value (a list item goes in)",
+		{id: "cmp-left", title: "Use candidate 1", group: "Compare", hint: "←/→", keys: []string{"left"}, desc: "compare: keep the left person's value for this field (a list item goes in)",
 			foot: 6, footIn: inBoth, inCompare: true, when: whenCmpEdit, run: func(m *Model) tea.Cmd { m.cmpTake(0); return nil }},
-		{id: "cmp-right", title: "Use candidate 2", group: "Compare", hint: "→", keys: []string{"right"}, desc: "compare: the field takes the right person's value (a list item goes in)",
+		{id: "cmp-right", title: "Use candidate 2", group: "Compare", hint: "→", keys: []string{"right"}, desc: "compare: keep the right person's value for this field (a list item goes in)",
 			inCompare: true, when: whenCmpEdit, run: func(m *Model) tea.Cmd { m.cmpTake(1); return nil }},
-		{id: "cmp-pick", title: "Toggle value or item", group: "Compare", hint: "space", keys: []string{"tab", " "}, desc: "compare: switch a field to the other person's value, or put a list item in or out of the result (tab or space)",
+		{id: "cmp-field", title: "Next field", group: "Compare", hint: "tab", keys: []string{"tab"}, desc: "compare: move to the next field, from the last back to the first (up and down move one row too)",
+			foot: 5, footIn: inBoth, footLabel: "next field", inCompare: true, when: whenCmpEdit, run: func(m *Model) tea.Cmd { m.cmp.cycle(); return nil }},
+		{id: "cmp-pick", title: "Toggle value or item", group: "Compare", hint: "space", keys: []string{" "}, desc: "compare: switch a field to the other person's value, or put a list item in or out of the result (left and right pick a side directly)",
 			foot: 7, footIn: inBoth, inCompare: true, when: whenCmpEdit, run: func(m *Model) tea.Cmd { m.cmp.toggle(); m.cmpPreview(); return nil }},
-		{id: "cmp-pick-back", title: "Toggle value or item (back)", group: "Compare", hint: "shift+tab", keys: []string{"shift+tab"}, desc: "compare: same as space",
-			inCompare: true, when: whenCmpEdit, run: func(m *Model) tea.Cmd { m.cmp.toggle(); m.cmpPreview(); return nil }},
 		{id: "cmp-survivor", title: "Change survivor", group: "Compare", hint: "ctrl+e", keys: []string{"ctrl+e"}, desc: "compare: keep the other person's record and id as the survivor",
 			foot: 8, footIn: inBoth, inCompare: true, when: whenCmpEdit, run: func(m *Model) tea.Cmd { m.cmp.nextSurvivor(); m.cmpPreview(); return nil }},
-		{id: "cmp-pair", title: "Change pair", group: "Compare", hint: "ctrl+b", keys: []string{"ctrl+b"}, desc: "compare: groups of three or more merge two people at a time, ctrl+b moves to the next pair",
-			foot: 9, footIn: inBoth, footIf: whenCmpGroup, inCompare: true, when: whenCmpEdit, run: func(m *Model) tea.Cmd { m.cmp.nextPair(); m.cmpPreview(); return nil }},
-		{id: "cmp-view", title: "Switch pane", group: "Compare", hint: "ctrl+w", keys: []string{"ctrl+w"}, desc: "compare: narrow terminals show fewer panes, ctrl+w switches between candidates and the result",
-			foot: 5, footIn: inBoth, footIf: whenCmpNarrow, inCompare: true, when: whenCmpEdit, run: func(m *Model) tea.Cmd { m.cmp.nextPage(); return nil }},
+		{id: "cmp-pair", title: "Change pair", group: "Compare", desc: "compare: groups of three or more merge two people at a time, this moves to the next pair (palette, no key)",
+			inCompare: true, when: whenCmpEdit, run: func(m *Model) tea.Cmd { m.cmp.nextPair(); m.cmpPreview(); return nil }},
+		{id: "cmp-view", title: "Switch pane", group: "Compare", desc: "compare: narrow terminals show fewer panes, this switches between candidates and the result (palette, no key)",
+			inCompare: true, when: whenCmpEdit, run: func(m *Model) tea.Cmd { m.cmp.nextPage(); return nil }},
 		{id: "cmp-confirm", title: "Merge (with summary)", group: "Compare", hint: "enter", keys: []string{"enter"}, desc: "compare: enter shows what will be archived and moved, enter again merges",
 			write: true, foot: 11, footIn: inBoth, inCompare: true, when: whenCompare, run: func(m *Model) tea.Cmd {
 				if m.cmp.confirm {
@@ -194,7 +189,7 @@ func buildActions() []action {
 			}},
 		{id: "cmp-apply", title: "Apply merge", group: "Compare", hint: "m", keys: []string{"m"}, desc: "compare: merge now without the summary (m is the Merge verb), the dropped person is archived and can be restored",
 			write: true, inCompare: true, when: whenCompare, run: func(m *Model) tea.Cmd { m.applyMerge(); return nil }},
-		{id: "cmp-back", title: "Close compare", group: "Compare", hint: "esc", keys: []string{"esc", "q"}, desc: "compare: leave without merging (also q), from the summary go back to the fields",
+		{id: "cmp-back", title: "Close compare", group: "Compare", hint: "esc", keys: []string{"esc"}, desc: "compare: leave without merging, from the summary go back to the fields",
 			foot: 12, footIn: inBoth, inCompare: true, when: whenCompare, run: func(m *Model) tea.Cmd {
 				if m.cmp.confirm {
 					m.cmp.confirm = false
@@ -210,28 +205,10 @@ func buildActions() []action {
 		// from the registry in objects.go and inserted after them.
 		{id: "contacted", title: "Mark contacted", group: "Contact", desc: "mark contacted now (resets the keep-in-touch clock). x does this on a person",
 			write: true, when: whenPerson, run: func(m *Model) tea.Cmd { m.markContacted(); return nil }},
-		{id: "link-edit", title: "Edit link or type", group: "Link", hint: "E", keys: []string{"E"}, desc: "the heavier twin of e (detail pane): edit the role, dates, primary flag, kind or notes of the linked row under the cursor, or pick a new type for a note row. ctrl+z undoes",
-			write: true, foot: 13, footIn: inDetail, footLabel: "edit link", footIf: whenLinkedOrNote, when: whenLinkedOrNote,
-			footDyn: func(m *Model) string {
-				if whenNoteRow(m) {
-					return "type"
-				}
-				return "edit link"
-			},
-			run: func(m *Model) tea.Cmd {
-				if whenNoteRow(m) {
-					m.retypeNote()
-					return nil
-				}
-				r, _ := m.rowFocused()
-				return m.editLinkRow(r)
-			}},
 		{id: "note-pick", title: "Add note (pick type)", group: "Contact", desc: "pick a note type from a list, then add the note",
 			write: true, when: whenPerson, run: func(m *Model) tea.Cmd { m.pickNoteType(); return nil }},
 		{id: "note-types", title: "Manage note types", group: "Contact", desc: "add or archive note types (call, email, meeting, ...)",
 			write: true, run: func(m *Model) tea.Cmd { return m.openNoteTypes() }},
-		{id: "note-retype", title: "Change note type", group: "Edit pane", desc: "pick a new type for the note under the cursor (detail pane). E does this on a note row",
-			write: true, when: whenNoteRow, run: func(m *Model) tea.Cmd { m.retypeNote(); return nil }},
 		{id: "snooze", title: "Snooze keep-in-touch", group: "Contact", hint: "s", keys: []string{"s"}, desc: "snooze keep-in-touch for N days (a person)",
 			write: true, when: whenPerson, run: func(m *Model) tea.Cmd {
 				m.startPrompt("snooze", "snooze days: ", "7")
@@ -251,8 +228,8 @@ func buildActions() []action {
 			}},
 		{id: "tag-delete", title: "Delete tag", group: "Contact", desc: "delete a tag from every record that has it (asks y/n, ctrl+z undoes; same as crm tag delete)",
 			write: true, run: func(m *Model) tea.Cmd { m.openTagDelete(); return nil }},
-		{id: "cadence", title: "Set keep-in-touch", group: "Contact", hint: "F", keys: []string{"F"}, desc: "pick a keep-in-touch cadence for the person or all marked",
-			write: true, foot: 32, footIn: inList, footIf: whenMarks, when: whenPerson, run: func(m *Model) tea.Cmd { m.pickCadence(m.targets()); return nil }},
+		{id: "cadence", title: "Set keep-in-touch", group: "Contact", desc: "pick a keep-in-touch cadence for the person or all selected (palette, no key)",
+			write: true, when: whenPerson, run: func(m *Model) tea.Cmd { m.pickCadence(m.targets()); return nil }},
 		{id: "done", title: "Complete task", group: "Contact", desc: "complete the selected task, or reopen it when it is done (Tasks view, or a task row). x does this on a task",
 			write: true, run: func(m *Model) tea.Cmd { m.completeTask(); return nil }},
 
@@ -279,8 +256,6 @@ func buildActions() []action {
 			run: func(m *Model) tea.Cmd { m.switchView(viewMerge); return nil }},
 		{id: "compare", title: "Compare group", group: "Merge", desc: "open the side by side compare for the selected group. enter, e or m",
 			when: whenMergeRows, run: func(m *Model) tea.Cmd { m.openGroupCompare(); return nil }},
-		{id: "dupe-level", title: "Duplicate level", group: "Merge", hint: "ctrl+l", keys: []string{"ctrl+l"}, desc: "cycle the lowest confidence shown: high, medium, low, fuzzy (it filters the view, so it is a ctrl key)",
-			foot: 21, footIn: inList, when: whenMergeList, run: func(m *Model) tea.Cmd { m.cycleLevel(); return nil }},
 		{id: "dismiss", title: "Dismiss group", group: "Merge", hint: "d", keys: []string{"d"}, desc: "mark the group as not duplicates (d is the Delete verb). Undo dismiss in the palette brings it back",
 			write: true, foot: 22, footIn: inList, footLabel: "dismiss", when: whenDismiss, run: func(m *Model) tea.Cmd { m.dismissGroup(); return nil }},
 		{id: "undo-dismiss", title: "Undo dismiss", group: "Merge", desc: "bring back the group dismissed last in this session (palette)",
@@ -289,15 +264,12 @@ func buildActions() []action {
 			write: true, when: whenMarks, run: func(m *Model) tea.Cmd { m.openMarkedCompare(); return nil }},
 
 		// Archive.
-		{id: "purge", title: "Purge forever", group: "Archive", hint: "d", keys: []string{"d"}, desc: "permanently delete the archived person after typing the name (d is the Delete verb)",
-			write: true, foot: 21, footIn: inList, when: whenArchivedPerson, run: func(m *Model) tea.Cmd { return m.askPurge() }},
-		{id: "purge-selected", title: "Purge selected forever", group: "Archive", desc: "permanently delete the space-selected archived people after typing the count back, for example purge 37 (palette, no key). Same tombstones as a single purge",
+		{id: "purge", title: "Purge forever", group: "Archive", hint: "d", keys: []string{"d"}, desc: "permanently delete the archived object (any type) after typing its name, or the selected ones after typing the count back, for example purge 5 (d is the Delete verb)",
+			write: true, foot: 21, footIn: inList, when: whenArchivedRows, run: func(m *Model) tea.Cmd { return m.askPurge() }},
+		{id: "purge-selected", title: "Purge selected forever", group: "Archive", desc: "permanently delete the selected archived objects (any type) after typing the count back, for example purge 37 (palette, no key). Same tombstones as a single purge",
 			write: true, when: whenBulkPurgeSelected, run: func(m *Model) tea.Cmd { return m.askPurgeMany(false) }},
-		{id: "purge-all", title: "Purge all remaining forever", group: "Archive", desc: "permanently delete every archived person in the current type filter after typing the count back, for example purge 37 (palette, no key). Only people can be purged",
+		{id: "purge-all", title: "Purge all remaining forever", group: "Archive", desc: "permanently delete every archived object in the list (all types, or the type set with ctrl+o) after typing the count back, for example purge 37 (palette, no key)",
 			write: true, when: whenBulkPurgeAll, run: func(m *Model) tea.Cmd { return m.askPurgeMany(true) }},
-		{id: "archived-type", title: "Filter archived by type", group: "Archive", hint: "ctrl+f", keys: []string{"ctrl+f"}, desc: "show only archived people, organizations, deals or tasks (Archived view). r restores the one under the cursor",
-			foot: 22, footIn: inList, footLabel: "type", when: func(m *Model) bool { return m.view == viewArchived && m.focus == focusList },
-			run: func(m *Model) tea.Cmd { m.pickArchivedType(); return nil }},
 
 		// Detail pane (form).
 		{id: "edit", title: "Edit row", group: "Edit pane", desc: "edit the selected row inline (enter saves, esc cancels). enter or e in the detail pane does this",
@@ -306,31 +278,21 @@ func buildActions() []action {
 			write: true, foot: 11, footIn: inDetail, when: whenAdd, run: func(m *Model) tea.Cmd { return m.addRow(m.form[m.fcur].kind) }},
 		{id: "delete", title: "Delete row", group: "Edit pane", hint: "d", keys: []string{"d"}, desc: "delete the selected row (asks y/n). Fields are cleared",
 			write: true, foot: 12, footIn: inDetail, when: whenDetail, run: func(m *Model) tea.Cmd { m.askDelete(); return nil }},
-		{id: "copy", title: "Copy value", group: "Edit pane", hint: "y", keys: []string{"y"}, desc: "copy the row value to the clipboard (OSC52, works over SSH)",
-			foot: 13, footIn: inDetail, when: whenDetail, run: func(m *Model) tea.Cmd { m.copyRow(); return nil }},
-		{id: "open", title: "Open link", group: "Edit pane", hint: "o", keys: []string{"o"}, desc: "open the row as a URL, mailto: or tel: on this machine",
-			write: true, foot: 14, footIn: inDetail, when: whenDetail, run: func(m *Model) tea.Cmd { m.openRow(); return nil }},
 		addKind("add-email", "Add email", "an email", rkEmail),
 		addKind("add-phone", "Add phone", "a phone number", rkPhone),
 		addKind("add-handle", "Add link", "a social or website link", rkHandle),
 		{id: "focus-detail", title: "Focus detail pane", group: "Edit pane", hint: "tab", keys: []string{"tab", "shift+tab", "right"}, desc: "move into the detail form (also right)",
 			foot: 20, footIn: inList, when: func(m *Model) bool { return whenList(m) && len(m.rows) > 0 && len(m.form) > 0 },
-			run: func(m *Model) tea.Cmd { m.focus = focusDetail; m.syncDetail(); return nil }},
+			run: func(m *Model) tea.Cmd { m.focus = focusDetail; m.fcol = 0; m.syncDetail(); return nil }},
 		{id: "back", title: "Back to list", group: "Edit pane", hint: "esc", keys: []string{"esc", "tab", "shift+tab", "left"}, desc: "return to the list (also left, tab)",
 			foot: 15, footIn: inDetail, when: func(m *Model) bool { return m.focus == focusDetail },
-			run: func(m *Model) tea.Cmd { m.focus = focusList; m.syncDetail(); return nil }},
-
-		// Bulk.
-		{id: "mark", title: "Mark row", group: "Bulk", hint: "space", keys: []string{" "}, desc: "mark or unmark the row (multi-select), then the verbs (d, f, x, m, the palette) apply to all marked",
-			foot: 25, footIn: inList, when: whenMarkable, run: func(m *Model) tea.Cmd { m.toggleMark(); return nil }},
-		{id: "mark-all", title: "Mark all visible", group: "Bulk", hint: "*", keys: []string{"*"}, desc: "mark every visible person (again to clear)",
-			when: whenList, run: func(m *Model) tea.Cmd { m.markAll(); return nil }},
+			run: func(m *Model) tea.Cmd { m.focus = focusList; m.fcol = 0; m.syncDetail(); return nil }},
 
 		// Movement. Arrow keys, tab and shift+tab, pages and jumps. The unit of ctrl+up and ctrl+down and the
 		// home destination of ctrl+shift+up and ctrl+shift+down are declared per view in navunits.go.
-		{id: "down", inCompare: true, title: "Move down", group: "Move", hint: "down", keys: []string{"down", "ctrl+n"}, desc: "next row (also ctrl+n)",
+		{id: "down", inCompare: true, title: "Move down", group: "Move", hint: "down", keys: []string{"down"}, desc: "next row",
 			foot: 5, footIn: inBoth, run: func(m *Model) tea.Cmd { m.step(1); return nil }},
-		{id: "up", inCompare: true, title: "Move up", group: "Move", hint: "up", keys: []string{"up", "ctrl+p"}, desc: "previous row (also ctrl+p)",
+		{id: "up", inCompare: true, title: "Move up", group: "Move", hint: "up", keys: []string{"up"}, desc: "previous row",
 			run: func(m *Model) tea.Cmd { m.step(-1); return nil }},
 		{id: "half-down", inCompare: true, title: "Half page down", group: "Move", hint: "ctrl+d", keys: []string{"ctrl+d"}, desc: "half a page down",
 			run: func(m *Model) tea.Cmd { m.step(m.bodyHeight() / 2); return nil }},
@@ -361,9 +323,9 @@ func buildActions() []action {
 		viewAction(viewHome), viewAction(viewPeople), viewAction(viewDue), viewAction(viewTasks), viewAction(viewOrgs), viewAction(viewBirthdays), viewAction(viewMerge), viewAction(viewArchived), viewAction(viewSync), viewAction(viewDeals),
 		{id: "goto-view", title: "Go to view", group: "Views", hint: "v", keys: []string{"v"}, desc: "list the views that are on with their number key (1-9) and jump to one. Turn views on or off with Modules",
 			foot: 85, footIn: inList, run: func(m *Model) tea.Cmd { return m.openViewSwitcher() }},
-		{id: "next-view", title: "Next view", group: "Views", hint: "]", keys: []string{"]"}, desc: "next view",
+		{id: "next-view", title: "Next view", group: "Views", hint: "]", keys: []string{"]", "ctrl+right"}, desc: "next view (also ctrl+right)",
 			run: func(m *Model) tea.Cmd { m.switchView(m.nextView(m.view, 1)); return nil }},
-		{id: "prev-view", title: "Previous view", group: "Views", hint: "[", keys: []string{"["}, desc: "previous view",
+		{id: "prev-view", title: "Previous view", group: "Views", hint: "[", keys: []string{"[", "ctrl+left"}, desc: "previous view (also ctrl+left)",
 			run: func(m *Model) tea.Cmd { m.switchView(m.nextView(m.view, -1)); return nil }},
 		{id: "clear-search", title: "Clear search", group: "Views", hint: "esc", keys: []string{"esc"}, desc: "clear the People filter set from the bar (a tag, an organization or Show all)",
 			when: func(m *Model) bool { return m.focus == focusList && m.query != "" },
@@ -373,19 +335,7 @@ func buildActions() []action {
 				m.report(m.rebuild(false))
 				return nil
 			}},
-		{id: "sort", title: "Toggle sort", group: "Views", hint: "ctrl+o", keys: []string{"ctrl+o"}, desc: "toggle sort: name / recently updated (it changes the view, so it is a ctrl key)",
-			when: func(m *Model) bool { return m.focus == focusList && m.view == viewPeople },
-			run: func(m *Model) tea.Cmd {
-				m.sortRecent = !m.sortRecent
-				m.cursor, m.offset = 0, 0
-				m.report(m.rebuild(false))
-				if m.sortRecent {
-					m.setStatus("sorted by recently updated", false)
-				} else {
-					m.setStatus("sorted by name", false)
-				}
-				return nil
-			}},
+		viewOptionsAction(),
 		{id: "reload", title: "Refresh", group: "Views", hint: "ctrl+r", keys: []string{"ctrl+r"}, desc: "reload from the database (r is Restore)",
 			run: func(m *Model) tea.Cmd {
 				m.report(m.reload())
@@ -394,7 +344,7 @@ func buildActions() []action {
 			}},
 
 		// App.
-		{id: "palette", inCompare: true, title: "Command palette", group: "App", hint: "ctrl+k", keys: []string{"ctrl+k", ":", "/"}, desc: "the one bar: type to find a person, org, deal, task, note, action or setting (also : and /). > actions, @ people, # tags, = settings, ? help. A command line works too: n Sam called #deal remind fri",
+		{id: "palette", inCompare: true, title: "Command palette", group: "App", hint: "ctrl+k", keys: []string{"ctrl+k", "/"}, desc: "the one bar: type to find a person, org, deal, task, note, action or setting (also /). > actions, @ people, # tags, = settings, ? help. A command line works too: n Sam called #deal remind fri",
 			foot: 1, footIn: inBoth, run: func(m *Model) tea.Cmd { return m.openPalette() }},
 		{id: "undo", title: "Undo", group: "App", hint: "ctrl+z", keys: []string{"ctrl+z"}, desc: "undo the last data change of this session. A toast says what was undone",
 			write: true, run: func(m *Model) tea.Cmd { return m.undoLast() }},
@@ -431,7 +381,7 @@ func buildActions() []action {
 			run: func(m *Model) tea.Cmd { m.openThemeChooser(); return nil }},
 		{id: "theme-reload", title: "Theme: reload", group: "App", desc: "re-read ~/.crm/themes/*.toml and apply the current theme again",
 			run: func(m *Model) tea.Cmd { m.reloadTheme(); return nil }},
-		{id: "quit", inCompare: true, title: "Quit", group: "App", hint: "q", keys: []string{"q", "ctrl+c"}, desc: "quit",
+		{id: "quit", inCompare: true, title: "Quit", group: "App", hint: "q", keys: []string{"q", "ctrl+c"}, desc: "quit. ctrl+c quits from a list and cancels a prompt or picker, and copies the focused field instead while the detail pane has a field focused",
 			run: func(m *Model) tea.Cmd { return tea.Quit }},
 	}
 	// The generated verbs come after the contact actions. Each key is limited to the views where it
@@ -443,8 +393,10 @@ func buildActions() []action {
 			break
 		}
 	}
-	out := append(append(append(append(append(append(barTagActions(), tagOpsActions()...), todayActions()...), globalAddActions()...), verbActions()...), orgAutoActions()...), acts[:at]...)
+	out := append(append(append(append(append(append(append(cellActions(), barTagActions()...), tagOpsActions()...), todayActions()...), globalAddActions()...), verbActions()...), orgAutoActions()...), acts[:at]...)
 	out = append(out, objectActions()...)
+	out = append(out, selectionActions()...)
+	out = append(out, copyOpenActions()...)
 	out = append(out, acts[at:]...)
 	out = append(out, orgMergeActions()...)
 	out = append(out, moduleActions()...)
@@ -460,6 +412,7 @@ func (m *Model) step(delta int) {
 	}
 	if m.focus == focusDetail {
 		m.fcur = clampInt(m.fcur+delta, 0, len(m.form)-1)
+		m.fcol = 0
 		m.syncDetail()
 		return
 	}
@@ -557,33 +510,6 @@ func (m *Model) completeTask() {
 	}
 	m.setStatus(msg, false)
 	m.afterWrite()
-}
-
-func (m *Model) toggleMark() {
-	r, ok := m.selected()
-	if !ok || r.personID == 0 {
-		return
-	}
-	if m.marked[r.personID] {
-		delete(m.marked, r.personID)
-	} else {
-		m.marked[r.personID] = true
-	}
-	m.move(1)
-}
-
-func (m *Model) markAll() {
-	ids := map[int64]bool{}
-	for _, r := range m.rows {
-		if r.personID != 0 {
-			ids[r.personID] = true
-		}
-	}
-	if len(ids) > 0 && len(m.markedIDs()) == len(ids) {
-		m.marked = map[int64]bool{}
-		return
-	}
-	m.marked = ids
 }
 
 func (m *Model) pickCadence(ids []int64) {

@@ -394,7 +394,7 @@ func TestCompareChangeSurvivorAndEsc(t *testing.T) {
 	assert.Equal(t, 1, c.s)
 	m.Update(tea.WindowSizeMsg{Width: 140, Height: 40})
 	assert.Contains(t, ansiStrip(m.View()), "Final #4")
-	for _, k := range []string{"esc", "q"} {
+	for _, k := range []string{"esc"} { // q no longer closes the compare, esc does
 		press(m, k)
 		assert.Nil(t, m.cmp, k)
 		assert.Empty(t, archivedIDs(t, m.pr))
@@ -422,19 +422,19 @@ func TestCompareNarrowResultToggle(t *testing.T) {
 	out := ansiStrip(m.View())
 	assert.Contains(t, out, "#2 Bob Baker")
 	assert.NotContains(t, out, "Final #2", "two panes show the candidates")
-	press(m, "ctrl+w")
+	runID(m, "cmp-view") // the palette entry, ctrl+w is gone
 	out = ansiStrip(m.View())
 	assert.Contains(t, out, "Final #2")
 	assert.NotContains(t, out, "#4 bob baker\n")
-	press(m, "ctrl+w")
+	runID(m, "cmp-view")
 	assert.Contains(t, ansiStrip(m.View()), "#4 bob baker")
 	assert.Equal(t, 2, c.page)
 
-	// The footer offers ctrl+w only when panes are hidden.
+	// ctrl+w is not a key any more, the footer never offers it.
 	hints := func() string { return ansiStrip(m.hintsLine()) }
-	assert.Contains(t, hints(), "ctrl+w pane")
+	assert.NotContains(t, hints(), "ctrl+w")
+	assert.Empty(t, m.actionByID("cmp-view").keys)
 	m.Update(tea.WindowSizeMsg{Width: 160, Height: 30})
-	assert.NotContains(t, hints(), "ctrl+w pane")
 	assert.Contains(t, hints(), "enter merge")
 	assert.Contains(t, hints(), "esc back")
 }
@@ -483,15 +483,19 @@ func TestCompareGroupOfThreeMergesPairByPair(t *testing.T) {
 	require.Len(t, c.members, 3)
 	assert.Equal(t, []int{0, 1}, []int{c.a, c.b})
 	assert.Contains(t, ansiStrip(m.View()), "group of 3")
-	press(m, "ctrl+b")
+	runID(m, "cmp-pair") // palette only, ctrl+b is gone
 	assert.Equal(t, []int{0, 2}, []int{c.a, c.b})
 	assert.GreaterOrEqual(t, itemRow(c, "email", "bobby@elsewhere.net"), 0)
-	press(m, "ctrl+b")
+	runID(m, "cmp-pair")
 	assert.Equal(t, []int{1, 2}, []int{c.a, c.b})
-	press(m, "ctrl+b")
+	runID(m, "cmp-pair")
 	assert.Equal(t, []int{0, 1}, []int{c.a, c.b}, "wraps")
+	assert.Empty(t, m.actionByID("cmp-pair").keys)
+	press(m, "ctrl+b")
+	assert.Equal(t, []int{0, 1}, []int{c.a, c.b}, "ctrl+b does nothing")
 
-	press(m, "ctrl+b", "m")
+	runID(m, "cmp-pair")
+	press(m, "m")
 	assert.Nil(t, m.cmp)
 	assert.True(t, archivedIDs(t, pr)[third.ID])
 	assert.False(t, archivedIDs(t, pr)[4], "the third person is untouched")

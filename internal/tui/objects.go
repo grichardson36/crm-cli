@@ -65,6 +65,10 @@ type objDef struct {
 	barVerb   string
 	barFields []hintField
 
+	// shortcut is the letter of this object in the add picker (a then the letter). Empty takes the first
+	// letter of the label, or when that is taken the next letter that is not (addShortcuts).
+	shortcut string
+
 	can map[verb]bool // verbs this object supports
 
 	// ids keeps the action ids that existed before the registry, so rebound keys still work.
@@ -78,7 +82,7 @@ type objDef struct {
 	archive   func(m *Model, id int64) error             // recorded soft delete
 	restore   func(m *Model, id int64) error             // recorded restore
 	showRow   func(m *Model, id int64)                   // put the cursor on the object after a restore
-	deleteAsk func(m *Model)                             // replaces the single y/n delete (people delete many)
+	deleteAsk func(m *Model) tea.Cmd                     // replaces the single y/n delete (people delete many)
 	restoreIn func(m *Model) bool                        // Restore applies here (nil: the session stack is not empty)
 	restoreDo func(m *Model)                             // replaces the stack restore (people come from the Archived view)
 	items     func(m *Model) []overlayItem               // every live object, for the link picker
@@ -102,7 +106,7 @@ func (o *objDef) actionID(v verb) string {
 
 // objectDefs registers every object, in key-resolution order.
 func objectDefs() []*objDef {
-	return []*objDef{orgDef(), dealDef(), taskDef(), noteDef(), personDef()}
+	return []*objDef{orgDef(), dealDef(), taskDef(), noteDef(), personDef(), tagDef()}
 }
 
 func objectByKind(kind string) *objDef {
@@ -118,7 +122,7 @@ func objectByKind(kind string) *objDef {
 
 func orgDef() *objDef {
 	return &objDef{
-		kind: "organization", label: "organization", short: "org", group: "Organizations", view: viewOrgs,
+		kind: "organization", label: "organization", short: "org", group: "Organizations", view: viewOrgs, shortcut: "o",
 		fields:   []string{"name", "domain", "industry", "size", "location", "website", "linkedin", "description", "notes"},
 		cols:     []string{"name", "industry", "domain"},
 		prompts:  []string{"org-add", "org-edit"},
@@ -155,7 +159,7 @@ func orgDef() *objDef {
 
 func dealDef() *objDef {
 	return &objDef{
-		kind: "deal", label: "deal", short: "deal", group: "Deals", view: viewDeals,
+		kind: "deal", label: "deal", short: "deal", group: "Deals", view: viewDeals, shortcut: "d",
 		fields:   []string{"title", "value", "stage", "organization", "person", "notes"},
 		cols:     []string{"title", "stage and organization", "value"},
 		prompts:  []string{"deal-add", "deal-edit"},
@@ -192,11 +196,11 @@ func dealDef() *objDef {
 
 func taskDef() *objDef {
 	return &objDef{
-		kind: "task", label: "task", short: "task", group: "Tasks", view: viewTasks,
-		fields:   []string{"title", "due"},
-		cols:     []string{"title", "repeat and tags", "due"},
-		prompts:  []string{"task-new", "task-edit", "task", "task-page"},
-		barVerb:  "task",
+		kind: "task", label: "task", short: "task", group: "Tasks", view: viewTasks, shortcut: "t",
+		fields:  []string{"title", "due"},
+		cols:    []string{"title", "repeat and tags", "due"},
+		prompts: []string{"task-new", "task-edit", "task", "task-page"},
+		barVerb: "task",
 		barFields: []hintField{{Label: "title"}, {Label: "by date", Marker: "by "}, {Label: "@person", Marker: "@"}, {Label: "#tag", Marker: "#"},
 			{Label: "!priority", Marker: "!"}, {Label: "every 3m", Marker: "every "}},
 		can:      map[verb]bool{vAdd: true, vEdit: true, vLink: true, vUnlink: true, vDelete: true, vRestore: true, vMark: true},
@@ -247,13 +251,13 @@ func taskDef() *objDef {
 // palette, and linked to any object with Link (patterns/objects-first). It has no list view of its own.
 func noteDef() *objDef {
 	return &objDef{
-		kind: model.NoteKind, label: "note", short: "note", group: "Contact", view: viewPeople,
-		fields:  []string{"text"},
-		cols:    []string{"date", "type and subject", "text"},
-		prompts: []string{"note", "note-object"},
-		barVerb: "note",
+		kind: model.NoteKind, label: "note", short: "note", group: "Contact", view: viewPeople, shortcut: "n",
+		fields:    []string{"text"},
+		cols:      []string{"date", "type and subject", "text"},
+		prompts:   []string{"note", "note-object"},
+		barVerb:   "note",
 		barFields: []hintField{{Label: "text"}, {Label: "@person", Marker: "@"}, {Label: "#tag", Marker: "#"}, {Label: "remind fri", Marker: "remind "}},
-		can:    map[verb]bool{vAdd: true, vEdit: true, vLink: true, vUnlink: true, vDelete: true, vRestore: true},
+		can:       map[verb]bool{vAdd: true, vEdit: true, vLink: true, vUnlink: true, vDelete: true, vRestore: true},
 		// The action ids that existed before the registry keep working for rebound keys.
 		ids:      map[verb]string{vAdd: "note", vRestore: "note-restore"},
 		selected: func(m *Model) int64 { return m.noteTarget() },
@@ -297,7 +301,7 @@ func noteDef() *objDef {
 
 func personDef() *objDef {
 	return &objDef{
-		kind: "person", label: "person", short: "person", group: "Contact", view: viewPeople,
+		kind: "person", label: "person", short: "person", group: "Contact", view: viewPeople, shortcut: "p",
 		cols: []string{"name", "company or title", "keep in touch"},
 		can:  map[verb]bool{vAdd: true, vEdit: true, vLink: true, vUnlink: true, vDelete: true, vRestore: true, vMark: true},
 		ids:  map[verb]string{vAdd: "new", vDelete: "archive", vRestore: "restore", vEdit: "person-edit"},
@@ -312,7 +316,7 @@ func personDef() *objDef {
 		edit:      func(m *Model, id int64) tea.Cmd { m.focus = focusDetail; m.syncDetail(); return nil },
 		archive:   func(m *Model, id int64) error { return m.hArchivePerson(m.ctx, id) },
 		restore:   func(m *Model, id int64) error { return m.hRestorePerson(m.ctx, id) },
-		deleteAsk: func(m *Model) { m.askArchive() },
+		deleteAsk: func(m *Model) tea.Cmd { return m.askArchive() },
 		restoreIn: whenArchivedRows,
 		restoreDo: func(m *Model) { m.restoreTargets() },
 		items: func(m *Model) []overlayItem {
@@ -408,7 +412,7 @@ func (o *objDef) addAction() action {
 	}
 	a := action{
 		id: o.actionID(vAdd), title: "Add " + o.label, group: o.group, keys: o.keysFor(vAdd),
-		desc: desc + ". From the palette, or a then " + addKindLetter(o.kind), write: true,
+		desc: desc + ". From the palette, or a then " + addShortcut(o.kind), write: true,
 		keyFor: o.keyFor(vAdd),
 		run:    func(m *Model) tea.Cmd { return o.add(m) },
 	}
@@ -417,6 +421,9 @@ func (o *objDef) addAction() action {
 	}
 	if o.kind == "task" {
 		a.desc = "add a task: title | optional due date. From the palette, or a then t (same as crm task add). A highlighted object is offered as the link, tab accepts it"
+	}
+	if o.kind == tagKind {
+		a.desc = "add a tag: type its name, an existing name picks that tag. A highlighted object is offered as the one to put it on, tab accepts. From the palette, or a then " + addShortcut(o.kind)
 	}
 	if o.kind == model.NoteKind {
 		a.when = func(m *Model) bool { return whenPerson(m) || whenObjectPage(m) }
@@ -450,7 +457,7 @@ func (o *objDef) deleteAction() action {
 		desc:  "delete the selected " + o.label + " (asks y/n, the same soft delete as crm " + cliNoun(o.kind) + " delete). ctrl+z undoes it",
 		write: true, keyFor: o.keyFor(vDelete), foot: footDelete, footIn: inList, footLabel: "delete",
 		when: func(m *Model) bool { return o.selected(m) != 0 },
-		run:  func(m *Model) tea.Cmd { m.verbDelete(o); return nil },
+		run:  func(m *Model) tea.Cmd { return m.verbDelete(o) },
 	}
 	if o.kind == "task" {
 		a.footIf = func(m *Model) bool { return m.view == viewTasks }
@@ -460,7 +467,7 @@ func (o *objDef) deleteAction() action {
 		a.desc = "delete the note under the cursor (asks y/n, the same soft delete as crm note delete). d on the note row, ctrl+z undoes it"
 	}
 	if o.kind == "person" {
-		a.desc = "delete (archive) the person or all marked (asks y/n, restore from the Archived view)"
+		a.desc = "delete (archive) the person or all selected (asks y/n for one, the count typed back for several, restore from the Archived view)"
 		a.footLabel = "archive"
 		a.foot = 35
 		a.footIf = whenMarks
@@ -509,14 +516,19 @@ func cliNoun(kind string) string {
 // --- generic verb handlers ---
 
 // verbDelete asks y/n, then deletes the selected object through its recorded archive hook.
-func (m *Model) verbDelete(o *objDef) {
+func (m *Model) verbDelete(o *objDef) tea.Cmd {
 	if o.deleteAsk != nil {
-		o.deleteAsk(m)
-		return
+		return o.deleteAsk(m)
+	}
+	if ids := m.bulkOfKind(o.kind); len(ids) > 1 {
+		return m.askTyped(fmt.Sprintf("delete %s", nouns(repeatKind(o.kind, len(ids)), len(ids))), bulkWord("delete", len(ids)), func() { m.deleteMany(o, ids) })
 	}
 	id := o.selected(m)
+	if ids := m.bulkOfKind(o.kind); len(ids) == 1 {
+		id = ids[0]
+	}
 	if id == 0 {
-		return
+		return nil
 	}
 	name := truncateLabel(o.nameOf(m, id))
 	m.mode = modeConfirm
@@ -533,6 +545,7 @@ func (m *Model) verbDelete(o *objDef) {
 			m.pendingCmd = m.showToast(o.label+" deleted · ctrl+z undoes", false)
 		},
 	}
+	return nil
 }
 
 // verbRestore brings back the object of this kind deleted last in the session. Objects that came

@@ -61,18 +61,28 @@ func TestNoteEnterEditsContentInline(t *testing.T) {
 	assert.Equal(t, "second draft", str(noteContent(t, m, id).Content))
 }
 
-func TestNoteTChangesTypeWithAPicker(t *testing.T) {
+// The note type is a cell of the note row (owner decision 2026-10-28): right moves to it, enter edits it.
+func TestNoteTypeIsACellOfTheRow(t *testing.T) {
 	m, id := noteModel(t)
+	assert.Nil(t, m.actionByID("note-retype"), "no separate change-type action")
+	assert.Nil(t, m.actionByID("link-edit"), "E is gone")
 	press(m, "E")
-	require.Equal(t, modeOverlay, m.mode)
-	assert.Equal(t, "Note type", m.ov.title)
-	assert.Equal(t, "note", m.ov.items[0].label, "the current type is first")
-	typeText(m, "meeting")
-	press(m, "enter")
+	assert.Equal(t, modeNormal, m.mode, "E does nothing now")
+	require.Len(t, m.form[m.fcur].cells, 1)
+	assert.Equal(t, "type", m.form[m.fcur].cells[0].key)
+	setCell(t, m, 1, "meeting")
 	assert.Equal(t, "meeting", noteContent(t, m, id).Type)
-	assert.Equal(t, "note type set to meeting", m.status)
+	assert.Contains(t, m.status, "saved type")
 	assert.Equal(t, id, m.form[m.fcur].id)
 	assert.Equal(t, "meeting", m.form[m.fcur].typ)
+	assert.Equal(t, 1, m.fcol, "the cursor stays on the cell")
+	// ctrl+z undoes it and left goes back to the row.
+	press(m, "ctrl+z")
+	assert.Equal(t, "note", noteContent(t, m, id).Type)
+	press(m, "left")
+	assert.Equal(t, 0, m.fcol)
+	press(m, "left")
+	assert.Equal(t, focusList, m.focus, "left from the first cell returns to the list")
 }
 
 func TestNoteDeleteAsksThenRestoreFromPalette(t *testing.T) {
@@ -170,23 +180,23 @@ func TestNoteActionsInPalette(t *testing.T) {
 		return out
 	}
 	st := state()
-	assert.Equal(t, "", st["note-retype"], "on a note row")
+
 	assert.Equal(t, "not here", st["note-restore"], "nothing deleted yet")
 	assert.Equal(t, "", st["edit"])
 	assert.Equal(t, "", st["delete"])
 
 	press(m, "esc") // back to the list
 	st = state()
-	assert.Equal(t, "not here", st["note-retype"], "needs the detail pane")
 
 	// t on a person in the list still adds a task.
 	press(m, "a", "t", "tab")
 	assert.Equal(t, modePrompt, m.mode)
 	press(m, "esc")
 
-	// The footer offers the type key on a note row.
+	// The footer offers the next cell on a note row.
 	press(m, "tab")
 	focusNote(t, m)
-	assert.Contains(t, m.hintsLine(), "type")
+	assert.Contains(t, m.hintsLine(), "cell")
+
 	assert.LessOrEqual(t, lipgloss.Width(strings.Split(m.View(), "\n")[len(strings.Split(m.View(), "\n"))-1]), 100)
 }

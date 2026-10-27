@@ -12,7 +12,6 @@ import (
 	"github.com/mattn/go-runewidth"
 )
 
-
 // cleanCell removes emoji and control characters that break column widths in list cells.
 func cleanCell(s string) string {
 	var b strings.Builder
@@ -200,7 +199,7 @@ func (m *Model) countText() string {
 	case viewHome:
 		return ""
 	case viewMerge:
-		return fmt.Sprintf("%d groups, %s+", len(m.rows), m.minLevel)
+		return fmt.Sprintf("%d groups, %s+", len(m.groups), m.minLevel)
 	case viewArchived:
 		if m.archKind != "" {
 			return fmt.Sprintf("%d archived %ss", len(m.rows), cliNoun(m.archKind))
@@ -257,10 +256,10 @@ func (m *Model) listView(w, h int) string {
 		case m.view == viewTasks:
 			return m.st.Dim.Render("No open tasks. a then enter adds one.")
 		case m.view == viewMerge:
-			return m.st.Dim.Render("No duplicates at " + m.minLevel.String() + " confidence or above. m lowers the level.")
+			return m.st.Dim.Render("No duplicates at " + m.minLevel.String() + " confidence or above. ctrl+o sets the minimum level.")
 		case m.view == viewArchived:
 			if m.archKind != "" {
-				return m.st.Dim.Render("No archived " + cliNoun(m.archKind) + "s. T changes the type filter.")
+				return m.st.Dim.Render("No archived " + cliNoun(m.archKind) + "s. ctrl+o changes the type.")
 			}
 			return m.st.Dim.Render("Nothing archived. d deletes the selected object, # archives the selected person.")
 		case m.view == viewSync:
@@ -278,7 +277,8 @@ func (m *Model) listView(w, h int) string {
 	}
 	anyMarks := len(m.marked) > 0
 	isMarked := func(r row) bool {
-		return (r.personID != 0 && m.marked[r.personID]) || (m.view == viewOrgs && r.orgID != 0 && m.marked[r.orgID])
+		ref, ok := m.rowRef(r)
+		return ok && m.marked[m.selKey(ref)]
 	}
 	var b strings.Builder
 	end := m.offset + h
@@ -352,7 +352,7 @@ var footShort = map[string]string{
 	"open": "open", "back": "back", "compare": "compare", "dupe-level": "level", "dismiss": "dismiss",
 	"undo-dismiss": "undo", "merge-marked": "merge", "archive": "archive", "restore": "restore", "purge": "purge",
 	"home-open": "open", "sync-now": "sync", "sync-dry": "dry-run", "inbox-accept": "accept", "inbox-attach": "attach",
-	"inbox-ignore": "ignore", "goto-view": "views", "note-retype": "type",
+	"inbox-ignore": "ignore", "goto-view": "views",
 	"org-add": "add", "org-edit": "edit", "org-delete": "delete",
 	"deal-add": "add", "deal-edit": "edit", "deal-delete": "delete",
 	"cmp-left": "pick", "cmp-pick": "toggle", "cmp-survivor": "survivor", "cmp-pair": "pair", "cmp-view": "pane", "cmp-confirm": "merge", "cmp-back": "back",

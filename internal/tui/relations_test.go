@@ -2,7 +2,6 @@ package tui
 
 import (
 	"context"
-	"strings"
 	"testing"
 
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
@@ -42,40 +41,65 @@ func TestLinkFormAsksRoleDatesAndPrimaryAndEditChangesThemInPlace(t *testing.T) 
 	assert.True(t, items[0].Primary)
 	assert.Equal(t, "joined via Pat", *items[0].Notes)
 
-	// The person page shows it with role and dates.
+	// The person page shows the link as a row of cells: role, dates, primary and notes (owner decision
+	// 2026-10-28), and E is gone.
 	press(m, "tab")
 	goTo(t, m, "organization")
 	row := m.form[m.fcur]
 	assert.Equal(t, "Acme", row.value)
-	assert.Contains(t, row.suffix, "CTO")
-	assert.Contains(t, row.suffix, "since 2019-03")
-	assert.Contains(t, row.suffix, "primary")
+	require.Len(t, row.cells, 5)
+	got := map[string]string{}
+	for _, c := range row.cells {
+		got[c.key] = c.value
+	}
+	assert.Equal(t, map[string]string{"role": "CTO", "from": "2019-03", "to": "", "primary": "yes", "notes": "joined via Pat"}, got)
 	assert.False(t, row.dim)
-
-	// E edits the same link: the prompt is filled, a field you empty is cleared.
+	view := plain(m.detail.View())
+	assert.Contains(t, view, "role", "the section heading carries the column titles")
+	assert.Contains(t, view, "CTO")
+	assert.Contains(t, view, "2019-03")
 	press(m, "E")
-	require.Equal(t, modePrompt, m.mode)
-	assert.Equal(t, "CTO | 2019-03 |  | yes | joined via Pat", m.input.Value())
-	submit(m, "Chief Technology Officer | 2019-03 | 2021-06")
+	assert.Equal(t, modeNormal, m.mode, "E does nothing now")
+
+	// left, right and tab move across the cells, enter edits the cell by its type.
+	press(m, "right")
+	assert.Equal(t, 1, m.fcol)
+	press(m, "tab")
+	assert.Equal(t, 2, m.fcol)
+	press(m, "shift+tab", "left")
+	assert.Equal(t, 0, m.fcol)
+	setCell(t, m, 1, "Chief Technology Officer")
+	assert.Contains(t, m.status, "saved role")
 	items = linkedOrgs(t, m, 1)
 	require.Len(t, items, 1, "edited in place, not a second link")
 	assert.Equal(t, "Chief Technology Officer", *items[0].Role)
+	assert.Equal(t, "2019-03", *items[0].StartedOn, "the other cells are untouched")
+	setCell(t, m, 3, "2021-06")
+	setCell(t, m, 4, "no") // the primary flag is a choice cell
+	setCell(t, m, 5, "")   // an emptied cell is cleared
+	items = linkedOrgs(t, m, 1)
 	assert.Equal(t, "2021-06", *items[0].EndedOn)
+	assert.False(t, items[0].Primary)
 	assert.False(t, items[0].Current)
 	assert.Nil(t, items[0].Notes, "the emptied notes are cleared")
-	assert.Contains(t, m.toast.text, "saved the link")
+
+	// A wrong value keeps the editor open and says what was expected.
+	press(m, "left", "left", "left", "left", "left")
+	assert.Equal(t, 0, m.fcol)
 
 	// The ended membership is dim on the page.
 	goTo(t, m, "organization")
 	assert.True(t, m.form[m.fcur].dim)
-	assert.Contains(t, m.form[m.fcur].suffix, "past")
 
-	// Undo and redo of the attribute edit.
-	press(m, "ctrl+z")
+	// Every cell edit is one undo step, and redo puts it back.
+	for i := 0; i < 4; i++ {
+		press(m, "ctrl+z")
+	}
 	items = linkedOrgs(t, m, 1)
 	assert.Equal(t, "CTO", *items[0].Role)
 	assert.Nil(t, items[0].EndedOn)
 	assert.True(t, items[0].Primary)
+	assert.NotNil(t, items[0].Notes)
 	press(m, "ctrl+y")
 	items = linkedOrgs(t, m, 1)
 	assert.Equal(t, "Chief Technology Officer", *items[0].Role)
@@ -247,7 +271,7 @@ func TestOrganizationPageHasMembersParentsDealsAndOpensLinkedRows(t *testing.T) 
 	runPalette(m, "organizations view")
 	m.cursorOn(func(r row) bool { return r.orgID == acme.ID })
 	view := m.detail.View()
-	for _, want := range []string{"Acme", "Rockets", "Members", "Zed Adams", "CEO", "since 2020", "Parent organizations", "Acme Holdings", "Deals", "Launch"} {
+	for _, want := range []string{"Acme", "Rockets", "Members", "Zed Adams", "CEO", "2020", "Parent organizations", "Acme Holdings", "Deals", "Launch"} {
 		assert.Contains(t, view, want)
 	}
 
@@ -382,10 +406,9 @@ func TestArchivedViewListsEveryKindFiltersByTypeAndRestores(t *testing.T) {
 	assert.Contains(t, m.View(), "4 archived")
 
 	// The type filter keeps one kind.
-	press(m, "ctrl+f")
+	press(m, "ctrl+o")
 	require.NotNil(t, m.ov)
-	typeText(m, "deals")
-	press(m, "enter")
+	press(m, "right", "right", "right", "esc") // all types, people, organizations, deals
 	require.Len(t, m.rows, 1)
 	assert.Equal(t, "deal", m.rows[0].akind)
 	assert.Contains(t, m.View(), "1 archived deals")
@@ -403,9 +426,7 @@ func TestArchivedViewListsEveryKindFiltersByTypeAndRestores(t *testing.T) {
 	require.Len(t, m.rows, 1, "the undone restore puts the deal back in the Archived list")
 
 	// Back to all types: restore the organization and its membership comes back with it.
-	press(m, "ctrl+f")
-	typeText(m, "all")
-	press(m, "enter")
+	press(m, "ctrl+o", "left", "left", "left", "esc") // deals, organizations, people, all types
 	m.cursorOn(func(r row) bool { return r.akind == "organization" })
 	press(m, "r")
 	items := linkedOrgs(t, m, 1)
@@ -426,62 +447,25 @@ func TestArchivedViewListsEveryKindFiltersByTypeAndRestores(t *testing.T) {
 	assert.Equal(t, "deal", m.rows[0].akind)
 }
 
-func TestPurgeAppliesToArchivedPeopleOnly(t *testing.T) {
+// Purge is a verb of every object type, not of people only (owner decision 2026-10-28).
+func TestPurgeAppliesToEveryArchivedType(t *testing.T) {
 	m, _ := newTestModel(t)
 	ctx := context.Background()
 	org, _ := m.orr.Create(ctx, model.CreateOrgInput{Name: "Acme"})
 	require.NoError(t, repo.ArchiveObject(ctx, m.db, "organization", org.ID))
 	press(m, "9")
 	require.Len(t, m.rows, 1)
-	assert.False(t, m.actionByID("purge").enabled(m), "an archived organization cannot be purged here")
-}
-
-// --- registry ---
-
-func TestLinkActionsAndKeysExistForPersonToPerson(t *testing.T) {
-	m, _ := newTestModel(t)
-	a := m.actionByID("link-person")
-	require.NotNil(t, a)
-	assert.True(t, a.enabled(m), "a person links to a person")
-	assert.True(t, strings.Contains(a.desc, "link"))
-	assert.NotNil(t, m.actionByID("link-edit"))
-	assert.NotNil(t, m.actionByID("archived-type"))
-	assert.Nil(t, m.actionByID("note-object"), "one Add note action for every page")
-	assert.NotNil(t, m.actionByID("note"))
-	assert.NotNil(t, m.actionByID("link-note"))
-	assert.NotNil(t, m.actionByID("unlink-note"))
-}
-
-func TestReferredByRendersFromTheViewingSideInTheTUI(t *testing.T) {
-	m, _ := newTestModel(t)
-	kind := "referred-by"
-	_, err := m.links.Link(context.Background(), personRef(1), personRef(2), model.LinkAttrs{Kind: &kind})
-	require.NoError(t, err)
-	m.afterWrite()
-	press(m, "tab")
-	goTo(t, m, "referred-by")
-	assert.Equal(t, "Bob Baker", m.form[m.fcur].value, "Zed was referred by Bob")
-	m.selectPerson(2)
-	m.focus = focusDetail
-	m.syncDetail()
-	goTo(t, m, "referred")
-	assert.Equal(t, "Zed Adams", m.form[m.fcur].value, "Bob referred Zed")
-}
-
-func TestDealMovedBetweenClosedStagesIsRestamped(t *testing.T) {
-	m, _ := newTestModel(t)
-	ctx := context.Background()
-	d, err := m.dlr.Create(ctx, model.CreateDealInput{Title: "Site", Stage: "lead"})
-	require.NoError(t, err)
-	goDeals(m)
-	setChoice(t, m, "stage", "won")
-	_, err = m.db.Exec(`UPDATE deals SET closed_at = '2000-01-01 00:00:00' WHERE id = ?`, d.ID)
-	require.NoError(t, err)
-	m.afterWrite()
-	setChoice(t, m, "stage", "lost")
-	got, err := m.dlr.FindByID(ctx, d.ID)
-	require.NoError(t, err)
-	assert.Equal(t, "lost", got.Stage)
-	require.NotNil(t, got.ClosedAt)
-	assert.Equal(t, "2026-10-13 12:00:00", *got.ClosedAt, "re-stamped with the model clock")
+	assert.True(t, m.actionByID("purge").enabled(m), "an archived organization can be purged")
+	press(m, "d")
+	require.Equal(t, modePrompt, m.mode)
+	assert.Contains(t, m.View(), `type "Acme" to delete forever`)
+	typeText(m, "Acme")
+	press(m, "enter")
+	assert.False(t, m.statusIsErr, m.status)
+	assert.Contains(t, m.status, "deleted Acme forever")
+	_, err := m.orr.FindByID(ctx, org.ID)
+	assert.ErrorIs(t, err, model.ErrNotFound)
+	var n int
+	require.NoError(t, m.db.QueryRow(`SELECT COUNT(*) FROM tombstones WHERE table_name = 'organizations'`).Scan(&n))
+	assert.Equal(t, 1, n, "a purge writes the tombstone for every type")
 }

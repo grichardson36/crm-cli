@@ -55,14 +55,43 @@ func globalAddActions() []action {
 }
 
 // addKindOrder is the order of the picker.
-var addKindOrder = []string{taskKindName, model.NoteKind, "organization", "person", "deal"}
+var addKindOrder = []string{taskKindName, model.NoteKind, "organization", "person", "deal", tagKind}
 
-// addKindLetter is the first letter of each kind's word in the picker.
-func addKindLetter(kind string) string {
-	if o := objectByKind(kind); o != nil {
-		return strings.ToLower(o.label[:1])
+// addShortcut is the letter of a kind in the add picker.
+func addShortcut(kind string) string { return addShortcuts()[kind] }
+
+// addShortcuts gives every kind that has an add its letter in the picker. A kind declares its own in
+// the registry (objDef.shortcut). One that does not takes the first letter of its label, or when that is
+// taken the next letter of the label that is free. Letters are unique (TestAddShortcutsAreUnique).
+func addShortcuts() map[string]string { return shortcutsFor(objectDefs()) }
+
+// shortcutsFor is addShortcuts over a list of objects.
+func shortcutsFor(all []*objDef) map[string]string {
+	out := map[string]string{}
+	taken := map[string]bool{}
+	var defs []*objDef
+	for _, o := range all {
+		if o.add != nil {
+			defs = append(defs, o)
+			if o.shortcut != "" {
+				out[o.kind] = strings.ToLower(o.shortcut)
+				taken[strings.ToLower(o.shortcut)] = true
+			}
+		}
 	}
-	return ""
+	for _, o := range defs {
+		if _, ok := out[o.kind]; ok {
+			continue
+		}
+		for _, r := range strings.ToLower(o.label) {
+			if r >= 'a' && r <= 'z' && !taken[string(r)] {
+				out[o.kind] = string(r)
+				taken[string(r)] = true
+				break
+			}
+		}
+	}
+	return out
 }
 
 // addKinds lists the kinds the picker offers, in the owner's order, then any kind registered later.
@@ -78,7 +107,7 @@ func addKinds() []overlayItem {
 		if o.kind == model.NoteKind {
 			desc = "add a note"
 		}
-		items = append(items, overlayItem{id: "add:" + o.kind, label: capitalize(o.label), desc: desc, value: o.kind, hint: addKindLetter(o.kind)})
+		items = append(items, overlayItem{id: "add:" + o.kind, label: capitalize(o.label), desc: desc, value: o.kind, hint: addShortcut(o.kind)})
 	}
 	for _, kind := range addKindOrder {
 		add(objectByKind(kind))
@@ -182,7 +211,17 @@ func (m *Model) suggestionFor(kind string) *addSuggestion {
 	s := m.addSugg
 	if s == nil {
 		m.addSugg = &addSuggestion{reason: "nothing highlighted to link"}
+		if kind == tagKind {
+			m.addSugg.reason = "nothing highlighted to tag"
+		}
 		return nil
+	}
+	if kind == tagKind {
+		m.addSugg = tagSuggestion(s)
+		if m.addSugg.reason != "" {
+			return nil
+		}
+		return m.addSugg
 	}
 	if s.reason != "" {
 		return nil

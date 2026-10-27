@@ -1,9 +1,11 @@
 package tui
 
 import (
+	"context"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -30,8 +32,8 @@ func TestAOpensAKindPickerBuiltFromTheRegistry(t *testing.T) {
 	press(m, "a")
 	require.Equal(t, modeOverlay, m.mode)
 	assert.Equal(t, "Add", m.ov.title)
-	assert.Equal(t, []string{"Task", "Note", "Organization", "Person", "Deal"}, kindLabels(m))
-	assert.Equal(t, []string{"t", "n", "o", "p", "d"}, kindHints(m), "each kind shows its first letter")
+	assert.Equal(t, []string{"Task", "Note", "Organization", "Person", "Deal", "Tag"}, kindLabels(m))
+	assert.Equal(t, []string{"t", "n", "o", "p", "d", "g"}, kindHints(m), "each kind shows the shortcut its registry entry declares")
 	press(m, "esc")
 	assert.Equal(t, modeNormal, m.mode, "esc leaves where you were")
 	assert.Equal(t, viewPeople, m.view)
@@ -228,7 +230,7 @@ func TestAddIsBlockedInReadOnlyModeAndRebindable(t *testing.T) {
 }
 
 func TestTheRetiredAddKeysDoNothing(t *testing.T) {
-	for _, k := range []string{"t", "n", "+", "N", "ctrl+a"} {
+	for _, k := range []string{"t", "n", "+", "N"} {
 		m, _ := newTestModel(t)
 		before := len(m.rows)
 		press(m, k)
@@ -236,4 +238,80 @@ func TestTheRetiredAddKeysDoNothing(t *testing.T) {
 		assert.Nil(t, m.ov, k)
 		assert.Len(t, m.rows, before, k)
 	}
+}
+
+// Every kind that can be added has a shortcut in the picker, they are all different, and the picker shows
+// exactly the letters the registry gives (owner decision 2026-10-28).
+func TestAddShortcutsAreUniqueAndShownInThePicker(t *testing.T) {
+	short := addShortcuts()
+	seen := map[string]string{}
+	for _, o := range objectDefs() {
+		if o.add == nil {
+			continue
+		}
+		s := short[o.kind]
+		require.NotEmpty(t, s, "%s has no shortcut", o.kind)
+		assert.Len(t, s, 1, o.kind)
+		other, dup := seen[s]
+		assert.False(t, dup, "%s and %s both take %q", other, o.kind, s)
+		seen[s] = o.kind
+	}
+	want := map[string]string{"task": "t", model.NoteKind: "n", "organization": "o", "person": "p", "deal": "d", "tag": "g"}
+	for kind, s := range want {
+		assert.Equal(t, s, short[kind], kind)
+	}
+	m, _ := newTestModel(t)
+	press(m, "a")
+	require.NotNil(t, m.ov)
+	shown := map[string]string{}
+	for _, idx := range m.ov.shown {
+		shown[m.ov.items[idx].value] = m.ov.items[idx].hint
+	}
+	assert.Equal(t, want, shown)
+}
+
+// A kind that declares nothing takes its first letter, or when that is taken the next free letter of its name.
+func TestDefaultShortcutIsTheFirstFreeLetterOfTheName(t *testing.T) {
+	add := func(m *Model) tea.Cmd { return nil }
+	got := shortcutsFor([]*objDef{
+		{kind: "task", label: "task", shortcut: "t", add: add},
+		{kind: "tag", label: "tag", add: add},     // t is taken, a is free
+		{kind: "thing", label: "thing", add: add}, // t taken, h is free
+		{kind: "label", label: "label", add: add}, // l is free
+		{kind: "lamp", label: "lamp", add: add},   // l taken, a taken by tag, m is free
+		{kind: "noadd", label: "noadd"},
+	})
+	assert.Equal(t, map[string]string{"task": "t", "tag": "a", "thing": "h", "label": "l", "lamp": "m"}, got)
+}
+
+func TestATagThroughTheAddPickerCreatesAndTagsTheHighlightedObject(t *testing.T) {
+	m, pr := newTestModel(t)
+	press(m, "a", "g")
+	require.Equal(t, modePrompt, m.mode)
+	assert.Equal(t, "tag-new", m.promptKind)
+	typeText(m, "vip")
+	assert.Contains(t, m.View(), "tab: link", "the highlighted person is offered")
+	press(m, "tab", "enter")
+	assert.Equal(t, modeNormal, m.mode)
+	p := personByID(t, pr, 1)
+	_ = p
+	tags, err := repo.NewTagRepo(m.db).GetForEntity(context.Background(), "person", 1)
+	require.NoError(t, err)
+	require.Len(t, tags, 1)
+	assert.Equal(t, "vip", tags[0].Name)
+
+	// Without tab the tag is created on its own and a second use of the name finds it.
+	press(m, "a", "g")
+	typeText(m, "later")
+	press(m, "enter")
+	assert.False(t, m.statusIsErr, m.status)
+	assert.Contains(t, m.status, "created")
+	var n int
+	require.NoError(t, m.db.QueryRow(`SELECT COUNT(*) FROM tags WHERE name = 'later'`).Scan(&n))
+	assert.Equal(t, 1, n)
+	press(m, "a", "g")
+	typeText(m, "later")
+	press(m, "enter")
+	require.NoError(t, m.db.QueryRow(`SELECT COUNT(*) FROM tags WHERE name = 'later'`).Scan(&n))
+	assert.Equal(t, 1, n, "the same name is found, not duplicated")
 }

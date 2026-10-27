@@ -24,7 +24,7 @@ type jumpUnit int
 
 const (
 	unitPage   jumpUnit = iota // a page, the default
-	unitDay                    // the next or previous day divider (Birthdays and later calendar-like views)
+	unitGroup                  // the next or previous group divider: a day in Birthdays, a confidence level in Merge
 	unitLetter                 // the next or previous first-letter group (People, Organizations)
 )
 
@@ -37,7 +37,8 @@ type viewNav struct {
 
 // viewNavs holds the declarations. A view that is not listed uses a page and has no home.
 var viewNavs = map[viewKind]viewNav{
-	viewBirthdays: {unit: unitDay, home: func(m *Model) { m.snapBirthdays() }},
+	viewBirthdays: {unit: unitGroup, home: func(m *Model) { m.snapBirthdays() }},
+	viewMerge:     {unit: unitGroup},
 	viewPeople:    {unit: unitLetter},
 	viewOrgs:      {unit: unitLetter},
 }
@@ -54,10 +55,10 @@ func (m *Model) jump(dir int) {
 	}
 	var starts []int
 	switch navOf(m.view).unit {
-	case unitDay:
-		starts = m.dayStarts()
+	case unitGroup:
+		starts = m.groupStarts()
 	case unitLetter:
-		if m.sortRecent && m.view == viewPeople {
+		if m.view == viewPeople && m.sortedRecent(viewPeople) {
 			m.move(dir * page) // groups by letter mean nothing in the recently updated order
 			return
 		}
@@ -118,8 +119,8 @@ func (m *Model) lastSelectable() int {
 	return m.cursor
 }
 
-// dayStarts lists the first selectable row under each day divider.
-func (m *Model) dayStarts() []int {
+// groupStarts lists the first selectable row under each group divider (a rule row).
+func (m *Model) groupStarts() []int {
 	var out []int
 	for i, r := range m.rows {
 		if !r.rule {

@@ -50,7 +50,7 @@ type overlay struct {
 	// turns the filter line off.
 	onKey    func(m *Model, key string) bool
 	noFilter bool
-	onPick  func(m *Model, it overlayItem)
+	onPick   func(m *Model, it overlayItem)
 	// onCursor runs when the cursor lands on a different item (live preview). onCancel runs when
 	// the overlay is closed without a pick. Both are optional.
 	onCursor  func(m *Model, it overlayItem)
@@ -249,7 +249,6 @@ func (m *Model) openViewSwitcher() tea.Cmd {
 	return nil
 }
 
-
 // openPicker shows a small list of choices. onPick runs after the overlay closes.
 func (m *Model) openPicker(title string, items []overlayItem, onPick func(m *Model, it overlayItem)) {
 	_ = m.showOverlay(m.newOverlay(title, items, false))
@@ -340,10 +339,10 @@ func (m *Model) overlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "enter":
 		return m, m.pickOverlay(o.cursor)
-	case "up", "ctrl+p", "shift+tab":
+	case "up", "shift+tab":
 		o.move(-1, page)
 		return m, nil
-	case "down", "ctrl+n", "tab":
+	case "down", "tab":
 		o.move(1, page)
 		return m, nil
 	case "pgup":
@@ -476,9 +475,9 @@ func (m *Model) openHelp() {
 
 func (m *Model) handleHelpKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "down", "ctrl+n":
+	case "down":
 		m.helpVP.LineDown(1)
-	case "up", "ctrl+p":
+	case "up":
 		m.helpVP.LineUp(1)
 	case "pgdown":
 		m.helpVP.ViewDown()

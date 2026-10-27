@@ -3,6 +3,7 @@ package tui
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -26,7 +27,6 @@ import (
 func orgPrompt() string  { return orgDef().prompt() }
 func dealPrompt() string { return dealDef().prompt() }
 
-
 func (m *Model) selOrg() int64 {
 	if m.view != viewOrgs {
 		return 0
@@ -47,11 +47,10 @@ func (m *Model) selDeal() int64 {
 	return 0
 }
 
-func whenOrgSel(m *Model) bool       { return m.selOrg() != 0 }
-func whenDealSel(m *Model) bool      { return m.selDeal() != 0 }
-func whenOrgsView(m *Model) bool     { return m.view == viewOrgs && m.focus == focusList }
-func whenDealsView(m *Model) bool    { return m.view == viewDeals && m.focus == focusList }
-
+func whenOrgSel(m *Model) bool    { return m.selOrg() != 0 }
+func whenDealSel(m *Model) bool   { return m.selDeal() != 0 }
+func whenOrgsView(m *Model) bool  { return m.view == viewOrgs && m.focus == focusList }
+func whenDealsView(m *Model) bool { return m.view == viewDeals && m.focus == focusList }
 
 // --- rows and detail ---
 
@@ -63,6 +62,9 @@ func (m *Model) orgRows() ([]row, error) {
 	m.orgs = map[int64]*model.Organization{}
 	m.orgSimilar = nil
 	similar := m.similarOrgs()
+	if !m.sortedRecent(viewOrgs) {
+		sort.SliceStable(list, func(i, j int) bool { return strings.ToLower(list[i].Name) < strings.ToLower(list[j].Name) })
+	}
 	rows := make([]row, 0, len(list))
 	for _, o := range list {
 		m.orgs[o.ID] = o

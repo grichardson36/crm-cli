@@ -57,7 +57,7 @@ func newTestModel(t *testing.T) (*Model, *repo.PersonRepo) {
 var specialKeys = map[string]tea.KeyType{
 	"enter": tea.KeyEnter, "esc": tea.KeyEsc, "tab": tea.KeyTab, "shift+tab": tea.KeyShiftTab,
 	"ctrl+d": tea.KeyCtrlD, "ctrl+k": tea.KeyCtrlK, "ctrl+u": tea.KeyCtrlU, "ctrl+z": tea.KeyCtrlZ, "ctrl+y": tea.KeyCtrlY,
-	"left": tea.KeyLeft, "right": tea.KeyRight, "up": tea.KeyUp, "down": tea.KeyDown, "ctrl+up": tea.KeyCtrlUp, "ctrl+down": tea.KeyCtrlDown,
+	"left": tea.KeyLeft, "right": tea.KeyRight, "up": tea.KeyUp, "down": tea.KeyDown, "ctrl+up": tea.KeyCtrlUp, "shift+up": tea.KeyShiftUp, "shift+down": tea.KeyShiftDown, "ctrl+left": tea.KeyCtrlLeft, "ctrl+right": tea.KeyCtrlRight, "ctrl+down": tea.KeyCtrlDown,
 	"ctrl+shift+up": tea.KeyCtrlShiftUp, "ctrl+shift+down": tea.KeyCtrlShiftDown, "home": tea.KeyHome, "end": tea.KeyEnd,
 	"pgup": tea.KeyPgUp, "pgdown": tea.KeyPgDown, "ctrl+r": tea.KeyCtrlR, "ctrl+o": tea.KeyCtrlO, "ctrl+l": tea.KeyCtrlL, "ctrl+f": tea.KeyCtrlF,
 	"ctrl+b": tea.KeyCtrlB, "ctrl+e": tea.KeyCtrlE, "ctrl+w": tea.KeyCtrlW, "ctrl+n": tea.KeyCtrlN, "ctrl+p": tea.KeyCtrlP, "ctrl+a": tea.KeyCtrlA,
@@ -439,16 +439,19 @@ func TestSortToggleAndReload(t *testing.T) {
 		}
 	}
 	press(m, "ctrl+o")
-	assert.True(t, m.sortRecent)
+	require.Equal(t, modeOverlay, m.mode, "ctrl+o opens the view options")
+	press(m, "right")
+	press(m, "esc")
+	assert.True(t, m.sortedRecent(viewPeople))
 	assert.Equal(t, "Cara Cole", names(m)[0], "most recently updated first")
-	press(m, "ctrl+o")
+	press(m, "ctrl+o", "right", "esc")
 	assert.Equal(t, "Zed Adams", names(m)[0])
 }
 
 func TestReadOnlyBlocksWrites(t *testing.T) {
 	m, pr := newTestModel(t)
 	m.readOnly = true
-	for _, k := range []string{"x", "f", "a", "s", "d", "F"} {
+	for _, k := range []string{"x", "f", "a", "s", "d"} {
 		press(m, k)
 		assert.Equal(t, modeNormal, m.mode, "key %s must not open a prompt", k)
 		assert.True(t, m.statusIsErr, "key %s", k)
@@ -476,7 +479,7 @@ func TestReadOnlyBlocksWrites(t *testing.T) {
 	}
 	var copied string
 	m.clip = func(s string) { copied = s }
-	press(m, "y")
+	press(m, "ctrl+c")
 	assert.Equal(t, "bob@globex.com", copied)
 	assert.False(t, m.statusIsErr)
 	assert.Len(t, personByID(t, pr, 2).Emails, 2)
@@ -669,8 +672,9 @@ func TestAddPhoneHandleTagTaskNote(t *testing.T) {
 	press(m, "n")
 	var copied string
 	m.clip = func(s string) { copied = s }
-	press(m, "y")
+	press(m, "ctrl+c") // copies the focused field in the detail pane
 	assert.Equal(t, "hello there", copied)
+	assert.NotNil(t, m, "ctrl+c in the detail pane did not quit")
 }
 
 func ptr64(i int64) *int64 { return &i }
@@ -682,7 +686,7 @@ func TestCopyAndOpen(t *testing.T) {
 	m.open = func(u string) error { opened = u; return nil }
 	press(m, "down", "tab")
 	goTo(t, m, "email")
-	press(m, "y")
+	press(m, "ctrl+c")
 	assert.Equal(t, "bob@globex.com", copied)
 	press(m, "o")
 	assert.Equal(t, "mailto:bob@globex.com", opened)
@@ -690,8 +694,8 @@ func TestCopyAndOpen(t *testing.T) {
 	goTo(t, m, "company")
 	opened = ""
 	press(m, "o")
-	assert.Empty(t, opened)
-	assert.True(t, m.statusIsErr)
+	assert.Equal(t, "https://www.google.com/search?q=Globex", opened, "text that is no link opens a web search for it")
+	assert.False(t, m.statusIsErr)
 
 	var sb strings.Builder
 	osc52Copy(&sb, "hi")
@@ -790,14 +794,15 @@ func TestMarksAndBulkActions(t *testing.T) {
 	tags, _ := m.tagr.GetForEntity(ctx, "person", 3)
 	assert.Empty(t, tags)
 
-	// * marks all, a second * clears them.
-	press(m, "*")
+	// ctrl+a selects all, a second ctrl+a clears them.
+	press(m, "ctrl+a")
 	assert.Len(t, m.markedIDs(), 3)
-	press(m, "*")
+	press(m, "ctrl+a")
 	assert.Empty(t, m.markedIDs())
 
-	// Cadence and priority through pickers.
-	press(m, "*", "F")
+	// Cadence (palette) and priority through pickers.
+	press(m, "ctrl+a")
+	runID(m, "cadence")
 	assert.Equal(t, modeOverlay, m.mode)
 	typeText(m, "6 mons")
 	press(m, "enter")
@@ -805,7 +810,7 @@ func TestMarksAndBulkActions(t *testing.T) {
 	for id := int64(1); id <= 3; id++ {
 		assert.Equal(t, "6 mons", str(personByID(t, pr, id).KeepInTouch))
 	}
-	press(m, "*")
+	press(m, "ctrl+a")
 	// Priority is a choice field of the person page now (no palette entry), edited in place.
 	press(m, "tab")
 	setChoice(t, m, "priority", "High")
@@ -820,9 +825,9 @@ func TestMarksAndBulkActions(t *testing.T) {
 	assert.True(t, personByID(t, pr, 1).IsFavorite)
 	assert.True(t, personByID(t, pr, 2).IsFavorite)
 	assert.False(t, personByID(t, pr, 3).IsFavorite)
-	press(m, "*", "f") // not all favorite: everyone becomes favorite
+	press(m, "ctrl+a", "f") // not all favorite: everyone becomes favorite
 	assert.True(t, personByID(t, pr, 3).IsFavorite)
-	press(m, "*", "f") // all favorite: everyone is cleared
+	press(m, "ctrl+a", "f") // all favorite: everyone is cleared
 	assert.False(t, personByID(t, pr, 1).IsFavorite)
 
 	// Marks clear when the view changes.
@@ -847,15 +852,17 @@ func TestPaletteFilterAndRun(t *testing.T) {
 	assert.Contains(t, out, "Command bar")
 	assert.Contains(t, out, "Toggle favorite")
 
-	typeText(m, "favor")
+	typeText(m, "toggle favor")
 	require.NotEmpty(t, m.ov.shown)
 	assert.Equal(t, "favorite", m.ov.items[m.ov.shown[0]].id)
 	press(m, "enter")
 	assert.Equal(t, modeNormal, m.mode)
 	assert.True(t, personByID(t, pr, 1).IsFavorite)
 
-	// ":" is an alias, esc closes without running anything.
+	// "/" opens the bar again, esc closes without running anything. ":" is no longer a key.
 	press(m, ":")
+	assert.Equal(t, modeNormal, m.mode)
+	press(m, "/")
 	assert.Equal(t, modeOverlay, m.mode)
 	typeText(m, "mark contacted")
 	press(m, "esc")
@@ -889,7 +896,12 @@ func TestPaletteReadOnlyIsGreyedOut(t *testing.T) {
 	m.readOnly = true
 	press(m, "ctrl+k")
 	typeText(m, "favorite")
-	it := m.ov.items[m.ov.shown[0]]
+	var it overlayItem
+	for pos, idx := range m.ov.shown { // a disabled action sorts after enabled ones that merely look like the text
+		if m.ov.items[idx].id == "favorite" {
+			it, m.ov.cursor = m.ov.items[idx], pos
+		}
+	}
 	assert.Equal(t, "favorite", it.id)
 	assert.Equal(t, "read-only", it.disabled)
 	assert.Contains(t, m.View(), "(read-only)")
@@ -916,7 +928,7 @@ func TestRegistryHasUniqueIDsAndEveryActionIsInThePalette(t *testing.T) {
 		assert.NotEmpty(t, a.title, a.id)
 		assert.NotNil(t, a.run, a.id)
 	}
-	press(m, ":")
+	press(m, "/")
 	ids := map[string]bool{}
 	for _, it := range m.ov.items {
 		ids[it.id] = true

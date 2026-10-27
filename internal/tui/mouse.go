@@ -95,6 +95,7 @@ func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			again := m.focus == focusDetail && m.fcur == idx
 			m.focus = focusDetail
 			m.fcur = idx
+			m.fcol = 0
 			m.syncDetail()
 			if again {
 				// A second click on the selected row edits it.

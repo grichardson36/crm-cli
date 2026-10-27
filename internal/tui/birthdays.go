@@ -6,6 +6,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/jdanielnd/crm-cli/internal/model"
 )
 
 // The Birthdays view lists the days a window back from today and ahead of it, grouped by month with
@@ -24,29 +25,23 @@ func (m *Model) birthdayRows() ([]row, error) {
 		return nil, err
 	}
 	thisYear := m.now().Year()
-	var rows []row
-	month, day := "", ""
-	monthRow, dayRow := -1, -1
-	m.bdToday, m.bdTop = -1, 0
 	for _, b := range list {
-		when, err := time.Parse("2006-01-02", b.Date)
-		if err != nil {
+		if _, err := time.Parse("2006-01-02", b.Date); err != nil {
 			return nil, fmt.Errorf("parse birthday date %q: %w", b.Date, err)
 		}
-		if key := when.Format("2006-01"); key != month {
-			month = key
-			head := strings.ToUpper(when.Month().String())
-			if when.Year() != thisYear {
-				head += fmt.Sprintf(" %d", when.Year())
-			}
-			rows = append(rows, row{title: head, skip: true})
-			monthRow = len(rows) - 1
+	}
+	// The view groups by day (the group field) under a month heading, through the shared grouped list.
+	g := groupRows(list, func(b model.UpcomingBirthday) []groupHead {
+		when, _ := time.Parse("2006-01-02", b.Date)
+		head := strings.ToUpper(when.Month().String())
+		if when.Year() != thisYear {
+			head += fmt.Sprintf(" %d", when.Year())
 		}
-		if b.Date != day {
-			day = b.Date
-			rows = append(rows, row{title: b.Date, meta: b.Relative, skip: true, rule: true})
-			dayRow = len(rows) - 1
+		return []groupHead{
+			{key: when.Format("2006-01"), title: head},
+			{key: b.Date, title: b.Date, meta: b.Relative, rule: true},
 		}
+	}, func(b model.UpcomingBirthday) row {
 		age := ""
 		if b.Turning != nil {
 			age = fmt.Sprintf("%d yrs", *b.Turning)
@@ -54,19 +49,24 @@ func (m *Model) birthdayRows() ([]row, error) {
 				age = "1 yr"
 			}
 		}
-		rows = append(rows, row{personID: b.PersonID, title: cleanCell(b.Name), meta: age})
-		if b.DaysUntil >= 0 && m.bdToday < 0 {
-			m.bdToday = len(rows) - 1
-			m.bdTop = dayRow
-			if monthRow == dayRow-1 {
-				m.bdTop = monthRow
+		return row{personID: b.PersonID, title: cleanCell(b.Name), meta: age}
+	})
+	m.bdToday, m.bdTop = -1, 0
+	for i, b := range list {
+		if b.DaysUntil >= 0 {
+			m.bdToday = g.at[i]
+			m.bdTop = g.headsAt[i][1]
+			if g.headsAt[i][0] == m.bdTop-1 {
+				m.bdTop = g.headsAt[i][0]
 			}
+			break
 		}
 	}
-	if m.bdToday < 0 && len(rows) > 0 { // every birthday is in the past
-		m.bdToday, m.bdTop = len(rows)-1, max(0, dayRow)
+	if m.bdToday < 0 && len(g.rows) > 0 { // every birthday is in the past
+		last := len(list) - 1
+		m.bdToday, m.bdTop = len(g.rows)-1, max(0, g.headsAt[last][1])
 	}
-	return rows, nil
+	return g.rows, nil
 }
 
 // snapBirthdays puts the cursor on the first birthday from today on and scrolls so that its day sits

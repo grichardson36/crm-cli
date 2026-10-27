@@ -101,15 +101,21 @@ func linkActions() []action {
 				desc:  "link " + article(label) + " " + label + " to the selected object: pick one or create it from the text you type (same as crm <object> link " + cliNoun(other) + ")",
 				write: true, when: whenLinkable(other),
 				run: func(m *Model) tea.Cmd {
-					src, _ := m.cursorObject()
-					return m.startLink(src, other, false)
+					srcs, ok := m.linkSources()
+					if !ok {
+						return nil
+					}
+					return m.startLinkMany(srcs, other, false)
 				}},
 			action{id: "unlink-" + cliNoun(other), title: "Unlink " + label, group: "Link",
 				desc:  "remove the link between the selected object and " + article(label) + " " + label + " (same as crm <object> unlink " + cliNoun(other) + ")",
 				write: true, when: whenLinkable(other),
 				run: func(m *Model) tea.Cmd {
-					src, _ := m.cursorObject()
-					return m.startLink(src, other, true)
+					srcs, ok := m.linkSources()
+					if !ok {
+						return nil
+					}
+					return m.startLinkMany(srcs, other, true)
 				}},
 		)
 	}
@@ -118,20 +124,25 @@ func linkActions() []action {
 
 // startLinkVerb is the l and u key: ask which relation when there is more than one.
 func (m *Model) startLinkVerb(unlink bool) tea.Cmd {
-	src, ok := m.cursorObject()
+	srcs, ok := m.linkSources()
 	if !ok {
 		return nil
 	}
+	src := srcs[0]
+	who := m.refName(src)
+	if len(srcs) > 1 {
+		who = nouns(refKinds(srcs), len(srcs))
+	}
 	kinds := relationsOf(src.Kind)
-	title := "Link " + m.refName(src) + " to"
+	title := "Link " + who + " to"
 	if unlink {
-		title = "Unlink from " + m.refName(src)
+		title = "Unlink from " + who
 	}
 	var items []overlayItem
 	for i, k := range kinds {
 		it := overlayItem{id: "rel-" + k, label: relationLabel(k), value: k, hint: strconv.Itoa(i + 1)}
 		if unlink {
-			if n := len(m.linkedItems(src, k)); n == 0 {
+			if n := len(m.linkedUnion(srcs, k)); n == 0 {
 				it.disabled = "none linked"
 			} else {
 				it.desc = fmt.Sprintf("%d linked", n)
@@ -141,10 +152,10 @@ func (m *Model) startLinkVerb(unlink bool) tea.Cmd {
 	}
 	m.openPicker(title, items, func(m *Model, it overlayItem) {
 		if it.disabled != "" {
-			m.setStatus(m.refName(src)+" has no "+it.label+" linked", true)
+			m.setStatus(who+" has no "+it.label+" linked", true)
 			return
 		}
-		m.pendingCmd = m.startLink(src, it.value, unlink)
+		m.pendingCmd = m.startLinkMany(srcs, it.value, unlink)
 	})
 	m.ov.digits = true
 	return nil
@@ -346,18 +357,6 @@ func (m *Model) openLinkRow(r formRow) tea.Cmd {
 		return nil
 	}
 	return m.startLink(m.pageRef(), r.other, false)
-}
-
-// editLinkRow is e on a linked row: edit the role, dates, primary flag, kind or notes of that link.
-func (m *Model) editLinkRow(r formRow) tea.Cmd {
-	if r.empty || r.li == nil {
-		return m.openLinkRow(r)
-	}
-	if m.readOnly {
-		m.setStatus("read-only: editing links is disabled", true)
-		return nil
-	}
-	return m.editLink(m.pageRef(), *r.li)
 }
 
 // askUnlinkRow is d on a linked row of a record page.

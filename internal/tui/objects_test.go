@@ -40,6 +40,9 @@ func TestActionsAreGeneratedFromTheObjectRegistry(t *testing.T) {
 
 func TestRelationsInTheRegistryMatchTheModel(t *testing.T) {
 	for _, o := range objectDefs() {
+		if o.kind == tagKind {
+			continue // a tag is the pseudo kind of the tag relation, it relates to nothing itself
+		}
 		assert.Equal(t, model.RelatedKinds(o.kind), relationsOf(o.kind)[:len(relationsOf(o.kind))-1], o.kind)
 		assert.Equal(t, tagKind, relationsOf(o.kind)[len(relationsOf(o.kind))-1], "every object can take a tag")
 	}

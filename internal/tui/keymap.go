@@ -58,6 +58,7 @@ var scopeTable = map[string]scopeDef{
 	"app":               {},
 	"form":              {parent: scopeApp},
 	"compare":           {parent: scopeApp},
+	"cells":             {parent: "form"},
 	"type:person":       {parent: scopeApp},
 	"type:task":         {parent: scopeApp},
 	"type:organization": {parent: scopeApp},
@@ -98,6 +99,9 @@ func (m *Model) scopeChain() []string {
 	}
 	var chain []string
 	if m.focus == focusDetail {
+		if whenCellRow(m) {
+			chain = append(chain, "cells") // left, right and tab move across the cells of this row
+		}
 		chain = append(chain, "form")
 	}
 	if m.barTag != "" {
@@ -216,18 +220,18 @@ var frameworkIDs = map[string]bool{
 	// verbs
 	"add-any": true, "add": true, "activate": true, "mark-state": true, "merge": true, "favorite": true,
 	"archive": true, "org-delete": true, "deal-delete": true, "task-delete": true, "delete": true, "dismiss": true,
-	"purge": true, "inbox-ignore": true, "bar-tag-delete": true, "cmp-dismiss": true, "tag-merge": true, "cmp-apply": true,
+	"purge": true, "copy": true, "inbox-ignore": true, "bar-tag-delete": true, "cmp-dismiss": true, "tag-merge": true, "cmp-apply": true,
 	"restore": true, "link": true, "unlink": true, "bar-tag-link": true, "bar-tag-unlink": true,
-	"mark": true, "org-mark": true, "mark-all": true,
+	"mark": true, "select-all": true, "extend-down": true, "extend-up": true,
 	"undo": true, "redo": true, "reload": true,
 	// navigation
 	"down": true, "up": true, "half-down": true, "half-up": true, "page-down": true, "page-up": true,
 	"jump-down": true, "jump-up": true, "top": true, "bottom": true, "home-top": true, "home-bottom": true,
-	"focus-detail": true, "back": true,
+	"focus-detail": true, "back": true, "cell-next": true, "cell-prev": true,
 	// app chrome
-	"palette": true, "help": true, "quit": true, "goto-view": true, "next-view": true, "prev-view": true, "clear-search": true,
+	"palette": true, "options": true, "help": true, "quit": true, "goto-view": true, "next-view": true, "prev-view": true, "clear-search": true,
 	// merge compare screen
-	"cmp-left": true, "cmp-right": true, "cmp-pick": true, "cmp-pick-back": true, "cmp-confirm": true, "cmp-back": true,
+	"cmp-left": true, "cmp-right": true, "cmp-pick": true, "cmp-field": true, "cmp-confirm": true, "cmp-back": true,
 	// text-entry mode
 	"prompt-tab": true, "prompt-tab-back": true,
 }
@@ -240,18 +244,18 @@ var scopeByID = map[string]string{
 	"archive": "type:person", "restore": "type:archive", "person-edit": "type:person", "new": "type:person",
 	// Tasks, organizations, deals
 	"task-delete": "type:task", "task-edit": "type:task", "task": "type:task", "task-restore": "type:task",
-	"org-delete": "type:organization", "org-edit": "type:organization", "org-restore": "type:organization", "org-add": "type:organization", "org-mark": "type:organization",
+	"org-delete": "type:organization", "org-edit": "type:organization", "org-restore": "type:organization", "org-add": "type:organization",
 	"deal-delete": "type:deal", "deal-edit": "type:deal", "deal-restore": "type:deal", "deal-add": "type:deal",
 	// Merge, Archived, Sync
-	"dupe-level": "type:dupes", "dismiss": "type:dupes", "undo-dismiss": "type:dupes", "compare": "type:dupes",
-	"purge": "type:archive", "purge-selected": "type:archive", "purge-all": "type:archive", "archived-type": "type:archive",
+	"dismiss": "type:dupes", "undo-dismiss": "type:dupes", "compare": "type:dupes",
+	"purge": "type:archive", "purge-selected": "type:archive", "purge-all": "type:archive",
 	"sync-now": "type:inbox", "sync-dry": "type:inbox", "inbox-accept": "type:inbox", "inbox-attach": "type:inbox", "inbox-ignore": "type:inbox",
 	// Tags in the bar
 	"bar-tag-delete": "type:tag", "bar-tag-link": "type:tag", "bar-tag-unlink": "type:tag", "tag-rename": "type:tag", "tag-merge": "type:tag",
 	// The detail form
-	"delete": "form", "add": "form", "copy": "form", "open": "form", "link-edit": "form", "note-retype": "form", "back": "form",
+	"delete": "form", "add": "form", "copy": "form", "back": "form", "cell-next": "cells", "cell-prev": "cells",
 	// The compare screen
-	"cmp-left": "compare", "cmp-right": "compare", "cmp-pick": "compare", "cmp-pick-back": "compare", "cmp-survivor": "compare",
+	"cmp-left": "compare", "cmp-right": "compare", "cmp-pick": "compare", "cmp-field": "compare", "cmp-survivor": "compare",
 	"cmp-pair": "compare", "cmp-view": "compare", "cmp-confirm": "compare", "cmp-apply": "compare", "cmp-back": "compare", "cmp-dismiss": "compare",
 }
 
@@ -336,6 +340,7 @@ var swallowedChords = map[string]string{
 	"ctrl+j":           "ctrl+j is the same byte as a newline",
 	"ctrl+shift+up":    "many terminals do not report ctrl+shift+up, use home as the fallback",
 	"ctrl+shift+down":  "many terminals do not report ctrl+shift+down, use end as the fallback",
+	"ctrl+shift+c":     "terminals such as Windows Terminal keep ctrl+shift+c for their own copy, use the palette entry Copy contact as vCard",
 	"ctrl+shift+left":  "many terminals do not report ctrl+shift+left",
 	"ctrl+shift+right": "many terminals do not report ctrl+shift+right",
 }

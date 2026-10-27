@@ -17,8 +17,8 @@ import (
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/dedupe"
 	"github.com/jdanielnd/crm-cli/internal/keys"
-	"github.com/jdanielnd/crm-cli/internal/modules"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/modules"
 	"github.com/jdanielnd/crm-cli/internal/quick"
 	"github.com/jdanielnd/crm-cli/internal/shortsyntax"
 	crmsync "github.com/jdanielnd/crm-cli/internal/sync"
@@ -73,6 +73,7 @@ const (
 type row struct {
 	personID int64
 	taskID   int64
+	noteID   int64
 	orgID    int64
 	dealID   int64
 	title    string
@@ -89,6 +90,8 @@ type row struct {
 	jump int
 	// sync carries the Sync view data of the row.
 	sync *syncItem
+	// dupe is the index of the duplicate group in m.groups plus one, 0 for a row that is not a group.
+	dupe int
 }
 
 // Model is the Bubble Tea model.
@@ -102,10 +105,10 @@ type Model struct {
 	tagr *repo.TagRepo
 	dr   *repo.DupeRepo
 	// ml is the persistent merge log: person and organization merges undo and redo through it.
-	ml *repo.MergeLogRepo
-	ntr  *repo.NoteTypeRepo
-	db   *sql.DB
-	now  func() time.Time
+	ml  *repo.MergeLogRepo
+	ntr *repo.NoteTypeRepo
+	db  *sql.DB
+	now func() time.Time
 
 	// Sync view: the adapters this process can run, the runner and the inbox over the database.
 	registry *crmsync.Registry
@@ -145,21 +148,28 @@ type Model struct {
 	lastFilter    string // filter text of the overlay that was just picked
 	actions       []action
 
-	people      []model.PersonSummary
-	rows        []row
-	cursor      int
-	offset      int
-	query       string
-	sortRecent  bool
-	marked      map[int64]bool
+	people []model.PersonSummary
+	rows   []row
+	cursor int
+	offset int
+	query  string
+	// sortRecentIn says per view which sort a list has: name or recent (view options, ctrl+o).
+	sortChoice map[viewKind]string
+	marked     map[int64]bool
+	// extend is the selection extension in progress (shift+up, shift+down), nil otherwise.
+	extend *extendState
 	// orgCreateAnyway lets the next organization create skip the duplicate check (the user chose Create anyway).
 	orgCreateAnyway bool
 	// aliases is the name alias table, read once from the database (aliasTable).
 	aliases *alias.Table
 	// addLinkPending is the accepted suggestion of an add that links after the object is created.
 	addLinkPending *addSuggestion
-	// purgeIDs are the archived people a bulk purge is waiting to confirm (archive.go).
-	purgeIDs []int64
+	// typed is the destructive bulk verb waiting for its confirmation word (bulk.go).
+	typed *typedConfirm
+	// linkAlso are the other selected objects of a bulk link, taken by the link form (linkmany.go).
+	linkAlso []repo.Ref
+	// setField is the bulk set-field waiting for its typed value (setfield.go).
+	setField    *setFieldState
 	detail      viewport.Model
 	detailKey   string
 	input       textinput.Model
@@ -173,12 +183,14 @@ type Model struct {
 	formTitle  string
 	formPerson int64
 	fcur       int
-	lineRow    []int // screen line in the detail content -> form row index, -1 for none
-	rowStart   []int
-	rowEnd     []int
-	creating   bool
-	edit       *editState
-	rowInput   textinput.Model
+	fcol       int // the cell under the cursor in a row with cells (cells.go), 0 is the row itself
+
+	lineRow  []int // screen line in the detail content -> form row index, -1 for none
+	rowStart []int
+	rowEnd   []int
+	creating bool
+	edit     *editState
+	rowInput textinput.Model
 
 	confirm    *confirmState
 	ov         *overlay
@@ -226,10 +238,10 @@ type Model struct {
 	bdToday, bdTop int
 	// barTag is the tag of the bar row a verb is running on (barverbs.go). barResume remembers a bar that
 	// is waiting for a verb with a prompt, a confirm or a picker to finish.
-	barTag    string
+	barTag string
 	// tagRenaming is the tag the rename prompt is for.
 	tagRenaming string
-	barResume *barResume
+	barResume   *barResume
 	// addResume remembers where a global add (ctrl+a) came from (globaladd.go).
 	addResume *addReturn
 	// addSugg is the highlighted object offered as the link of a new task or note (globaladd.go).
@@ -237,9 +249,9 @@ type Model struct {
 	// barKind is the kind of the bar row whose verb is running (enterBarContext), "" outside the bar.
 	barKind string
 	// mods is the module arrangement (modules.go): which views are on and in what order.
-	mods modules.Arrangement
-	keyProblems  []string
-	capture      *captureState
+	mods        modules.Arrangement
+	keyProblems []string
+	capture     *captureState
 
 	// names is the open list of unsettled names, and the choices remembered in this session.
 	names      *namesPanel
@@ -277,7 +289,7 @@ func New(ctx context.Context, db *sql.DB) (*Model, error) {
 		dr:         repo.NewDupeRepo(db),
 		ml:         repo.NewMergeLogRepo(db),
 		ntr:        repo.NewNoteTypeRepo(db),
-		minLevel:   dedupe.Medium,
+		minLevel:   dedupe.Fuzzy, // the Merge view lists every candidate, grouped by level; ctrl+o narrows it
 		noteType:   "note",
 		now:        time.Now,
 		input:      in,
@@ -425,9 +437,7 @@ func (m *Model) rebuild(keep bool) error {
 			return err
 		}
 		m.groups = groups
-		for _, g := range groups {
-			rows = append(rows, groupRow(g))
-		}
+		rows = m.mergeRows(groups)
 	case viewArchived:
 		ar, err := m.archivedRows()
 		if err != nil {
@@ -489,7 +499,7 @@ func (m *Model) settle() {
 
 func (m *Model) peopleRows() []row {
 	people := m.people
-	if m.sortRecent {
+	if m.sortedRecent(viewPeople) {
 		sorted := append([]model.PersonSummary(nil), people...)
 		sortByUpdated(sorted)
 		people = sorted
@@ -663,28 +673,13 @@ func (m *Model) move(delta int) {
 	m.refreshDetail(false)
 }
 
-// markedIDs lists the marked people that are visible in the current list, in list order.
-func (m *Model) markedIDs() []int64 {
-	if len(m.marked) == 0 {
-		return nil
-	}
-	var ids []int64
-	seen := map[int64]bool{}
-	for _, r := range m.rows {
-		if r.personID != 0 && m.marked[r.personID] && !seen[r.personID] {
-			seen[r.personID] = true
-			ids = append(ids, r.personID)
-		}
-	}
-	return ids
-}
+// markedIDs lists the selected people that are visible in the current list, in list order.
+func (m *Model) markedIDs() []int64 { return m.markedOfKind("person") }
 
 // targets are the people a person action applies to: the marked ones in the list, else the current one.
 func (m *Model) targets() []int64 {
-	if m.focus == focusList {
-		if ids := m.markedIDs(); len(ids) > 0 {
-			return ids
-		}
+	if m.focus == focusList && len(m.marked) > 0 {
+		return m.markedIDs() // rows of another kind are selected: no person is the target
 	}
 	if p := m.curPerson(); p != 0 {
 		return []int64{p}
@@ -777,6 +772,9 @@ func (m *Model) switchView(v viewKind) {
 
 // handleKey dispatches a key in normal mode through the action registry.
 func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if k := msg.String(); k != "shift+up" && k != "shift+down" {
+		m.extend = nil // any other key ends the extension of the selection
+	}
 	if a := m.lookupKey(msg.String(), keyNormal); a != nil {
 		return m, m.runAction(a)
 	}
@@ -933,11 +931,14 @@ func (m *Model) runPrompt(kind, value string) {
 	case "notetype-add":
 		m.addNoteType(value)
 		return
-	case "purge":
-		m.purgeCurrent(value)
+	case "tag-new":
+		m.saveNewTag(value)
 		return
-	case "purge-bulk":
-		m.purgeMany(value)
+	case "set-field":
+		m.runSetField(value)
+		return
+	case "typed-confirm":
+		m.runTypedConfirm(value)
 		return
 	case "tasktag":
 		m.tagTask(value)

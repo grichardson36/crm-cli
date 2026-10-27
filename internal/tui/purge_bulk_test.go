@@ -66,11 +66,13 @@ func TestBulkPurgeNeedsTheTypedCount(t *testing.T) {
 		assert.Equal(t, 3, left())
 	})
 
-	t.Run("the type filter limits and refuses other kinds", func(t *testing.T) {
+	t.Run("the type filter limits what purge all takes", func(t *testing.T) {
 		m, _ := setup(t)
 		m.archKind = "task"
-		assert.False(t, m.actionByID("purge-all").enabled(m), "tasks have no purge")
+		require.NoError(t, m.rebuild(false))
+		assert.False(t, m.actionByID("purge-all").enabled(m), "no archived tasks, nothing to purge")
 		m.archKind = "person"
+		require.NoError(t, m.rebuild(false))
 		assert.True(t, m.actionByID("purge-all").enabled(m))
 	})
 

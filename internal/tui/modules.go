@@ -152,13 +152,13 @@ func (m *Model) moduleItems() []overlayItem {
 }
 
 // openModules shows the Modules screen: space or enter turns the module under the cursor on or off,
-// K and J move it up and down, r puts the default arrangement back, esc closes.
+// shift+up and shift+down move it up and down, esc closes. The palette entry "Modules: reset" puts the default arrangement back.
 func (m *Model) openModules() tea.Cmd {
 	return m.showModules("")
 }
 
 func (m *Model) showModules(focusID string) tea.Cmd {
-	o := m.newOverlay("Modules: space toggles, K / J moves, r resets, esc closes", m.moduleItems(), false)
+	o := m.newOverlay("Modules: space toggles, shift+up / shift+down moves, esc closes", m.moduleItems(), false)
 	o.noFilter = true
 	if focusID != "" {
 		for i, it := range o.items {
@@ -181,13 +181,10 @@ func (m *Model) showModules(focusID string) tea.Cmd {
 				return true
 			}
 			next, err = m.mods.With(cur, m.mods.Position(cur) == 0)
-		case "K", "shift+up":
+		case "shift+up":
 			next, err = m.shiftModule(cur, -1)
-		case "J", "shift+down":
+		case "shift+down":
 			next, err = m.shiftModule(cur, 1)
-		case "r":
-			cur = ""
-			next = modules.Default()
 		default:
 			return false
 		}
@@ -235,5 +232,14 @@ func moduleActions() []action {
 	return []action{
 		{id: "modules", title: "Modules", group: "App", desc: "turn views on or off and put them in order (same as crm modules). Per device, in config.toml",
 			run: func(m *Model) tea.Cmd { return m.openModules() }},
+		{id: "modules-reset", title: "Modules: reset", group: "App", desc: "put the default module arrangement back: every view on, in the default order (palette, no key)", write: true,
+			run: func(m *Model) tea.Cmd {
+				if err := m.setModules(modules.Default()); err != nil {
+					m.setStatus(err.Error(), true)
+					return m.showToast(err.Error(), true)
+				}
+				m.setStatus("modules: default arrangement restored", false)
+				return nil
+			}},
 	}
 }

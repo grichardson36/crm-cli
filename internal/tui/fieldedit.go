@@ -30,6 +30,8 @@ type typedEdit struct {
 	spec   model.FieldSpec
 	ref    repo.Ref
 	choice int // index into spec.Choices
+	// cell is set when the edit is for a cell of a linked row or a note (cells.go).
+	cell *cellEdit
 }
 
 // parseDateField is the date parser handed to FieldSpec.Normalize: the same phrases as "by <date>".
@@ -84,22 +86,28 @@ func (m *Model) beginTyped() tea.Cmd {
 	if spec.Type == model.FieldRelation {
 		return m.startLink(r.ref, spec.Kind, false)
 	}
-	t := &typedEdit{spec: spec, ref: r.ref}
-	m.edit = &editState{row: m.fcur, kind: r.kind, field: spec.Key, oldValue: r.value, typed: t}
+	return m.startTypedEdit(spec, r.ref, r.value, nil)
+}
+
+// startTypedEdit opens the in-place editor of one value by its field type: a field of the record, or
+// with ce set a cell of the row under the cursor.
+func (m *Model) startTypedEdit(spec model.FieldSpec, ref repo.Ref, value string, ce *cellEdit) tea.Cmd {
+	t := &typedEdit{spec: spec, ref: ref, cell: ce}
+	m.edit = &editState{row: m.fcur, kind: m.form[m.fcur].kind, field: spec.Key, oldValue: value, typed: t}
 	m.focus = focusDetail
 	m.mode = modeEdit
 	m.setStatus("", false)
 	if spec.Type == model.FieldChoice {
 		t.choice = 0
 		for i, c := range spec.Choices {
-			if c.Value == r.value {
+			if c.Value == value {
 				t.choice = i
 			}
 		}
 		m.syncDetail()
 		return nil
 	}
-	m.rowInput.SetValue(strings.ReplaceAll(r.value, "\n", "⏎"))
+	m.rowInput.SetValue(strings.ReplaceAll(value, "\n", "⏎"))
 	m.rowInput.CursorEnd()
 	m.rowInput.Width = max(5, m.detail.Width-labelWidth-1)
 	m.syncDetail()
@@ -183,7 +191,11 @@ func (m *Model) commitTyped() {
 		return
 	}
 	m.beginGroup()
-	err = m.saveTyped(t.ref, t.spec, v)
+	if t.cell != nil {
+		err = m.saveCell(t.cell, t.ref, v)
+	} else {
+		err = m.saveTyped(t.ref, t.spec, v)
+	}
 	m.endGroup("")
 	if err != nil {
 		m.setStatus(err.Error(), true)
@@ -203,9 +215,25 @@ func (m *Model) saveTyped(ref repo.Ref, spec model.FieldSpec, v string) error {
 	}
 	switch ref.Kind {
 	case "person":
-		if spec.Key == "tier" {
+		switch spec.Key {
+		case "tier":
 			n, _ := strconv.Atoi(v)
 			_, err := m.hUpdatePerson(m.ctx, ref.ID, model.UpdatePersonInput{PriorityTier: &n})
+			return err
+		case "birthday":
+			if birthdayShort.MatchString(v) {
+				v = "--" + v
+			}
+			_, err := m.hUpdatePerson(m.ctx, ref.ID, model.UpdatePersonInput{Birthday: &v})
+			return err
+		}
+	case "task":
+		switch spec.Key {
+		case "due":
+			_, err := m.hUpdateTask(m.ctx, ref.ID, model.UpdateTaskInput{DueAt: &v})
+			return err
+		case "priority":
+			_, err := m.hUpdateTask(m.ctx, ref.ID, model.UpdateTaskInput{Priority: &v})
 			return err
 		}
 	case "organization":

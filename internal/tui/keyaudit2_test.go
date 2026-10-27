@@ -25,7 +25,7 @@ func auditFamily(id string) string {
 		return "add"
 	case "restore", "org-restore", "deal-restore", "task-restore":
 		return "restore"
-	case "mark", "org-mark":
+	case "mark", "select-all", "extend-down", "extend-up":
 		return "select"
 	case "mark-state", "contacted", "done":
 		return "mark"
@@ -37,9 +37,9 @@ func auditFamily(id string) string {
 		return "unlink"
 	case "down", "up", "top", "bottom", "half-down", "half-up", "page-down", "page-up", "jump-up", "jump-down", "home-top", "home-bottom":
 		return "move"
-	case "focus-detail", "back":
+	case "focus-detail", "back", "cell-next", "cell-prev", "cmp-field":
 		return "pane_focus"
-	case "cmp-left", "cmp-right", "cmp-pick", "cmp-pick-back":
+	case "cmp-left", "cmp-right", "cmp-pick":
 		return "pick"
 	}
 	if strings.HasPrefix(id, "view-") {
@@ -283,6 +283,6 @@ func TestConflictForIsScopedAndNamesTheOtherAction(t *testing.T) {
 	assert.Equal(t, "", ConflictFor(nil, "sync-now", []string{"s"}), "s is free on the Sync screen")
 	assert.Contains(t, ConflictFor(nil, "sync-now", []string{"x"}), "Mark", "x is a framework verb live in every view")
 	assert.NotEmpty(t, ConflictFor(nil, "snooze", []string{"d"}), "d is the delete verb, live in every view")
-	assert.Contains(t, ConflictFor(nil, "dupe-level", []string{"ctrl+d"}), "Half page down")
-	assert.Equal(t, "", ConflictFor(nil, "dupe-level", []string{"ctrl+g"}))
+	assert.Contains(t, ConflictFor(nil, "options", []string{"ctrl+d"}), "Half page down")
+	assert.Equal(t, "", ConflictFor(nil, "options", []string{"ctrl+g"}))
 }

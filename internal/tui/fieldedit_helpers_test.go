@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/stretchr/testify/require"
 )
 
@@ -40,4 +41,30 @@ func focusLabel(t *testing.T, m *Model, label string) {
 		}
 	}
 	t.Fatalf("no row labelled %q", label)
+}
+
+// setCell edits the cell in column col (1 is the first cell) of the focused row: right moves across the
+// cells, enter opens the editor of its type, a choice is picked with up and down, enter saves.
+func setCell(t *testing.T, m *Model, col int, option string) {
+	t.Helper()
+	require.Equal(t, focusDetail, m.focus)
+	for m.fcol < col {
+		press(m, "right")
+	}
+	require.Equal(t, col, m.fcol)
+	press(m, "enter")
+	require.NotNil(t, m.edit, "enter opens the editor of the cell")
+	require.NotNil(t, m.edit.typed)
+	if m.edit.typed.spec.Type == model.FieldChoice {
+		for i := 0; i < len(m.edit.typed.spec.Choices)+1; i++ {
+			c := m.edit.typed.spec.Choices[m.edit.typed.choice]
+			if strings.EqualFold(c.Label, option) || strings.EqualFold(c.Value, option) {
+				break
+			}
+			press(m, "down")
+		}
+	} else {
+		replaceText(m, option)
+	}
+	press(m, "enter")
 }

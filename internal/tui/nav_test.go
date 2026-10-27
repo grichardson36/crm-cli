@@ -93,7 +93,7 @@ func TestHelpAndFooterMentionNewKeys(t *testing.T) {
 	m.settle()
 	archivedHelp := m.helpText()
 	assert.Contains(t, archivedHelp, "restore the archived object")
-	assert.Contains(t, archivedHelp, "permanently delete the archived person")
+	assert.Contains(t, archivedHelp, "permanently delete the archived object")
 }
 
 func TestTabBarNeverExceeds80Columns(t *testing.T) {

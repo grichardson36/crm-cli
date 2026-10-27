@@ -22,8 +22,8 @@ import (
 // barReserved are keys the bar keeps for itself in the results.
 var barReserved = map[string]bool{
 	"enter": true, "esc": true, "tab": true, "shift+tab": true, "up": true, "down": true, "left": true, "right": true,
-	"pgup": true, "pgdown": true, "ctrl+n": true, "ctrl+p": true, "ctrl+c": true, "ctrl+k": true,
-	":": true, "/": true, "q": true, "?": true, "a": true,
+	"pgup": true, "pgdown": true, "ctrl+c": true, "ctrl+k": true,
+	"/": true, "q": true, "?": true, "a": true,
 }
 
 // barVerbGroups are the registry groups whose actions act on a selected object.
@@ -266,7 +266,7 @@ func (m *Model) barFocusKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	case "tab", "esc", "shift+tab":
 		o.focusResults = false
 		return m, nil, true
-	case "enter", "up", "down", "pgup", "pgdown", "ctrl+n", "ctrl+p", "ctrl+c":
+	case "enter", "up", "down", "pgup", "pgdown", "ctrl+c":
 		return m, nil, false
 	}
 	return m, m.runBarVerb(msg), true

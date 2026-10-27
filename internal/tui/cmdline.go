@@ -217,10 +217,10 @@ func (m *Model) cmdKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 		return m, nil, true
 	case "alt+d":
 		return m, m.dismissChip(), true
-	case "up", "ctrl+p":
+	case "up":
 		c.sel = max(0, c.sel-1)
 		return m, nil, true
-	case "down", "ctrl+n":
+	case "down":
 		c.sel = clampInt(c.sel+1, 0, max(0, len(c.comp.Candidates)-1))
 		return m, nil, true
 	case "pgup", "pgdown":
@@ -517,6 +517,7 @@ func (m *Model) dismissChip() tea.Cmd {
 	m.syncCmd()
 	return m.showToast("Kept as plain text: "+text, false)
 }
+
 // askNamesFromBar lists the unsettled names of the command line. After the choices the line runs
 // as usual (a multi-field set still asks to confirm).
 func (m *Model) askNamesFromBar() tea.Cmd {

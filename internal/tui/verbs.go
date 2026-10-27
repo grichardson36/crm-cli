@@ -56,6 +56,10 @@ func (m *Model) runActivate() tea.Cmd {
 func whenMarkState(m *Model) bool { return m.taskTarget() != 0 || whenPerson(m) }
 
 func (m *Model) runMarkState() tea.Cmd {
+	if ids := m.bulkOfKind("task"); len(ids) > 1 && m.view == viewTasks {
+		m.completeTasks(ids)
+		return nil
+	}
 	if m.taskTarget() != 0 {
 		m.completeTask()
 		return nil
@@ -80,8 +84,6 @@ func (m *Model) runMerge() tea.Cmd {
 	}
 	return nil
 }
-
-func whenLinkedOrNote(m *Model) bool { return whenLinkedRow(m) || whenNoteRow(m) }
 
 // verbActions are the framework verbs defined in this file plus the text-entry key.
 func verbActions() []action {
