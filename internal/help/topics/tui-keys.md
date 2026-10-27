@@ -17,13 +17,13 @@ Every key in the terminal UI. The palette (`ctrl+k`) runs any of these by name, 
 
 ## Person keys
 
-- `c` mark contacted. `s` snooze. `n` add a note, `N` pick the type first. `t` add a task for the person: `title | optional due date`. `x` complete a task.
+- `c` mark contacted. `s` snooze. `n` add a note, `N` pick the type first. `t` add a task for the person, organization or deal on screen: `title | optional due date`. `x` complete a task.
 - `f` favorite. `T` tag (`-name` removes). `F` cadence. `p` priority tier. `*` marks all visible, then `c`, `f`, `T`, `F`, `p`, `d` apply to every marked person.
-- `s` sets a deal stage in the Deals view. Linked rows (organizations, related people, deals, members) in the detail form: `enter` opens (or links when empty), `d` unlinks, `E` edits the role and dates. `n` adds a note on an organization or deal page.
+- `s` sets a deal stage in the Deals view. Linked rows (organizations, related people, deals, members) in the detail form: `enter` opens (or links when empty), `d` unlinks, `E` edits the role and dates. `n` adds a note and `t` adds a task on an organization or deal page, the same keys as a person page.
 
 ## Edit pane
 
-In the detail form: `enter` edits a row, `a` adds a row, `d` deletes the row (asks y/n), `y` copies the value, `o` opens a link, email or phone. A note row: `t` changes the type.
+In the detail form: `enter` edits a row, `a` adds a row, `d` deletes the row (asks y/n), `y` copies the value, `o` opens a link, email or phone. Task and note rows edit with `enter` on every record page (person, organization, deal). A note row: `t` changes the type. Notes are an object like the others: Add, Edit, Delete and Restore note, and Link note attaches an existing note to any object (palette). While you type in a prompt such as `title | due`, the rest of the line shows dimmed after the cursor, and the bar shows the shape of a verb you typed (`task`, `note`, `set`, `snooze`). The hint is never submitted.
 
 ## Merge, archive, notes, sync, home
 
