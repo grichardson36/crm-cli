@@ -109,7 +109,7 @@ func registerObjectTools(s *server.MCPServer, db *sql.DB) {
 		kind := kind
 		noun := objectNoun[kind]
 		if kind != "person" {
-			// Person delete and restore exist as crm_person_archive and crm_person_restore.
+			// Person delete and restore exist as crm_person_delete and crm_person_restore.
 			if kind != "task" { // crm_task_delete exists
 				s.AddTool(
 					gomcp.NewTool(fmt.Sprintf("crm_%s_delete", noun),

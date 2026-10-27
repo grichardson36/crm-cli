@@ -27,7 +27,7 @@ Without `-f json`, the error is `crm: error: MESSAGE`.
 A dry run (`--dry-run`) exits 3 when a target record does not exist.
 
 ```sh crm-example
-crm person archive 3 --dry-run -f json
+crm person delete 3 --dry-run -f json
 ```
 
 See also: output, agents, install.

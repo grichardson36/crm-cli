@@ -34,7 +34,7 @@ If `crm` is not installed, read `INSTALL.md`.
 1. Use `-f json` for every command whose output you parse. Data is on stdout, messages and errors are on stderr.
 2. Read before you write. Search before you create, so you do not add duplicates.
 3. Run `--dry-run` first on any command that changes data. It prints what would change and writes nothing.
-4. Commands that cannot be undone need `--yes` (`person purge`, `tag delete`). Ask the owner before using them. Prefer `person archive`, which can be restored.
+4. Commands that cannot be undone need `--yes` (`person purge`, `tag delete`). Ask the owner before using them. Prefer `person delete`, which can be restored.
 5. Preview a merge with `crm person merge KEEP DROP --dry-run` and confirm it with the owner.
 6. With `-f json`, errors are JSON on stderr: `{"error":{"code":"not_found","message":"...","exit_code":3}}`. Branch on `code`.
 7. Exit codes: 0 ok, 1 unexpected error, 2 usage or validation, 3 not found, 4 conflict, 10 database.

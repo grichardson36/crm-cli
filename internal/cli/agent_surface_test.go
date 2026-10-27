@@ -272,7 +272,7 @@ func TestDryRunOnEveryKindOfMutation(t *testing.T) {
 
 func TestDryRunMissingTargetIsNotFound(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "crm.db")
-	_, stderr, code := crm(t, dbPath, "person", "archive", "999", "--dry-run", "-f", "json")
+	_, stderr, code := crm(t, dbPath, "person", "delete", "999", "--dry-run", "-f", "json")
 	assert.Equal(t, 3, code)
 	assert.Contains(t, stderr, `"code":"not_found"`)
 }
@@ -280,9 +280,9 @@ func TestDryRunMissingTargetIsNotFound(t *testing.T) {
 func TestDryRunHumanOutput(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "crm.db")
 	crm(t, dbPath, "person", "add", "Jane Smith")
-	stdout, _, code := crm(t, dbPath, "person", "archive", "1", "--dry-run", "-f", "table")
+	stdout, _, code := crm(t, dbPath, "person", "delete", "1", "--dry-run", "-f", "table")
 	assert.Equal(t, 0, code)
-	assert.Contains(t, stdout, "dry run: would run: crm person archive 1")
+	assert.Contains(t, stdout, "dry run: would run: crm person delete 1")
 	assert.Contains(t, stdout, "Jane Smith")
 	assert.Contains(t, stdout, "nothing was written")
 }

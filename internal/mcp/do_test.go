@@ -166,10 +166,13 @@ func TestTaskDeleteToolDeletesAndRestores(t *testing.T) {
 	var list []map[string]any
 	callJSON(t, s, "crm_task_list", map[string]any{}, &list)
 	assert.Empty(t, list)
+	// restore=true is gone from crm_task_delete (X15): it deletes again and the task stays deleted.
 	_, isErr = call(t, s, "crm_task_delete", map[string]any{"id": task["id"], "restore": true})
+	assert.True(t, isErr, "an already deleted task cannot be deleted again, restore is not an option")
+	callJSON(t, s, "crm_task_list", map[string]any{}, &list)
+	assert.Empty(t, list)
+	_, isErr = call(t, s, "crm_task_restore", map[string]any{"id": task["id"]})
 	assert.False(t, isErr)
 	callJSON(t, s, "crm_task_list", map[string]any{}, &list)
 	assert.Len(t, list, 1)
-	_, isErr = call(t, s, "crm_task_delete", map[string]any{"id": task["id"], "restore": true})
-	assert.True(t, isErr)
 }

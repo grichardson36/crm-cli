@@ -28,14 +28,20 @@ func registerRelateCommands(personCmd *cobra.Command) {
 	personCmd.AddCommand(personUnrelateCmd())
 }
 
+// relateDeprecated prints the pointer from an older relate name to the link verb (stderr).
+func relateDeprecated(old, use string) {
+	fmt.Fprintf(os.Stderr, "crm: %s is deprecated, use: %s\n", old, use)
+}
+
 func personRelateCmd() *cobra.Command {
 	var relType, notes string
 
 	cmd := &cobra.Command{
 		Use:   "relate <person_id> <related_person_id>",
-		Short: "Create a relationship between two people (same as: person link person)",
+		Short: "Deprecated, use 'person link person' (creates a relationship between two people)",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			relateDeprecated("person relate", "crm person link person <id> <id> --kind <kind>")
 			personID, err := parsePersonID(args[0])
 			if err != nil {
 				return err
@@ -70,9 +76,10 @@ func personRelationshipsCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:     "relationships <person_id>",
 		Aliases: []string{"rels"},
-		Short:   "List the people related to a person, with the kind of each link",
+		Short:   "Deprecated, use 'person show' (lists the people related to a person)",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			relateDeprecated("person relationships", "crm person show <id>")
 			personID, err := strconv.ParseInt(args[0], 10, 64)
 			if err != nil {
 				return model.NewExitError(model.ErrValidation, "invalid person ID: %s", args[0])
@@ -110,9 +117,10 @@ func personRelationshipsCmd() *cobra.Command {
 func personUnrelateCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "unrelate <link_id>",
-		Short: "Remove a relationship by its link id (same as: person unlink person --id)",
+		Short: "Deprecated, use 'person unlink person --id' (removes a relationship by its link id)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			relateDeprecated("person unrelate", "crm person unlink person --id <link id>")
 			id, err := strconv.ParseInt(args[0], 10, 64)
 			if err != nil {
 				return model.NewExitError(model.ErrValidation, "invalid relationship ID: %s", args[0])

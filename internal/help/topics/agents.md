@@ -21,7 +21,7 @@ Each command that changes data accepts `--dry-run`. It checks that the records e
 
 ```sh crm-example
 crm person edit 1 --title CTO --dry-run -f json
-crm person archive 3 --dry-run -f json
+crm person delete 3 --dry-run -f json
 crm person merge 1 3 --dry-run -f json
 crm tag delete vip --dry-run -f json
 ```

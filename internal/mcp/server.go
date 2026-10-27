@@ -144,7 +144,7 @@ func NewServer(db *sql.DB, version string, opts ...Option) *server.MCPServer {
 
 	s.AddTool(
 		gomcp.NewTool("crm_person_delete",
-			gomcp.WithDescription("Deprecated alias of crm_person_archive"),
+			gomcp.WithDescription("Delete (archive) a person. It is soft and crm_person_restore brings it back. Deleted people are hidden from search, due, birthdays and dupes"),
 			gomcp.WithNumber("id", gomcp.Required(), gomcp.Description("Person ID")),
 		),
 		personDeleteHandler(pr),
@@ -152,7 +152,7 @@ func NewServer(db *sql.DB, version string, opts ...Option) *server.MCPServer {
 
 	s.AddTool(
 		gomcp.NewTool("crm_person_archive",
-			gomcp.WithDescription("Archive a person (reversible). Archived people are hidden from search, due, birthdays and dupes"),
+			gomcp.WithDescription("Deprecated alias of crm_person_delete"),
 			gomcp.WithNumber("id", gomcp.Required(), gomcp.Description("Person ID")),
 		),
 		personDeleteHandler(pr),
@@ -347,7 +347,7 @@ func NewServer(db *sql.DB, version string, opts ...Option) *server.MCPServer {
 	rr := repo.NewLinkRepo(db)
 	s.AddTool(
 		gomcp.NewTool("crm_person_relate",
-			gomcp.WithDescription("Deprecated, use crm_person_link with other=person and kind. Create a relationship between two people"),
+			gomcp.WithDescription("Deprecated alias of crm_person_link with other=person and kind (the result carries a note saying so). Create a relationship between two people"),
 			gomcp.WithNumber("person_id", gomcp.Required(), gomcp.Description("Person ID")),
 			gomcp.WithNumber("related_person_id", gomcp.Required(), gomcp.Description("Related person ID")),
 			gomcp.WithString("type", gomcp.Required(), gomcp.Description("Relationship kind: related, spouse, sibling, friend, colleague, parent, manager, mentor, referred-by, or one you added")),
@@ -1185,7 +1185,8 @@ func relateHandler(rr *repo.LinkRepo) server.ToolHandlerFunc {
 		if err != nil {
 			return mcpError(err)
 		}
-		return jsonResult(map[string]any{"link_id": res.LinkID, "person_id": personID, "related_person_id": relatedID, "type": relType, "changed": res.Changed})
+		return jsonResult(map[string]any{"link_id": res.LinkID, "person_id": personID, "related_person_id": relatedID, "type": relType, "changed": res.Changed,
+			"note": "crm_person_relate is deprecated: use crm_person_link with other=person and kind"})
 	}
 }
 

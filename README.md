@@ -104,7 +104,7 @@ crm person list                          # all contacts
 crm person list --tag vip --limit 10     # filtered
 crm person show 1                        # full details
 crm person edit 1 --title "CTO" --company "Acme Corp"
-crm person archive 1                     # reversible; crm person restore 1 brings them back
+crm person delete 1                      # reversible; crm person restore 1 brings them back
 crm person edit 1 --title CTO --dry-run  # preview any change without writing
 ```
 
@@ -176,7 +176,7 @@ crm relation-kind add godparent --inverse godchild             # your own kinds
 crm person show 1 -f json                                      # includes links with role, dates and kind
 ```
 
-`crm person relate|relationships|unrelate` still work and call the same link core. Kinds: `crm relation-kind list`. See `crm help links` and `crm help relations`.
+`crm person relate|relationships|unrelate` are deprecated aliases of the link verbs: they work, print a pointer to `link` on stderr and call the same link core. Kinds: `crm relation-kind list`. See `crm help links` and `crm help relations`.
 
 ### Search
 
@@ -307,7 +307,7 @@ Then point the agent at [`AGENTS.md`](AGENTS.md) so it knows how to use the CRM 
 | `crm_person_create` | Create a new person |
 | `crm_person_update` | Update person fields |
 | `crm_person_delete` | Delete (archive) a person |
-| `crm_person_relate` | Create relationship between people (older name of `crm_person_link` with `other=person`) |
+| `crm_person_relate` | Deprecated alias of `crm_person_link` with `other=person` (the result carries a note) |
 | `crm_<object>_link` / `_unlink` | Link or unlink with role, dates, primary, kind |
 | `crm_relation_kind_list` / `_add` / `_remove` | Manage link kinds |
 | `crm_links` | List the links of an object |

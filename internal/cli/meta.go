@@ -52,9 +52,9 @@ var commandMeta = map[string]cmdMeta{
 	"person show": {fields: personFields, examples: []string{`crm person show 1 -f json`}},
 	"person edit": {mutates: true, fields: personFields, target: "person", targetArgs: "first", examples: []string{
 		`crm person edit 1 --title CTO --company "Acme Corp"`, `crm person edit 1 --keep-in-touch "14 days" --dry-run`}},
-	"person archive": {mutates: true, target: "person", targetArgs: "all", examples: []string{
-		`crm person archive 3`, `crm person archive 3 4 --dry-run`}},
-	"person delete": {mutates: true, target: "person", targetArgs: "all", examples: []string{`crm person delete 3`}},
+	"person delete": {mutates: true, target: "person", targetArgs: "all", examples: []string{
+		`crm person delete 3`, `crm person delete 3 4 --dry-run`}},
+	"person archive": {mutates: true, target: "person", targetArgs: "all", examples: []string{`crm person archive 3`}},
 	"person restore": {mutates: true, target: "person", targetArgs: "all", examples: []string{
 		`crm person restore 3`, `crm person restore 3 --dry-run`}},
 	"person purge": {mutates: true, destructive: true, target: "person", targetArgs: "all", examples: []string{

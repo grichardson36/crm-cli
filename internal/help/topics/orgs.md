@@ -25,8 +25,8 @@ Organizations is tab 5 and Deals tab 6 by default. Hide a view you do not use wi
 ## Relationships between people
 
 ```sh crm-example
-crm person relate 1 2 --type colleague --notes "Same team"
-crm person relationships 1
+crm person link person 1 2 --kind colleague --notes "Same team"
+crm person show 1
 ```
 
 `relate` is the older name of `crm person link person --kind`. Kinds: see `crm relation-kind list`.

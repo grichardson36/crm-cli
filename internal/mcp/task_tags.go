@@ -60,31 +60,22 @@ func registerTaskTagTools(s *server.MCPServer, db *sql.DB) {
 	)
 }
 
-// registerTaskDeleteTool adds crm_task_delete: a soft delete that restore reverses.
+// registerTaskDeleteTool adds crm_task_delete: a soft delete that crm_task_restore reverses.
 func registerTaskDeleteTool(s *server.MCPServer, tr *repo.TaskRepo) {
 	s.AddTool(
 		gomcp.NewTool("crm_task_delete",
-			gomcp.WithDescription("Delete (archive) a task. It leaves lists. Set restore to true to bring a deleted task back."),
+			gomcp.WithDescription("Delete (archive) a task. It leaves lists. crm_task_restore brings it back."),
 			gomcp.WithNumber("id", gomcp.Required(), gomcp.Description("Task ID")),
-			gomcp.WithBoolean("restore", gomcp.Description("Restore a deleted task instead")),
 		),
 		func(ctx context.Context, req gomcp.CallToolRequest) (*gomcp.CallToolResult, error) {
 			id, errResult := requireID(req, "id")
 			if errResult != nil {
 				return errResult, nil
 			}
-			verb := "deleted"
-			var err error
-			if req.GetBool("restore", false) {
-				err = tr.Restore(ctx, id)
-				verb = "restored"
-			} else {
-				err = tr.Archive(ctx, id)
-			}
-			if err != nil {
+			if err := tr.Archive(ctx, id); err != nil {
 				return mcpError(err)
 			}
-			return gomcp.NewToolResultText(fmt.Sprintf("Task #%d %s", id, verb)), nil
+			return gomcp.NewToolResultText(fmt.Sprintf("Task #%d deleted", id)), nil
 		},
 	)
 }

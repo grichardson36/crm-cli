@@ -7,13 +7,13 @@ Removing a person is reversible. Only `purge` is permanent.
 An archived person disappears from lists, search and the due view. Their history is kept.
 
 ```sh crm-example
-crm person archive 2
-crm person archive 2 3
+crm person delete 2
+crm person delete 2 3
 crm person list --archived
 crm person restore 4
 ```
 
-You can pass several IDs. `crm person delete` is a deprecated alias of `archive`. Organizations, deals, tasks and interactions are archived by their own `delete` or `rm` commands. A deleted organization or deal hides its links, restoring it brings them back. The Archived view in the terminal UI lists every kind with a type filter.
+You can pass several IDs. `crm person archive` is a deprecated alias of `delete`. Organizations, deals, tasks and interactions are archived by their own `delete` or `rm` commands. A deleted organization or deal hides its links, restoring it brings them back. The Archived view in the terminal UI lists every kind with a type filter.
 
 ## Purge
 
@@ -28,8 +28,8 @@ Purge refuses people who are not archived.
 
 ## Safe order for an agent
 
-1. `crm person archive ID --dry-run` shows who will be archived.
-2. `crm person archive ID` archives.
+1. `crm person delete ID --dry-run` shows who will be archived.
+2. `crm person delete ID` archives.
 3. Ask the owner before any purge, then run `--dry-run`, then `--yes`.
 
 See also: duplicates (merge archives the dropped people), agents, tui-keys (Archived view, key 7: `u` restores, `X` purges after you type the name).
