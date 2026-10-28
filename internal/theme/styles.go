@@ -22,6 +22,19 @@ type Styles struct {
 	TabOff lipgloss.Style
 	Sel    lipgloss.Style // selected row
 	Off    lipgloss.Style // cursor row of the pane that is not focused
+
+	// Kind holds one style per object kind (person, organization, deal, task, interaction, tag). Use
+	// KindStyle to read it.
+	Kind map[string]lipgloss.Style
+}
+
+// KindStyle is the style of an object kind. A kind without a color is drawn plain. Without color
+// support every kind is plain, so the short kind prefix (p:, o:, #) carries the meaning.
+func (s Styles) KindStyle(kind string) lipgloss.Style {
+	if st, ok := s.Kind[kind]; ok {
+		return st
+	}
+	return lipgloss.NewStyle()
 }
 
 // NewStyles builds the styles of t. r decides the color profile: pass nil for the process
@@ -58,6 +71,12 @@ func NewStyles(t Theme, r *lipgloss.Renderer) Styles {
 	s.TabOn = ns().Bold(true).Foreground(c(t.TabFg)).Background(c(t.TabBg)).Padding(0, 1)
 	s.TabOff = ns().Foreground(c(t.Dim)).Padding(0, 1)
 	s.Off = ns().Underline(true)
+	s.Kind = map[string]lipgloss.Style{}
+	for kind := range KindRoles {
+		if col := t.KindColor(kind); col != "" {
+			s.Kind[kind] = ns().Foreground(c(col))
+		}
+	}
 	if t.SelFg != "" && t.SelBg != "" {
 		s.Sel = ns().Foreground(c(t.SelFg)).Background(c(t.SelBg))
 	} else {
@@ -85,6 +104,7 @@ func monoStyles(t Theme) Styles {
 		TabOff: ns().Faint(true).Padding(0, 1),
 		Sel:    ns().Reverse(true),
 		Off:    ns().Underline(true),
+		Kind:   map[string]lipgloss.Style{},
 	}
 }
 

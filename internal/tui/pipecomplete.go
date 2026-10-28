@@ -6,7 +6,6 @@ import (
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	sg "github.com/jdanielnd/crm-cli/internal/suggest"
 )
@@ -31,6 +30,9 @@ type pipeSession struct {
 	dates []Suggestion
 	// datesRead says the recent dates were loaded.
 	datesRead bool
+	// idx and direct cache the live objects by id and the links read for the related segment (related.go).
+	idx    map[string]map[int64]overlayItem
+	direct map[string][]relCand
 }
 
 // pipeCompleter is the Completer of a pipe line.
@@ -67,6 +69,7 @@ func (m *Model) pipeSessionFor() (*pipeSession, *textinput.Model) {
 	}
 	s := &pipeSession{kind: kind, pl: pl, cand: map[string][]overlayItem{}}
 	s.ac = NewAutocomplete(&pipeCompleter{m: m, s: s})
+	s.ac.limit = relatedMaxRows
 	m.pipe = s
 	return s, in
 }
@@ -146,11 +149,11 @@ func (c *pipeCompleter) Suggest(text string, cursor int) []Suggestion {
 	switch {
 	case seg.Link:
 		ts, _ := tokenBounds(rs, start, end, cursor)
-		tok := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(string(rs[ts:clampInt(cursor, ts, end)])), "#"))
-		rows = m.pipeLinkRows(s, seg, tok, string(rs[start:end]))
-		typed = tok
+		tok := strings.TrimSpace(string(rs[ts:clampInt(cursor, ts, end)]))
+		rows = m.pipeLinkRows(s, seg, tok, text, idx)
+		typed = strings.TrimPrefix(tok, "#")
 	case seg.Spec.Type == model.FieldRelation && seg.Spec.Kind == tagKind:
-		rows = m.pipeLinkRows(s, pipeSeg{Link: true, Kinds: []string{tagKind}}, typed, "")
+		rows = m.pipeLinkRows(s, pipeSeg{Link: true, Kinds: []string{tagKind}}, typed, "", -1)
 	case seg.Spec.Type == model.FieldChoice:
 		for _, o := range seg.Spec.Choices {
 			if seg.Spec.Clear != "" && o.Value == seg.Spec.Clear {
@@ -178,80 +181,6 @@ func descIf(ok bool, s string) string {
 		return s
 	}
 	return ""
-}
-
-// pipeLinkRows are the rows of a link segment for the name being typed. The highlighted object of the
-// add picker leads when its kind fits and it matches the text. Names already in the segment are left out.
-func (m *Model) pipeLinkRows(s *pipeSession, seg pipeSeg, tok, segText string) []Suggestion {
-	used := map[string]bool{}
-	for _, n := range splitCommas(segText) {
-		used[strings.ToLower(n)] = true
-	}
-	delete(used, strings.ToLower(tok))
-	var rows []Suggestion
-	if h, ok := m.pipeHighlight(seg); ok && !used[strings.ToLower(h.Label)] {
-		if tok == "" || len(sg.Rank([]Suggestion{h}, tok, func(r Suggestion) string { return r.Label }, sg.Options{Aliases: m.aliasTable()})) > 0 {
-			rows = append(rows, h)
-		}
-	}
-	if tok == "" {
-		return rows
-	}
-	var all []Suggestion
-	for _, k := range seg.Kinds {
-		for _, it := range m.pipeCandidates(s, k) {
-			r := Suggestion{Label: it.label, Desc: it.desc}
-			if k == tagKind {
-				r = Suggestion{Label: it.label, Tag: it.label, Desc: "tag"}
-			} else {
-				r.Ref = repo.Ref{Kind: k, ID: it.ref}
-				if len(seg.Kinds) > 1 {
-					r.Desc = relationLabel(k) + descJoin(it.desc)
-				}
-			}
-			all = append(all, r)
-		}
-	}
-	for _, r := range sg.Rank(all, tok, func(r Suggestion) string { return r.Label }, sg.Options{Aliases: m.aliasTable(), Limit: acMaxRows}) {
-		if used[strings.ToLower(r.Label)] || (len(rows) > 0 && rows[0].Label == r.Label && rows[0].Ref == r.Ref) {
-			continue
-		}
-		rows = append(rows, r)
-	}
-	return rows
-}
-
-func descJoin(d string) string {
-	if d == "" {
-		return ""
-	}
-	return ", " + d
-}
-
-// pipeHighlight is the highlighted object of the add picker as a row, when the segment takes its kind.
-func (m *Model) pipeHighlight(seg pipeSeg) (Suggestion, bool) {
-	h := m.addSugg
-	if h == nil {
-		return Suggestion{}, false
-	}
-	has := func(kind string) bool {
-		for _, k := range seg.Kinds {
-			if k == kind {
-				return true
-			}
-		}
-		return false
-	}
-	if h.tag != "" {
-		if has(tagKind) {
-			return Suggestion{Label: h.tag, Tag: h.tag, Desc: "highlighted"}, true
-		}
-		return Suggestion{}, false
-	}
-	if h.ref.ID != 0 && has(h.ref.Kind) {
-		return Suggestion{Label: h.label, Ref: h.ref, Desc: "highlighted"}, true
-	}
-	return Suggestion{}, false
 }
 
 // pipeCandidates lists the objects of a kind once per session: every live object, or the tags.
@@ -346,6 +275,9 @@ func (c *pipeCompleter) Accept(text string, cursor int, row Suggestion) (string,
 		head := string(rs[:ts])
 		if ts > 0 && rs[ts-1] == '|' {
 			head += " " // a space after the pipe
+		}
+		if row.Tag != "" && len(c.s.pl.segs[idx].Kinds) > 1 {
+			head += "#" // in a segment of several kinds a tag is written #name
 		}
 		head += string(label)
 		tail := strings.TrimLeft(string(rs[te:]), " ")

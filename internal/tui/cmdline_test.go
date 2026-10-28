@@ -960,6 +960,7 @@ func TestNamesListFitsTheTerminal(t *testing.T) {
 		for _, l := range lines {
 			assert.LessOrEqual(t, lipgloss.Width(l), size[0], l)
 		}
-		press(m, "esc", "esc")
+		press(m, "esc", "esc", "esc") // the names list, the popup, the prompt
+		require.Equal(t, modeNormal, m.mode)
 	}
 }

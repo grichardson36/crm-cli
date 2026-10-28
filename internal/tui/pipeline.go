@@ -31,6 +31,9 @@ type pipeSeg struct {
 	// or edited object. Kinds lists the object kinds a name may belong to (tagKind for a tag).
 	Link  bool
 	Kinds []string
+	// Related marks the one related segment of an add line (related.go): its suggestions come from the
+	// context and its kinds are grouped in the popup and the chips.
+	Related bool
 }
 
 // pipeLine is the segments of one prompt kind.
@@ -78,7 +81,9 @@ func (m *Model) pipeFor(kind string) *pipeLine {
 			}
 			pl.core = len(pl.segs)
 			if pl.add {
-				pl.segs = append(pl.segs, linkSegs(o.kind, pl.segs)...)
+				if r, ok := relatedSeg(o.kind); ok {
+					pl.segs = append(pl.segs, r)
+				}
 			}
 			return pl
 		}
@@ -99,58 +104,19 @@ func coreSeg(objKind, key string) pipeSeg {
 	return s
 }
 
-// linkWords are what the hint calls the objects of a kind.
+// linkWords are what the picker titles call the objects of a kind.
 var linkWords = map[string]string{"person": "people", "organization": "organizations", "deal": "deals", "task": "tasks", model.NoteKind: "notes", tagKind: "tags"}
 
-func linkWord(kind string, related bool) string {
-	w := linkWords[kind]
-	if w == "" {
-		w = kind + "s"
+func linkWord(kind string) string {
+	if w := linkWords[kind]; w != "" {
+		return w
 	}
-	if related {
-		return "related " + w
-	}
-	return w
-}
-
-// linkSegs are the link segments of an add line: one per kind the relation registry joins to the
-// object, in the registry's order, then tags for an object that carries tags. A kind the line already
-// has (a deal's organization and person) is left out.
-func linkSegs(objKind string, have []pipeSeg) []pipeSeg {
-	has := map[string]bool{}
-	for _, s := range have {
-		if s.Link {
-			for _, k := range s.Kinds {
-				has[k] = true
-			}
-		}
-	}
-	var out []pipeSeg
-	add := func(kind string, related bool) {
-		w := linkWord(kind, related)
-		for _, h := range have {
-			if h.Label == w { // an object with a notes field: the notes it is linked to are "linked notes"
-				w = "linked " + w
-			}
-		}
-		out = append(out, pipeSeg{Key: w, Label: w, Link: true, Kinds: []string{kind},
-			Spec: model.FieldSpec{Key: kind, Label: w, Type: model.FieldRelation, Kind: kind}})
-	}
-	for _, k := range model.RelatedKinds(objKind) {
-		if has[k] {
-			continue
-		}
-		add(k, k == objKind)
-	}
-	if model.ValidTaggable(objKind) {
-		add(tagKind, false)
-	}
-	return out
+	return kind + "s"
 }
 
 // tagNewLine is the add-tag prompt: the tag's name, then the objects to put it on.
 func tagNewLine() *pipeLine {
-	on := pipeSeg{Key: "on", Label: "on", Link: true, Spec: model.FieldSpec{Key: "on", Label: "on", Type: model.FieldRelation}}
+	on := pipeSeg{Key: "related", Label: "related", Link: true, Related: true, Spec: model.FieldSpec{Key: "related", Label: "related", Type: model.FieldRelation}}
 	for _, k := range model.ObjectKinds {
 		if model.ValidTaggable(k) {
 			on.Kinds = append(on.Kinds, k)
@@ -167,7 +133,9 @@ const personAddKind = "person-add"
 func personAddLine() *pipeLine {
 	name := pipeSeg{Key: "name", Label: "name", Spec: model.FieldSpec{Key: "name", Label: "name", Type: model.FieldText, Required: true}}
 	pl := &pipeLine{kind: personAddKind, obj: "person", segs: []pipeSeg{name}, core: 1, add: true}
-	pl.segs = append(pl.segs, linkSegs("person", pl.segs)...)
+	if r, ok := relatedSeg("person"); ok {
+		pl.segs = append(pl.segs, r)
+	}
 	return pl
 }
 
@@ -213,13 +181,14 @@ func tokenBounds(rs []rune, segStart, segEnd, cursor int) (start, end int) {
 	return
 }
 
-// splitCommas splits a link segment into its names: trimmed, no empty ones, each once (any case).
+// splitCommas splits a link segment into its names: trimmed, no empty ones, each once (any case). A
+// leading # is kept, it says the name is a tag.
 func splitCommas(s string) []string {
 	var out []string
 	seen := map[string]bool{}
 	for _, p := range strings.Split(s, ",") {
-		p = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(p), "#"))
-		if p == "" || seen[strings.ToLower(p)] {
+		p = strings.TrimSpace(p)
+		if p == "" || p == "#" || seen[strings.ToLower(p)] {
 			continue
 		}
 		seen[strings.ToLower(p)] = true
@@ -379,7 +348,7 @@ func (m *Model) pipeSoft(s *pipeSession, seg pipeSeg, rs []rune, start, end, cur
 	text := strings.TrimSpace(string(rs[start:end]))
 	if seg.Link {
 		ts, te := tokenBounds(rs, start, end, cursor)
-		tok := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(string(rs[ts:te])), "#"))
+		tok := strings.TrimSpace(string(rs[ts:te]))
 		if tok == "" {
 			return ""
 		}
@@ -391,6 +360,8 @@ func (m *Model) pipeSoft(s *pipeSession, seg pipeSeg, rs []rune, start, end, cur
 			return fmt.Sprintf("%d match %q, enter asks which", len(res.matches), tok)
 		case len(seg.Kinds) == 1 && seg.Kinds[0] != tagKind:
 			return fmt.Sprintf("no %s named %q yet, enter offers to create it", relationLabel(seg.Kinds[0]), tok)
+		case len(seg.Kinds) > 1:
+			return fmt.Sprintf("nothing named %q yet, enter offers to create it", tok)
 		}
 		return ""
 	}

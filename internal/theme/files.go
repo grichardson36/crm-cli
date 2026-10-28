@@ -194,6 +194,8 @@ func Example(name string) []byte {
 		RoleDanger: "errors and destructive prompts", RoleGood: "success messages", RoleWarn: "cautions, READ-ONLY badge",
 		RoleMark: "marked rows", RoleTabFg: "active tab text", RoleTabBg: "active tab background",
 		RoleSelFg: "selected row text (optional, set with sel_bg)", RoleSelBg: "selected row background (optional)",
+		RoleKindPerson: "people in the related segment (optional)", RoleKindOrg: "organizations (optional)", RoleKindDeal: "deals (optional)",
+		RoleKindTask: "tasks (optional)", RoleKindNote: "notes (optional)", RoleKindTag: "tags (optional)",
 	}
 	for _, r := range Roles {
 		v := base.Color(r)
