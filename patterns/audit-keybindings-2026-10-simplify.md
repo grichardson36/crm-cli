@@ -27,7 +27,7 @@ All clear removals (C) are applied. Decisions on the D items:
 | F21, F22 | `J`, `K` and `r` removed from Modules. The reset is the palette entry "Modules: reset". |
 | F15, F23 to F28 | Kept. |
 
-Counts after B2: see the generated table (`KEYS_AUDIT_OUT`), the old-to-new table is in FEATURES.md and `crm help tui-keys`.
+Counts after B2: see the generated table (`KEYS_AUDIT_OUT`), the old-to-new table is in [[current-tui-keys]] and `crm help tui-keys`.
 
 The text below is the original proposal, kept for the reasoning.
 

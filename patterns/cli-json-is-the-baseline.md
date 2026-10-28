@@ -14,6 +14,6 @@ status: decided
 
 **Smaller patterns.** [[agents-never-get-prompts]]
 
-**Sources.** FEATURES.md rule 3
+**Sources.** [[feature-rules]] rule 3
 
 **Inspired by.** [[dex]], [[dzhng-crm-cli]], [[us]]

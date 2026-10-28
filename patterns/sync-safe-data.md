@@ -14,6 +14,6 @@ status: decided
 
 **Smaller patterns.** [[soft-delete-restorable]], [[conflicts-keep-server-store-local]], [[sync-maps-structure-to-flat-fields]]
 
-**Sources.** FEATURES.md rule 4
+**Sources.** [[feature-rules]] rule 4
 
 **Inspired by.** [[folk]]

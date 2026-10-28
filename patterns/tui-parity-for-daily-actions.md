@@ -12,4 +12,4 @@ status: decided
 
 **Larger patterns.** [[three-doors-one-core]], [[advanced-objects-off-main-path]]
 
-**Sources.** FEATURES.md rule 1, BUSINESS.md 2026-10-15
+**Sources.** [[feature-rules]] rule 1, BUSINESS.md 2026-10-15

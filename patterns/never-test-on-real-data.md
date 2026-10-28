@@ -12,4 +12,4 @@ status: decided
 
 **Larger patterns.** [[local-first]]
 
-**Sources.** FEATURES.md rule 5
+**Sources.** [[feature-rules]] rule 5

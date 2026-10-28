@@ -1,7 +1,7 @@
 ---
 type: research
 ---
-# Research: images in the terminal interface (FEATURES M16)
+# Research: images in the terminal interface (M16 in [[features-organizations]])
 
 Date 2026-10-20. Question from the owner: can the TUI show logos and profile photos, or must we change the TUI framework or leave the terminal? Evidence tags: search (web search summaries, first-party pages not yet read) and unverified.
 

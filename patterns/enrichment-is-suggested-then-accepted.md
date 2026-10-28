@@ -16,6 +16,6 @@ status: decided
 
 **Smaller patterns.** [[unresolved-names-stay-text]], [[conflicts-keep-server-store-local]], [[pick-or-create]]
 
-**Sources.** Owner decision 2026-10-19, FEATURES.md section N
+**Sources.** Owner decision 2026-10-19, [[features-enrichment]]
 
 **Inspired by.** [[dex]], [[hubspot]], [[clay-me-sh]]

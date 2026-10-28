@@ -78,7 +78,7 @@ Part of the [[index]]. Process rules are in [[how-to-use]] and [[surface-gaps-be
 
 ## Research status key
 
-- mined: read in depth, rows built into FEATURES.md or a plan file.
+- mined: read in depth, rows built into the feature-area notes (see [[index]]) or a plan file.
 - partial: some first-party pages read, some claims from search summaries. Each note marks which.
 - bookmarked: named as an inspiration, not researched in detail.
 
@@ -93,8 +93,8 @@ Part of the [[index]]. Process rules are in [[how-to-use]] and [[surface-gaps-be
 7. Restore and trash conventions: HubSpot, Notion and Gmail restore flows (for [[soft-delete-restorable]]).
 8. Object registries and generic verbs: how Attio, Notion and Folk expose one verb set across object types (for [[objects-first]]).
 9. Local-first community sync standard: Ink & Switch, Automerge, cr-sqlite, Replicache, Linear, ElectricSQL, Actual Budget. Field-level merge, structured-to-flat mappings, deletes, conflict display (for [[sync-maps-structure-to-flat-fields]]).
-10. Terminal UI platform and images: which terminals draw images (Sixel, Kitty, iTerm2 protocols; Windows Terminal), whether Bubble Tea can host them, or whether another TUI stack or a native/web front end is needed for logos and photos. Owner open decision 2026-10-19 (FEATURES M16). First pass done 2026-10-20: [[research-terminal-images]]. Spikes pending.
-11. Enrichment providers: Clay, Anymailfinder and similar APIs: fields, pricing, rate limits, terms (for [[enrichment-is-suggested-then-accepted]], FEATURES section N).
+10. Terminal UI platform and images: which terminals draw images (Sixel, Kitty, iTerm2 protocols; Windows Terminal), whether Bubble Tea can host them, or whether another TUI stack or a native/web front end is needed for logos and photos. Owner open decision 2026-10-19 ([[features-organizations]] M16). First pass done 2026-10-20: [[research-terminal-images]]. Spikes pending.
+11. Enrichment providers: Clay, Anymailfinder and similar APIs: fields, pricing, rate limits, terms (for [[enrichment-is-suggested-then-accepted]], [[features-enrichment]]).
 12. Module customization: how Notion, Obsidian, Raycast, HubSpot and Attio let users turn parts of the UI on or off and reorder them (for [[modules-are-user-arranged]]).
 13. Keybindings: first pass [[research-keybindings]] (herdr, Obsidian, Primer/GitLab). Still to read: Obsidian default table, Superhuman, Linear, Gmail, helix, Zellij, tmux, Things, Todoist.
 

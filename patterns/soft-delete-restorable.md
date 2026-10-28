@@ -16,6 +16,6 @@ status: decided
 
 **Smaller patterns.** [[undo-redo-two-stacks]], [[hidden-not-removed-links]]
 
-**Sources.** Office undo, Gmail undo toast, FEATURES.md rule 4
+**Sources.** Office undo, Gmail undo toast, [[feature-rules]] rule 4
 
 **Inspired by.** [[dex]], [[us]]

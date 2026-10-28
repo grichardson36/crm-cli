@@ -12,4 +12,4 @@ status: decided
 
 **Larger patterns.** [[three-doors-one-core]]
 
-**Sources.** FEATURES.md rule 2
+**Sources.** [[feature-rules]] rule 2

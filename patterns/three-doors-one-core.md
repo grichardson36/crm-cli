@@ -16,6 +16,6 @@ status: decided
 
 **Smaller patterns.** [[tui-parity-for-daily-actions]], [[cli-json-is-the-baseline]], [[agents-never-get-prompts]], [[tests-for-every-door]]
 
-**Sources.** FEATURES.md rules 1 to 3, git porcelain over plumbing
+**Sources.** [[feature-rules]] rules 1 to 3, git porcelain over plumbing
 
 **Inspired by.** [[jdanielnd-crm-cli]]

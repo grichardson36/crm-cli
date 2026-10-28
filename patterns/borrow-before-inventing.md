@@ -14,4 +14,4 @@ status: decided
 
 **Smaller patterns.** [[surface-gaps-before-deciding]], [[name-things-once]], [[sigils-for-things-words-for-time]]
 
-**Sources.** FEATURES.md rule 6
+**Sources.** [[feature-rules]] rule 6

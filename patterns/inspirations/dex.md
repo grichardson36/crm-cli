@@ -22,4 +22,4 @@ research: mined
 
 **Gaps to research.** Confirm field shapes through the Dex REST API (needs the Professional plan, not held). LinkedIn feed_items are not imported.
 
-**Sources.** DEX-GAP.md (REA capture 2026-10-13 plus public JS, field names observed, types inferred). FEATURES.md has 94 mined rows. Dex CSV exports 2026-10-13 are imported (4445 contacts, 93 notes). github.com/getdex/agent-skills for the CLI and MCP docs.
+**Sources.** DEX-GAP.md (REA capture 2026-10-13 plus public JS, field names observed, types inferred). The feature-area notes ([[index]]) hold the 94 mined rows. Dex CSV exports 2026-10-13 are imported (4445 contacts, 93 notes). github.com/getdex/agent-skills for the CLI and MCP docs.

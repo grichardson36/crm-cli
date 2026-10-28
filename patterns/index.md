@@ -5,6 +5,18 @@ type: index
 
 Atomic notes. One note is one idea. Notes link to larger and smaller patterns. Read [[how-to-use]] first. Known code that breaks a pattern is listed in [[open-discrepancies]].
 
+This is the single entry point for the repository's decisions and features. Start here before any design decision or feature change.
+
+## How to use this vault
+
+1. Read [[how-to-use]], then find the patterns that apply below. Follow links to larger and smaller patterns and use [[decision-cascade]] when the direction is unclear.
+2. To learn what a feature does today, open the feature-area note for it (list below). Its table has one row per feature with a stable ID (A01, M27 and so on), State, Now and open questions. [[feature-rules]] explains the columns and the row lifecycle.
+3. If no pattern covers the question, or code breaks a pattern, follow [[surface-gaps-before-deciding]] and tell the owner. Do not decide alone.
+4. After the owner decides, write one atomic note, link it from [[index]], and update the affected feature-area rows and [[open-discrepancies]] in the same session ([[keep-the-tracker-accurate]]).
+5. Never test on the real databases ([[never-test-on-real-data]]).
+
+Note types (frontmatter `type`): `pattern` (one decided rule), `feature-area` (feature rows grouped by area), `research` (read-only findings), `audit`, `schema`, `guide`, `discrepancies` (code that breaks a pattern), `roadmap`, `index`.
+
 ## Production scale
 *Pertains to our internal best-practices and ethos around product development and production.*
 
@@ -19,7 +31,7 @@ Atomic notes. One note is one idea. Notes link to larger and smaller patterns. R
 - [[extension-ladder]] (Extend in ascending order of cost and risk)
 - [[borrow-before-inventing]] (Borrow a proven pattern before inventing one)
 - [[surface-gaps-before-deciding]] (Surface gaps to the user before deciding)
-- [[keep-the-tracker-accurate]] (Keep FEATURES.md accurate in the same session)
+- [[keep-the-tracker-accurate]] (Keep the feature-area notes accurate in the same session)
 - [[never-test-on-real-data]] (Test on copies, never on the real databases)
 - [[inspirations]] (Lists the apps/programs this program borrows the best implementation from to influence new design direction)
 ## Object scale
@@ -104,3 +116,60 @@ Atomic notes. One note is one idea. Notes link to larger and smaller patterns. R
 - [[duration-forms]] (Duration has three accepted forms)
 - [[remind-word]] (remind sets a reminder)
 - [[date-safety-rules]] (Plain-word dates need safety rules)
+
+## Feature areas
+
+Feature rows (moved from FEATURES.md, which is retired). Each note lists the patterns the area follows and the research behind it. The IDs are stable and cited by agents, never reuse one.
+
+- [[feature-rules]] (Rules every feature follows, column meanings, row lifecycle, inspiration status, build order)
+- [[features-people-and-contact-details]] (Person fields, labels, tier, favorites)
+- [[features-organizations]] (Organizations, company text, duplicate guard, native fields, images)
+- [[features-deals]] (Deal stages and roles)
+- [[features-tasks-and-notes]] (Tasks, reminders, notes, note types, timeline)
+- [[features-keep-in-touch-and-birthdays]] (Cadences, due, snooze, birthdays, digests, Home)
+- [[features-tags-groups-and-views]] (Tags, groups, saved views, filters, bulk edit, search)
+- [[features-links-and-relations]] (Typed links between all objects)
+- [[features-merge-archive-and-undo]] (Duplicates, merge and merge log, archive, purge, undo)
+- [[features-import-and-export]] (Dex CSV, other importers, export)
+- [[features-sync-and-dav]] (Device sync, sync runner and inbox, CardDAV server, mail and message sync)
+- [[features-insights-and-outreach]] (Briefs, email from a contact, mail merge, insights)
+- [[features-enrichment]] (Suggested data, providers, refresh policy)
+- [[features-tui-keys-and-modules]] (Keys, the one bar, rebinding, modules)
+- [[current-tui-keys]] (Current key tables, old key to new key, registry structure)
+- [[features-tui-input-and-syntax]] (Short syntax, pipe lines, autocomplete, related segment, hints)
+- [[features-platform-and-themes]] (Web, phone, desktop, domains, themes, learn mode)
+- [[features-cli-mcp-and-agents]] (CLI with JSON, MCP, help topics, schema manifest, install)
+- [[features-validation-and-field-types]] (Field types, the one validation framework, aliases)
+- [[features-data-safety]] (Backup, doctor, dry runs, migrations)
+- [[features-calendar-archived]] (Calendar, scheduling and booking links, archived 2026-10-16)
+
+## Research notes
+
+Read-only findings that feed the patterns. Verify before relying on them.
+
+- [[research-charm-ecosystem]] (What Bubble Tea and Charm libraries provide)
+- [[research-hubspot-export]] (How real HubSpot data uses the relation schema)
+- [[research-keybindings]] (Keybindings that stay intuitive across modules)
+- [[research-local-first-stacks]] (Stay in Go, rewrite in Rust, or hybrid)
+- [[research-mesh-architectures]] (Reticulum, Meshtastic, MeshCore and the sync contract)
+- [[research-relationship-models]] (How mature CRMs model relationships)
+- [[research-sync-building-blocks]] (Libraries to adopt or study for sync)
+- [[research-sync-engines]] (Sync engines that fit Go and SQLite)
+- [[research-sync-standard]] (Structured-to-flat mapping and round-trip fidelity)
+- [[research-sync-standardization]] (The smallest database-agnostic sync contract)
+- [[research-terminal-images]] (Images in the terminal interface)
+- [[research-tui-building-blocks]] (Standard TUI building blocks)
+- [[research-tui-inspirations]] (TUI-first apps and what they teach)
+- [[research-view-module-standard]] (Renderer-agnostic view modules)
+
+## Design records
+
+- [[schema-er]] (Schema proposal: relationships that match the real world)
+- [[sync-contract]] (Sync contract v1)
+- [[audit-keybindings-2026-10]] (Key audit, 2026-10-21)
+- [[audit-keybindings-2026-10-simplify]] (Keys to simplify, 2026-10-27)
+
+## Open discrepancies and roadmap
+
+- [[open-discrepancies]] (Live list of code that breaks a pattern, with the owner question for each)
+- [[roadmap]] (Items not built yet)

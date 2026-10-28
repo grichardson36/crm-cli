@@ -14,4 +14,4 @@ research: ongoing
 - Reversible actions and soft deletes. [[soft-delete-restorable]] [[undo-redo-two-stacks]]
 - Agent first: help topics, schema manifest, JSON output. [[cli-json-is-the-baseline]] [[agents-never-get-prompts]]
 
-**Sources.** BUSINESS.md, FEATURES.md design direction 2026-10-14.
+**Sources.** BUSINESS.md, [[feature-rules]] design direction 2026-10-14.

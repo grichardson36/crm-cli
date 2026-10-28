@@ -16,6 +16,6 @@ status: decided
 
 **Smaller patterns.** [[undo-redo-two-stacks]]
 
-**Sources.** [[schema-er]] (rules every table follows, Q26), FEATURES.md rule 4
+**Sources.** [[schema-er]] (rules every table follows, Q26), [[feature-rules]] rule 4
 
 **Inspired by.** [[dex]], [[us]]
