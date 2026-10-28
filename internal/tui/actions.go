@@ -207,6 +207,7 @@ func buildActions() []action {
 			write: true, when: whenPerson, run: func(m *Model) tea.Cmd { m.markContacted(); return nil }},
 		{id: "note-pick", title: "Add note (pick type)", group: "Contact", desc: "pick a note type from a list, then add the note",
 			write: true, when: whenPerson, run: func(m *Model) tea.Cmd { m.pickNoteType(); return nil }},
+		dealRolesAction(),
 		{id: "note-types", title: "Manage note types", group: "Contact", desc: "add or archive note types (call, email, meeting, ...)",
 			write: true, run: func(m *Model) tea.Cmd { return m.openNoteTypes() }},
 		{id: "snooze", title: "Snooze keep-in-touch", group: "Contact", hint: "s", keys: []string{"s"}, desc: "snooze keep-in-touch for N days (a person)",

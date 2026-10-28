@@ -30,7 +30,7 @@ var barReserved = map[string]bool{
 var barVerbGroups = map[string]bool{"Contact": true, "Link": true, "Organizations": true, "Deals": true, "Tasks": true, "Tags": true}
 
 // barNoVerb are actions in those groups that do not act on one selected object.
-var barNoVerb = map[string]bool{"org-mark": true, "org-merge": true, "merge-marked": true, "merge": true, "new": true, "note-pick": true, "note-types": true}
+var barNoVerb = map[string]bool{"org-mark": true, "org-merge": true, "merge-marked": true, "merge": true, "new": true, "note-pick": true, "note-types": true, "deal-roles": true}
 
 // barTarget is what a bar row stands for: the kind of object and its id (or tag name).
 type barTarget struct {
