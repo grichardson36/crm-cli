@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 // Settings in the bar. Typing a setting name finds it with its current value, and enter opens the

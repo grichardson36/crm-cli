@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 // The universal verbs that need one action for the whole framework (patterns/universal-verbs).

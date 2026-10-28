@@ -165,7 +165,7 @@ func TestPersonPriorityBirthdayAndDateHints(t *testing.T) {
 	assert.Equal(t, modeEdit, m.mode)
 	replaceText(m, "")
 	typeText(m, "next friday")
-	assert.Contains(t, m.View(), "-> 2026-10-23", "the hint previews the date the phrase means")
+	assert.Contains(t, m.screen(), "-> 2026-10-23", "the hint previews the date the phrase means")
 	press(m, "esc")
 }
 
@@ -208,7 +208,7 @@ func TestRelationTypeahead(t *testing.T) {
 			assert.Equal(t, tt.want, labels())
 			assert.Equal(t, tt.create, m.edit.ta.canCreate)
 			if tt.create && tt.typed != "" {
-				assert.Contains(t, m.View(), "Create '"+tt.typed+"'", "the last row reads Create 'X'")
+				assert.Contains(t, m.screen(), "Create '"+tt.typed+"'", "the last row reads Create 'X'")
 			}
 		})
 	}

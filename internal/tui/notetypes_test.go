@@ -21,7 +21,7 @@ func TestNotePromptDefaultsToNoteAndRemembersType(t *testing.T) {
 	press(m, "a", "n")
 	require.Equal(t, modePrompt, m.mode)
 	assert.Equal(t, "note: ", m.input.Prompt)
-	assert.Contains(t, m.View(), "tab type")
+	assert.Contains(t, m.screen(), "tab type")
 	typeLinked(m, "plain note")
 	press(m, "enter")
 	assert.Equal(t, "note added", m.status)
@@ -50,7 +50,7 @@ func TestNotePromptDefaultsToNoteAndRemembersType(t *testing.T) {
 
 	// The detail pane shows the type of each note.
 	press(m, "tab")
-	out := m.View()
+	out := m.screen()
 	assert.Contains(t, out, "call")
 	assert.Contains(t, out, "talked about the trip")
 }
@@ -127,7 +127,7 @@ func TestManageNoteTypesAddAndArchive(t *testing.T) {
 	assert.Equal(t, "coffee", m.ov.items[m.ov.shown[0]].id)
 	press(m, "enter")
 	require.Equal(t, modeConfirm, m.mode)
-	assert.Contains(t, m.View(), "archive note type coffee")
+	assert.Contains(t, m.screen(), "archive note type coffee")
 	press(m, "n")
 	nt, _ = m.ntr.FindByName(context.Background(), "coffee")
 	assert.False(t, nt.Archived)

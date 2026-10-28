@@ -52,7 +52,7 @@ func TestOrgsAndDealsAreOnByDefaultAndFollowTheArrangement(t *testing.T) {
 	// Turned off, Deals leaves the cycle but a link still opens it. ] goes to the first view and [ to the last.
 	require.NoError(t, m.setModules(mustWith(t, m.mods, "deals", false)))
 	m.switchView(viewDeals)
-	assert.Contains(t, m.View(), "v Deals")
+	assert.Contains(t, m.screen(), "v Deals")
 	press(m, "]")
 	assert.Equal(t, viewHome, m.view, "] leaves a view that is off")
 	m.switchView(viewDeals)
@@ -64,7 +64,7 @@ func TestOrgAddEditDeleteRestoreWithUndo(t *testing.T) {
 	m, _ := newTestModel(t)
 	runPalette(m, "organizations view")
 	require.Equal(t, viewOrgs, m.view)
-	assert.Contains(t, m.View(), "No organizations")
+	assert.Contains(t, m.screen(), "No organizations")
 
 	press(m, "a", "enter")
 	require.Equal(t, modePrompt, m.mode)
@@ -76,7 +76,7 @@ func TestOrgAddEditDeleteRestoreWithUndo(t *testing.T) {
 	require.NotNil(t, m.toast)
 	assert.Contains(t, m.toast.text, "organization added: Initech")
 	assert.Equal(t, list[0].ID, m.rows[m.cursor].orgID)
-	assert.Contains(t, m.View(), "initech.com")
+	assert.Contains(t, m.screen(), "initech.com")
 
 	// Undo and redo of the add.
 	press(m, "ctrl+z")
@@ -162,7 +162,7 @@ func TestDealAddEditStageDeleteRestoreWithUndo(t *testing.T) {
 	assert.Equal(t, org.ID, *d.OrgID)
 	assert.Equal(t, []int64{2}, d.PersonIDs)
 	assert.Equal(t, "phase one", *d.Notes)
-	body := m.View()
+	body := m.screen()
 	assert.Contains(t, body, "Site redesign")
 	assert.Contains(t, body, "12,500")
 	assert.Contains(t, body, "Bob Baker")

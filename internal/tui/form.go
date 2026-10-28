@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/jdanielnd/crm-cli/internal/validate"
@@ -365,7 +365,7 @@ func (m *Model) refreshDetail(force bool) {
 
 // syncDetail renders the form into the detail viewport and keeps the cursor row in view.
 func (m *Model) syncDetail() {
-	w := m.detail.Width
+	w := m.detail.Width()
 	if len(m.form) == 0 {
 		m.lineRow, m.rowStart, m.rowEnd = nil, nil, nil
 		m.detail.SetContent(m.emptyDetail())
@@ -404,10 +404,10 @@ func (m *Model) syncDetail() {
 	m.detail.SetContent(strings.Join(lines, "\n"))
 	if m.focus == focusDetail && m.fcur < len(m.rowStart) {
 		top, bottom := m.rowStart[m.fcur], m.rowEnd[m.fcur]
-		if top < m.detail.YOffset {
+		if top < m.detail.YOffset() {
 			m.detail.SetYOffset(top)
-		} else if bottom >= m.detail.YOffset+m.detail.Height {
-			m.detail.SetYOffset(bottom - m.detail.Height + 1)
+		} else if bottom >= m.detail.YOffset()+m.detail.Height() {
+			m.detail.SetYOffset(bottom - m.detail.Height() + 1)
 		}
 	}
 }
@@ -593,7 +593,7 @@ func (m *Model) beginEdit(idx int, add bool) tea.Cmd {
 	v = strings.ReplaceAll(v, "\n", "⏎")
 	m.rowInput.SetValue(v)
 	m.rowInput.CursorEnd()
-	m.rowInput.Width = max(5, m.detail.Width-labelWidth-1)
+	m.rowInput.SetWidth(max(5, m.detail.Width()-labelWidth-1))
 	m.focus = focusDetail
 	m.mode = modeEdit
 	m.setStatus("", false)
@@ -676,7 +676,7 @@ func (m *Model) cancelEdit() {
 	m.setStatus("", false)
 }
 
-func (m *Model) handleEditKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *Model) handleEditKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.edit != nil && m.edit.typed != nil {
 		return m.handleTypedKey(msg)
 	}
@@ -687,7 +687,7 @@ func (m *Model) handleEditKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.creating && m.pipeKey(msg) {
 		return m, nil
 	}
-	switch msg.String() {
+	switch keyName(msg) {
 	case "esc":
 		m.cancelEdit()
 		return m, nil
@@ -696,7 +696,7 @@ func (m *Model) handleEditKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "tab", "shift+tab":
 		if m.edit != nil && m.edit.kind == rkHandle {
-			m.cycleHandleKind(msg.String() == "tab")
+			m.cycleHandleKind(keyName(msg) == "tab")
 		}
 		return m, nil
 	}

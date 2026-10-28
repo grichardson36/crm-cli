@@ -3,10 +3,9 @@ package tui
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/jdanielnd/crm-cli/internal/keys"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -124,7 +123,7 @@ func TestKeysCustomizeFlowSavesTheBinding(t *testing.T) {
 	typeText(m, "toggle favorite")
 	press(m, "enter")
 	require.Equal(t, modeCapture, m.mode)
-	assert.Contains(t, m.View(), "press the new key for Toggle favorite")
+	assert.Contains(t, m.screen(), "press the new key for Toggle favorite")
 
 	// A key that is taken is refused and the capture stays open.
 	m.Update(keyMsg("x"))
@@ -262,9 +261,4 @@ func TestNoLegacyUndoRedoKeys(t *testing.T) {
 }
 
 // keyMsg builds the key message for "ctrl+f" style names and plain characters.
-func keyMsg(k string) tea.KeyMsg {
-	if strings.HasPrefix(k, "ctrl+") && len(k) == 6 {
-		return tea.KeyMsg{Type: tea.KeyType(int(k[5]-'a') + 1)}
-	}
-	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(k)}
-}
+func keyMsg(k string) tea.KeyPressMsg { return keyPress(k) }

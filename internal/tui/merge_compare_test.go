@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -80,7 +80,7 @@ func TestCompareShowsEverythingAndDefaults(t *testing.T) {
 	assert.False(t, c.conflict(rowIndex(c, "title")), "one side empty is a difference, not a conflict")
 
 	m.Update(tea.WindowSizeMsg{Width: 140, Height: 40})
-	out := ansiStrip(m.View())
+	out := ansiStrip(m.screen())
 	for _, want := range []string{"Duplicates", "MED", "#2 Bob Baker", "#4 bob baker", "survivor", "archived after merge", "Final #2", "bob@home.org", "result:"} {
 		assert.Contains(t, out, want)
 	}
@@ -121,14 +121,14 @@ func TestCompareLayoutAtSeveralWidths(t *testing.T) {
 				if step != "" {
 					press(m, step)
 				}
-				lines := strings.Split(m.View(), "\n")
+				lines := strings.Split(m.screen(), "\n")
 				assert.LessOrEqual(t, len(lines), size[1], "%v page %d height", size, page)
 				for _, l := range lines {
 					assert.LessOrEqual(t, lipgloss.Width(l), size[0], "%v page %d: %q", size, page, l)
 				}
 			}
 			c.confirm = true
-			for _, l := range strings.Split(m.View(), "\n") {
+			for _, l := range strings.Split(m.screen(), "\n") {
 				assert.LessOrEqual(t, lipgloss.Width(l), size[0], "%v confirm: %q", size, l)
 			}
 		}
@@ -218,7 +218,7 @@ func TestCompareListItemsToggleIntoResult(t *testing.T) {
 	press(m, " ")
 	assert.False(t, c.included(home))
 	assert.Equal(t, "", c.finalText(home), "out of the result pane")
-	assert.Contains(t, ansiStrip(m.View()), "✗ bob@home.org", "the candidate pane still shows it, marked out")
+	assert.Contains(t, ansiStrip(m.screen()), "✗ bob@home.org", "the candidate pane still shows it, marked out")
 	press(m, " ")
 	assert.True(t, c.included(home))
 
@@ -315,7 +315,7 @@ func TestCompareFlowSummaryThenApply(t *testing.T) {
 	press(m, "enter")
 	require.NotNil(t, m.cmp)
 	assert.True(t, c.confirm)
-	out := ansiStrip(m.View())
+	out := ansiStrip(m.screen())
 	for _, want := range []string{"Merge #4 bob baker into #2 Bob Baker", "kept", "archived", "restorable", "merged into #2", "notes", "1 move to #2", "interactions", "2 move to #2", "tasks", "enter merges"} {
 		assert.Contains(t, out, want)
 	}
@@ -393,7 +393,7 @@ func TestCompareChangeSurvivorAndEsc(t *testing.T) {
 	press(m, "ctrl+e")
 	assert.Equal(t, 1, c.s)
 	m.Update(tea.WindowSizeMsg{Width: 140, Height: 40})
-	assert.Contains(t, ansiStrip(m.View()), "Final #4")
+	assert.Contains(t, ansiStrip(m.screen()), "Final #4")
 	for _, k := range []string{"esc"} { // q no longer closes the compare, esc does
 		press(m, k)
 		assert.Nil(t, m.cmp, k)
@@ -419,15 +419,15 @@ func TestCompareSwallowsOtherKeys(t *testing.T) {
 func TestCompareNarrowResultToggle(t *testing.T) {
 	m, c := openBobs(t)
 	m.Update(tea.WindowSizeMsg{Width: 90, Height: 30})
-	out := ansiStrip(m.View())
+	out := ansiStrip(m.screen())
 	assert.Contains(t, out, "#2 Bob Baker")
 	assert.NotContains(t, out, "Final #2", "two panes show the candidates")
 	runID(m, "cmp-view") // the palette entry, ctrl+w is gone
-	out = ansiStrip(m.View())
+	out = ansiStrip(m.screen())
 	assert.Contains(t, out, "Final #2")
 	assert.NotContains(t, out, "#4 bob baker\n")
 	runID(m, "cmp-view")
-	assert.Contains(t, ansiStrip(m.View()), "#4 bob baker")
+	assert.Contains(t, ansiStrip(m.screen()), "#4 bob baker")
 	assert.Equal(t, 2, c.page)
 
 	// ctrl+w is not a key any more, the footer never offers it.
@@ -467,7 +467,7 @@ func TestCompareClickPicksAndToggles(t *testing.T) {
 	assert.False(t, c.included(home))
 	click(m, l.x0[0]+2, lineOf(home))
 	assert.True(t, c.included(home))
-	m.Update(tea.MouseMsg{X: 3, Y: 5, Button: tea.MouseButtonWheelDown, Action: tea.MouseActionPress})
+	m.Update(tea.MouseWheelMsg{X: 3, Y: 5, Button: tea.MouseWheelDown})
 	assert.Greater(t, c.cur, home)
 }
 
@@ -482,7 +482,7 @@ func TestCompareGroupOfThreeMergesPairByPair(t *testing.T) {
 	require.NotNil(t, c)
 	require.Len(t, c.members, 3)
 	assert.Equal(t, []int{0, 1}, []int{c.a, c.b})
-	assert.Contains(t, ansiStrip(m.View()), "group of 3")
+	assert.Contains(t, ansiStrip(m.screen()), "group of 3")
 	runID(m, "cmp-pair") // palette only, ctrl+b is gone
 	assert.Equal(t, []int{0, 2}, []int{c.a, c.b})
 	assert.GreaterOrEqual(t, itemRow(c, "email", "bobby@elsewhere.net"), 0)

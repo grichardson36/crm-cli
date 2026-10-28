@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -397,7 +397,7 @@ func TestBarVerbsFollowKeyRebinding(t *testing.T) {
 	assert.Contains(t, barFooter(m), "ctrl+g contacted")
 	press(m, "x")
 	assert.Contains(t, *personByID(t, pr, 2).LastContactedAt, "2020-01-01", "the old key no longer runs the verb")
-	m.Update(tea.KeyMsg{Type: tea.KeyCtrlG})
+	m.Update(keyPress("ctrl+g"))
 	assert.Contains(t, *personByID(t, pr, 2).LastContactedAt, "2026-10-13")
 }
 
@@ -409,10 +409,10 @@ func TestBarResultsFocusFitsEightyColumns(t *testing.T) {
 		typeText(m, tc.query)
 		cursorOnBarRow(t, m, tc.id)
 		press(m, "tab")
-		for _, l := range strings.Split(m.View(), "\n") {
+		for _, l := range strings.Split(m.screen(), "\n") {
 			assert.LessOrEqual(t, lipgloss.Width(l), 80, "%q", l)
 		}
-		assert.Contains(t, plain(m.View()), "tab or esc: input")
+		assert.Contains(t, plain(m.screen()), "tab or esc: input")
 		press(m, "esc", "esc")
 	}
 }

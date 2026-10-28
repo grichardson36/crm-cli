@@ -6,7 +6,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/jdanielnd/crm-cli/internal/modules"
 	"github.com/mattn/go-runewidth"

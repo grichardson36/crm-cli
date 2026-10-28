@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 
 	"github.com/jdanielnd/crm-cli/internal/model"
@@ -20,13 +20,7 @@ import (
 
 // keyCmd presses one key and returns the command the model answered with.
 func keyCmd(m *Model, k string) tea.Cmd {
-	var msg tea.KeyMsg
-	if kt, ok := specialKeys[k]; ok {
-		msg = tea.KeyMsg{Type: kt}
-	} else {
-		msg = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(k)}
-	}
-	_, cmd := m.Update(msg)
+	_, cmd := m.Update(keyPress(k))
 	return cmd
 }
 
@@ -118,7 +112,7 @@ func TestCtrlArrowsAreAliasesOfTheViewSwitchKeys(t *testing.T) {
 	m, _ := newTestModel(t)
 	assert.Equal(t, []string{"]", "ctrl+right"}, m.actionByID("next-view").keys)
 	assert.Equal(t, []string{"[", "ctrl+left"}, m.actionByID("prev-view").keys)
-	assert.Equal(t, "ctrl+right", tea.KeyMsg{Type: tea.KeyCtrlRight}.String())
+	assert.Equal(t, "ctrl+right", keyName(keyPress("ctrl+right")))
 	start := m.view
 	press(m, "ctrl+right")
 	assert.NotEqual(t, start, m.view)
@@ -295,7 +289,7 @@ func TestCtrlASelectsAllAndShiftArrowsExtendTheSelection(t *testing.T) {
 
 	// The View shows the check marks.
 	press(m, "shift+down")
-	assert.Contains(t, m.View(), "✓")
+	assert.Contains(t, m.screen(), "✓")
 }
 
 func TestShiftArrowsStillReorderInsideTheModulesScreen(t *testing.T) {
@@ -607,7 +601,7 @@ func TestBulkDeleteOfTasksShowsTheCountAndNeedsItTyped(t *testing.T) {
 	m.switchView(viewTasks)
 	press(m, "ctrl+a", "d")
 	require.Equal(t, modePrompt, m.mode, "several objects ask for the count typed back")
-	assert.Contains(t, m.View(), `type "delete 3" to delete 3 tasks`)
+	assert.Contains(t, m.screen(), `type "delete 3" to delete 3 tasks`)
 	typeText(m, "delete 2")
 	press(m, "enter")
 	assert.True(t, m.statusIsErr)
@@ -872,7 +866,7 @@ func TestBulkPurgeInTheArchivedViewTakesEveryType(t *testing.T) {
 
 	runID(m, "purge-all")
 	require.Equal(t, modePrompt, m.mode)
-	assert.Contains(t, m.View(), `type "purge 4" to delete 4 objects remaining forever`)
+	assert.Contains(t, m.screen(), `type "purge 4" to delete 4 objects remaining forever`)
 	typeText(m, "purge 3")
 	press(m, "enter")
 	assert.True(t, m.statusIsErr)

@@ -67,19 +67,19 @@ func TestHelpTopicsFilterOpenScrollAndBack(t *testing.T) {
 	press(m, "enter")
 	require.NotNil(t, m.tv)
 	assert.Nil(t, m.ov)
-	assert.Contains(t, m.View(), "Help: keep-in-touch")
-	assert.Contains(t, m.View(), "ctrl+k for every action")
+	assert.Contains(t, m.screen(), "Help: keep-in-touch")
+	assert.Contains(t, m.screen(), "ctrl+k for every action")
 
 	// Scrolling: j moves down, G goes to the end, g to the top.
-	require.Greater(t, m.tv.vp.TotalLineCount(), m.tv.vp.Height, "topic is longer than the screen")
+	require.Greater(t, m.tv.vp.TotalLineCount(), m.tv.vp.Height(), "topic is longer than the screen")
 	press(m, "down")
-	assert.Equal(t, 1, m.tv.vp.YOffset)
+	assert.Equal(t, 1, m.tv.vp.YOffset())
 	press(m, "end")
 	assert.True(t, m.tv.vp.AtBottom())
 	press(m, "up")
 	assert.False(t, m.tv.vp.AtBottom())
 	press(m, "home")
-	assert.Equal(t, 0, m.tv.vp.YOffset)
+	assert.Equal(t, 0, m.tv.vp.YOffset())
 
 	// esc returns to the topic list with the filter kept.
 	press(m, "esc")
@@ -122,14 +122,14 @@ func TestHelpSearchWithoutMatchesSetsStatus(t *testing.T) {
 func TestKeysHelpShowsPaletteHint(t *testing.T) {
 	m := toolsModel(t)
 	press(m, "?")
-	assert.Contains(t, m.View(), "ctrl+k for every action")
+	assert.Contains(t, m.screen(), "ctrl+k for every action")
 }
 
 func TestDoctorOverlayShowsChecksAndFixes(t *testing.T) {
 	m := toolsModel(t)
 	runPalette(m, "doctor")
 	require.NotNil(t, m.tv)
-	v := m.View()
+	v := m.screen()
 	assert.Contains(t, v, "Doctor")
 	assert.Contains(t, v, "binary")
 	assert.Contains(t, v, "database")
@@ -144,7 +144,7 @@ func TestDoctorReportsFixForMissingDatabase(t *testing.T) {
 	m.env.DBPath = filepath.Join(t.TempDir(), "missing.db")
 	runPalette(m, "doctor")
 	require.NotNil(t, m.tv)
-	v := m.View()
+	v := m.screen()
 	assert.Contains(t, v, "fail")
 	assert.Contains(t, v, "fix: run: crm init")
 }

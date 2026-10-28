@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	crmsync "github.com/jdanielnd/crm-cli/internal/sync"
 	"github.com/mattn/go-runewidth"
@@ -108,7 +108,7 @@ func (m *Model) syncRows() ([]row, error) {
 
 // syncItemDetail is the detail pane text for the selected Sync row.
 func (m *Model) syncItemDetail(r row) string {
-	w := max(1, m.detail.Width)
+	w := max(1, m.detail.Width())
 	line := func(s string) string { return runewidth.Truncate(s, w, "…") }
 	kv := func(k, v string) string { return m.st.Dim.Render(fit(k, labelWidth)) + line(v) + "\n" }
 	var b strings.Builder

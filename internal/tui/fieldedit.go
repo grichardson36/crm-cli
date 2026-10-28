@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/jdanielnd/crm-cli/internal/validate"
@@ -115,18 +116,18 @@ func (m *Model) startTypedEdit(spec model.FieldSpec, ref repo.Ref, value string,
 	}
 	m.rowInput.SetValue(strings.ReplaceAll(value, "\n", "⏎"))
 	m.rowInput.CursorEnd()
-	m.rowInput.Width = max(5, m.detail.Width-labelWidth-1)
+	m.rowInput.SetWidth(max(5, m.detail.Width()-labelWidth-1))
 	m.syncDetail()
 	return m.rowInput.Focus()
 }
 
 // handleTypedKey is a key in a typed edit.
-func (m *Model) handleTypedKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *Model) handleTypedKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	t := m.edit.typed
 	if t.vocab != nil {
 		return m.handleVocabKey(msg)
 	}
-	key := msg.String()
+	key := keyName(msg)
 	switch key {
 	case "esc":
 		m.cancelEdit()
@@ -143,8 +144,8 @@ func (m *Model) handleTypedKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "down", "right":
 			t.choice = (t.choice + 1) % n
 		default:
-			if len(msg.Runes) == 1 {
-				m.jumpChoice(string(msg.Runes))
+			if utf8.RuneCountInString(msg.Text) == 1 {
+				m.jumpChoice(msg.Text)
 			}
 		}
 		m.setStatus("", false)

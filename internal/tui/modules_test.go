@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func tabBar(m *Model) string { return strings.Split(m.View(), "\n")[0] }
+func tabBar(m *Model) string { return strings.Split(m.screen(), "\n")[0] }
 
 func paletteTitles(m *Model) []string {
 	press(m, "ctrl+k")

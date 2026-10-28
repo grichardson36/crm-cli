@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/jdanielnd/crm-cli/internal/keys"
 	"github.com/mattn/go-runewidth"
 )
@@ -242,9 +242,9 @@ func (o *overlay) highlighted() (overlayItem, bool) {
 }
 
 // barFocusKey handles Tab and the results focus. handled is false to let the bar treat the key as usual.
-func (m *Model) barFocusKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+func (m *Model) barFocusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 	o := m.ov
-	key := msg.String()
+	key := keyName(msg)
 	if !o.focusResults {
 		if key != "tab" {
 			return m, nil, false
@@ -276,7 +276,7 @@ func (m *Model) barFocusKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 // shown as the object's view with the object selected, handleKey runs, and the screen is put back. A
 // verb that opens a prompt, a confirm or a picker keeps the borrowed screen until the model is back
 // in normal mode, then the bar returns (see resumeBar).
-func (m *Model) runBarVerb(msg tea.KeyMsg) tea.Cmd {
+func (m *Model) runBarVerb(msg tea.KeyPressMsg) tea.Cmd {
 	o := m.ov
 	it, ok := o.highlighted()
 	if !ok {
@@ -286,7 +286,7 @@ func (m *Model) runBarVerb(msg tea.KeyMsg) tea.Cmd {
 	if !has {
 		t = barTarget{kind: "none"} // only undo and redo run on a row with no verbs
 	}
-	key := msg.String()
+	key := keyName(msg)
 	saved := m.enterBarContext(t)
 	act := m.lookupKeyWith(key, keyNormal, func(a *action, key string) bool { return m.barVerbKeyOK(a, key, t.kind == "tag") })
 	if act == nil {

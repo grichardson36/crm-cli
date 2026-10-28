@@ -4,8 +4,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	sg "github.com/jdanielnd/crm-cli/internal/suggest"
 )
@@ -87,19 +87,19 @@ func (m *Model) pipeRefresh() *pipeSession {
 // pipeKey gives the pipe line the first look at a key of its input. handled says the key is done.
 // up, down, tab and esc work on the popup only while it is open, and typing a pipe right after an
 // accepted name drops the comma that was added for the next name.
-func (m *Model) pipeKey(msg tea.KeyMsg) (handled bool) {
+func (m *Model) pipeKey(msg tea.KeyPressMsg) (handled bool) {
 	s := m.pipeRefresh()
 	if s == nil {
 		return false
 	}
 	_, in := m.pipeSessionFor()
-	if consumed, acc := s.ac.Key(msg.String()); consumed {
+	if consumed, acc := s.ac.Key(keyName(msg)); consumed {
 		if acc != nil {
 			m.pipeAccept(s, in, *acc)
 		}
 		return true
 	}
-	if msg.Type == tea.KeyRunes && string(msg.Runes) == "|" {
+	if msg.Text == "|" {
 		rs := []rune(in.Value())
 		cur := clampInt(in.Position(), 0, len(rs))
 		idx, _, _ := segBounds(rs, cur)

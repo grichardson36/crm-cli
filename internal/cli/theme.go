@@ -7,7 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/colorprofile"
 	"github.com/jdanielnd/crm-cli/internal/format"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/jdanielnd/crm-cli/internal/theme"
@@ -45,7 +46,7 @@ func loadThemeContext() (*themeContext, error) {
 		return nil, err
 	}
 	name, source := theme.Chosen(dir, os.Getenv)
-	dark := lipgloss.HasDarkBackground()
+	dark := lipgloss.HasDarkBackground(os.Stdin, os.Stdout)
 	return &themeContext{dir: dir, cat: theme.LoadCatalog(dir, dark), active: name, source: source}, nil
 }
 
@@ -151,7 +152,7 @@ func themeShowCmd() *cobra.Command {
 			resolved := ""
 			if t.Name == theme.AutoName {
 				resolved = "dark"
-				if !lipgloss.HasDarkBackground() {
+				if !lipgloss.HasDarkBackground(os.Stdin, os.Stdout) {
 					resolved = "light"
 				}
 			}
@@ -163,7 +164,7 @@ func themeShowCmd() *cobra.Command {
 			if resolveFormat() == format.FormatJSON {
 				return json.NewEncoder(os.Stdout).Encode(out)
 			}
-			w := os.Stdout
+			w := colorprofile.NewWriter(os.Stdout, os.Environ()) // drops the swatch color when stdout is not a color terminal
 			fmt.Fprintf(w, "name:        %s (%s)\n", t.Name, kindOf(t))
 			fmt.Fprintf(w, "description: %s\n", t.Description)
 			if t.Name == c.active {
@@ -178,7 +179,7 @@ func themeShowCmd() *cobra.Command {
 			if resolved != "" {
 				fmt.Fprintf(w, "resolves to: %s\n", resolved)
 			}
-			// The swatch is drawn with the theme's own color. lipgloss drops it when output is
+			// The swatch is drawn with the theme's own color. the colorprofile writer drops it when output is
 			// not a terminal or NO_COLOR is set, leaving the plain value.
 			for _, rc := range t.Colors() {
 				if rc.Color == "" {

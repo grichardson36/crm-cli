@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/jdanielnd/crm-cli/internal/keys"
 	"github.com/jdanielnd/crm-cli/internal/modules"
 	"github.com/mattn/go-runewidth"
@@ -287,7 +287,7 @@ func (m *Model) pickOverlay(i int) tea.Cmd {
 	return cmd
 }
 
-func (m *Model) handleOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *Model) handleOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	mm, cmd := m.overlayKey(msg)
 	m.previewCursor()
 	return mm, cmd
@@ -307,13 +307,13 @@ func (m *Model) previewCursor() {
 	o.onCursor(m, it)
 }
 
-func (m *Model) overlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *Model) overlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	o := m.ov
 	page := m.overlayPage()
-	if o.onKey != nil && o.onKey(m, msg.String()) {
+	if o.onKey != nil && o.onKey(m, keyName(msg)) {
 		return m, nil
 	}
-	if o.palette && o.cmd == nil && m.globalAddKeyInBar(msg.String()) {
+	if o.palette && o.cmd == nil && m.globalAddKeyInBar(keyName(msg)) {
 		if m.readOnly {
 			return m, m.showToast("read-only: new object is disabled", true)
 		}
@@ -330,7 +330,7 @@ func (m *Model) overlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return mdl, c
 		}
 	}
-	switch msg.String() {
+	switch keyName(msg) {
 	case "esc", "ctrl+c":
 		if o.onCancel != nil {
 			o.onCancel(m)
@@ -354,7 +354,7 @@ func (m *Model) overlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		o.move(page, page)
 		return m, nil
 	}
-	if k := msg.String(); o.digits && len(k) == 1 && k[0] >= '0' && k[0] <= '9' {
+	if k := keyName(msg); o.digits && len(k) == 1 && k[0] >= '0' && k[0] <= '9' {
 		for i, idx := range o.shown {
 			if o.items[idx].hint == k {
 				return m, m.pickOverlay(i)
@@ -362,7 +362,7 @@ func (m *Model) overlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
-	if k := msg.String(); o.letters && len(k) == 1 {
+	if k := keyName(msg); o.letters && len(k) == 1 {
 		for i, idx := range o.shown {
 			if strings.EqualFold(o.items[idx].hint, k) {
 				return m, m.pickOverlay(i)
@@ -384,26 +384,23 @@ func (m *Model) overlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m *Model) handleOverlayMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+func (m *Model) handleOverlayMouse(msg mouseEvent) (tea.Model, tea.Cmd) {
 	mm, cmd := m.overlayMouse(msg)
 	m.previewCursor()
 	return mm, cmd
 }
 
-func (m *Model) overlayMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+func (m *Model) overlayMouse(msg mouseEvent) (tea.Model, tea.Cmd) {
 	o := m.ov
 	if o.cmd != nil {
 		return m, nil
 	}
 	switch msg.Button {
-	case tea.MouseButtonWheelUp:
+	case tea.MouseWheelUp:
 		o.move(-3, m.overlayPage())
-	case tea.MouseButtonWheelDown:
+	case tea.MouseWheelDown:
 		o.move(3, m.overlayPage())
-	case tea.MouseButtonLeft:
-		if msg.Action != tea.MouseActionPress {
-			return m, nil
-		}
+	case tea.MouseLeft:
 		i := o.offset + msg.Y - overlayTop
 		if msg.Y >= overlayTop && msg.Y < overlayTop+m.overlayPage() {
 			return m, m.pickOverlay(i)
@@ -469,26 +466,26 @@ func (m *Model) overlayView() string {
 
 func (m *Model) openHelp() {
 	m.help = true
-	m.helpVP.Width = m.width
-	m.helpVP.Height = max(1, m.height-2)
+	m.helpVP.SetWidth(m.width)
+	m.helpVP.SetHeight(max(1, m.height-2))
 	m.helpVP.SetContent(m.helpText())
 	m.helpVP.GotoTop()
 }
 
-func (m *Model) handleHelpKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
+func (m *Model) handleHelpKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch keyName(msg) {
 	case "down":
-		m.helpVP.LineDown(1)
+		m.helpVP.ScrollDown(1)
 	case "up":
-		m.helpVP.LineUp(1)
+		m.helpVP.ScrollUp(1)
 	case "pgdown":
-		m.helpVP.ViewDown()
+		m.helpVP.PageDown()
 	case "ctrl+d", " ":
-		m.helpVP.HalfViewDown()
+		m.helpVP.HalfPageDown()
 	case "pgup":
-		m.helpVP.ViewUp()
+		m.helpVP.PageUp()
 	case "ctrl+u":
-		m.helpVP.HalfViewUp()
+		m.helpVP.HalfPageUp()
 	case "home", "ctrl+shift+up":
 		m.helpVP.GotoTop()
 	case "end", "ctrl+shift+down":

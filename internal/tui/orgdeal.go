@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/mattn/go-runewidth"
@@ -161,7 +161,7 @@ func money(v *float64) string {
 func cutTo(s string, w int) string { return runewidth.Truncate(s, w, "…") }
 
 func (m *Model) detailLine(label, value string) string {
-	return m.st.Dim.Render(fit(label, labelWidth)) + cutTo(value, max(1, m.detail.Width-labelWidth))
+	return m.st.Dim.Render(fit(label, labelWidth)) + cutTo(value, max(1, m.detail.Width()-labelWidth))
 }
 
 // orgDetail and dealDetail are shown only when a page cannot be built.

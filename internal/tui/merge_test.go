@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/dedupe"
 	"github.com/jdanielnd/crm-cli/internal/model"
@@ -64,7 +64,7 @@ func TestMergeViewListsGroupsHighFirstUnderLevelDividers(t *testing.T) {
 	assert.True(t, strings.HasPrefix(rows[0].title, "HIGH"), rows[0].title)
 	assert.Contains(t, rows[0].title, "Cara Cole | Karen Cole")
 	assert.True(t, strings.HasPrefix(rows[1].title, "MED"), rows[1].title)
-	out := m.View()
+	out := m.screen()
 	assert.Contains(t, out, "2 groups, medium+")
 	assert.Contains(t, out, "8 Merge")
 	assert.Contains(t, out, "email cara@initech.com", "the detail pane explains the group")
@@ -122,7 +122,7 @@ func TestMergeViewGroupsByLevel(t *testing.T) {
 	rows := groupRowsOf(m)
 	require.Len(t, rows, 1)
 	assert.Contains(t, rows[0].title, "HIGH")
-	assert.Contains(t, m.View(), "1 groups, high+")
+	assert.Contains(t, m.screen(), "1 groups, high+")
 	assert.Empty(t, m.actionByID("options").keys[1:], "ctrl+o is the only key of the options overlay")
 }
 
@@ -130,7 +130,7 @@ func TestMergeViewEmptyMessage(t *testing.T) {
 	m, _ := newTestModel(t)
 	press(m, "8")
 	assert.Empty(t, m.rows)
-	assert.Contains(t, m.View(), "No duplicates")
+	assert.Contains(t, m.screen(), "No duplicates")
 }
 
 func TestDismissAndUndoDismiss(t *testing.T) {
@@ -173,7 +173,7 @@ func TestManualMergeOfMarkedPeople(t *testing.T) {
 	require.NotNil(t, m.cmp)
 	assert.Equal(t, []int64{1, 3}, []int64{m.cmp.members[0].id, m.cmp.members[1].id})
 	assert.True(t, m.cmp.manual)
-	assert.Contains(t, m.View(), "marked by you")
+	assert.Contains(t, m.screen(), "marked by you")
 	press(m, "esc")
 	assert.Nil(t, m.cmp)
 	assert.Len(t, m.markedIDs(), 2, "marks survive a cancelled compare")
@@ -243,7 +243,7 @@ func TestArchiveRestoreFlow(t *testing.T) {
 	m, pr := newTestModel(t)
 	press(m, "d")
 	assert.Equal(t, modeConfirm, m.mode)
-	assert.Contains(t, m.View(), "archive Zed Adams? y/n")
+	assert.Contains(t, m.screen(), "archive Zed Adams? y/n")
 	press(m, "n")
 	assert.Empty(t, archivedIDs(t, pr))
 	assert.Len(t, m.rows, 3)
@@ -258,7 +258,7 @@ func TestArchiveRestoreFlow(t *testing.T) {
 	assert.Equal(t, viewArchived, m.view)
 	require.Len(t, m.rows, 1)
 	assert.Equal(t, "Zed Adams", m.rows[0].title)
-	out := m.View()
+	out := m.screen()
 	assert.Contains(t, out, "1 archived")
 	assert.Contains(t, out, "zed@acme.com", "the detail pane describes the archived person")
 
@@ -282,7 +282,7 @@ func TestArchiveRestoreFlow(t *testing.T) {
 func TestArchiveMarkedAndRestoreMarked(t *testing.T) {
 	m, pr := newTestModel(t)
 	press(m, "ctrl+a", "d")
-	assert.Contains(t, m.View(), `type "archive 3" to archive 3 people`)
+	assert.Contains(t, m.screen(), `type "archive 3" to archive 3 people`)
 	typeText(m, "archive 3")
 	press(m, "enter")
 	assert.Len(t, archivedIDs(t, pr), 3)
@@ -319,7 +319,7 @@ func TestPurgeNeedsTheTypedName(t *testing.T) {
 	m, pr := newTestModel(t)
 	press(m, "d", "y", "9", "d")
 	require.Equal(t, modePrompt, m.mode)
-	assert.Contains(t, m.View(), `type "Zed Adams" to delete forever`)
+	assert.Contains(t, m.screen(), `type "Zed Adams" to delete forever`)
 
 	typeText(m, "zed")
 	press(m, "enter")
@@ -423,7 +423,7 @@ func TestTabBarFitsAndClicksWork(t *testing.T) {
 		for i, v := range m.visibleViews() {
 			press(m, modules.Key(i+1))
 			require.Equal(t, v, m.view)
-			line := strings.Split(m.View(), "\n")[0]
+			line := strings.Split(m.screen(), "\n")[0]
 			assert.LessOrEqual(t, lipgloss.Width(line), w, "tab bar at width %d view %d", w, v)
 			assert.Contains(t, line, viewNames[v], "the current tab keeps its name at width %d", w)
 			assert.Contains(t, line, "v More")
@@ -431,7 +431,7 @@ func TestTabBarFitsAndClicksWork(t *testing.T) {
 		// A view that is off but opened from a link shows its name in the More slot.
 		require.NoError(t, m.setModules(mustWith(t, modules.Default(), "deals", false)))
 		m.switchView(viewDeals)
-		assert.Contains(t, strings.Split(m.View(), "\n")[0], "v Deals")
+		assert.Contains(t, strings.Split(m.screen(), "\n")[0], "v Deals")
 	}
 
 	// Click each tab at 80 columns. The More tab opens the view switcher.
@@ -459,7 +459,7 @@ func TestTabBarFitsAndClicksWork(t *testing.T) {
 	assert.LessOrEqual(t, segs[len(segs)-1].x1, 30)
 	click(m, segs[2].x0, 0)
 	assert.Equal(t, viewDue, m.view)
-	assert.LessOrEqual(t, lipgloss.Width(strings.Split(m.View(), "\n")[0]), 30)
+	assert.LessOrEqual(t, lipgloss.Width(strings.Split(m.screen(), "\n")[0]), 30)
 }
 
 func TestNumberAndBracketKeysCoverEveryView(t *testing.T) {
@@ -480,7 +480,7 @@ func TestCompareAndNewViewsFitTerminals(t *testing.T) {
 	for _, size := range [][2]int{{100, 30}, {80, 24}, {60, 12}, {40, 10}, {120, 50}} {
 		m.Update(tea.WindowSizeMsg{Width: size[0], Height: size[1]})
 		check := func(what string) {
-			lines := strings.Split(m.View(), "\n")
+			lines := strings.Split(m.screen(), "\n")
 			assert.LessOrEqual(t, len(lines), size[1], "%v %s height", size, what)
 			for _, l := range lines {
 				assert.LessOrEqual(t, lipgloss.Width(l), size[0], "%v %s: %q", size, what, l)

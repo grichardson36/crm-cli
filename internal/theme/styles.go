@@ -1,10 +1,8 @@
 package theme
 
 import (
-	"io"
-
-	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/termenv"
+	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/colorprofile"
 )
 
 // Styles are the lipgloss styles a theme produces. Every view draws with these and nothing else.
@@ -37,60 +35,49 @@ func (s Styles) KindStyle(kind string) lipgloss.Style {
 	return lipgloss.NewStyle()
 }
 
-// NewStyles builds the styles of t. r decides the color profile: pass nil for the process
-// default, which honors NO_COLOR and degrades truecolor to 256 or 16 colors on older terminals.
+// NewStyles builds the styles of t. p is the color profile of the terminal: Bubble Tea v2 reports
+// it with a tea.ColorProfileMsg. Styles always carry the exact theme colors and Bubble Tea
+// downsamples them to the terminal (256 or 16 colors) when it writes the frame, so the profile only
+// decides one thing here: whether colors exist at all.
 //
-// With no color support (NO_COLOR, --no-color, a dumb terminal) lipgloss would also drop bold and
-// reverse video, which would hide the selected row. NO_COLOR only asks for no color, so in that
-// case the styles use text attributes alone: reverse for the selection and the active tab, bold
-// for names and headings, faint for secondary text.
-func NewStyles(t Theme, r *lipgloss.Renderer) Styles {
-	var profile termenv.Profile
-	if r != nil {
-		profile = r.ColorProfile()
-	} else {
-		profile = lipgloss.ColorProfile()
-	}
-	if profile == termenv.Ascii {
+// With no color support (NO_COLOR, --no-color, a dumb terminal) the colors would be dropped and the
+// selected row would vanish. NO_COLOR only asks for no color, so in that case the styles use text
+// attributes alone: reverse for the selection and the active tab, bold for names and headings,
+// faint for secondary text.
+func NewStyles(t Theme, p colorprofile.Profile) Styles {
+	if p <= colorprofile.Ascii {
 		return monoStyles(t)
 	}
 	ns := lipgloss.NewStyle
-	if r != nil {
-		ns = r.NewStyle
-	}
-	c := func(s string) lipgloss.Color { return lipgloss.Color(s) }
-
+	col := lipgloss.Color
 	s := Styles{Theme: t}
-	s.Dim = ns().Foreground(c(t.Dim))
-	s.Name = ns().Bold(true).Foreground(c(t.Accent))
-	s.Head = ns().Bold(true).Foreground(c(t.Fg))
-	s.Err = ns().Foreground(c(t.Danger))
-	s.Ok = ns().Foreground(c(t.Good))
-	s.Warn = ns().Foreground(c(t.Warn))
-	s.Mark = ns().Bold(true).Foreground(c(t.Mark))
-	s.TabOn = ns().Bold(true).Foreground(c(t.TabFg)).Background(c(t.TabBg)).Padding(0, 1)
-	s.TabOff = ns().Foreground(c(t.Dim)).Padding(0, 1)
+	s.Dim = ns().Foreground(col(t.Dim))
+	s.Name = ns().Bold(true).Foreground(col(t.Accent))
+	s.Head = ns().Bold(true).Foreground(col(t.Fg))
+	s.Err = ns().Foreground(col(t.Danger))
+	s.Ok = ns().Foreground(col(t.Good))
+	s.Warn = ns().Foreground(col(t.Warn))
+	s.Mark = ns().Bold(true).Foreground(col(t.Mark))
+	s.TabOn = ns().Bold(true).Foreground(col(t.TabFg)).Background(col(t.TabBg)).Padding(0, 1)
+	s.TabOff = ns().Foreground(col(t.Dim)).Padding(0, 1)
 	s.Off = ns().Underline(true)
 	s.Kind = map[string]lipgloss.Style{}
 	for kind := range KindRoles {
-		if col := t.KindColor(kind); col != "" {
-			s.Kind[kind] = ns().Foreground(c(col))
+		if k := t.KindColor(kind); k != "" {
+			s.Kind[kind] = ns().Foreground(col(k))
 		}
 	}
 	if t.SelFg != "" && t.SelBg != "" {
-		s.Sel = ns().Foreground(c(t.SelFg)).Background(c(t.SelBg))
+		s.Sel = ns().Foreground(col(t.SelFg)).Background(col(t.SelBg))
 	} else {
 		s.Sel = ns().Reverse(true)
 	}
 	return s
 }
 
-// monoStyles uses a private renderer fixed to 16 colors and sets no color on it, so only
-// attributes are written.
+// monoStyles sets no color, so only attributes are written.
 func monoStyles(t Theme) Styles {
-	r := lipgloss.NewRenderer(io.Discard)
-	r.SetColorProfile(termenv.ANSI)
-	ns := r.NewStyle
+	ns := lipgloss.NewStyle
 	return Styles{
 		Theme:  t,
 		Dim:    ns().Faint(true),
@@ -108,8 +95,9 @@ func monoStyles(t Theme) Styles {
 	}
 }
 
-// Swatch draws a small block in the given color, for `crm theme show`. Like every style it
-// degrades with the terminal and prints as plain blocks without color.
+// Swatch draws a small block in the given color, for `crm theme show`. It carries the exact color.
+// Print it through a colorprofile.Writer so it degrades with the terminal and prints as plain
+// blocks without color.
 func Swatch(color string) string {
 	return lipgloss.NewStyle().Foreground(lipgloss.Color(color)).Render("██")
 }

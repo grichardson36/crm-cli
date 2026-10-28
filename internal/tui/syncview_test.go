@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/jdanielnd/crm-cli/internal/db"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	crmsync "github.com/jdanielnd/crm-cli/internal/sync"
@@ -42,13 +42,7 @@ func runCmds(m *Model, cmd tea.Cmd) {
 // pressRun presses keys like press and runs the commands they return.
 func pressRun(m *Model, keys ...string) {
 	for _, k := range keys {
-		var msg tea.KeyMsg
-		if kt, ok := specialKeys[k]; ok {
-			msg = tea.KeyMsg{Type: kt}
-		} else {
-			msg = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(k)}
-		}
-		_, cmd := m.Update(msg)
+		_, cmd := m.Update(keyPress(k))
 		runCmds(m, cmd)
 	}
 }
@@ -98,8 +92,8 @@ func TestSyncViewEmptyStateWithoutAdapters(t *testing.T) {
 	press(m, "0")
 	assert.Equal(t, viewSync, m.view)
 	assert.Empty(t, m.rows)
-	assert.Contains(t, m.View(), "No sync sources connected yet.")
-	assert.Contains(t, m.View(), "0 sources, 0 in inbox")
+	assert.Contains(t, m.screen(), "No sync sources connected yet.")
+	assert.Contains(t, m.screen(), "0 sources, 0 in inbox")
 }
 
 func TestSyncViewListsSourcesAndRunsInTheBackground(t *testing.T) {
@@ -107,14 +101,14 @@ func TestSyncViewListsSourcesAndRunsInTheBackground(t *testing.T) {
 	press(m, "0")
 	require.Equal(t, "fake", m.rows[m.cursor].title)
 	assert.Equal(t, "never run", m.rows[m.cursor].sub)
-	assert.Contains(t, m.View(), "never run")
-	assert.Contains(t, m.View(), "cursor", "the detail pane shows the cursor")
+	assert.Contains(t, m.screen(), "never run")
+	assert.Contains(t, m.screen(), "cursor", "the detail pane shows the cursor")
 
 	// Sync now (a palette entry) starts the run and returns at once: the model is busy and the spinner shows.
 	cmd := runID(m, "sync-now")
 	require.NotNil(t, cmd)
 	assert.Equal(t, "syncing fake", m.busy)
-	assert.Contains(t, m.View(), "syncing fake...")
+	assert.Contains(t, m.screen(), "syncing fake...")
 
 	// A second run is refused while one is in flight.
 	runID(m, "sync-now")
@@ -138,7 +132,7 @@ func TestSyncViewListsSourcesAndRunsInTheBackground(t *testing.T) {
 	require.Len(t, inboxRows(m), 2)
 	assert.Equal(t, "Nina North", inboxRows(m)[0].title)
 	assert.Equal(t, "person", inboxRows(m)[0].meta)
-	assert.Contains(t, m.View(), "1 sources, 2 in inbox")
+	assert.Contains(t, m.screen(), "1 sources, 2 in inbox")
 
 	// Zed was updated through the match, the others waited.
 	zed, err := m.pr.FindByID(context.Background(), 1)
@@ -178,7 +172,7 @@ func TestInboxAcceptCreatesAPerson(t *testing.T) {
 	e := m.selectedEntry()
 	require.NotNil(t, e)
 	assert.Equal(t, "Nina North", e.Summary)
-	assert.Contains(t, m.View(), "nina@north.org", "the detail pane shows the record")
+	assert.Contains(t, m.screen(), "nina@north.org", "the detail pane shows the record")
 
 	press(m, "enter") // enter on an inbox record accepts it
 	assert.Contains(t, m.status, "accepted as person #4")
@@ -326,14 +320,14 @@ func TestSyncViewFitsTerminals(t *testing.T) {
 		press(m, "0")
 		for _, k := range []string{"down", "ctrl+down"} {
 			press(m, k)
-			lines := strings.Split(m.View(), "\n")
+			lines := strings.Split(m.screen(), "\n")
 			assert.LessOrEqual(t, len(lines), size[1], "%v height", size)
 			for _, l := range lines {
 				assert.LessOrEqual(t, lipgloss.Width(l), size[0], "%v: %q", size, l)
 			}
 		}
 		press(m, "esc", "1")
-		for _, l := range strings.Split(m.View(), "\n") {
+		for _, l := range strings.Split(m.screen(), "\n") {
 			assert.LessOrEqual(t, lipgloss.Width(l), size[0], "home %v: %q", size, l)
 		}
 	}

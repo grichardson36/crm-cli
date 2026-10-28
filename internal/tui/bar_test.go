@@ -40,7 +40,7 @@ func TestBarGroupsActionsAndPeople(t *testing.T) {
 		assert.GreaterOrEqual(t, r, last)
 		last = r
 	}
-	out := plain(m.View())
+	out := plain(m.screen())
 	assert.Contains(t, out, "People")
 	assert.Contains(t, out, "Bob Baker")
 
@@ -132,7 +132,7 @@ func TestBarNoMatchOffersCreatePersonAndNote(t *testing.T) {
 	assert.Equal(t, map[string]int{kindCreate: 2}, kindsOf(m))
 	press(m, "enter")
 	assert.Equal(t, modeNormal, m.mode)
-	assert.Contains(t, plain(m.View()), "Created Qwerty Zxcvb")
+	assert.Contains(t, plain(m.screen()), "Created Qwerty Zxcvb")
 	list, err := pr.Search(m.ctx, "Qwerty", 5)
 	require.NoError(t, err)
 	require.Len(t, list, 1)
@@ -164,7 +164,7 @@ func TestBarShowsKeysOnTheRight(t *testing.T) {
 	m, _ := newTestModel(t)
 	press(m, "ctrl+k")
 	typeText(m, "toggle favorite")
-	lines := strings.Split(plain(m.View()), "\n")
+	lines := strings.Split(plain(m.screen()), "\n")
 	var row string
 	for _, l := range lines {
 		if len(l) > 0 && strings.Contains(l, "Toggle favorite") {
@@ -185,7 +185,7 @@ func TestBarFindsSettingsByTypingWithTheirCurrentValue(t *testing.T) {
 	require.NotEmpty(t, labels, shownKinds(m))
 	assert.Equal(t, "Theme: nord", labels[0], "the current theme is shown")
 	assert.Contains(t, barNames(m, kindAction), "Theme: choose", "the action is still listed after the setting")
-	assert.Contains(t, plain(m.View()), "Settings")
+	assert.Contains(t, plain(m.screen()), "Settings")
 	press(m, "enter")
 	require.Equal(t, modeOverlay, m.mode)
 	assert.Equal(t, "Theme", m.ov.title, "enter opens the theme chooser")

@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/jdanielnd/crm-cli/internal/modules"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,7 +21,7 @@ func TestTabBarHandlesTenModules(t *testing.T) {
 		for i, v := range m.visibleViews() {
 			press(m, modules.Key(i+1))
 			require.Equal(t, v, m.view, "key %s at width %d", modules.Key(i+1), w)
-			line := strings.Split(m.View(), "\n")[0]
+			line := strings.Split(m.screen(), "\n")[0]
 			assert.LessOrEqual(t, lipgloss.Width(line), w, "tab bar at width %d view %d", w, i+1)
 			assert.Contains(t, line, viewNames[v], "the current tab keeps its name at width %d", w)
 			assert.Contains(t, line, "v More", "nothing is dropped at width %d", w)
@@ -34,12 +34,12 @@ func TestTabBarHandlesTenModules(t *testing.T) {
 	// 120 columns show every name, 80 columns the first four and the keys of the rest.
 	m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	press(m, "1")
-	line := strings.Split(m.View(), "\n")[0]
+	line := strings.Split(m.screen(), "\n")[0]
 	for _, v := range m.visibleViews() {
 		assert.Contains(t, line, viewNames[v])
 	}
 	m.Update(tea.WindowSizeMsg{Width: 80, Height: 30})
-	line = strings.Split(m.View(), "\n")[0]
+	line = strings.Split(m.screen(), "\n")[0]
 	for _, name := range []string{"Home", "People", "Follow-up", "Tasks"} {
 		assert.Contains(t, line, name)
 	}

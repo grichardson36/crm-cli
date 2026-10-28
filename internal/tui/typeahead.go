@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/jdanielnd/crm-cli/internal/alias"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
@@ -51,7 +51,7 @@ func (m *Model) beginTypeahead(src repo.Ref, other string) tea.Cmd {
 	ta := &typeahead{src: src, other: other, label: label, all: m.candidateItems(src, other)}
 	m.edit = &editState{row: m.fcur, kind: rkLinked, ta: ta}
 	m.rowInput.SetValue("")
-	m.rowInput.Width = max(5, m.detail.Width-labelWidth-1)
+	m.rowInput.SetWidth(max(5, m.detail.Width()-labelWidth-1))
 	m.mode = modeEdit
 	m.focus = focusDetail
 	m.setStatus("", false)
@@ -88,13 +88,13 @@ func (m *Model) taRefresh() {
 }
 
 // handleTypeaheadKey is a key while a relation typeahead is open.
-func (m *Model) handleTypeaheadKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *Model) handleTypeaheadKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	ta := m.edit.ta
 	rows := len(ta.shown)
 	if ta.canCreate {
 		rows++
 	}
-	switch msg.String() {
+	switch keyName(msg) {
 	case "esc":
 		m.cancelEdit()
 		return m, nil

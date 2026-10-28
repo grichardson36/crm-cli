@@ -34,7 +34,7 @@ var named = map[string]string{
 	"space": " ",
 }
 
-// Normalize checks a key name and returns the form Bubble Tea reports (tea.KeyMsg.String), such
+// Normalize checks a key name and returns the form Bubble Tea reports (internal/tui keyName), such
 // as "ctrl+k", "shift+tab", "enter" or "T". A space is " ". Single characters keep their case.
 func Normalize(key string) (string, error) {
 	orig := key

@@ -3,7 +3,7 @@ package tui
 import (
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 // Tags are objects (owner decision 2026-10-28), so the add picker offers them with the other kinds:

@@ -5,11 +5,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/jdanielnd/crm-cli/internal/theme"
-	"github.com/muesli/termenv"
+	"github.com/charmbracelet/colorprofile"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -235,17 +235,13 @@ func TestRelatedGroupsRowsByKindWithHeadings(t *testing.T) {
 	}
 	assert.Equal(t, []string{"Organizations", "People", "Deals", "Tags"}, heads)
 
-	st := theme.NewStyles(mustTheme(t, "dark"), lipgloss.NewRenderer(nilWriter{}))
+	st := theme.NewStyles(mustTheme(t, "dark"), colorprofile.TrueColor)
 	ac := &Autocomplete{rows: got}
 	lines := ac.Lines(30, st)
 	require.Len(t, lines, 9, "five rows and four headings")
 	assert.Contains(t, plain(lines[0]), "Organizations", "the first line is a heading")
 	assert.Contains(t, plain(lines[1]), "o:Acme")
 }
-
-type nilWriter struct{}
-
-func (nilWriter) Write(p []byte) (int, error) { return len(p), nil }
 
 func mustTheme(t *testing.T, name string) theme.Theme {
 	t.Helper()
@@ -262,7 +258,7 @@ func TestRelatedPopupScrollsInsideItsLines(t *testing.T) {
 	}
 	rows = relatedGroup(rows)
 	ac := &Autocomplete{rows: rows, cur: len(rows) - 1}
-	st := theme.NewStyles(mustTheme(t, "dark"), lipgloss.NewRenderer(nilWriter{}))
+	st := theme.NewStyles(mustTheme(t, "dark"), colorprofile.TrueColor)
 	lines := ac.Lines(30, st)
 	assert.Len(t, lines, acMaxLines)
 	assert.Contains(t, plain(lines[len(lines)-1]), "t:l", "the last row is in view")
@@ -290,15 +286,13 @@ func TestKindColorsAndPrefixes(t *testing.T) {
 
 	// Truecolor: a chip carries the color of its token. No color: only the prefix tells the kind.
 	th := mustTheme(t, "nord")
-	tc := lipgloss.NewRenderer(nilWriter{})
-	tc.SetColorProfile(termenv.TrueColor)
+	tc := colorprofile.TrueColor
 	groups := []chipGroup{{kind: "person", names: []string{"Zed Adams"}}, {kind: "organization", names: []string{"Acme"}}}
 	out := strings.Join(renderChips(groups, 80, theme.NewStyles(th, tc)), "\n")
 	assert.Contains(t, out, "38;2;129;161;193", "people use kind_person (#81A1C1)")
 	assert.Contains(t, out, "38;2;208;135;112", "organizations use kind_org (#D08770)")
 
-	mono := lipgloss.NewRenderer(nilWriter{})
-	mono.SetColorProfile(termenv.Ascii)
+	mono := colorprofile.Ascii
 	out = strings.Join(renderChips(groups, 80, theme.NewStyles(th, mono)), "\n")
 	assert.NotContains(t, out, "38;")
 	assert.Equal(t, "[p:Zed Adams]  [o:Acme]", out)
@@ -323,8 +317,7 @@ func TestChipsAreGroupedInStableOrderAndWrap(t *testing.T) {
 	assert.Equal(t, []string{"person", "organization", "deal", "task", model.NoteKind, tagKind}, kinds)
 	assert.Equal(t, []string{"Zed", "Bob"}, groups[0].names, "the typed order holds inside a group")
 
-	mono := lipgloss.NewRenderer(nilWriter{})
-	mono.SetColorProfile(termenv.Ascii)
+	mono := colorprofile.Ascii
 	st := theme.NewStyles(mustTheme(t, "dark"), mono)
 	one := renderChips(groups, 200, st)
 	require.Len(t, one, 1)

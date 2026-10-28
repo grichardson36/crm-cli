@@ -1,7 +1,7 @@
 package theme
 
 import (
-	"io"
+	"bytes"
 	"math"
 	"os"
 	"path/filepath"
@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/termenv"
+	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/colorprofile"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -192,45 +192,47 @@ func TestSaveChoiceKeepsOtherSettingsAndRejectsBrokenFile(t *testing.T) {
 	assert.Equal(t, "auto", name)
 }
 
-func rendererFor(p termenv.Profile) *lipgloss.Renderer {
-	r := lipgloss.NewRenderer(io.Discard)
-	r.SetColorProfile(p)
-	return r
+// render draws s the way Bubble Tea writes a frame: the style carries the exact color and the
+// writer for the terminal profile downsamples it.
+func render(p colorprofile.Profile, s lipgloss.Style, text string) string {
+	var buf bytes.Buffer
+	w := &colorprofile.Writer{Forward: &buf, Profile: p}
+	_, _ = w.WriteString(s.Render(text))
+	return buf.String()
 }
 
 func TestStylesDegradeByProfile(t *testing.T) {
 	th, _ := Builtin("nord", true)
 
-	tc := rendererFor(termenv.TrueColor)
-	out := NewStyles(th, tc).Name.Render("x")
+	out := render(colorprofile.TrueColor, NewStyles(th, colorprofile.TrueColor).Name, "x")
 	assert.Contains(t, out, "38;2;136;192;208", "truecolor writes the exact color")
 
-	c256 := rendererFor(termenv.ANSI256)
-	out = NewStyles(th, c256).Name.Render("x")
+	out = render(colorprofile.ANSI256, NewStyles(th, colorprofile.ANSI256).Name, "x")
 	assert.Contains(t, out, "38;5;", "256 color terminals get the nearest palette color")
 	assert.NotContains(t, out, "38;2;")
 
-	c16 := rendererFor(termenv.ANSI)
-	out = NewStyles(th, c16).Name.Render("x")
+	out = render(colorprofile.ANSI, NewStyles(th, colorprofile.ANSI).Name, "x")
 	assert.NotContains(t, out, "38;2;")
 	assert.NotContains(t, out, "38;5;")
-	assert.Contains(t, out, "\x1b[")
+	assert.Contains(t, out, "[")
 }
 
 func TestNoColorKeepsAttributesNotColors(t *testing.T) {
 	th, _ := Builtin("catppuccin", true)
-	st := NewStyles(th, rendererFor(termenv.Ascii))
+	st := NewStyles(th, colorprofile.Ascii)
 	for name, s := range map[string]lipgloss.Style{"name": st.Name, "dim": st.Dim, "sel": st.Sel, "tab": st.TabOn, "err": st.Err, "mark": st.Mark} {
-		out := s.Render("x")
+		out := render(colorprofile.Ascii, s, "x")
 		assert.NotContains(t, out, "38;", name)
 		assert.NotContains(t, out, "48;", name)
 	}
-	assert.Contains(t, st.Sel.Render("row"), "\x1b[7m", "the selected row stays visible as reverse video")
-	assert.Contains(t, st.TabOn.Render("tab"), "7m", "the active tab stays visible")
+	assert.Contains(t, render(colorprofile.Ascii, st.Sel, "row"), "[7m", "the selected row stays visible as reverse video")
+	assert.Contains(t, render(colorprofile.Ascii, st.TabOn, "tab"), "7m", "the active tab stays visible")
+	// The writer for an Ascii terminal keeps text attributes and drops only colors.
+	assert.Contains(t, render(colorprofile.Ascii, st.Name, "x"), "[1m")
 }
 
 func TestSelectionColorsOrReverse(t *testing.T) {
-	tc := rendererFor(termenv.TrueColor)
+	tc := colorprofile.TrueColor
 	dark, _ := Builtin("dark", true) // no sel colors
 	assert.Contains(t, NewStyles(dark, tc).Sel.Render("x"), "\x1b[7m")
 	hc, _ := Builtin("high-contrast", true)

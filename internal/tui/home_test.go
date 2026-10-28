@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -65,7 +65,7 @@ func TestHomeIsTheDefaultView(t *testing.T) {
 
 func TestHomeShowsOnlySectionsWithContent(t *testing.T) {
 	m := homeModel(t)
-	out := m.View()
+	out := m.screen()
 	assert.Contains(t, out, "1 Home")
 	for _, h := range []string{"Due to reach out", "Tasks due today"} {
 		assert.Contains(t, out, h)
@@ -86,7 +86,7 @@ func TestHomeEmptyDatabaseShowsNoDashboardCounts(t *testing.T) {
 	require.NoError(t, err)
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 	assert.Empty(t, m.rows)
-	assert.Contains(t, m.View(), "Nothing needs attention today.")
+	assert.Contains(t, m.screen(), "Nothing needs attention today.")
 }
 
 func TestHomeCursorSkipsHeadingsAndEnterOpensThePerson(t *testing.T) {
@@ -117,7 +117,7 @@ func TestHomeCursorSkipsHeadingsAndEnterOpensThePerson(t *testing.T) {
 	assert.Equal(t, viewPeople, m.view)
 	assert.Equal(t, int64(1), m.curPerson())
 	assert.Equal(t, focusDetail, m.focus, "the detail pane is open")
-	assert.Contains(t, m.View(), "zed@acme.com")
+	assert.Contains(t, m.screen(), "zed@acme.com")
 
 	// Back on Home, the first item jumps to Bob.
 	press(m, "esc", "1", "enter")

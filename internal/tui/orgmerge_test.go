@@ -78,7 +78,7 @@ func TestMergeMarkedOrganizationsIsOneUndoStep(t *testing.T) {
 
 	press(m, " ", " ") // marks the first two rows, the cursor moves down
 	assert.Len(t, m.markedOrgIDs(), 2)
-	assert.Contains(t, m.View(), "✓")
+	assert.Contains(t, m.screen(), "✓")
 	press(m, "m")
 	require.NotNil(t, m.ov)
 	assert.Contains(t, m.ov.title, "Keep which")

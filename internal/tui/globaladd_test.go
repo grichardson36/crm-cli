@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/stretchr/testify/assert"
@@ -91,7 +91,7 @@ func TestATaskOffersTheHighlightedPersonInThePeopleSegmentAndTabAcceptsIt(t *tes
 	press(m, "a", "t")
 	require.Equal(t, modePrompt, m.mode)
 	typeText(m, "Send deck||")
-	assert.Contains(t, m.View(), "Bob Baker", "the popup under the people segment leads with the highlighted person")
+	assert.Contains(t, m.screen(), "Bob Baker", "the popup under the people segment leads with the highlighted person")
 	assert.NotContains(t, m.promptHint(0), "tab: link", "the old grayscale offer is gone")
 	press(m, "tab")
 	assert.Equal(t, "Send deck|| Bob Baker, ", m.input.Value(), "the name goes into the segment, a comma follows for the next one")
@@ -123,7 +123,7 @@ func TestANoteOfferedAnOrganizationLinksItOnTab(t *testing.T) {
 	press(m, "a", "n")
 	require.Equal(t, modePrompt, m.mode)
 	typeText(m, "met their CEO|")
-	assert.Contains(t, m.View(), "Acme")
+	assert.Contains(t, m.screen(), "Acme")
 	press(m, "tab", "enter")
 	notes, err := m.ir.FindAll(m.ctx, model.InteractionFilters{OrgID: &o.ID, Limit: 10})
 	require.NoError(t, err)
@@ -223,7 +223,7 @@ func TestAddIsBlockedInReadOnlyModeAndRebindable(t *testing.T) {
 
 	m2, _ := newTestModel(t)
 	m2.applyKeys(map[string][]string{"add-any": {"ctrl+b"}})
-	m2.Update(tea.KeyMsg{Type: tea.KeyCtrlB})
+	m2.Update(keyPress("ctrl+b"))
 	require.NotNil(t, m2.ov)
 	assert.Equal(t, "Add", m2.ov.title)
 }
@@ -289,7 +289,7 @@ func TestATagThroughTheAddPickerCreatesAndTagsTheHighlightedObject(t *testing.T)
 	require.Equal(t, modePrompt, m.mode)
 	assert.Equal(t, "tag-new", m.promptKind)
 	typeText(m, "vip|")
-	assert.Contains(t, m.View(), "Zed Adams", "the highlighted person is the first suggestion of the on segment")
+	assert.Contains(t, m.screen(), "Zed Adams", "the highlighted person is the first suggestion of the on segment")
 	press(m, "tab", "enter")
 	assert.Equal(t, modeNormal, m.mode)
 	p := personByID(t, pr, 1)

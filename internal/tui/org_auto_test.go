@@ -80,7 +80,7 @@ func TestOrgsViewShowsSimilarNamesAndTheReviewIsGone(t *testing.T) {
 		require.NoError(t, err)
 	}
 	m.switchView(viewOrgs)
-	out := plain(m.View())
+	out := plain(m.screen())
 	assert.Contains(t, out, "~ Acme Corp")
 	for _, a := range buildActions() {
 		assert.NotContains(t, a.group, "Company review")

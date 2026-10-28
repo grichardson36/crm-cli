@@ -46,7 +46,7 @@ func TestDavInfoShowsConnectionDetailsReadOnly(t *testing.T) {
 	assert.Contains(t, body, "https://contacts.example.com")
 	assert.Contains(t, body, "grant")
 	assert.Contains(t, body, "CRM contacts", "book is named after crm.db")
-	assert.Contains(t, m.View(), "DAV info")
+	assert.Contains(t, m.screen(), "DAV info")
 	press(m, "end")
 	assert.Contains(t, m.tv.vp.View(), "does not start the server")
 	press(m, "esc")

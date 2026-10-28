@@ -220,7 +220,7 @@ func isNotFound(err error) bool { return err != nil && strings.Contains(err.Erro
 
 // emptyDetail is the detail pane content when no form is shown.
 func (m *Model) emptyDetail() string {
-	w := max(1, m.detail.Width)
+	w := max(1, m.detail.Width())
 	line := func(s string) string { return runewidth.Truncate(s, w, "…") }
 	r, ok := m.selected()
 	if !ok {

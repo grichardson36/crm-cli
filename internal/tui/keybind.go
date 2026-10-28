@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/jdanielnd/crm-cli/internal/keys"
 )
 
@@ -237,8 +237,8 @@ func (m *Model) captureTitle() string {
 }
 
 // handleCaptureKey takes the next key press as the new key for the action.
-func (m *Model) handleCaptureKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	k := msg.String()
+func (m *Model) handleCaptureKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	k := keyName(msg)
 	if k == "esc" {
 		m.mode, m.capture = modeNormal, nil
 		return m, m.showToast("Keys: cancelled", false)

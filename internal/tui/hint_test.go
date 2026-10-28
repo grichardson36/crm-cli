@@ -4,9 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/jdanielnd/crm-cli/internal/model"
-	"github.com/muesli/termenv"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -225,10 +223,6 @@ func TestCommandBarRunsTheTypedLineNotTheHint(t *testing.T) {
 
 // The hint is drawn with the Dim style, and the typed text is not.
 func TestHintIsRenderedWithTheDimStyle(t *testing.T) {
-	prev := lipgloss.ColorProfile()
-	lipgloss.SetColorProfile(termenv.ANSI256)
-	t.Cleanup(func() { lipgloss.SetColorProfile(prev) })
-
 	m, _ := newTestModel(t)
 	m.width = 400
 	m.startInput("org-add", orgPrompt(), "")

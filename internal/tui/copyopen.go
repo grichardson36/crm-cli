@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/emersion/go-vcard"
 	"github.com/jdanielnd/crm-cli/internal/dav"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"

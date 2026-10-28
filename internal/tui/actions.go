@@ -9,8 +9,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/jdanielnd/crm-cli/internal/modules"
 )
@@ -38,7 +39,7 @@ type action struct {
 	title string
 	group string
 	hint  string   // key label shown to the user
-	keys  []string // key strings that trigger it (tea.KeyMsg.String)
+	keys  []string // key strings that trigger it (keyName of the tea.KeyPressMsg)
 	desc  string
 	write bool // changes data (or needs the local machine): blocked by --read-only
 
@@ -317,9 +318,9 @@ func buildActions() []action {
 		{id: "home-bottom", inCompare: true, title: "Go to home or bottom", group: "Move", hint: "ctrl+shift+down", keys: []string{"ctrl+shift+down"}, desc: "the view's home destination (today in Birthdays), else the last row like end. Terminals that do not report ctrl+shift+down still have end",
 			run: func(m *Model) tea.Cmd { m.goHome(1); return nil }},
 		{id: "scroll-down", title: "Scroll detail down", group: "Move", desc: "scroll the detail pane down (palette; tab moves into the detail pane)",
-			run: func(m *Model) tea.Cmd { m.detail.LineDown(3); return nil }},
+			run: func(m *Model) tea.Cmd { m.detail.ScrollDown(3); return nil }},
 		{id: "scroll-up", title: "Scroll detail up", group: "Move", desc: "scroll the detail pane up (palette; tab moves into the detail pane)",
-			run: func(m *Model) tea.Cmd { m.detail.LineUp(3); return nil }},
+			run: func(m *Model) tea.Cmd { m.detail.ScrollUp(3); return nil }},
 
 		// Views and search.
 		viewAction(viewHome), viewAction(viewPeople), viewAction(viewDue), viewAction(viewTasks), viewAction(viewOrgs), viewAction(viewBirthdays), viewAction(viewMerge), viewAction(viewArchived), viewAction(viewSync), viewAction(viewDeals),
@@ -557,8 +558,22 @@ func openURL(u string) error {
 
 // newInput is a helper for overlays.
 func newInput(prompt string) textinput.Model {
-	in := textinput.New()
+	in := newTextInput()
 	in.Prompt = prompt
 	in.CharLimit = 200
+	return in
+}
+
+// newTextInput is textinput.New with the look Bubbles v1 had: a plain prompt and plain text, a
+// reverse-video cursor with no color of its own. The v2 defaults color the prompt and the cursor,
+// and every color of ours comes from the theme.
+func newTextInput() textinput.Model {
+	in := textinput.New()
+	st := in.Styles()
+	st.Focused.Prompt = lipgloss.NewStyle()
+	st.Blurred.Prompt = lipgloss.NewStyle()
+	st.Blurred.Text = lipgloss.NewStyle()
+	st.Cursor.Color = nil
+	in.SetStyles(st)
 	return in
 }

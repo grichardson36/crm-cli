@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/jdanielnd/crm-cli/internal/db"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
@@ -54,28 +54,15 @@ func newTestModel(t *testing.T) (*Model, *repo.PersonRepo) {
 	return m, pr
 }
 
-var specialKeys = map[string]tea.KeyType{
-	"enter": tea.KeyEnter, "esc": tea.KeyEsc, "tab": tea.KeyTab, "shift+tab": tea.KeyShiftTab,
-	"ctrl+d": tea.KeyCtrlD, "ctrl+k": tea.KeyCtrlK, "ctrl+u": tea.KeyCtrlU, "ctrl+z": tea.KeyCtrlZ, "ctrl+y": tea.KeyCtrlY,
-	"left": tea.KeyLeft, "right": tea.KeyRight, "up": tea.KeyUp, "down": tea.KeyDown, "ctrl+up": tea.KeyCtrlUp, "shift+up": tea.KeyShiftUp, "shift+down": tea.KeyShiftDown, "ctrl+left": tea.KeyCtrlLeft, "ctrl+right": tea.KeyCtrlRight, "ctrl+down": tea.KeyCtrlDown,
-	"ctrl+shift+up": tea.KeyCtrlShiftUp, "ctrl+shift+down": tea.KeyCtrlShiftDown, "home": tea.KeyHome, "end": tea.KeyEnd,
-	"pgup": tea.KeyPgUp, "pgdown": tea.KeyPgDown, "ctrl+r": tea.KeyCtrlR, "ctrl+o": tea.KeyCtrlO, "ctrl+l": tea.KeyCtrlL, "ctrl+f": tea.KeyCtrlF,
-	"ctrl+b": tea.KeyCtrlB, "ctrl+e": tea.KeyCtrlE, "ctrl+w": tea.KeyCtrlW, "ctrl+n": tea.KeyCtrlN, "ctrl+p": tea.KeyCtrlP, "ctrl+a": tea.KeyCtrlA,
-}
-
 func press(m *Model, keys ...string) {
 	for _, k := range keys {
-		if kt, ok := specialKeys[k]; ok {
-			m.Update(tea.KeyMsg{Type: kt})
-			continue
-		}
-		m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(k)})
+		m.Update(keyPress(k))
 	}
 }
 
 func typeText(m *Model, s string) {
 	for _, r := range s {
-		m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		m.Update(keyPress(string(r)))
 	}
 }
 
@@ -114,7 +101,7 @@ func TestInitialRender(t *testing.T) {
 	m, _ := newTestModel(t)
 	assert.Equal(t, []string{"Zed Adams", "Bob Baker", "Cara Cole"}, names(m), "sorted by last name")
 
-	out := m.View()
+	out := m.screen()
 	assert.Contains(t, out, "2 People")
 	assert.Contains(t, out, "Zed Adams")
 	assert.Contains(t, out, "zed@acme.com", "detail pane shows the first person")
@@ -124,7 +111,7 @@ func TestInitialRender(t *testing.T) {
 func TestViewFitsTerminal(t *testing.T) {
 	m, _ := newTestModel(t)
 	check := func(size [2]int, what string) {
-		out := m.View()
+		out := m.screen()
 		lines := strings.Split(out, "\n")
 		assert.LessOrEqual(t, len(lines), size[1], "height at %v %s", size, what)
 		for _, l := range lines {
@@ -158,8 +145,8 @@ func TestNavigation(t *testing.T) {
 	m, _ := newTestModel(t)
 	press(m, "down")
 	assert.Equal(t, 1, m.cursor)
-	assert.Contains(t, m.View(), "bob@globex.com")
-	assert.Contains(t, m.View(), "bob@home.org", "all emails appear in the detail pane")
+	assert.Contains(t, m.screen(), "bob@globex.com")
+	assert.Contains(t, m.screen(), "bob@home.org", "all emails appear in the detail pane")
 	press(m, "end")
 	assert.Equal(t, 2, m.cursor)
 	press(m, "down")
@@ -204,7 +191,7 @@ func TestSlashOpensTheBarAndFindsPeople(t *testing.T) {
 	typeText(m, "#friend")
 	press(m, "enter")
 	assert.Equal(t, []string{"Bob Baker"}, names(m))
-	assert.Contains(t, m.View(), "filter: #friend")
+	assert.Contains(t, m.screen(), "filter: #friend")
 	press(m, "esc")
 	assert.Len(t, m.rows, 3, "esc clears the filter")
 
@@ -222,9 +209,9 @@ func TestViewsDueBirthdaysTasks(t *testing.T) {
 
 	press(m, "3")
 	assert.Equal(t, viewDue, m.view)
-	assert.Contains(t, m.View(), "Follow-up")
+	assert.Contains(t, m.screen(), "Follow-up")
 	assert.Equal(t, []string{"Bob Baker"}, names(m))
-	assert.Contains(t, m.View(), "overdue")
+	assert.Contains(t, m.screen(), "overdue")
 
 	press(m, "7")
 	var birthdays []row
@@ -245,7 +232,7 @@ func TestViewsDueBirthdaysTasks(t *testing.T) {
 
 	press(m, "4")
 	assert.Empty(t, m.rows)
-	assert.Contains(t, m.View(), "No open tasks")
+	assert.Contains(t, m.screen(), "No open tasks")
 
 	press(m, "]")
 	assert.Equal(t, viewOrgs, m.view, "Organizations follows Tasks")
@@ -294,7 +281,7 @@ func TestSnoozeFavoriteNoteAndTask(t *testing.T) {
 	typeLinked(m, "met at the conference")
 	press(m, "enter")
 	assert.Equal(t, "note added", m.status)
-	assert.Contains(t, m.View(), "met at the conference")
+	assert.Contains(t, m.screen(), "met at the conference")
 
 	press(m, "a", "t")
 	typeLinked(m, "send deck | 2026-12-01")
@@ -305,7 +292,7 @@ func TestSnoozeFavoriteNoteAndTask(t *testing.T) {
 	require.Len(t, m.rows, 1)
 	assert.Equal(t, "send deck", m.rows[0].title)
 	assert.Equal(t, "2026-12-01", m.rows[0].meta)
-	assert.Contains(t, m.View(), "send deck")
+	assert.Contains(t, m.screen(), "send deck")
 	press(m, "x")
 	assert.Empty(t, m.rows)
 
@@ -331,19 +318,19 @@ func TestCompleteOutsideTasksViewIsRejected(t *testing.T) {
 func TestMouse(t *testing.T) {
 	m, _ := newTestModel(t)
 	// Rows start on screen line 1, under the tab bar.
-	m.Update(tea.MouseMsg{X: 3, Y: 3, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
+	m.Update(tea.MouseClickMsg{X: 3, Y: 3, Button: tea.MouseLeft})
 	assert.Equal(t, 2, m.cursor)
-	m.Update(tea.MouseMsg{X: 3, Y: 3, Button: tea.MouseButtonWheelUp, Action: tea.MouseActionPress})
+	m.Update(tea.MouseWheelMsg{X: 3, Y: 3, Button: tea.MouseWheelUp})
 	assert.Equal(t, 0, m.cursor)
 
 	// Click the "3 Due" tab.
 	x := m.tabLayout()[2].x0 + 1
-	m.Update(tea.MouseMsg{X: x, Y: 0, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
+	m.Update(tea.MouseClickMsg{X: x, Y: 0, Button: tea.MouseLeft})
 	assert.Equal(t, viewDue, m.view)
 }
 
 func click(m *Model, x, y int) {
-	m.Update(tea.MouseMsg{X: x, Y: y, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
+	m.Update(tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
 }
 
 func TestMouseSelectsDetailRowAndSecondClickEdits(t *testing.T) {
@@ -355,7 +342,7 @@ func TestMouseSelectsDetailRowAndSecondClickEdits(t *testing.T) {
 		}
 	}
 	require.GreaterOrEqual(t, idx, 0)
-	x, y := m.listWidth()+3, 1+m.rowStart[idx]-m.detail.YOffset
+	x, y := m.listWidth()+3, 1+m.rowStart[idx]-m.detail.YOffset()
 	click(m, x, y)
 	assert.Equal(t, focusDetail, m.focus)
 	assert.Equal(t, idx, m.fcur)
@@ -403,11 +390,11 @@ func TestFooterButtonsAndStatusTap(t *testing.T) {
 func TestHelpOverlay(t *testing.T) {
 	m, _ := newTestModel(t)
 	press(m, "?")
-	assert.Contains(t, m.View(), "Keys in People")
-	assert.Contains(t, m.View(), "Framework")
+	assert.Contains(t, m.screen(), "Keys in People")
+	assert.Contains(t, m.screen(), "Framework")
 	press(m, "x") // any other key closes it and is swallowed
 	assert.False(t, m.help)
-	assert.NotContains(t, m.View(), "press any key")
+	assert.NotContains(t, m.screen(), "press any key")
 
 	// The help text lists the keys that work in this view and mode, framework first, then the app.
 	text := m.helpText()
@@ -457,7 +444,7 @@ func TestReadOnlyBlocksWrites(t *testing.T) {
 		assert.True(t, m.statusIsErr, "key %s", k)
 		m.setStatus("", false)
 	}
-	assert.Contains(t, m.View(), "READ-ONLY")
+	assert.Contains(t, m.screen(), "READ-ONLY")
 	p, err := pr.FindByID(context.Background(), 1)
 	require.NoError(t, err)
 	assert.False(t, p.IsFavorite)
@@ -517,7 +504,7 @@ func TestInlineEditCommitAndCancel(t *testing.T) {
 	goTo(t, m, "company")
 	press(m, "enter")
 	require.Equal(t, modeEdit, m.mode)
-	assert.Contains(t, m.View(), "Acme", "inline box starts with the current value")
+	assert.Contains(t, m.screen(), "Acme", "inline box starts with the current value")
 
 	// Esc cancels and writes nothing.
 	replaceText(m, "Nope")
@@ -532,7 +519,7 @@ func TestInlineEditCommitAndCancel(t *testing.T) {
 	assert.Equal(t, modeNormal, m.mode)
 	assert.Equal(t, "Acme Corp", *personByID(t, pr, 1).Company)
 	assert.Equal(t, "company", m.form[m.fcur].label)
-	assert.Contains(t, m.View(), "Acme Corp")
+	assert.Contains(t, m.screen(), "Acme Corp")
 
 	// Birthday accepts MM-DD and a bad value shows an error and keeps the box open.
 	goTo(t, m, "birthday")
@@ -587,7 +574,7 @@ func TestAddAndDeleteEmail(t *testing.T) {
 	// d asks first, n keeps it, y deletes it.
 	press(m, "d")
 	assert.Equal(t, modeConfirm, m.mode)
-	assert.Contains(t, m.View(), "delete email bob@work.org")
+	assert.Contains(t, m.screen(), "delete email bob@work.org")
 	press(m, "n")
 	assert.Len(t, personByID(t, pr, 2).Emails, 3)
 	press(m, "d", "y")
@@ -625,7 +612,7 @@ func TestAddPhoneHandleTagTaskNote(t *testing.T) {
 
 	// Tab in the box changes the kind of a handle.
 	press(m, "enter", "tab")
-	assert.Contains(t, m.View(), "twitter")
+	assert.Contains(t, m.screen(), "twitter")
 	press(m, "enter")
 	h = personByID(t, pr, 1).Handles
 	require.Len(t, h, 1)
@@ -658,7 +645,7 @@ func TestAddPhoneHandleTagTaskNote(t *testing.T) {
 	assert.Equal(t, modePrompt, m.mode)
 	typeText(m, "hello there")
 	press(m, "enter")
-	assert.Contains(t, m.View(), "hello there")
+	assert.Contains(t, m.screen(), "hello there")
 	for i, r := range m.form {
 		if r.kind == rkNote && !r.empty {
 			m.fcur = i
@@ -709,7 +696,7 @@ func TestCreateContact(t *testing.T) {
 	press(m, "a", "enter")
 	assert.Equal(t, modeEdit, m.mode)
 	assert.Equal(t, focusDetail, m.focus)
-	assert.Contains(t, m.View(), "New contact")
+	assert.Contains(t, m.screen(), "New contact")
 	press(m, "esc")
 	assert.Equal(t, modeNormal, m.mode)
 	assert.False(t, m.creating)
@@ -772,8 +759,8 @@ func TestMarksAndBulkActions(t *testing.T) {
 	press(m, " ", " ") // marks Zed and Bob, cursor moves down each time
 	assert.Equal(t, 2, m.cursor)
 	assert.Len(t, m.markedIDs(), 2)
-	assert.Contains(t, m.View(), "2 marked")
-	assert.Contains(t, m.View(), "✓ Zed Adams")
+	assert.Contains(t, m.screen(), "2 marked")
+	assert.Contains(t, m.screen(), "✓ Zed Adams")
 
 	// Tag all marked (the palette's Tag), marks clear afterwards.
 	runID(m, "tag")
@@ -781,7 +768,7 @@ func TestMarksAndBulkActions(t *testing.T) {
 	typeText(m, "#vip")
 	press(m, "enter")
 	assert.Empty(t, m.marked)
-	assert.NotContains(t, m.View(), "marked")
+	assert.NotContains(t, m.screen(), "marked")
 	for _, id := range []int64{1, 2} {
 		tags, err := m.tagr.GetForEntity(ctx, "person", id)
 		require.NoError(t, err)
@@ -848,7 +835,7 @@ func TestPaletteFilterAndRun(t *testing.T) {
 		}
 	}
 	assert.Len(t, m.ov.items, on, "palette lists every action of a module that is on")
-	out := m.View()
+	out := m.screen()
 	assert.Contains(t, out, "Command bar")
 	assert.Contains(t, out, "Toggle favorite")
 
@@ -904,7 +891,7 @@ func TestPaletteReadOnlyIsGreyedOut(t *testing.T) {
 	}
 	assert.Equal(t, "favorite", it.id)
 	assert.Equal(t, "read-only", it.disabled)
-	assert.Contains(t, m.View(), "(read-only)")
+	assert.Contains(t, m.screen(), "(read-only)")
 	press(m, "enter")
 	assert.True(t, m.statusIsErr)
 	assert.False(t, personByID(t, pr, 1).IsFavorite)

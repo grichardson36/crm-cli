@@ -9,10 +9,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/spinner"
-	"github.com/charmbracelet/bubbles/textinput"
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/spinner"
+	"charm.land/bubbles/v2/textinput"
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/colorprofile"
 	"github.com/jdanielnd/crm-cli/internal/alias"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/dedupe"
@@ -230,6 +231,7 @@ type Model struct {
 	st        theme.Styles
 	themeName string // name of the active theme
 	darkBG    bool   // terminal has a dark background (resolves the auto theme)
+	profile   colorprofile.Profile // what colors the terminal can show (NO_COLOR gives Ascii)
 	// Command bar: caches for the quick package, the person the palette opened on, the changes of
 	// command lines run this session (newest last) for Undo, and the short syntax switch.
 	qix       *quick.Index
@@ -277,9 +279,9 @@ type Model struct {
 
 // New creates the model and loads data.
 func New(ctx context.Context, db *sql.DB) (*Model, error) {
-	in := textinput.New()
+	in := newTextInput()
 	in.CharLimit = 500
-	ri := textinput.New()
+	ri := newTextInput()
 	ri.CharLimit = 2000
 	ri.Prompt = ""
 	registry := crmsync.DefaultRegistry(os.Getenv)
@@ -310,8 +312,9 @@ func New(ctx context.Context, db *sql.DB) (*Model, error) {
 		now:        time.Now,
 		input:      in,
 		rowInput:   ri,
-		detail:     viewport.New(0, 0),
-		helpVP:     viewport.New(0, 0),
+		detail:     viewport.New(),
+		helpVP:     viewport.New(),
+		profile:    colorprofile.TrueColor,
 		marked:     map[int64]bool{},
 		nameMemory: map[string]int64{},
 		actions:    buildActions(),
@@ -327,7 +330,7 @@ func New(ctx context.Context, db *sql.DB) (*Model, error) {
 }
 
 // Run starts the TUI.
-func Run(ctx context.Context, db *sql.DB, readOnly bool, env Env) error {
+func Run(ctx context.Context, db *sql.DB, readOnly bool, noColor bool, env Env) error {
 	m, err := New(ctx, db)
 	if err != nil {
 		return err
@@ -337,12 +340,16 @@ func Run(ctx context.Context, db *sql.DB, readOnly bool, env Env) error {
 	m.applyStartupTheme()
 	m.applyStartupKeys()
 	m.applyStartupModules()
-	_, err = tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion(), tea.WithContext(ctx)).Run()
+	opts := []tea.ProgramOption{tea.WithContext(ctx)}
+	if noColor {
+		opts = append(opts, tea.WithColorProfile(colorprofile.Ascii))
+	}
+	_, err = tea.NewProgram(m, opts...).Run()
 	return err
 }
 
 // Init implements tea.Model.
-func (m *Model) Init() tea.Cmd { return nil }
+func (m *Model) Init() tea.Cmd { return tea.RequestBackgroundColor }
 
 func (m *Model) setStatus(msg string, isErr bool) {
 	m.status, m.statusIsErr = msg, isErr
@@ -716,18 +723,38 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
-		m.detail.Width = m.width - m.listWidth() - 3
-		m.detail.Height = m.bodyHeight()
-		m.helpVP.Width = m.width
-		m.helpVP.Height = max(1, m.height-2)
+		m.detail.SetWidth(m.width - m.listWidth() - 3)
+		m.detail.SetHeight(m.bodyHeight())
+		m.helpVP.SetWidth(m.width)
+		m.helpVP.SetHeight(max(1, m.height-2))
 		if m.tv != nil {
-			m.tv.vp.Width, m.tv.vp.Height = m.width, max(1, m.height-2)
+			m.tv.vp.SetWidth(m.width)
+			m.tv.vp.SetHeight(max(1, m.height-2))
 		}
 		m.clamp()
 		m.refreshDetail(true)
 		return m, nil
-	case tea.MouseMsg:
-		return m.handleMouse(msg)
+	case tea.MouseClickMsg:
+		return m.handleMouse(mouseEvent{msg.X, msg.Y, msg.Button})
+	case tea.MouseWheelMsg:
+		return m.handleMouse(mouseEvent{msg.X, msg.Y, msg.Button})
+	case tea.ColorProfileMsg:
+		// Bubble Tea reports what the terminal can show (NO_COLOR and --no-color included).
+		if msg.Profile != m.profile {
+			m.profile = msg.Profile
+			m.setTheme(m.st.Theme)
+		}
+		return m, nil
+	case tea.BackgroundColorMsg:
+		m.darkBG = msg.IsDark()
+		if m.themeName == theme.AutoName {
+			if t, err := m.themeCatalog().Find(theme.AutoName); err == nil {
+				m.setTheme(t)
+			}
+		}
+		return m, nil
+	case tea.PasteMsg:
+		return m.handlePaste(msg)
 	case toastExpireMsg:
 		if m.toast != nil && m.toast.seq == msg.seq {
 			m.toast = nil
@@ -743,7 +770,7 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.spin, cmd = m.spin.Update(msg)
 		return m, cmd
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		if m.mode == modeOverlay {
 			return m.handleOverlayKey(msg)
 		}
@@ -787,11 +814,11 @@ func (m *Model) switchView(v viewKind) {
 }
 
 // handleKey dispatches a key in normal mode through the action registry.
-func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if k := msg.String(); k != "shift+up" && k != "shift+down" {
+func (m *Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if k := keyName(msg); k != "shift+up" && k != "shift+down" {
 		m.extend = nil // any other key ends the extension of the selection
 	}
-	if a := m.lookupKey(msg.String(), keyNormal); a != nil {
+	if a := m.lookupKey(keyName(msg), keyNormal); a != nil {
 		return m, m.runAction(a)
 	}
 	return m, nil
@@ -832,8 +859,8 @@ func (m *Model) startInput(kind, prompt, initial string) {
 	m.input.CursorEnd()
 }
 
-func (m *Model) handlePromptKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
+func (m *Model) handlePromptKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch keyName(msg) {
 	case "enter":
 		value := strings.TrimSpace(m.input.Value())
 		kind := m.promptKind
@@ -852,7 +879,7 @@ func (m *Model) handlePromptKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.pipeKey(msg) {
 		return m, nil
 	}
-	switch msg.String() {
+	switch keyName(msg) {
 	case "esc":
 		m.mode = modeNormal
 		m.input.Blur()
@@ -861,7 +888,7 @@ func (m *Model) handlePromptKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "tab", "shift+tab":
 		// The text-entry keys come from the registry (prompt-tab, prompt-tab-back in verbs.go).
-		if a := m.lookupKey(msg.String(), keyText); a != nil {
+		if a := m.lookupKey(keyName(msg), keyText); a != nil {
 			return m, m.runAction(a)
 		}
 	}
@@ -871,9 +898,9 @@ func (m *Model) handlePromptKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m *Model) handleConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *Model) handleConfirmKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	c := m.confirm
-	switch msg.String() {
+	switch keyName(msg) {
 	case "y", "Y":
 		m.mode, m.confirm = modeNormal, nil
 		m.pendingCmd = nil

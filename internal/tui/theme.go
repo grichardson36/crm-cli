@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/colorprofile"
 	"github.com/jdanielnd/crm-cli/internal/theme"
 )
 
@@ -16,12 +16,12 @@ import (
 // remembered theme). It does no terminal I/O.
 func defaultStyles() theme.Styles {
 	t, _ := theme.Builtin("dark", true)
-	return theme.NewStyles(t, nil)
+	return theme.NewStyles(t, colorprofile.TrueColor)
 }
 
 // setTheme makes t the active theme for this session.
 func (m *Model) setTheme(t theme.Theme) {
-	m.st = theme.NewStyles(t, nil)
+	m.st = theme.NewStyles(t, m.profile)
 	m.themeName = t.Name
 }
 
@@ -33,7 +33,7 @@ func (m *Model) themeCatalog() theme.Catalog {
 // applyStartupTheme picks the remembered theme (CRM_THEME, then config.toml, then auto).
 // A problem never stops the program: it falls back to auto and says why in the status line.
 func (m *Model) applyStartupTheme() {
-	m.darkBG = lipgloss.HasDarkBackground()
+	m.darkBG = true // until the terminal answers (tea.BackgroundColorMsg)
 	name, _ := theme.Chosen(m.env.DataDir, os.Getenv)
 	cat := m.themeCatalog()
 	t, err := cat.Find(name)

@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -93,8 +93,8 @@ func TestBirthdayViewOpensAtTodayWithThePastAbove(t *testing.T) {
 	}
 	assert.Equal(t, "Older", m.rows[m.cursor].title, "the oldest birthday is the first row to select")
 	assert.Equal(t, 0, m.offset, "the list scrolled to the top to show the heading above it")
-	assert.Contains(t, m.View(), "JULY")
-	assert.Contains(t, m.View(), "2mo 3w 3d ago")
+	assert.Contains(t, m.screen(), "JULY")
+	assert.Contains(t, m.screen(), "2mo 3w 3d ago")
 
 	for i := 0; i < 20; i++ {
 		press(m, "down")
@@ -272,7 +272,7 @@ func TestBirthdayViewFitsEightyColumns(t *testing.T) {
 	m := birthdayModel(t)
 	m.Update(tea.WindowSizeMsg{Width: 80, Height: 40})
 	m.snapBirthdays()
-	for _, l := range strings.Split(m.View(), "\n") {
+	for _, l := range strings.Split(m.screen(), "\n") {
 		assert.LessOrEqual(t, lipgloss.Width(l), 80, "%q", l)
 	}
 	list := m.listView(38, 20)

@@ -5,8 +5,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/jdanielnd/crm-cli/internal/quick"
 	"github.com/jdanielnd/crm-cli/internal/shortsyntax"
@@ -182,9 +182,9 @@ func (o *overlay) setLine(s string, bytePos int) {
 
 // cmdKey handles keys that mean something in command mode. ok is false when the generic overlay
 // handling should run.
-func (m *Model) cmdKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+func (m *Model) cmdKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 	o := m.ov
-	k := msg.String()
+	k := keyName(msg)
 	if o.cmd == nil {
 		if k == "tab" {
 			if v, ok := verbCompletion(o.filter.Value()); ok {

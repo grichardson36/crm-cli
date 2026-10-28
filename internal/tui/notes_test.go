@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -52,7 +52,7 @@ func TestNoteEnterEditsContentInline(t *testing.T) {
 	assert.Equal(t, "note saved", m.status)
 	assert.Equal(t, "second draft", str(noteContent(t, m, id).Content))
 	assert.Equal(t, id, m.form[m.fcur].id, "the cursor stays on the note")
-	assert.Contains(t, m.View(), "second draft")
+	assert.Contains(t, m.screen(), "second draft")
 
 	// Esc cancels without saving.
 	press(m, "enter")
@@ -198,5 +198,5 @@ func TestNoteActionsInPalette(t *testing.T) {
 	focusNote(t, m)
 	assert.Contains(t, m.hintsLine(), "cell")
 
-	assert.LessOrEqual(t, lipgloss.Width(strings.Split(m.View(), "\n")[len(strings.Split(m.View(), "\n"))-1]), 100)
+	assert.LessOrEqual(t, lipgloss.Width(strings.Split(m.screen(), "\n")[len(strings.Split(m.screen(), "\n"))-1]), 100)
 }

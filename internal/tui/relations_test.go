@@ -403,7 +403,7 @@ func TestArchivedViewListsEveryKindFiltersByTypeAndRestores(t *testing.T) {
 		kinds[r.akind] = true
 	}
 	assert.Equal(t, map[string]bool{"person": true, "organization": true, "deal": true, "task": true}, kinds, "every object kind is listed")
-	assert.Contains(t, m.View(), "4 archived")
+	assert.Contains(t, m.screen(), "4 archived")
 
 	// The type filter keeps one kind.
 	press(m, "ctrl+o")
@@ -411,7 +411,7 @@ func TestArchivedViewListsEveryKindFiltersByTypeAndRestores(t *testing.T) {
 	press(m, "right", "right", "right", "esc") // all types, people, organizations, deals
 	require.Len(t, m.rows, 1)
 	assert.Equal(t, "deal", m.rows[0].akind)
-	assert.Contains(t, m.View(), "1 archived deals")
+	assert.Contains(t, m.screen(), "1 archived deals")
 	assert.Contains(t, m.detail.View(), "Site")
 
 	// r restores the deal, with ctrl+z to undo.
@@ -458,7 +458,7 @@ func TestPurgeAppliesToEveryArchivedType(t *testing.T) {
 	assert.True(t, m.actionByID("purge").enabled(m), "an archived organization can be purged")
 	press(m, "d")
 	require.Equal(t, modePrompt, m.mode)
-	assert.Contains(t, m.View(), `type "Acme" to delete forever`)
+	assert.Contains(t, m.screen(), `type "Acme" to delete forever`)
 	typeText(m, "Acme")
 	press(m, "enter")
 	assert.False(t, m.statusIsErr, m.status)

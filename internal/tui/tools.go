@@ -7,9 +7,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/jdanielnd/crm-cli/internal/db"
 	"github.com/jdanielnd/crm-cli/internal/doctor"
 	"github.com/jdanielnd/crm-cli/internal/help"
@@ -35,7 +35,7 @@ type textView struct {
 
 // openText shows body in a scrollable page.
 func (m *Model) openText(title, body string, back func(m *Model)) {
-	vp := viewport.New(m.width, max(1, m.height-2))
+	vp := viewport.New(viewport.WithWidth(m.width), viewport.WithHeight(max(1, m.height-2)))
 	if m.width > 0 {
 		body = lipgloss.NewStyle().Width(m.width).Render(body)
 	}
@@ -43,21 +43,21 @@ func (m *Model) openText(title, body string, back func(m *Model)) {
 	m.tv = &textView{title: title, vp: vp, back: back}
 }
 
-func (m *Model) handleTextKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *Model) handleTextKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	tv := m.tv
-	switch msg.String() {
+	switch keyName(msg) {
 	case "down":
-		tv.vp.LineDown(1)
+		tv.vp.ScrollDown(1)
 	case "up":
-		tv.vp.LineUp(1)
+		tv.vp.ScrollUp(1)
 	case "pgdown":
-		tv.vp.ViewDown()
+		tv.vp.PageDown()
 	case "ctrl+d", " ":
-		tv.vp.HalfViewDown()
+		tv.vp.HalfPageDown()
 	case "pgup":
-		tv.vp.ViewUp()
+		tv.vp.PageUp()
 	case "ctrl+u":
-		tv.vp.HalfViewUp()
+		tv.vp.HalfPageUp()
 	case "home", "ctrl+shift+up":
 		tv.vp.GotoTop()
 	case "end", "ctrl+shift+down":

@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/jdanielnd/crm-cli/internal/modules"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -70,7 +70,7 @@ func TestViewSwitcherReachableByMouseOnMore(t *testing.T) {
 	// Click the Birthdays line (view 5 is the fifth item under the two header lines).
 	click(m, 3, overlayTop+m.viewPosition(viewBirthdays)-1)
 	assert.Equal(t, viewBirthdays, m.view)
-	assert.Contains(t, strings.Split(m.View(), "\n")[0], "7 Birthdays")
+	assert.Contains(t, strings.Split(m.screen(), "\n")[0], "7 Birthdays")
 }
 
 func TestHelpAndFooterMentionNewKeys(t *testing.T) {
@@ -101,7 +101,7 @@ func TestTabBarNeverExceeds80Columns(t *testing.T) {
 	m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
 	for i := range m.visibleViews() {
 		press(m, modules.Key(i+1))
-		bar := strings.Split(m.View(), "\n")[0]
+		bar := strings.Split(m.screen(), "\n")[0]
 		assert.LessOrEqual(t, lipgloss.Width(bar), 80, "view %d", i+1)
 		assert.Contains(t, bar, "1 Home")
 		assert.Contains(t, bar, "2 People")

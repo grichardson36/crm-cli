@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/jdanielnd/crm-cli/internal/keys"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/stretchr/testify/assert"
@@ -231,10 +231,10 @@ func TestStaleKeyFileIsReportedNotFatal(t *testing.T) {
 
 // Bubble Tea reports the ctrl+shift arrows as these names where the terminal sends the sequences.
 func TestCtrlShiftArrowsHaveTheNamesTheRegistryUses(t *testing.T) {
-	assert.Equal(t, "ctrl+shift+up", tea.KeyMsg{Type: tea.KeyCtrlShiftUp}.String())
-	assert.Equal(t, "ctrl+shift+down", tea.KeyMsg{Type: tea.KeyCtrlShiftDown}.String())
-	assert.Equal(t, "ctrl+down", tea.KeyMsg{Type: tea.KeyCtrlDown}.String())
-	assert.Equal(t, "pgdown", tea.KeyMsg{Type: tea.KeyPgDown}.String())
+	assert.Equal(t, "ctrl+shift+up", keyName(tea.KeyPressMsg{Code: tea.KeyUp, Mod: tea.ModCtrl | tea.ModShift}))
+	assert.Equal(t, "ctrl+shift+down", keyName(tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModCtrl | tea.ModShift}))
+	assert.Equal(t, "ctrl+down", keyName(tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModCtrl}))
+	assert.Equal(t, "pgdown", keyName(tea.KeyPressMsg{Code: tea.KeyPgDown}))
 	m, _ := newTestModel(t)
 	assert.Equal(t, "home-top", m.lookupKey("ctrl+shift+up", keyNormal).id)
 	assert.Equal(t, "home-bottom", m.lookupKey("ctrl+shift+down", keyNormal).id)

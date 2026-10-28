@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/mattn/go-runewidth"
 )
 
@@ -30,8 +30,17 @@ func (m *Model) showToast(text string, isErr bool) tea.Cmd {
 	return tea.Tick(toastTime, func(time.Time) tea.Msg { return toastExpireMsg{seq: seq} })
 }
 
-// View implements tea.Model: the current screen with the toast on its last line.
-func (m *Model) View() string {
+// View implements tea.Model. The alternate screen and cell-motion mouse reporting are properties of
+// the view in Bubble Tea v2, so they are on for the whole session.
+func (m *Model) View() tea.View {
+	v := tea.NewView(m.screen())
+	v.AltScreen = true
+	v.MouseMode = tea.MouseModeCellMotion
+	return v
+}
+
+// screen is the current screen as text with the toast on its last line.
+func (m *Model) screen() string {
 	out := m.baseView()
 	if m.toast == nil || m.width == 0 {
 		return out

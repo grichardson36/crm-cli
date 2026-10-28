@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/bubbles/textinput"
+	"charm.land/bubbles/v2/textinput"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/stretchr/testify/assert"
@@ -34,7 +34,7 @@ func rowLabels(rows []Suggestion) []string {
 }
 
 // plainView is the screen without color codes.
-func plainView(m *Model) string { return plain(m.View()) }
+func plainView(m *Model) string { return plain(m.screen()) }
 
 // Live validation (owner decision 2026-10-29): typing a pipe closes a segment and the segment is checked
 // through internal/validate at once. The error shows inline with its code, what was expected and the fix.

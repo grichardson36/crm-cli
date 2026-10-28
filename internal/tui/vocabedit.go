@@ -3,8 +3,8 @@ package tui
 import (
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/jdanielnd/crm-cli/internal/model"
 )
 
@@ -84,16 +84,16 @@ func (m *Model) startVocabEdit(t *typedEdit, spec model.FieldSpec, value string)
 		}
 	}
 	m.rowInput.SetValue("")
-	m.rowInput.Width = max(5, m.detail.Width-labelWidth-1)
+	m.rowInput.SetWidth(max(5, m.detail.Width()-labelWidth-1))
 	m.syncDetail()
 	return m.rowInput.Focus()
 }
 
 // handleVocabKey is a key in the vocabulary editor.
-func (m *Model) handleVocabKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *Model) handleVocabKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	t := m.edit.typed
 	v := t.vocab
-	switch msg.String() {
+	switch keyName(msg) {
 	case "esc":
 		m.cancelEdit()
 		return m, nil

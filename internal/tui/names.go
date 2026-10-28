@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/jdanielnd/crm-cli/internal/quick"
 	"github.com/jdanielnd/crm-cli/internal/shortsyntax"
@@ -72,9 +72,9 @@ func (m *Model) openNames(p *quick.Plan, reopen func(), reparse func(map[string]
 	m.mode = modeNames
 }
 
-func (m *Model) handleNamesKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *Model) handleNamesKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	np := m.names
-	k := msg.String()
+	k := keyName(msg)
 	switch k {
 	case "esc":
 		m.names = nil
