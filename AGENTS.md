@@ -49,3 +49,12 @@ If `crm` is not installed, read `INSTALL.md`.
 ## More
 
 `README.md` is the human guide. `INSTALL.md` is the install checklist. `crm help agents` is the full guide for agents.
+
+## Working on this repository
+
+The `patterns/` folder is an Obsidian vault and the source of truth for design decisions and features. Open `patterns/index.md` first.
+
+1. Read the patterns that apply before any design or feature change. Feature rows (IDs such as M27) are in the `patterns/features-*.md` notes.
+2. If code breaks a pattern, or no pattern covers the question, surface it to the owner with a recommendation. Do not decide alone. The live list is `patterns/open-discrepancies.md`.
+3. Log each new rule as one atomic note in `patterns/`, linked from `patterns/index.md`. Update the feature rows you change in the same session.
+4. Never test on the real databases.
