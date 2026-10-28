@@ -219,7 +219,7 @@ func (m *Model) tagRows() ([]row, error) {
 			if a.Key != b.Key {
 				return a.Key < b.Key
 			}
-			return false
+			return dupPos(a, list[i].Name) < dupPos(a, list[j].Name) // the spelling they merge into first
 		})
 		g := groupRows(list, func(s repo.TagStat) []groupHead {
 			d := m.tagDups[s.Name]
@@ -813,4 +813,14 @@ func (m *Model) deleteUnusedVerb() tea.Cmd {
 		m.setStatus(fmt.Sprintf("%d unused tags deleted (ctrl+z undoes)", res.Count), false)
 		m.pendingCmd = m.showToast(fmt.Sprintf("%d unused tags deleted · ctrl+z undoes", res.Count), false)
 	})
+}
+
+// dupPos is the place of a spelling in its group: 0 for the most used one.
+func dupPos(g repo.TagDupGroup, name string) int {
+	for i, t := range g.Tags {
+		if t.Name == name {
+			return i
+		}
+	}
+	return len(g.Tags)
 }
