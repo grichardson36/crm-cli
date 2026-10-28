@@ -48,7 +48,7 @@ func registerModuleTools(s *server.MCPServer, dataDir func() (string, error)) {
 	)
 	s.AddTool(
 		gomcp.NewTool("crm_modules_set",
-			gomcp.WithDescription("Turn a module on or off and/or move it. Modules: home, people, follow-up, tasks, organizations, birthdays, merge, archived, sync, deals. Off hides the view from tabs, number keys, [ ], the view list and the palette, its data and links stay. One module must stay on, and Home or People"),
+			gomcp.WithDescription("Turn a module on or off and/or move it. Modules: home, people, follow-up, tasks, organizations, birthdays, merge, archived, sync, deals, settings. Off hides the view from tabs, number keys, [ ] and the palette and lists it under Hidden in the Views screen, its data and links stay. Settings cannot be turned off, Archived and Sync start off. One module must stay on, and Home or People"),
 			gomcp.WithString("module", gomcp.Required(), gomcp.Description("Module name")),
 			gomcp.WithBoolean("on", gomcp.Description("true turns it on, false turns it off")),
 			gomcp.WithNumber("position", gomcp.Description("Place among all modules, 1 is first")),

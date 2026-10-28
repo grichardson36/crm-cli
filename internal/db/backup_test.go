@@ -223,3 +223,22 @@ func TestStaleLockIsReplaced(t *testing.T) {
 	require.NoError(t, err)
 	unlock()
 }
+
+func TestListBackupsNewestFirstAndOnlyThisDatabase(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "personal.db")
+	bdir := filepath.Join(dir, "backups")
+	require.NoError(t, os.MkdirAll(bdir, 0o700))
+	for _, n := range []string{"personal-pre-v3-20260101-100000.db", "personal-pre-v5-20260301-090000.db", "personal-pre-v5-20260301-090000-2.db", "work-pre-v5-20260401-090000.db", "notes.txt"} {
+		require.NoError(t, os.WriteFile(filepath.Join(bdir, n), []byte("x"), 0o600))
+	}
+	got := ListBackups(path)
+	var names []string
+	for _, b := range got {
+		names = append(names, b.Name)
+	}
+	assert.Equal(t, []string{"personal-pre-v5-20260301-090000-2.db", "personal-pre-v5-20260301-090000.db", "personal-pre-v3-20260101-100000.db"}, names)
+	assert.Equal(t, 5, got[0].Version)
+	assert.Equal(t, int64(1), got[0].Size)
+	assert.Empty(t, ListBackups(filepath.Join(t.TempDir(), "x.db")), "no folder is an empty list")
+}

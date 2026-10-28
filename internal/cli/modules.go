@@ -22,8 +22,8 @@ func registerModulesCommands(rootCmd *cobra.Command) {
 	cmd := &cobra.Command{
 		Use:   "modules",
 		Short: "Turn views on or off and put them in order (per device)",
-		Long: "Every view of the terminal UI is a module: " + "home, people, follow-up, tasks, organizations, birthdays, merge, archived, sync, deals" + ".\n" +
-			"Off hides a module from the tabs, the number keys, [ and ], the view list and the palette. Its data and its links stay.\n" +
+		Long: "Every view of the terminal UI is a module: " + "home, people, follow-up, tasks, organizations, birthdays, merge, archived, sync, deals, settings" + ".\n" +
+			"Off hides a module from the tabs, the number keys, [ and ] and the palette, and lists it under Hidden in the Views screen (v). Its data and its links stay. Settings never turns off. Archived and Sync start off.\n" +
 			"The arrangement is the [modules] table of ~/.crm/config.toml. See 'crm help modules'.",
 	}
 	cmd.AddCommand(modulesListCmd(), modulesSwitchCmd("on", true), modulesSwitchCmd("off", false), modulesMoveCmd(), modulesResetCmd())
