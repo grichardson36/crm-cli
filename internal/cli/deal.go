@@ -83,6 +83,7 @@ func registerDealCommands(rootCmd *cobra.Command) {
 	dealCmd.AddCommand(dealEditCmd())
 	dealCmd.AddCommand(dealDeleteCmd())
 	dealCmd.AddCommand(dealPipelineCmd())
+	dealCmd.AddCommand(dealRolesCmd())
 
 	rootCmd.AddCommand(dealCmd)
 }

@@ -4,7 +4,7 @@ How people and organizations relate. All of it is a link (see links), so it work
 
 ## A person in many organizations
 
-A membership has a free-text role, a start and end date (`YYYY`, `YYYY-MM` or `YYYY-MM-DD`, no end means current) and a primary flag. One live primary per person. The first current membership becomes primary. A past stay is dimmed in the terminal UI and a repeated stay at one organization is a second link (`--new`). Roles are free text, `crm roles` lists the ones in use.
+A membership has a free-text role, a start and end date (`YYYY`, `YYYY-MM` or `YYYY-MM-DD`, no end means current) and a primary flag. One live primary per person. The first current membership becomes primary. A past stay is dimmed in the terminal UI and a repeated stay at one organization is a second link (`--new`). Membership roles are free text, `crm roles` lists the ones in use. The role of a person on a deal is a different thing, a sales role from a list you manage (see deal-roles).
 
 ```sh crm-example
 crm person link org 2 1 --role Founder --from 2018 --to 2021

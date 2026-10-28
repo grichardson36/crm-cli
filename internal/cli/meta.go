@@ -92,7 +92,7 @@ var commandMeta = map[string]cmdMeta{
 		`crm birthdays -f json`, `crm birthdays --days 90 -f json`}},
 
 	// organizations
-	"purge": {mutates: true, noDryRun: true, destructive: true, fields: "id,name,status", examples: []string{`crm purge --archived`, `crm purge --archived --type person --ids 3,4 --apply`}},
+	"purge":        {mutates: true, noDryRun: true, destructive: true, fields: "id,name,status", examples: []string{`crm purge --archived`, `crm purge --archived --type person --ids 3,4 --apply`}},
 	"alias":        {examples: []string{`crm alias list`}},
 	"alias list":   {fields: "alias,canonical,source,active", examples: []string{`crm alias list -f json`}},
 	"alias add":    {mutates: true, noDryRun: true, examples: []string{`crm alias add zeke zachary`}},
@@ -124,12 +124,19 @@ var commandMeta = map[string]cmdMeta{
 		`crm org merge 1 2 3 -f json`, `crm org merge 1 2 3 --apply`}},
 
 	// deals
-	"deal add":      {mutates: true, fields: dealFields, examples: []string{`crm deal add "Website Redesign" --value 15000 --person 1 --stage proposal`}},
-	"deal list":     {fields: dealFields, examples: []string{`crm deal list --open -f json`}},
-	"deal show":     {fields: dealFields, examples: []string{`crm deal show 1 -f json`}},
-	"deal edit":     {mutates: true, fields: dealFields, target: "deal", targetArgs: "first", examples: []string{`crm deal edit 1 --stage won --closed-at 2026-10-15`}},
-	"deal delete":   {mutates: true, target: "deal", targetArgs: "first", examples: []string{`crm deal delete 1`}},
-	"deal pipeline": {fields: "stage,count,total_value", examples: []string{`crm deal pipeline -f json`}},
+	"deal add":            {mutates: true, fields: dealFields, examples: []string{`crm deal add "Website Redesign" --value 15000 --person 1 --stage proposal`}},
+	"deal list":           {fields: dealFields, examples: []string{`crm deal list --open -f json`}},
+	"deal show":           {fields: dealFields, examples: []string{`crm deal show 1 -f json`}},
+	"deal edit":           {mutates: true, fields: dealFields, target: "deal", targetArgs: "first", examples: []string{`crm deal edit 1 --stage won --closed-at 2026-10-15`}},
+	"deal delete":         {mutates: true, target: "deal", targetArgs: "first", examples: []string{`crm deal delete 1`}},
+	"deal pipeline":       {fields: "stage,count,total_value", examples: []string{`crm deal pipeline -f json`}},
+	"deal roles":          {examples: []string{`crm deal roles list`}},
+	"deal roles list":     {fields: "position,name,in_use,removed", examples: []string{`crm deal roles list -f json`, `crm deal roles list --all`}},
+	"deal roles add":      {mutates: true, noDryRun: true, fields: "position,name,in_use,removed", examples: []string{`crm deal roles add "technical evaluator"`}},
+	"deal roles rename":   {mutates: true, noDryRun: true, fields: "old,new,rows", examples: []string{`crm deal roles rename "decision maker" "final decision maker"`}},
+	"deal roles remove":   {mutates: true, noDryRun: true, fields: "name,moved,kept,replaced_by", examples: []string{`crm deal roles remove blocker --replace-with influencer`, `crm deal roles remove "billing contact" --keep`}},
+	"deal roles reorder":  {mutates: true, noDryRun: true, fields: "position,name,in_use,removed", examples: []string{`crm deal roles reorder champion "economic buyer" signer`, `crm deal roles reorder signer --position 2`}},
+	"deal roles backfill": {mutates: true, noDryRun: true, fields: "applied,counts,roles", examples: []string{`crm deal roles backfill -f json`, `crm deal roles backfill --apply`}},
 
 	// tasks
 	"task add": {mutates: true, noDryRun: true, fields: taskFields, examples: []string{
@@ -142,14 +149,14 @@ var commandMeta = map[string]cmdMeta{
 		`crm do "set Jane: company=Acme title=CTO" --dry-run -f json`,
 		`crm do "tag note" --person 1`,
 		`crm do "n coffee with @Priya" --person 1 --keep-unresolved --dry-run`}},
-	"task list":   {fields: taskFields, examples: []string{`crm task list -f json`, `crm task list --overdue -f json`, `crm task list --tag work -f json`}},
-	"task tag":    {mutates: true, fields: taskFields, target: "task", targetArgs: "first", examples: []string{`crm task tag 1 work urgent`}},
-	"task untag":  {mutates: true, fields: taskFields, target: "task", targetArgs: "first", examples: []string{`crm task untag 1 urgent`}},
-	"task show":   {fields: taskFields, examples: []string{`crm task show 1 -f json`}},
+	"task list":  {fields: taskFields, examples: []string{`crm task list -f json`, `crm task list --overdue -f json`, `crm task list --tag work -f json`}},
+	"task tag":   {mutates: true, fields: taskFields, target: "task", targetArgs: "first", examples: []string{`crm task tag 1 work urgent`}},
+	"task untag": {mutates: true, fields: taskFields, target: "task", targetArgs: "first", examples: []string{`crm task untag 1 urgent`}},
+	"task show":  {fields: taskFields, examples: []string{`crm task show 1 -f json`}},
 	"task edit": {mutates: true, fields: taskFields, target: "task", targetArgs: "first", examples: []string{`crm task edit 1 --priority low`,
 		`crm task edit 1 --due 2026-11-03 --dry-run`}},
-	"task done":   {mutates: true, fields: taskFields, target: "task", targetArgs: "first", examples: []string{`crm task done 1`}},
-	"task delete": {mutates: true, target: "task", targetArgs: "first", examples: []string{`crm task delete 1`}},
+	"task done":    {mutates: true, fields: taskFields, target: "task", targetArgs: "first", examples: []string{`crm task done 1`}},
+	"task delete":  {mutates: true, target: "task", targetArgs: "first", examples: []string{`crm task delete 1`}},
 	"task restore": {mutates: true, target: "task", targetArgs: "first", examples: []string{`crm task restore 1`}},
 
 	// interactions

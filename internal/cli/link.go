@@ -150,7 +150,7 @@ func relationCmd(kind, other string, remove bool) *cobra.Command {
 		verb, short = "unlink", fmt.Sprintf("Remove the link between a %s and a %s", objectNoun[kind], objectNoun[other])
 	}
 	var role, from, to, kindName, notes string
-	var primary, addNew bool
+	var primary, addNew, createRole bool
 	var linkID int64
 	cmd := &cobra.Command{
 		Use:   fmt.Sprintf("%s <%s_id> <%s_id>", objectNoun[other], objectNoun[kind], objectNoun[other]),
@@ -191,6 +191,7 @@ func relationCmd(kind, other string, remove bool) *cobra.Command {
 			flags := cmd.Flags()
 			if flags.Changed("role") {
 				attrs.Role = &role
+				attrs.CreateRole = createRole
 			}
 			if flags.Changed("from") {
 				attrs.StartedOn = &from
@@ -247,7 +248,12 @@ func relationCmd(kind, other string, remove bool) *cobra.Command {
 	for _, key := range rel.Attrs {
 		switch key {
 		case model.AttrRole:
-			f.StringVar(&role, "role", "", "free-text role, for example CTO or champion (empty clears)")
+			roleHelp := "free-text role, for example CTO or champion (empty clears)"
+			if rel.Name == model.DealPersonKind {
+				roleHelp = "deal role from the list (crm deal roles list), for example champion (empty clears)"
+				f.BoolVar(&createRole, "create", false, "add the role to the deal role list when it is not there yet")
+			}
+			f.StringVar(&role, "role", "", roleHelp)
 		case model.AttrFrom:
 			f.StringVar(&from, "from", "", "start date: YYYY, YYYY-MM, YYYY-MM-DD or today (empty clears)")
 		case model.AttrTo:
