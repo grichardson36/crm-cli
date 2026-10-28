@@ -19,7 +19,7 @@ Keymap part B2 (owner decisions 2026-10-28). Every function a removed key had is
 | bulk tier, bulk stage | palette: Set field on selected |
 | purge of people only | `d` or the palette, any archived type |
 
-Pipe-line prompts (owner decision 2026-10-29): the grayscale "tab: link ..." offer of the add picker (and the dropped link chip with `l`/`u`) is replaced by link segments. `tab` accepts the highlighted suggestion of the popup while it is open, `up`/`down` move through it, `esc` closes it. No other key changed.
+Pipe-line prompts (owner decision 2026-10-29): the grayscale "tab: link ..." offer of the add picker (and the dropped link chip with `l`/`u`) is replaced by link segments. `tab` accepts the highlighted suggestion of the popup while it is open, `up`/`down` move through it, `esc` closes it. No other key changed. Follow-up (2026-10-29): the per-kind link segments became one `related` segment, no key changed.
 
 | Old | Now |
 |---|---|
