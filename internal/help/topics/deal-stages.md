@@ -5,10 +5,10 @@ A deal is in one stage of a pipeline. The stages are a list you manage. A new da
 ```sh crm-example
 crm deal stages list
 crm deal stages add qualified
-crm deal stages outcome qualified open
+crm deal stages outcome negotiation lost
 crm deal stages rename proposal "quote sent"
-crm deal stages reorder lead qualified prospect
-crm deal stages remove prospect --replace-with qualified
+crm deal stages reorder lead proposal
+crm deal stages remove prospect --replace-with lead
 ```
 
 - `list` shows pipeline order, outcome and how many deals are in each stage. `--all` adds removed stages.
