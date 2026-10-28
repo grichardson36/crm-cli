@@ -86,7 +86,7 @@ func (m *Model) linkCells(li model.LinkedObject, kindNames map[string][]model.Fi
 	}
 	if li.Kind == "deal" {
 		if d, err := m.dlr.FindByID(m.ctx, li.ID); err == nil {
-			stage, _ := model.FieldNamed("deal", "stage")
+			stage, _ := m.fieldSpec("deal", "stage")
 			value, _ := model.FieldNamed("deal", "value")
 			cv := ""
 			if d.Value != nil {

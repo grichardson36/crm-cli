@@ -256,7 +256,7 @@ func NewServer(db *sql.DB, version string, opts ...Option) *server.MCPServer {
 			gomcp.WithDescription("Create a new deal"),
 			gomcp.WithString("title", gomcp.Required(), gomcp.Description("Deal title")),
 			gomcp.WithNumber("value", gomcp.Description("Deal value")),
-			gomcp.WithString("stage", gomcp.Description("Stage: lead, prospect, proposal, negotiation, won, lost (default: lead)")),
+			gomcp.WithString("stage", gomcp.Description("Stage from the deal stage list (crm_deal_stage_list), default the first open stage. An unlisted stage is E_VOCAB_UNKNOWN")),
 			gomcp.WithNumber("person_id", gomcp.Description("Associated person ID")),
 			gomcp.WithNumber("org_id", gomcp.Description("Associated organization ID (becomes the primary one)")),
 			gomcp.WithString("notes", gomcp.Description("Notes")),
@@ -270,9 +270,9 @@ func NewServer(db *sql.DB, version string, opts ...Option) *server.MCPServer {
 			gomcp.WithNumber("id", gomcp.Required(), gomcp.Description("Deal ID")),
 			gomcp.WithString("title", gomcp.Description("Deal title")),
 			gomcp.WithNumber("value", gomcp.Description("Deal value")),
-			gomcp.WithString("stage", gomcp.Description("Stage: lead, prospect, proposal, negotiation, won, lost")),
+			gomcp.WithString("stage", gomcp.Description("Stage from the deal stage list (crm_deal_stage_list). Moving into a stage whose outcome is won or lost stamps closed_at, moving into an open stage clears it")),
 			gomcp.WithString("notes", gomcp.Description("Notes")),
-			gomcp.WithString("closed_at", gomcp.Description("Close date. It is re-stamped to now on every move into won or lost and cleared when it reopens. Empty clears it")),
+			gomcp.WithString("closed_at", gomcp.Description("Close date. It is re-stamped to now on every move into a won or lost stage (by outcome, not by name) and cleared when it reopens. Empty clears it")),
 			gomcp.WithNumber("person_id", gomcp.Description("Also link this person")),
 			gomcp.WithNumber("org_id", gomcp.Description("Also link this organization as the primary one")),
 		),
@@ -369,6 +369,7 @@ func NewServer(db *sql.DB, version string, opts ...Option) *server.MCPServer {
 	registerOrgAutoTools(s, db)
 	registerAliasTools(s, db)
 	registerDealRoleTools(s, db)
+	registerDealStageTools(s, db)
 	registerPurgeTools(s, db)
 	registerOrgMergeTool(s, db)
 	registerMergeLogTools(s, db)
@@ -871,7 +872,7 @@ func dealCreateHandler(dr *repo.DealRepo) server.ToolHandlerFunc {
 		args := req.GetArguments()
 		input := model.CreateDealInput{
 			Title: req.GetString("title", ""),
-			Stage: req.GetString("stage", "lead"),
+			Stage: req.GetString("stage", ""),
 			Notes: strPtr(req.GetString("notes", "")),
 		}
 
@@ -1219,7 +1220,7 @@ func statsHandler(db *sql.DB) server.ToolHandlerFunc {
 		var dealCount int
 		var dealValue float64
 		if err := db.QueryRowContext(ctx,
-			"SELECT COUNT(*), COALESCE(SUM(value), 0) FROM deals WHERE archived = 0 AND stage NOT IN ('won', 'lost')").
+			"SELECT COUNT(*), COALESCE(SUM(value), 0) FROM deals WHERE archived = 0 AND "+repo.OpenDealCond("stage")).
 			Scan(&dealCount, &dealValue); err != nil {
 			return mcpError(fmt.Errorf("count deals: %w", err))
 		}

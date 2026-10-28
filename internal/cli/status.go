@@ -40,7 +40,7 @@ func registerStatusCommand(rootCmd *cobra.Command) {
 			var dealCount int
 			var dealValue float64
 			if err := db.QueryRowContext(ctx,
-				"SELECT COUNT(*), COALESCE(SUM(value), 0) FROM deals WHERE archived = 0 AND stage NOT IN ('won', 'lost')").
+				"SELECT COUNT(*), COALESCE(SUM(value), 0) FROM deals WHERE archived = 0 AND "+repo.OpenDealCond("stage")).
 				Scan(&dealCount, &dealValue); err != nil {
 				return fmt.Errorf("count deals: %w", err)
 			}

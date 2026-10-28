@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	"strings"
 
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/format"
@@ -25,6 +24,7 @@ var dealColumns = []format.ColumnDef{
 
 var pipelineColumns = []format.ColumnDef{
 	{Header: "Stage", Field: "stage"},
+	{Header: "Outcome", Field: "outcome"},
 	{Header: "Count", Field: "count"},
 	{Header: "Total Value", Field: "total_value"},
 }
@@ -84,6 +84,7 @@ func registerDealCommands(rootCmd *cobra.Command) {
 	dealCmd.AddCommand(dealDeleteCmd())
 	dealCmd.AddCommand(dealPipelineCmd())
 	dealCmd.AddCommand(dealRolesCmd())
+	dealCmd.AddCommand(dealStagesCmd())
 
 	rootCmd.AddCommand(dealCmd)
 }
@@ -133,7 +134,8 @@ func dealAddCmd() *cobra.Command {
 	}
 
 	cmd.Flags().Float64Var(&value, "value", 0, "deal value")
-	cmd.Flags().StringVar(&stage, "stage", "lead", "deal stage: "+strings.Join(model.DealStages, ", "))
+	cmd.Flags().StringVar(&stage, "stage", "", stageFlagHelp(", default the first open stage"))
+	_ = cmd.RegisterFlagCompletionFunc("stage", completeStages)
 	cmd.Flags().StringVar(&notes, "notes", "", "notes")
 	cmd.Flags().Int64Var(&personID, "person", 0, "link this person (more with: crm deal link person)")
 	cmd.Flags().Int64Var(&orgID, "org", 0, "link this organization as the primary one (more with: crm deal link org)")
@@ -178,7 +180,8 @@ func dealListCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&stage, "stage", "", "filter by stage")
+	cmd.Flags().StringVar(&stage, "stage", "", "filter by stage (crm deal stages list)")
+	_ = cmd.RegisterFlagCompletionFunc("stage", completeStages)
 	cmd.Flags().Int64Var(&personID, "person", 0, "filter by person ID")
 	cmd.Flags().Int64Var(&orgID, "org", 0, "filter by organization ID")
 	cmd.Flags().IntVar(&limit, "limit", 0, "max results")
@@ -273,11 +276,12 @@ func dealEditCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&title, "title", "", "deal title")
 	cmd.Flags().Float64Var(&value, "value", 0, "deal value")
-	cmd.Flags().StringVar(&stage, "stage", "", "deal stage: "+strings.Join(model.DealStages, ", "))
+	cmd.Flags().StringVar(&stage, "stage", "", stageFlagHelp(""))
+	_ = cmd.RegisterFlagCompletionFunc("stage", completeStages)
 	cmd.Flags().StringVar(&notes, "notes", "", "notes")
 	cmd.Flags().Int64Var(&personID, "person", 0, "also link this person")
 	cmd.Flags().Int64Var(&orgID, "org", 0, "also link this organization as the primary one")
-	cmd.Flags().StringVar(&closedAt, "closed-at", "", "close date. It is re-stamped to now on every move into won or lost and cleared when it reopens. Empty clears it")
+	cmd.Flags().StringVar(&closedAt, "closed-at", "", "close date. It is re-stamped to now on every move into a won or lost stage (by outcome, not by name) and cleared when it reopens. Empty clears it")
 
 	return cmd
 }
@@ -313,7 +317,7 @@ func dealDeleteCmd() *cobra.Command {
 func dealPipelineCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "pipeline",
-		Short: "Show deal pipeline summary by stage",
+		Short: "Show deal pipeline summary by stage, in the order of the stage list",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			db, err := openDB()
 			if err != nil {
@@ -331,6 +335,7 @@ func dealPipelineCmd() *cobra.Command {
 			for i, s := range stages {
 				data[i] = map[string]any{
 					"stage":       s.Stage,
+					"outcome":     s.Outcome,
 					"count":       s.Count,
 					"total_value": s.TotalValue,
 				}

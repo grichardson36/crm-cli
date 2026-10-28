@@ -19,7 +19,7 @@ func TestCLIUsesTheValidationFramework(t *testing.T) {
 	}{
 		{"person email", []string{"person", "add", "Jane", "--email", "nope"}, "E_EMAIL_INVALID", "email"},
 		{"org website", []string{"org", "add", "Acme", "--website", "not a url"}, "E_URL_INVALID", "website"},
-		{"deal stage", []string{"deal", "add", "D", "--stage", "maybe"}, "E_CHOICE_INVALID", "stage"},
+		{"deal stage", []string{"deal", "add", "D", "--stage", "maybe"}, "E_VOCAB_UNKNOWN", "stage"},
 		{"task priority", []string{"task", "add", "T", "--priority", "zzz"}, "E_CHOICE_INVALID", "priority"},
 	}
 	for _, tt := range tests {

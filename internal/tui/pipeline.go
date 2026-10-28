@@ -77,7 +77,11 @@ func (m *Model) pipeFor(kind string) *pipeLine {
 			}
 			pl := &pipeLine{kind: kind, obj: o.kind, add: pipeAddKinds[kind]}
 			for _, key := range o.fields {
-				pl.segs = append(pl.segs, coreSeg(o.kind, key))
+				seg := coreSeg(o.kind, key)
+				if seg.Spec.Vocabulary != "" {
+					seg.Spec, _ = m.fieldSpec(o.kind, key)
+				}
+				pl.segs = append(pl.segs, seg)
 			}
 			pl.core = len(pl.segs)
 			if pl.add {

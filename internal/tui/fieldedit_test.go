@@ -123,11 +123,11 @@ func TestTypedFieldsOnTheDealPage(t *testing.T) {
 	got, _ = m.dlr.FindByID(ctx, d.ID)
 	assert.Equal(t, "Site v2", got.Title)
 
-	// Choice: letter jump, esc keeps the old value.
+	// Stage is a vocabulary choice: typing filters the list, esc keeps the old value.
 	focusLabel(t, m, "stage")
 	press(m, "enter")
 	press(m, "w")
-	assert.Equal(t, "won", m.edit.typed.spec.Choices[m.edit.typed.choice].Value)
+	assert.Equal(t, "won", m.edit.typed.vocab.items[m.edit.typed.vocab.sel].value)
 	press(m, "esc")
 	got, _ = m.dlr.FindByID(ctx, d.ID)
 	assert.Equal(t, "lead", got.Stage)

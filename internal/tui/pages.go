@@ -233,7 +233,7 @@ func (m *Model) buildDealForm(id int64) []formRow {
 
 	values := map[string]string{"title": d.Title, "stage": d.Stage, "value": plainNumber(d.Value), "notes": str(d.Notes)}
 	var rows []formRow
-	for _, spec := range model.FieldsOf("deal") {
+	for _, spec := range m.fieldsOf("deal") {
 		if spec.Type == model.FieldRelation {
 			continue
 		}

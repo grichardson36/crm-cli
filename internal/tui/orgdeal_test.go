@@ -204,7 +204,7 @@ func TestDealAddEditStageDeleteRestoreWithUndo(t *testing.T) {
 	press(m, "esc")
 	press(m, "e")
 	submit(m, "Site | | nope")
-	assert.Contains(t, m.status, "E_CHOICE_INVALID")
+	assert.Contains(t, m.status, "E_VOCAB_UNKNOWN")
 	press(m, "esc")
 	press(m, "e")
 	submit(m, "Site | | lead | nobody")

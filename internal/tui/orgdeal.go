@@ -372,12 +372,10 @@ func (m *Model) saveDealAdd(line string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	stage := strings.ToLower(f[2])
-	if stage == "" {
-		stage = "lead"
-	}
-	if !model.ValidDealStage(stage) {
-		return "", fmt.Errorf("stage must be one of: %s", strings.Join(model.DealStages, ", "))
+	// An empty stage becomes the first open stage in the repository.
+	stage, err := m.resolveStage(f[2])
+	if err != nil {
+		return "", err
 	}
 	// The organization and person segments hold several names: pipePrepare resolved them and
 	// afterCreate links them, the first organization as the primary one (pipelink.go).
@@ -409,10 +407,9 @@ func (m *Model) saveDealEdit(id int64, line string) (string, error) {
 		return "", err
 	}
 	if f[2] != "" {
-		after.Stage = strings.ToLower(f[2])
-	}
-	if !model.ValidDealStage(after.Stage) {
-		return "", fmt.Errorf("stage must be one of: %s", strings.Join(model.DealStages, ", "))
+		if after.Stage, err = m.resolveStage(f[2]); err != nil {
+			return "", err
+		}
 	}
 	after.Notes = optional(f[5])
 	// The fields and the two links undo as one step.
@@ -563,9 +560,9 @@ func (m *Model) hOverwriteDeal(id int64, after *model.Deal) error {
 	}
 	// closed_at follows the stage in every door (X6): set when it becomes won or lost, cleared on reopen.
 	if before.Stage != after.Stage {
-		closed := func(s string) bool { return s == "won" || s == "lost" }
+		// The outcome of the stage decides, not its name (patterns/deal-stages).
 		switch {
-		case closed(after.Stage):
+		case m.stageClosed(after.Stage):
 			now := m.now().UTC().Format("2006-01-02 15:04:05")
 			after.ClosedAt = &now
 		default:

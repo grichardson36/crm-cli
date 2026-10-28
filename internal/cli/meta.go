@@ -33,6 +33,7 @@ type cmdMeta struct {
 const (
 	personFields = "id,uuid,first_name,last_name,name,email,phone,title,company,location,notes,summary,birthday,keep_in_touch,last_contacted_at,is_favorite,priority_tier,emails,phones,handles,links,created_at,updated_at"
 	orgFields    = "id,uuid,name,domain,industry,notes,summary,website,size,city,region,country,linkedin_url,description,logo_path,links,created_at,updated_at"
+	stageFields  = "position,name,outcome,in_use,removed"
 	dealFields   = "id,uuid,title,stage,value,person_ids,org_ids,org_id,notes,closed_at,links,created_at,updated_at"
 	taskFields   = "id,uuid,title,priority,completed,description,person_ids,org_ids,deal_ids,due_at,recurrence,tags,completed_at,links,created_at,updated_at"
 	logFields    = "id,uuid,type,subject,content,direction,occurred_at,person_ids,org_ids,deal_ids,created_at,updated_at"
@@ -129,7 +130,7 @@ var commandMeta = map[string]cmdMeta{
 	"deal show":           {fields: dealFields, examples: []string{`crm deal show 1 -f json`}},
 	"deal edit":           {mutates: true, fields: dealFields, target: "deal", targetArgs: "first", examples: []string{`crm deal edit 1 --stage won --closed-at 2026-10-15`}},
 	"deal delete":         {mutates: true, target: "deal", targetArgs: "first", examples: []string{`crm deal delete 1`}},
-	"deal pipeline":       {fields: "stage,count,total_value", examples: []string{`crm deal pipeline -f json`}},
+	"deal pipeline":       {fields: "stage,outcome,count,total_value", examples: []string{`crm deal pipeline -f json`}},
 	"deal roles":          {examples: []string{`crm deal roles list`}},
 	"deal roles list":     {fields: "position,name,in_use,removed", examples: []string{`crm deal roles list -f json`, `crm deal roles list --all`}},
 	"deal roles add":      {mutates: true, noDryRun: true, fields: "position,name,in_use,removed", examples: []string{`crm deal roles add "technical evaluator"`}},
@@ -137,6 +138,13 @@ var commandMeta = map[string]cmdMeta{
 	"deal roles remove":   {mutates: true, noDryRun: true, fields: "name,moved,kept,replaced_by", examples: []string{`crm deal roles remove blocker --replace-with influencer`, `crm deal roles remove "billing contact" --keep`}},
 	"deal roles reorder":  {mutates: true, noDryRun: true, fields: "position,name,in_use,removed", examples: []string{`crm deal roles reorder champion "economic buyer" signer`, `crm deal roles reorder signer --position 2`}},
 	"deal roles backfill": {mutates: true, noDryRun: true, fields: "applied,counts,roles", examples: []string{`crm deal roles backfill -f json`, `crm deal roles backfill --apply`}},
+	"deal stages":         {examples: []string{`crm deal stages list`}},
+	"deal stages list":    {fields: stageFields, examples: []string{`crm deal stages list -f json`, `crm deal stages list --all`}},
+	"deal stages add":     {mutates: true, noDryRun: true, fields: stageFields, examples: []string{`crm deal stages add qualified`}},
+	"deal stages rename":  {mutates: true, noDryRun: true, fields: "old,new,rows", examples: []string{`crm deal stages rename proposal "quote sent"`}},
+	"deal stages remove":  {mutates: true, noDryRun: true, fields: "name,moved,replaced_by", examples: []string{`crm deal stages remove prospect --replace-with lead`}},
+	"deal stages reorder": {mutates: true, noDryRun: true, fields: stageFields, examples: []string{`crm deal stages reorder lead proposal`, `crm deal stages reorder proposal --position 2`}},
+	"deal stages outcome": {mutates: true, noDryRun: true, fields: "name,old,new,closed", examples: []string{`crm deal stages outcome lost lost`, `crm deal stages outcome negotiation open`}},
 
 	// tasks
 	"task add": {mutates: true, noDryRun: true, fields: taskFields, examples: []string{

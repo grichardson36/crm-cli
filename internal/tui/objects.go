@@ -184,7 +184,7 @@ func dealDef() *objDef {
 			return out
 		},
 		create: func(m *Model, text string) (int64, error) {
-			d, err := m.hCreateDeal(model.CreateDealInput{Title: text, Stage: "lead"})
+			d, err := m.hCreateDeal(model.CreateDealInput{Title: text})
 			if err != nil {
 				return 0, err
 			}

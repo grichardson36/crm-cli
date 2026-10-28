@@ -97,7 +97,7 @@ func (m *Model) openSetField() tea.Cmd {
 		items[i] = overlayItem{id: "field:" + f.Key, label: f.Label, desc: string(f.Type), value: f.Key}
 	}
 	m.openPicker("Set field on "+who, items, func(m *Model, it overlayItem) {
-		spec, _ := model.FieldNamed(kind, it.value)
+		spec, _ := m.fieldSpec(kind, it.value)
 		if kind == "person" && it.value == dealRoleKey {
 			m.pendingCmd = m.askDealForRole(refs)
 			return
@@ -163,7 +163,7 @@ func (m *Model) applySetField(refs []repo.Ref, spec model.FieldSpec, v string) {
 	var first error
 	for _, ref := range refs {
 		save := func() error { return m.saveTyped(ref, spec, v) }
-		if spec.Vocabulary != "" {
+		if spec.Key == dealRoleKey {
 			save = func() error { return m.saveDealRole(ref, v) }
 		}
 		if err := save(); err != nil {

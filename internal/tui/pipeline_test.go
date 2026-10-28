@@ -53,7 +53,7 @@ func TestClosingASegmentValidatesItAtOnce(t *testing.T) {
 		{"task title is required", "task", "|fri", "E_FIELD_REQUIRED"},
 		{"deal value is not a number", "deal", "Big|abc|", "E_NUMBER_INVALID"},
 		{"deal value is a number", "deal", "Big|$12,500|", ""},
-		{"deal stage is not a stage", "deal", "Big|100|nope|", "E_CHOICE_INVALID"},
+		{"deal stage is not a stage", "deal", "Big|100|nope|", "E_VOCAB_UNKNOWN"},
 		{"deal stage is a stage", "deal", "Big|100|lead|", ""},
 	}
 	for _, tc := range cases {

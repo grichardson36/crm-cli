@@ -991,6 +991,12 @@ func (m *Model) runPrompt(kind, value string) {
 	case "vocab-role-rename":
 		m.renameDealRole(value)
 		return
+	case "vocab-stage-add":
+		m.addDealStage(value)
+		return
+	case "vocab-stage-rename":
+		m.renameDealStage(value)
+		return
 	case "set-field":
 		m.runSetField(value)
 		return

@@ -20,14 +20,29 @@ func setChoice(t *testing.T, m *Model, label, option string) {
 	press(m, "enter")
 	require.NotNil(t, m.edit, "enter opens the choice editor")
 	require.NotNil(t, m.edit.typed)
-	for i := 0; i < len(m.edit.typed.spec.Choices)+1; i++ {
-		c := m.edit.typed.spec.Choices[m.edit.typed.choice]
+	pickOption(m, option)
+	press(m, "enter")
+}
+
+// pickOption moves the open choice editor (a plain choice or a vocabulary list) to an option.
+func pickOption(m *Model, option string) {
+	t := m.edit.typed
+	if t.vocab != nil {
+		for i := 0; i < len(t.vocab.items)+1; i++ {
+			if strings.EqualFold(t.vocab.items[t.vocab.sel].value, option) {
+				return
+			}
+			press(m, "down")
+		}
+		return
+	}
+	for i := 0; i < len(t.spec.Choices)+1; i++ {
+		c := t.spec.Choices[t.choice]
 		if strings.EqualFold(c.Label, option) || strings.EqualFold(c.Value, option) {
-			break
+			return
 		}
 		press(m, "down")
 	}
-	press(m, "enter")
 }
 
 // focusRow puts the detail cursor on the first row with the label, from anywhere on the page.
@@ -56,13 +71,7 @@ func setCell(t *testing.T, m *Model, col int, option string) {
 	require.NotNil(t, m.edit, "enter opens the editor of the cell")
 	require.NotNil(t, m.edit.typed)
 	if m.edit.typed.spec.Type == model.FieldChoice {
-		for i := 0; i < len(m.edit.typed.spec.Choices)+1; i++ {
-			c := m.edit.typed.spec.Choices[m.edit.typed.choice]
-			if strings.EqualFold(c.Label, option) || strings.EqualFold(c.Value, option) {
-				break
-			}
-			press(m, "down")
-		}
+		pickOption(m, option)
 	} else {
 		replaceText(m, option)
 	}

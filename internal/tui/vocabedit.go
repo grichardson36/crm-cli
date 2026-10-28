@@ -30,6 +30,12 @@ type vocabEdit struct {
 	sel   int
 }
 
+// vocabStrict says a value of the field cannot be cleared (deal stages).
+func vocabStrict(spec model.FieldSpec) bool {
+	vs, ok := model.VocabularyNamed(spec.Vocabulary)
+	return ok && vs.Strict
+}
+
 // vocabNoun is the word for one value of the field's vocabulary ("role").
 func vocabNoun(spec model.FieldSpec) string {
 	if vs, ok := model.VocabularyNamed(spec.Vocabulary); ok {
@@ -60,7 +66,7 @@ func vocabItemsFor(spec model.FieldSpec, typed, current string) []vocabItem {
 	}
 	items := append(append(exact, prefix...), inner...)
 	switch {
-	case typed == "" && current != "":
+	case typed == "" && current != "" && !vocabStrict(spec):
 		items = append(items, vocabItem{label: "(no " + vocabNoun(spec) + ")", clear: true})
 	case typed != "" && len(exact) == 0:
 		name := model.CleanVocabName(typed)
