@@ -92,7 +92,7 @@ Check: `crm_linux_amd64.tar.gz: OK` (Windows: `checksum OK`), and a `crm` file (
 
 #### 3b. No release yet: build from source
 
-If the download fails with HTTP 404, no release is published yet. Build from source. This needs Go 1.24 or newer (`go version`) and git. No C compiler is needed.
+If the download fails with HTTP 404, no release is published yet. Build from source. This needs Go 1.26 or newer (`go version`) and git. No C compiler is needed.
 
 ```sh
 git clone https://github.com/grichardson36/crm-cli.git

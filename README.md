@@ -45,7 +45,7 @@ The easiest way is the prompt above. By hand:
 2. Put `crm` on your PATH.
 3. Run `crm --version`, then `crm init` and `crm doctor`.
 
-Or build from source with Go 1.24+:
+Or build from source with Go 1.26+:
 
 ```bash
 go build -o crm ./cmd/crm
@@ -376,7 +376,7 @@ go build -o crm ./cmd/crm
 go test ./...
 ```
 
-Requires Go 1.24+. No CGO — builds anywhere Go runs.
+Requires Go 1.26+. No CGO — builds anywhere Go runs.
 
 ## Tech Stack
 

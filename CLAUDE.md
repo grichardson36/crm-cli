@@ -6,9 +6,10 @@
 
 ## Quick Reference
 
-- **Language:** Go 1.23+
+- **Language:** Go 1.26+
 - **Database:** SQLite via `modernc.org/sqlite` (pure Go, no CGO)
 - **CLI framework:** `cobra`
+- **TUI:** Bubble Tea v2 (`charm.land/bubbletea/v2` v2.1.1), Bubbles v2 (`charm.land/bubbles/v2` v2.2.1), Lip Gloss v2 (`charm.land/lipgloss/v2` v2.0.6), `x/ansi` for widths and `colorprofile` for color levels. They move as one bundle. Keys reach the registry through `keyName` in `internal/tui/keyname.go`.
 - **MCP:** `mcp-go` (stdio transport)
 - **Testing:** `testing` + `testify`
 - **Linting:** `golangci-lint`
@@ -418,7 +419,7 @@ docs/contributing-guide
 ### `ci.yml` — every push and PR
 
 1. **Lint** — `golangci-lint run`
-2. **Test** — `go test -race ./...` on Go 1.23 (matrix: ubuntu, macos)
+2. **Test** — `go test -race ./...` on Go 1.26 (matrix: ubuntu, macos)
 3. **Build** — `go build ./cmd/crm`
 
 ### `release.yml` — on tag push
