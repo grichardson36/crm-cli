@@ -33,6 +33,9 @@ type linkDraft struct {
 	also []repo.Ref
 	// allowDup: the user chose Create anyway for a new organization that matched an existing one.
 	allowDup bool
+	// offeredRole is a deal role typed that is not on the list: the prompt offered to create it and
+	// the next enter with the same text does. createRole is the role to add while saving.
+	offeredRole, createRole string
 }
 
 func (d *linkDraft) targetName(m *Model) string {
@@ -207,8 +210,8 @@ func (m *Model) askLinkAttrs(d *linkDraft) tea.Cmd {
 	}
 	m.startInput("link-attrs", linkAttrsPrompt(d.rel), strings.TrimRight(strings.Join(vals, " | "), " |"))
 	if d.rel.HasAttr(model.AttrRole) {
-		if roles, err := m.links.Roles(m.ctx, d.rel.Name, 6); err == nil && len(roles) > 0 {
-			m.setStatus("roles in use: "+strings.Join(roles, ", ")+" (tab completes)", false)
+		if roles, err := m.roleSuggestions(d.rel.Name, 6); err == nil && len(roles) > 0 {
+			m.setStatus(roleHint(d.rel)+strings.Join(roles, ", ")+" (tab completes)", false)
 		}
 	}
 	return m.input.Focus()
@@ -222,7 +225,7 @@ func (m *Model) completeRole() {
 	}
 	first, rest, _ := strings.Cut(m.input.Value(), "|")
 	typed := strings.TrimSpace(first)
-	roles, err := m.links.Roles(m.ctx, d.rel.Name, 50)
+	roles, err := m.roleSuggestions(d.rel.Name, 50)
 	if err != nil {
 		return
 	}
@@ -279,6 +282,27 @@ func (m *Model) runLinkAttrs(line string) {
 			}
 		}
 	}
+	if d.rel.Name == model.DealPersonKind && d.attrs.Role != nil && *d.attrs.Role != "" {
+		name := model.CleanVocabName(*d.attrs.Role)
+		names, _ := m.vr.Names(m.ctx, model.DealRoleKind)
+		listed := false
+		for _, n := range names {
+			listed = listed || strings.EqualFold(n, name)
+		}
+		same := d.existing != nil && d.existing.Role != nil && strings.EqualFold(*d.existing.Role, name)
+		if !listed && !same {
+			if !strings.EqualFold(d.offeredRole, name) {
+				// Pick or create: offer once, the same text entered again creates the role.
+				d.offeredRole = name
+				d.attrs.Role = nil
+				m.startInput("link-attrs", linkAttrsPrompt(d.rel), line)
+				m.setStatus("Create role "+name+": it is not on the list. Enter again to create it, or retype", false)
+				m.pendingCmd = m.input.Focus()
+				return
+			}
+			d.createRole = name
+		}
+	}
 	d.prompted = true
 	m.pendingCmd = m.nextLinkStep()
 }
@@ -288,6 +312,13 @@ func (m *Model) finishLink(d *linkDraft) tea.Cmd {
 	m.draft = nil
 	m.beginGroup()
 	defer m.afterWrite()
+	if d.createRole != "" {
+		if err := m.createVocabValue(model.DealRoleKind, d.createRole); err != nil {
+			m.endGroup("")
+			m.setStatus(err.Error(), true)
+			return m.showToast(err.Error(), true)
+		}
+	}
 	src := d.src
 	name := m.refName(src)
 	if d.target.ID == 0 {

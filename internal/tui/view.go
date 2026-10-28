@@ -450,6 +450,8 @@ func (m *Model) hintsLine() string {
 	case modeEdit:
 		h := "enter save  esc cancel"
 		switch {
+		case m.edit != nil && m.edit.typed != nil && m.edit.typed.vocab != nil:
+			h = "type to filter  up/down pick  tab complete  enter save  esc cancel"
 		case m.edit != nil && m.edit.typed != nil && m.edit.typed.spec.Type == model.FieldChoice:
 			h = "up/down pick  enter or tab save  esc cancel"
 		case m.edit != nil && m.edit.typed != nil && m.edit.typed.spec.Type == model.FieldLongText:

@@ -28,7 +28,7 @@ type rowCell struct {
 }
 
 // cellWidths are the column widths by cell key.
-var cellWidths = map[string]int{"role": 14, "from": 10, "to": 10, "primary": 8, "kind": 12, "notes": 16, "stage": 11, "value": 10, "type": 10}
+var cellWidths = map[string]int{"role": 16, "from": 10, "to": 10, "primary": 8, "kind": 12, "notes": 16, "stage": 11, "value": 10, "type": 10}
 
 func cellWidth(key string) int {
 	if w, ok := cellWidths[key]; ok {
@@ -59,6 +59,13 @@ func (m *Model) linkCells(li model.LinkedObject, kindNames map[string][]model.Fi
 	for _, a := range rel.AskAttrs() {
 		switch a {
 		case model.AttrRole:
+			if rel.Name == model.DealPersonKind {
+				// A role on a deal is a value of the deal role list, edited with the choice editor
+				// and pick-or-create. A text from before the list shows as written.
+				spec, _ := model.FieldNamed(model.DealPersonKind, model.AttrRole)
+				cells = append(cells, rowCell{key: "role", label: "deal role", value: str(li.Role), spec: spec.WithVocabulary(roleNames(kindNames[model.DealRoleKind]))})
+				continue
+			}
 			cells = append(cells, text("role", "role", str(li.Role), "what they do there, for example CTO"))
 		case model.AttrFrom:
 			cells = append(cells, text("from", "from", str(li.StartedOn), "2021, 2021-03 or 2021-03-15"))
@@ -103,6 +110,9 @@ func (m *Model) kindChoices() map[string][]model.FieldChoiceOption {
 		for _, k := range kinds {
 			out[t] = append(out[t], model.FieldChoiceOption{Value: k.Name, Label: k.Name})
 		}
+	}
+	if names, err := m.vr.Names(m.ctx, model.DealRoleKind); err == nil {
+		out[model.DealRoleKind] = model.ChoicesFromNames(names)
 	}
 	return out
 }
@@ -157,7 +167,7 @@ func (m *Model) beginCell() tea.Cmd {
 		m.setStatus("read-only: editing is disabled", true)
 		return nil
 	}
-	if c.spec.Type == model.FieldChoice && len(c.spec.Choices) == 0 {
+	if c.spec.Type == model.FieldChoice && c.spec.Vocabulary == "" && len(c.spec.Choices) == 0 {
 		m.setStatus("nothing to choose from for "+c.label, true)
 		return nil
 	}
@@ -358,4 +368,13 @@ func (m *Model) cellHeader(i int, r formRow, w int) string {
 func firstLineOf(s string) string {
 	l, _ := splitFirst(s)
 	return l
+}
+
+// roleNames turns the options of a vocabulary back into its values.
+func roleNames(opts []model.FieldChoiceOption) []string {
+	out := make([]string, len(opts))
+	for i, o := range opts {
+		out[i] = o.Value
+	}
+	return out
 }

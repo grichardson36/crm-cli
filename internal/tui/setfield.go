@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"strings"
 	"fmt"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -21,8 +22,10 @@ type setFieldState struct {
 	spec model.FieldSpec
 }
 
+
 // settableFields are the fields of a kind that a bulk set can take: choice, date and number fields
-// the record editors can save.
+// the record editors can save. The deal role of people (the role of a person on a deal, a field of
+// the deal link) is one of them, backed by the deal role list.
 func settableFields(kind string) []model.FieldSpec {
 	var out []model.FieldSpec
 	for _, f := range model.FieldsOf(kind) {
@@ -33,7 +36,22 @@ func settableFields(kind string) []model.FieldSpec {
 			out = append(out, f)
 		}
 	}
+	if kind == "person" {
+		out = append(out, dealRoleSpec(nil))
+	}
 	return out
+}
+
+// dealRoleKey is the key of the deal role in the set-field picker. The field itself is the role of
+// model.Fields[deal_person].
+const dealRoleKey = "deal_role"
+
+// dealRoleSpec is the deal role field as a bulk-settable field of a person, with its options set from
+// names (nil leaves them empty, the picker loads them).
+func dealRoleSpec(names []string) model.FieldSpec {
+	spec, _ := model.FieldNamed(model.DealPersonKind, model.AttrRole)
+	spec.Key = dealRoleKey
+	return spec.WithVocabulary(names)
 }
 
 // bulkSettable lists the fields saveTyped writes, by kind and key.
@@ -80,6 +98,10 @@ func (m *Model) openSetField() tea.Cmd {
 	}
 	m.openPicker("Set field on "+who, items, func(m *Model, it overlayItem) {
 		spec, _ := model.FieldNamed(kind, it.value)
+		if kind == "person" && it.value == dealRoleKey {
+			m.pendingCmd = m.askDealForRole(refs)
+			return
+		}
 		m.pendingCmd = m.askFieldValue(refs, spec)
 	})
 	return nil
@@ -129,10 +151,22 @@ func (m *Model) applySetField(refs []repo.Ref, spec model.FieldSpec, v string) {
 	}
 	who := nouns(refKinds(refs), len(refs))
 	m.beginGroup()
+	if name := m.setFieldCreate; name != "" {
+		m.setFieldCreate = ""
+		if err := m.createVocabValue(model.DealRoleKind, name); err != nil {
+			m.endGroup("")
+			m.setStatus(err.Error(), true)
+			return
+		}
+	}
 	ok := 0
 	var first error
 	for _, ref := range refs {
-		if err := m.saveTyped(ref, spec, v); err != nil {
+		save := func() error { return m.saveTyped(ref, spec, v) }
+		if spec.Vocabulary != "" {
+			save = func() error { return m.saveDealRole(ref, v) }
+		}
+		if err := save(); err != nil {
 			if first == nil {
 				first = err
 			}
@@ -159,6 +193,97 @@ func (m *Model) applySetField(refs []repo.Ref, spec model.FieldSpec, v string) {
 
 func setFieldAction() action {
 	return action{id: "set-field", title: "Set field on selected", group: "Bulk",
-		desc:  "set a choice, date or number field on the selected rows, or the highlighted one: priority tier of people, stage and value of deals, due date and priority of tasks. Palette, no key. The value is checked like on the record page",
+		desc:  "set a choice, date or number field on the selected rows, or the highlighted one: priority tier and deal role of people, stage and value of deals, due date and priority of tasks. Palette, no key. The value is checked like on the record page. A deal role asks for the deal first and can create a new role",
 		write: true, when: whenSetField, run: func(m *Model) tea.Cmd { return m.openSetField() }}
+}
+
+// --- the deal role of people (the role on a deal link) ---
+
+// askDealForRole is the first step of a bulk deal role: the role of a person belongs to a deal, so the
+// deal is picked first from the deals the selected people are on.
+func (m *Model) askDealForRole(refs []repo.Ref) tea.Cmd {
+	var items []overlayItem
+	seen := map[int64]bool{}
+	for _, r := range refs {
+		deals, err := m.links.Linked(m.ctx, r, "deal")
+		if err != nil {
+			m.setStatus(err.Error(), true)
+			return nil
+		}
+		for _, d := range deals {
+			if !seen[d.ID] {
+				seen[d.ID] = true
+				items = append(items, overlayItem{id: fmt.Sprintf("deal:%d", d.ID), label: d.Name, value: fmt.Sprint(d.ID)})
+			}
+		}
+	}
+	if len(items) == 0 {
+		m.setStatus("the selected people are on no deal, link them to a deal first", true)
+		return nil
+	}
+	who := nouns(refKinds(refs), len(refs))
+	m.openPicker("Set deal role on "+who+": which deal?", items, func(m *Model, it overlayItem) {
+		var id int64
+		fmt.Sscan(it.value, &id)
+		m.pendingCmd = m.askDealRoleValue(refs, repo.Ref{Kind: "deal", ID: id})
+	})
+	return nil
+}
+
+// askDealRoleValue picks the role from the deal role list. Typing a name that is not on the list adds
+// the last row "Create role X" (pick or create).
+func (m *Model) askDealRoleValue(refs []repo.Ref, deal repo.Ref) tea.Cmd {
+	names, err := m.vr.Names(m.ctx, model.DealRoleKind)
+	if err != nil {
+		m.setStatus(err.Error(), true)
+		return nil
+	}
+	spec := dealRoleSpec(names)
+	items := make([]overlayItem, len(spec.Choices))
+	for i, c := range spec.Choices {
+		items[i] = overlayItem{id: "choice:" + c.Value, label: c.Label, value: c.Value}
+	}
+	who := nouns(refKinds(refs), len(refs))
+	m.openPicker("Set deal role on "+who+" for "+m.refName(deal), items, func(m *Model, it overlayItem) {
+		m.setFieldDeal = deal
+		defer func() { m.setFieldDeal = repo.Ref{} }()
+		if it.id == "create" {
+			m.setFieldCreate = it.value
+		}
+		m.applySetField(refs, spec, it.value)
+	})
+	m.ov.create = func(q string) (overlayItem, bool) {
+		q = model.CleanVocabName(q)
+		if q == "" {
+			return overlayItem{}, false
+		}
+		for _, c := range spec.Choices {
+			if strings.EqualFold(c.Value, q) {
+				return overlayItem{}, false
+			}
+		}
+		return overlayItem{id: "create", label: "Create role " + q, desc: "add it to the deal roles and set it", value: q}, true
+	}
+	m.ov.refilter()
+	return nil
+}
+
+// saveDealRole sets the role of one person on the deal of m.setFieldDeal, as a recorded link change.
+func (m *Model) saveDealRole(person repo.Ref, role string) error {
+	deal := m.setFieldDeal
+	linked, err := m.links.Linked(m.ctx, deal, "person")
+	if err != nil {
+		return err
+	}
+	for _, l := range linked {
+		if l.ID != person.ID {
+			continue
+		}
+		label := "set deal role of " + m.refName(person) + " on " + m.refName(deal)
+		return m.recordLinkChange(label, deal, person, func() error {
+			_, err := m.links.Update(m.ctx, l.Relation, l.LinkID, model.LinkAttrs{Role: &role})
+			return err
+		})
+	}
+	return fmt.Errorf("%s is not on %s: %w", m.refName(person), m.refName(deal), model.ErrValidation)
 }

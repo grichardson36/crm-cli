@@ -619,3 +619,20 @@ func (r *VocabRepo) RedoBackfill(ctx context.Context, ch VocabBackfillChange) er
 	}
 	return tx.Commit()
 }
+
+// Discard deletes a value that was just added, for undo. Records that hold the text are untouched.
+func (r *VocabRepo) Discard(ctx context.Context, e model.VocabEntry) error {
+	if _, err := r.db.ExecContext(ctx, "DELETE FROM vocabulary WHERE id = ? AND uuid = ?", e.ID, e.UUID); err != nil {
+		return fmt.Errorf("undo add value: %w", err)
+	}
+	return nil
+}
+
+// Restore puts a discarded value back with its id and position, for redo. A value of the same name
+// that exists meanwhile is left alone.
+func (r *VocabRepo) Restore(ctx context.Context, e model.VocabEntry) error {
+	if _, err := r.db.ExecContext(ctx, "INSERT OR IGNORE INTO vocabulary (id, uuid, kind, name, position) VALUES (?, ?, ?, ?, ?)", e.ID, e.UUID, e.Kind, e.Name, e.Position); err != nil {
+		return fmt.Errorf("redo add value: %w", err)
+	}
+	return nil
+}

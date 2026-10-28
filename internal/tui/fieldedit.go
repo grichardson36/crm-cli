@@ -33,6 +33,8 @@ type typedEdit struct {
 	choice int // index into spec.Choices
 	// cell is set when the edit is for a cell of a linked row or a note (cells.go).
 	cell *cellEdit
+	// vocab is set when the field is backed by a vocabulary: the option list with pick-or-create.
+	vocab *vocabEdit
 }
 
 // parseDateField is the date parser handed to FieldSpec.Normalize: the same phrases as "by <date>".
@@ -98,6 +100,9 @@ func (m *Model) startTypedEdit(spec model.FieldSpec, ref repo.Ref, value string,
 	m.focus = focusDetail
 	m.mode = modeEdit
 	m.setStatus("", false)
+	if spec.Vocabulary != "" {
+		return m.startVocabEdit(t, spec, value)
+	}
 	if spec.Type == model.FieldChoice {
 		t.choice = 0
 		for i, c := range spec.Choices {
@@ -118,6 +123,9 @@ func (m *Model) startTypedEdit(spec model.FieldSpec, ref repo.Ref, value string,
 // handleTypedKey is a key in a typed edit.
 func (m *Model) handleTypedKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	t := m.edit.typed
+	if t.vocab != nil {
+		return m.handleVocabKey(msg)
+	}
 	key := msg.String()
 	switch key {
 	case "esc":
@@ -174,18 +182,28 @@ func (m *Model) commitTyped() {
 	e := m.edit
 	t := e.typed
 	var raw string
-	if t.spec.Type == model.FieldChoice {
+	create := false
+	if t.vocab != nil {
+		var ok bool
+		if raw, create, ok = t.vocabPick(); !ok {
+			m.setStatus("type a "+vocabNoun(t.spec)+" name to create it", true)
+			return
+		}
+	} else if t.spec.Type == model.FieldChoice {
 		raw = t.spec.Choices[t.choice].Value
 	} else {
 		raw = strings.ReplaceAll(m.rowInput.Value(), "⏎", "\n")
 	}
-	res := validate.Field(t.spec, raw, validate.Options{Kind: t.ref.Kind, ParseDate: m.parseDateField})
+	res := validate.Field(t.spec, raw, validate.Options{Kind: t.ref.Kind, ParseDate: m.parseDateField, Create: create})
 	if err := res.Err(); err != nil {
 		m.setStatus(err.Error(), true)
 		return
 	}
 	v := res.Value
-	hint := suggestionLine(res)
+	hint := ""
+	if !create {
+		hint = suggestionLine(res)
+	}
 	if t.spec.Type == model.FieldChoice && t.spec.Clear != "" && v == t.spec.Clear {
 		v = ""
 	}
@@ -195,6 +213,13 @@ func (m *Model) commitTyped() {
 	}
 	var err error
 	m.beginGroup()
+	if create {
+		if err = m.createVocabValue(t.spec.Vocabulary, v); err != nil {
+			m.endGroup("")
+			m.setStatus(err.Error(), true)
+			return
+		}
+	}
 	if t.cell != nil {
 		err = m.saveCell(t.cell, t.ref, v)
 	} else {
@@ -342,6 +367,9 @@ func (m *Model) clearTyped(r formRow) {
 // typedEditLine is the row while a typed edit is open: the input with its hint, or the options.
 func (m *Model) typedEditLine(label string, w int) string {
 	t := m.edit.typed
+	if t.vocab != nil {
+		return m.vocabEditLine(label, w)
+	}
 	if t.spec.Type == model.FieldChoice {
 		var parts []string
 		for i, c := range t.spec.Choices {

@@ -107,6 +107,8 @@ type Model struct {
 	// ml is the persistent merge log: person and organization merges undo and redo through it.
 	ml  *repo.MergeLogRepo
 	ntr *repo.NoteTypeRepo
+	// vr is the user-managed vocabularies (deal roles).
+	vr *repo.VocabRepo
 	db  *sql.DB
 	now func() time.Time
 
@@ -177,6 +179,9 @@ type Model struct {
 	linkAlso []repo.Ref
 	// setField is the bulk set-field waiting for its typed value (setfield.go).
 	setField    *setFieldState
+	// setFieldDeal and setFieldCreate carry a bulk deal role: the deal it is set on and a role to add to the list first.
+	setFieldDeal   repo.Ref
+	setFieldCreate string
 	detail      viewport.Model
 	detailKey   string
 	input       textinput.Model
@@ -297,6 +302,7 @@ func New(ctx context.Context, db *sql.DB) (*Model, error) {
 		dr:         repo.NewDupeRepo(db),
 		ml:         repo.NewMergeLogRepo(db),
 		ntr:        repo.NewNoteTypeRepo(db),
+		vr:         repo.NewVocabRepo(db),
 		minLevel:   dedupe.Fuzzy, // the Merge view lists every candidate, grouped by level; ctrl+o narrows it
 		noteType:   "note",
 		now:        time.Now,
