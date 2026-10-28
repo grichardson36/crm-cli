@@ -327,6 +327,8 @@ func (m *Model) openObject(kind string, id int64) {
 	case "deal":
 		m.switchView(viewDeals)
 		m.cursorOn(func(r row) bool { return r.dealID == id })
+	case model.NoteKind:
+		m.openNote(id)
 	}
 }
 

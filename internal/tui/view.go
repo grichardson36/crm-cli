@@ -209,6 +209,8 @@ func (m *Model) countText() string {
 		return fmt.Sprintf("%d organizations", len(m.rows))
 	case viewDeals:
 		return fmt.Sprintf("%d deals", len(m.rows))
+	case viewTags:
+		return m.tagCountText()
 	case viewSync:
 		sources, inbox := 0, 0
 		for _, r := range m.rows {
@@ -268,6 +270,8 @@ func (m *Model) listView(w, h int) string {
 			return m.st.Dim.Render("No organizations. a adds one.")
 		case m.view == viewDeals:
 			return m.st.Dim.Render("No deals. a adds one.")
+		case m.view == viewTags:
+			return m.st.Dim.Render(m.tagEmptyText())
 		}
 		return m.st.Dim.Render("Nothing here yet.")
 	}
@@ -289,7 +293,11 @@ func (m *Model) listView(w, h int) string {
 		r := m.rows[i]
 		title, sub := cleanCell(r.title), cleanCell(r.sub)
 		if r.rule {
-			b.WriteString(m.st.Dim.Render(ruleLine(title, cleanCell(r.meta), w)))
+			rs := m.st.Dim
+			if r.akind != "" { // a heading of a kind (a tag page) takes the kind color of the related segment, dimmed
+				rs = m.st.KindStyle(r.akind).Faint(true)
+			}
+			b.WriteString(rs.Render(ruleLine(title, cleanCell(r.meta), w)))
 			if i < end-1 {
 				b.WriteString("\n")
 			}

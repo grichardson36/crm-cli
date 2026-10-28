@@ -17,9 +17,9 @@ import (
 // "delete" on a person, an organization and a task is one meaning and not three.
 func auditFamily(id string) string {
 	switch id {
-	case "archive", "delete", "org-delete", "deal-delete", "task-delete", "bar-tag-delete", "dismiss", "cmp-dismiss", "purge", "inbox-ignore":
+	case "archive", "delete", "org-delete", "deal-delete", "task-delete", "tags-delete", "dismiss", "cmp-dismiss", "purge", "inbox-ignore":
 		return "delete"
-	case "activate", "edit", "home-open", "compare", "person-edit", "org-edit", "deal-edit", "task-edit", "inbox-accept", "tag-rename", "cmp-confirm":
+	case "activate", "edit", "home-open", "compare", "person-edit", "org-edit", "deal-edit", "task-edit", "inbox-accept", "tag-open", "tag-rename", "cmp-confirm":
 		return "activate"
 	case "add-any", "new", "org-add", "deal-add", "task", "note", "note-object", "add":
 		return "add"
@@ -29,11 +29,11 @@ func auditFamily(id string) string {
 		return "select"
 	case "mark-state", "contacted", "done":
 		return "mark"
-	case "merge", "merge-marked", "org-merge", "tag-merge", "cmp-apply":
+	case "merge", "merge-marked", "org-merge", "tag-merge", "tag-merge-marked", "cmp-apply":
 		return "merge"
-	case "link", "bar-tag-link":
+	case "link", "tag-link":
 		return "link"
-	case "unlink", "bar-tag-unlink":
+	case "unlink", "tag-unlink":
 		return "unlink"
 	case "down", "up", "top", "bottom", "half-down", "half-up", "page-down", "page-up", "jump-up", "jump-down", "home-top", "home-bottom":
 		return "move"

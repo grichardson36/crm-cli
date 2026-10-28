@@ -30,6 +30,8 @@ func viewOptionsFor(v viewKind) []viewOption {
 	switch v {
 	case viewPeople, viewOrgs:
 		return []viewOption{sortOption(v)}
+	case viewTags:
+		return tagViewOptions()
 	case viewMerge:
 		return []viewOption{{
 			id: "level", label: "Minimum level",

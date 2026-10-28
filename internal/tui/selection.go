@@ -45,6 +45,11 @@ func (m *Model) primaryKind() string {
 		return "deal"
 	case viewMerge:
 		return groupKind
+	case viewTags:
+		if m.onTagPage() {
+			return "person"
+		}
+		return tagKind
 	}
 	return "person"
 }
@@ -85,6 +90,8 @@ func (m *Model) rowRef(r row) (repo.Ref, bool) {
 				return repo.Ref{Kind: r.akind, ID: id}, true
 			}
 		}
+	case viewTags:
+		return m.tagRowRef(r)
 	case viewSync:
 	default:
 		if r.personID != 0 {

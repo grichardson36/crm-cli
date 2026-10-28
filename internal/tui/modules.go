@@ -17,6 +17,7 @@ import (
 var moduleViews = map[string]viewKind{
 	"home": viewHome, "people": viewPeople, "follow-up": viewDue, "tasks": viewTasks, "organizations": viewOrgs,
 	"birthdays": viewBirthdays, "merge": viewMerge, "archived": viewArchived, "sync": viewSync, "deals": viewDeals,
+	"tags": viewTags,
 }
 
 // moduleOf is the module id of a view. Every view here is a module or opens from a link.

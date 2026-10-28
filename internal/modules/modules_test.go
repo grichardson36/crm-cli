@@ -12,11 +12,12 @@ import (
 
 func TestDefaultArrangement(t *testing.T) {
 	a := modules.Default()
-	assert.Equal(t, []string{"home", "people", "follow-up", "tasks", "organizations", "deals", "birthdays", "merge", "archived", "sync"}, a.Visible(), "the default shows every module")
+	assert.Equal(t, []string{"home", "people", "follow-up", "tasks", "organizations", "deals", "tags", "birthdays", "merge", "archived", "sync"}, a.Visible(), "the default shows every module")
 	assert.Equal(t, 5, a.Position("organizations"))
 	assert.Equal(t, 6, a.Position("deals"))
-	assert.Equal(t, "0", modules.Key(a.Position("sync")), "the tenth module takes the 0 key")
-	assert.Equal(t, "", modules.Key(11))
+	assert.Equal(t, 7, a.Position("tags"), "Tags comes after Deals")
+	assert.Equal(t, "0", modules.Key(a.Position("archived")), "the tenth module takes the 0 key")
+	assert.Equal(t, "", modules.Key(a.Position("sync")), "the eleventh has no number key")
 	assert.Empty(t, a.Hidden)
 	assert.True(t, a.IsDefault())
 	assert.NoError(t, a.Check())
@@ -38,7 +39,7 @@ func TestOnOffMoveAndGuards(t *testing.T) {
 	a, err = a.With("birthdays", false)
 	require.NoError(t, err)
 	assert.Equal(t, 0, a.Position("birthdays"))
-	assert.Equal(t, 7, a.Position("merge"), "the next module takes its place")
+	assert.Equal(t, 8, a.Position("merge"), "the next module takes its place")
 	a, err = a.With("deals", false)
 	require.NoError(t, err)
 	assert.Equal(t, 0, a.Position("deals"))
@@ -49,7 +50,7 @@ func TestOnOffMoveAndGuards(t *testing.T) {
 	a, err = a.Moved("deals", 1)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"deals", "home", "people"}, a.Visible()[:3])
-	_, err = a.Moved("deals", 11)
+	_, err = a.Moved("deals", 12)
 	assert.Error(t, err)
 	_, err = a.Moved("nope", 1)
 	assert.Error(t, err)
@@ -60,7 +61,7 @@ func TestOnOffMoveAndGuards(t *testing.T) {
 	_, err = b.With("people", false)
 	assert.ErrorContains(t, err, "Home or People")
 	var c modules.Arrangement = modules.Default()
-	for _, id := range []string{"home", "follow-up", "tasks", "organizations", "deals", "birthdays", "merge", "archived", "sync", "people"} {
+	for _, id := range []string{"home", "follow-up", "tasks", "organizations", "deals", "tags", "birthdays", "merge", "archived", "sync", "people"} {
 		c, err = c.With(id, false)
 		if err != nil {
 			break

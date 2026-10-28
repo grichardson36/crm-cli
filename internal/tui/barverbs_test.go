@@ -329,7 +329,7 @@ func TestBarTagNameDoesNotMixTaggedPeopleIntoTheResults(t *testing.T) {
 func TestBarTagRowOpensItsTaggedPeopleAndHasItsOwnVerbs(t *testing.T) {
 	m, _ := newTestModel(t)
 	startBar(t, m, "friend", "tag:friend")
-	assert.Equal(t, []string{"d delete tag", "l tag a person", "u untag a person", "m merge", "e rename", "ctrl+z undo", "ctrl+y redo"}, barVerbLabelsFor(m, "tag:friend"), "tag verbs, not person verbs")
+	assert.Equal(t, []string{"m merge", "d delete", "l link", "u unlink", "e rename", "ctrl+z undo", "ctrl+y redo"}, barVerbLabelsFor(m, "tag:friend"), "the verbs of the Tags view, not person verbs")
 
 	// Enter opens the tag: the People view filtered by #friend, as # does.
 	press(m, "enter")
@@ -341,7 +341,7 @@ func TestBarTagRowOpensItsTaggedPeopleAndHasItsOwnVerbs(t *testing.T) {
 	m.query = ""
 	startBar(t, m, "friend", "tag:friend")
 	press(m, "tab", "l")
-	require.NotNil(t, m.ov, "L opens a picker of people who can take the tag")
+	require.NotNil(t, m.ov, "l opens a picker of objects that can take the tag")
 	typeText(m, "cara")
 	press(m, "enter")
 	assert.Equal(t, modeOverlay, m.mode)

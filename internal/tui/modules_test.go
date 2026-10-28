@@ -78,7 +78,7 @@ func TestModulesScreenTogglesMovesResetsAndSaves(t *testing.T) {
 	runPalette(m, "modules")
 	require.NotNil(t, m.ov)
 	assert.Contains(t, m.ov.title, "Modules")
-	require.Len(t, m.ov.items, 10)
+	require.Len(t, m.ov.items, 11)
 	assert.Contains(t, m.ov.items[0].label, "Home")
 	assert.Equal(t, "1", m.ov.items[0].hint)
 	assert.Contains(t, m.ov.items[5].label, "Deals")

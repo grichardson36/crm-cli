@@ -327,6 +327,9 @@ func (m *Model) refreshDetail(force bool) {
 	if m.view == viewMerge || m.view == viewSync {
 		key += fmt.Sprintf("/%d", m.cursor)
 	}
+	if m.view == viewTags {
+		key += fmt.Sprintf("/%s/%d/%s/%d", r.tag, r.tagID, r.akind, r.objID)
+	}
 	if !ok {
 		key = ""
 	}
@@ -341,6 +344,8 @@ func (m *Model) refreshDetail(force bool) {
 		m.form = m.buildOrgForm(r.orgID)
 	case ok && m.view == viewDeals:
 		m.form = m.buildDealForm(r.dealID)
+	case ok && m.view == viewTags:
+		m.form = m.buildTagForm(r)
 	case ok && m.view != viewArchived:
 		m.form = m.buildForm(r.personID, r.taskID)
 	default:

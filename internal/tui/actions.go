@@ -323,7 +323,7 @@ func buildActions() []action {
 			run: func(m *Model) tea.Cmd { m.detail.ScrollUp(3); return nil }},
 
 		// Views and search.
-		viewAction(viewHome), viewAction(viewPeople), viewAction(viewDue), viewAction(viewTasks), viewAction(viewOrgs), viewAction(viewBirthdays), viewAction(viewMerge), viewAction(viewArchived), viewAction(viewSync), viewAction(viewDeals),
+		viewAction(viewHome), viewAction(viewPeople), viewAction(viewDue), viewAction(viewTasks), viewAction(viewOrgs), viewAction(viewBirthdays), viewAction(viewMerge), viewAction(viewArchived), viewAction(viewSync), viewAction(viewDeals), viewAction(viewTags),
 		{id: "goto-view", title: "Go to view", group: "Views", hint: "v", keys: []string{"v"}, desc: "list the views that are on with their number key (1-9) and jump to one. Turn views on or off with Modules",
 			foot: 85, footIn: inList, run: func(m *Model) tea.Cmd { return m.openViewSwitcher() }},
 		{id: "next-view", title: "Next view", group: "Views", hint: "]", keys: []string{"]", "ctrl+right"}, desc: "next view (also ctrl+right)",
@@ -396,7 +396,7 @@ func buildActions() []action {
 			break
 		}
 	}
-	out := append(append(append(append(append(append(append(cellActions(), barTagActions()...), tagOpsActions()...), todayActions()...), globalAddActions()...), verbActions()...), orgAutoActions()...), acts[:at]...)
+	out := append(append(append(append(append(append(cellActions(), tagViewActions()...), todayActions()...), globalAddActions()...), verbActions()...), orgAutoActions()...), acts[:at]...)
 	out = append(out, objectActions()...)
 	out = append(out, selectionActions()...)
 	out = append(out, copyOpenActions()...)

@@ -84,6 +84,8 @@ func viewScopeType(v viewKind) string {
 		return "type:archive"
 	case viewSync:
 		return "type:inbox"
+	case viewTags:
+		return "type:tag"
 	}
 	return "type:person"
 }
@@ -104,7 +106,7 @@ func (m *Model) scopeChain() []string {
 		}
 		chain = append(chain, "form")
 	}
-	if m.barTag != "" {
+	if m.barTag != "" && viewScopeType(m.view) != "type:tag" {
 		chain = append(chain, "type:tag")
 	}
 	return append(chain, viewScopeName(m.view), viewScopeType(m.view), scopeApp)
@@ -220,8 +222,8 @@ var frameworkIDs = map[string]bool{
 	// verbs
 	"add-any": true, "add": true, "activate": true, "mark-state": true, "merge": true, "favorite": true,
 	"archive": true, "org-delete": true, "deal-delete": true, "task-delete": true, "delete": true, "dismiss": true,
-	"purge": true, "copy": true, "inbox-ignore": true, "bar-tag-delete": true, "cmp-dismiss": true, "tag-merge": true, "cmp-apply": true,
-	"restore": true, "link": true, "unlink": true, "bar-tag-link": true, "bar-tag-unlink": true,
+	"purge": true, "copy": true, "inbox-ignore": true, "tags-delete": true, "tag-back": true, "cmp-dismiss": true, "tag-merge": true, "cmp-apply": true,
+	"restore": true, "link": true, "unlink": true, "tag-link": true, "tag-unlink": true,
 	"mark": true, "select-all": true, "extend-down": true, "extend-up": true,
 	"undo": true, "redo": true, "reload": true,
 	// navigation
@@ -251,7 +253,8 @@ var scopeByID = map[string]string{
 	"purge": "type:archive", "purge-selected": "type:archive", "purge-all": "type:archive",
 	"sync-now": "type:inbox", "sync-dry": "type:inbox", "inbox-accept": "type:inbox", "inbox-attach": "type:inbox", "inbox-ignore": "type:inbox",
 	// Tags in the bar
-	"bar-tag-delete": "type:tag", "bar-tag-link": "type:tag", "bar-tag-unlink": "type:tag", "tag-rename": "type:tag", "tag-merge": "type:tag",
+	"tags-delete": "type:tag", "tag-link": "type:tag", "tag-unlink": "type:tag", "tag-rename": "type:tag", "tag-merge": "type:tag",
+	"tag-open": "type:tag", "tag-back": "type:tag", "tag-merge-marked": "type:tag",
 	// The detail form
 	"delete": "form", "add": "form", "copy": "form", "back": "form", "cell-next": "cells", "cell-prev": "cells",
 	// The compare screen

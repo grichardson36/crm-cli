@@ -130,6 +130,8 @@ func viewAddKind(v viewKind) string {
 		return "organization"
 	case viewDeals:
 		return "deal"
+	case viewTags:
+		return tagKind
 	}
 	return "person"
 }

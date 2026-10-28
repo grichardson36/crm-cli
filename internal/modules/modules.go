@@ -35,6 +35,7 @@ var All = []Module{
 	{"tasks", "Tasks", "open tasks"},
 	{"organizations", "Organizations", "companies and groups"},
 	{"deals", "Deals", "deals with stage and value"},
+	{"tags", "Tags", "labels on anything, rename, merge, clean up"},
 	{"birthdays", "Birthdays", "upcoming birthdays"},
 	{"merge", "Merge", "probable duplicates"},
 	{"archived", "Archived", "archived records, restore or purge"},

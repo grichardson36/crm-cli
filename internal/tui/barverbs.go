@@ -119,7 +119,9 @@ func (m *Model) enterBarContext(t barTarget) barSaved {
 	case "task":
 		m.view, m.rows = viewTasks, []row{{taskID: t.id}}
 	case "tag":
-		m.view, m.rows = viewHome, nil
+		// The tag is shown as the Tags view with one row, so the bar runs the very same tag actions
+		// (tagview.go). The id is a marker: tag verbs find the tag by m.barTag.
+		m.view, m.rows = viewTags, []row{{tagID: -1, tag: t.name, title: t.name}}
 		m.barTag = t.name
 	case "blank-person":
 		m.view, m.rows = viewPeople, nil
@@ -364,71 +366,4 @@ func barTargetName(t barTarget, it overlayItem) string {
 		return "#" + t.name
 	}
 	return it.label
-}
-
-// --- tag rows: the verbs of a tag, registry actions that only apply in the bar ---
-
-func barTagActions() []action {
-	return []action{
-		{id: "bar-tag-delete", title: "Delete tag", group: "Tags", hint: "d", keys: []string{"d"}, barOnly: true, write: true,
-			desc: "delete the tag from every record (y/n). ctrl+z puts it back. Same as crm tag delete",
-			when: func(m *Model) bool { return m.barTag != "" },
-			run:  func(m *Model) tea.Cmd { m.askDeleteTag(m.barTag); return nil }},
-		{id: "bar-tag-link", title: "Tag a person", group: "Tags", hint: "l", keys: []string{"l"}, barOnly: true, write: true,
-			desc: "pick a person to give this tag",
-			when: func(m *Model) bool { return m.barTag != "" },
-			run:  func(m *Model) tea.Cmd { m.pickPersonForTag(m.barTag, true); return nil }},
-		{id: "bar-tag-unlink", title: "Untag a person", group: "Tags", hint: "u", keys: []string{"u"}, barOnly: true, write: true,
-			desc: "pick a person who has this tag to take it off",
-			when: func(m *Model) bool { return m.barTag != "" },
-			run:  func(m *Model) tea.Cmd { m.pickPersonForTag(m.barTag, false); return nil }},
-	}
-}
-
-func (m *Model) askDeleteTag(name string) {
-	n := 0
-	for _, e := range taggableEntities {
-		ids, _ := m.tagr.GetEntities(m.ctx, name, e)
-		n += len(ids)
-	}
-	m.mode = modeConfirm
-	m.confirm = &confirmState{
-		prompt: fmt.Sprintf("delete tag #%s from %d records? y/n", name, n),
-		yes:    func() { m.deleteTag(name) },
-	}
-}
-
-// pickPersonForTag lists the people who can take the tag (add) or who have it (remove) and applies the pick.
-func (m *Model) pickPersonForTag(tag string, add bool) {
-	have := map[int64]bool{}
-	ids, _ := m.tagr.GetEntities(m.ctx, tag, "person")
-	for _, id := range ids {
-		have[id] = true
-	}
-	var items []overlayItem
-	for _, p := range m.people {
-		if have[p.ID] == add {
-			continue
-		}
-		items = append(items, overlayItem{id: fmt.Sprintf("person:%d", p.ID), label: p.Name, desc: p.Company, ref: p.ID, value: p.Name})
-	}
-	title := "Give #" + tag + " to"
-	if !add {
-		title = "Take #" + tag + " off"
-	}
-	if len(items) == 0 {
-		m.setStatus("nobody to pick for #"+tag, true)
-		return
-	}
-	m.openPicker(title, items, func(m *Model, it overlayItem) {
-		id := it.ref
-		if add {
-			m.report(m.hTagApply(m.ctx, "person", id, tag))
-			m.setStatus("#"+tag+" added to "+it.value+" (ctrl+z undoes)", false)
-		} else {
-			m.report(m.hTagRemove(m.ctx, "person", id, tag))
-			m.setStatus("#"+tag+" removed from "+it.value+" (ctrl+z undoes)", false)
-		}
-		m.afterWrite()
-	})
 }

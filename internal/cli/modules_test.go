@@ -22,7 +22,9 @@ func TestModulesCommands(t *testing.T) {
 	assert.Equal(t, "5", rows["organizations"]["key"])
 	assert.Equal(t, true, rows["deals"]["on"], "every module is on by default")
 	assert.EqualValues(t, 6, rows["deals"]["position"])
-	assert.Equal(t, "0", rows["sync"]["key"])
+	assert.Equal(t, "0", rows["archived"]["key"])
+	assert.Equal(t, "", rows["sync"]["key"], "the eleventh module has no number key")
+	assert.EqualValues(t, 7, rows["tags"]["position"], "Tags comes after Deals")
 
 	_, stderr, code = run("off", "deals")
 	require.Equal(t, 0, code, stderr)

@@ -11,6 +11,7 @@ import (
 	"github.com/jdanielnd/crm-cli/internal/db"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/modules"
 	crmsync "github.com/jdanielnd/crm-cli/internal/sync"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -44,6 +45,10 @@ func newTestModel(t *testing.T) (*Model, *repo.PersonRepo) {
 
 	m, err := New(ctx, d)
 	require.NoError(t, err)
+	// Most tests reach a view by its number key, so they keep the order the number keys had before the Tags
+	// module: Tags is last and off here (tests of the Tags view switch to it). The default order has its own tests (modules_test.go).
+	m.mods = modules.Arrangement{Order: []string{"home", "people", "follow-up", "tasks", "organizations", "deals", "birthdays", "merge", "archived", "sync", "tags"}, Hidden: []string{"tags"}}.Normalize()
+	m.patchModuleActions()
 	m.now = func() time.Time { return time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC) }
 	m.clip = func(string) {}
 	m.open = func(string) error { return nil }

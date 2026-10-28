@@ -23,10 +23,10 @@ import (
 
 // activateTargets are the handlers of activate, tried in order. The first one that applies in the
 // current context runs.
-var activateTargets = []string{"edit", "home-open", "compare", "org-edit", "deal-edit", "task-edit", "person-edit", "inbox-accept", "tag-rename"}
+var activateTargets = []string{"edit", "home-open", "compare", "org-edit", "deal-edit", "task-edit", "person-edit", "inbox-accept", "tag-open", "tag-rename"}
 
 // mergeTargets are the handlers of merge, tried in order.
-var mergeTargets = []string{"compare", "org-merge", "merge-marked"}
+var mergeTargets = []string{"compare", "org-merge", "merge-marked", "tag-merge-marked"}
 
 // applies says whether the action would run for a key in the current context.
 func (m *Model) applies(a *action) bool {
@@ -125,7 +125,7 @@ func verbActions() []action {
 		{id: "merge", title: "Merge", group: "Verbs", hint: "m", keys: []string{"m"},
 			desc:  "merge the space-selected rows (people, organizations) or the highlighted duplicate group (opens the compare). m on a tag row moves it into another tag",
 			write: true, foot: 34, footIn: inList, footLabel: "merge",
-			footIf: func(m *Model) bool { return len(m.markedIDs()) >= 2 || len(m.markedOrgIDs()) >= 2 || whenMergeRows(m) },
+			footIf: func(m *Model) bool { return len(m.markedIDs()) >= 2 || len(m.markedOrgIDs()) >= 2 || whenMergeRows(m) || whenTagList(m) },
 			when:   func(m *Model) bool { return m.whenMerge() },
 			run:    func(m *Model) tea.Cmd { return m.runMerge() }},
 		{id: "prompt-tab", title: "Prompt: tab", group: "Verbs", hint: "tab", keys: []string{"tab"}, mode: keyText,

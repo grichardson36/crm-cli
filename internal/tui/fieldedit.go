@@ -208,6 +208,10 @@ func (m *Model) commitTyped() {
 	if t.spec.Type == model.FieldChoice && t.spec.Clear != "" && v == t.spec.Clear {
 		v = ""
 	}
+	if t.ref.Kind == tagKind && t.cell == nil { // a tag name: rename, or merge into the tag that has the name (tagview.go)
+		m.commitTagName(t.ref, e.oldValue, v)
+		return
+	}
 	if v == strings.TrimSpace(e.oldValue) {
 		m.cancelEdit()
 		return

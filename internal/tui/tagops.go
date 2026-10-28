@@ -5,25 +5,11 @@ import (
 	"fmt"
 	"strings"
 
-	tea "charm.land/bubbletea/v2"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 )
 
-// Tag rename and merge (X25). Registry actions in the Tags group: "Rename tag" and "Merge tag into
-// another" work from the palette (they ask which tag first) and, with their keys r and m, on a tag row
-// in the bar. A merge shows what moves and asks y/n. Both are one undo step.
-
-func tagOpsActions() []action {
-	inRow := func(m *Model) bool { return m.barTag != "" }
-	return []action{
-		{id: "tag-rename", title: "Rename tag", group: "Tags", keyIf: inRow, tagVerb: true, write: true, footLabel: "rename",
-			desc: "give a tag a new name. A name that exists offers a merge instead. e on a tag row does this (rename is just activate). Same as crm tag rename",
-			run:  func(m *Model) tea.Cmd { m.askTagRename(m.barTag); return nil }},
-		{id: "tag-merge", title: "Merge tag into another", group: "Tags", keys: []string{"m"}, keyIf: inRow, tagVerb: true, write: true, footLabel: "merge",
-			desc: "move every record of this tag to another tag and remove this one (y/n). Same as crm tag merge",
-			run:  func(m *Model) tea.Cmd { m.askTagMerge(m.barTag); return nil }},
-	}
-}
+// Tag rename and merge (X25). The actions are in tagview.go. "Rename tag" and "Merge tag into another"
+// work from the palette (they ask which tag first). A merge shows what moves and asks y/n. Both are one undo step.
 
 // pickTag lists every tag (except the one given) and runs onPick with the name.
 func (m *Model) pickTag(title, except string, onPick func(name string)) {

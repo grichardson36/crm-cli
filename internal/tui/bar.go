@@ -226,6 +226,9 @@ func (m *Model) barSearch(scope byte, q string) []overlayItem {
 	}
 	// A tag is an object: its name in the query (any case, whole or part) lists it without the # prefix.
 	if low := strings.ToLower(strings.TrimSpace(q)); low != "" {
+		if m.view == viewTags && scope == 0 { // / in the Tags view searches the tags of the list
+			out = append(out, overlayItem{id: "tags-all", kind: kindAll, label: fmt.Sprintf("Show the tags matching %q", q), desc: "filter the Tags list (esc clears)", value: q})
+		}
 		for _, t := range m.quickEnv().Tags {
 			lt := strings.ToLower(t)
 			if lt == low || strings.Contains(lt, low) {
@@ -351,7 +354,11 @@ func (m *Model) pickBar(it overlayItem) (handled bool, cmd tea.Cmd) {
 	case kindTag:
 		m.showPeopleQuery("#" + it.value)
 	case kindAll:
-		m.showPeopleQuery(it.value)
+		if it.id == "tags-all" {
+			m.showTagQuery(it.value)
+		} else {
+			m.showPeopleQuery(it.value)
+		}
 	case kindSetting:
 		return true, m.runSetting(it)
 	case kindDeal, kindNote:

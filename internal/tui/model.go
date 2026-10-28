@@ -45,10 +45,11 @@ const (
 const (
 	viewOrgs viewKind = numViews + iota
 	viewDeals
+	viewTags
 	numAllViews
 )
 
-var viewNames = [numAllViews]string{"Home", "People", "Follow-up", "Tasks", "Birthdays", "Merge", "Archived", "Sync", "Organizations", "Deals"}
+var viewNames = [numAllViews]string{"Home", "People", "Follow-up", "Tasks", "Birthdays", "Merge", "Archived", "Sync", "Organizations", "Deals", "Tags"}
 
 type mode int
 
@@ -93,6 +94,11 @@ type row struct {
 	sync *syncItem
 	// dupe is the index of the duplicate group in m.groups plus one, 0 for a row that is not a group.
 	dupe int
+	// tag is the name of the tag a row of the Tags view stands for, tagID its id. On a tag page a row is an
+	// object (akind, objID) that carries the tag. See tagview.go.
+	tag   string
+	tagID int64
+	objID int64
 }
 
 // Model is the Bubble Tea model.
@@ -266,6 +272,13 @@ type Model struct {
 	barKind string
 	// mods is the module arrangement (modules.go): which views are on and in what order.
 	mods        modules.Arrangement
+	// Tags view (tagview.go): the tag whose page is open ("" shows the list), the filter of the list
+	// (view options) and the counts read for the rows.
+	tagPage   string
+	tagQuery  string
+	tagFilter string
+	tagStats  map[string]repo.TagStat
+	tagDups   map[string]repo.TagDupGroup
 	keyProblems []string
 	capture     *captureState
 
@@ -381,11 +394,13 @@ func (m *Model) afterWrite() {
 // rebuild recomputes rows for the current view. With keep it leaves the cursor on the same item,
 // or at the same position if that item is gone. Otherwise the cursor goes to the top.
 func (m *Model) rebuild(keep bool) error {
-	var keepPerson, keepTask, keepOrg, keepDeal int64
+	var keepPerson, keepTask, keepOrg, keepDeal, keepTag, keepObj int64
+	keepObjKind := ""
 	oldCursor := m.cursor
 	if keep && m.cursor >= 0 && m.cursor < len(m.rows) {
 		keepPerson, keepTask = m.rows[m.cursor].personID, m.rows[m.cursor].taskID
 		keepOrg, keepDeal = m.rows[m.cursor].orgID, m.rows[m.cursor].dealID
+		keepTag, keepObj, keepObjKind = m.rows[m.cursor].tagID, m.rows[m.cursor].objID, m.rows[m.cursor].akind
 	}
 
 	var rows []row
@@ -454,6 +469,12 @@ func (m *Model) rebuild(keep bool) error {
 			return err
 		}
 		rows = dr
+	case viewTags:
+		tr, err := m.tagRows()
+		if err != nil {
+			return err
+		}
+		rows = tr
 	case viewMerge:
 		groups, err := m.dr.Find(m.ctx, m.minLevel)
 		if err != nil {
@@ -479,6 +500,10 @@ func (m *Model) rebuild(keep bool) error {
 				break
 			}
 			if (keepOrg != 0 && r.orgID == keepOrg) || (keepDeal != 0 && r.dealID == keepDeal) {
+				m.cursor = i
+				break
+			}
+			if (keepTag != 0 && r.tagID == keepTag) || (keepObj != 0 && r.objID == keepObj && r.akind == keepObjKind) {
 				m.cursor = i
 				break
 			}
