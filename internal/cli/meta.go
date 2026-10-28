@@ -185,13 +185,15 @@ var commandMeta = map[string]cmdMeta{
 	"log rm":        {mutates: true, target: "interaction", targetArgs: "first", examples: []string{`crm log rm 1`}},
 
 	// tags
-	"tag list":   {fields: tagFields, examples: []string{`crm tag list -f json`}},
-	"tag apply":  {mutates: true, targetArgs: "tag", examples: []string{`crm tag apply person 1 vip`}},
-	"tag remove": {mutates: true, targetArgs: "tag", examples: []string{`crm tag remove person 1 vip`}},
-	"tag show":   {fields: tagFields, examples: []string{`crm tag show person 1 -f json`}},
-	"tag rename": {mutates: true, noDryRun: true, fields: "old,name", examples: []string{`crm tag rename friends friend`}},
-	"tag merge":  {mutates: true, noDryRun: true, fields: tagMergeFields, examples: []string{`crm tag merge old-tag new-tag -f json`, `crm tag merge old-tag new-tag --apply`}},
-	"tag delete": {mutates: true, destructive: true, examples: []string{`crm tag delete old-tag --dry-run`, `crm tag delete old-tag --yes`}},
+	"tag list":       {fields: tagFields, examples: []string{`crm tag list -f json`}},
+	"tag apply":      {mutates: true, targetArgs: "tag", examples: []string{`crm tag apply person 1 vip`}},
+	"tag remove":     {mutates: true, targetArgs: "tag", examples: []string{`crm tag remove person 1 vip`}},
+	"tag show":       {fields: tagFields, examples: []string{`crm tag show person 1 -f json`}},
+	"tag rename":     {mutates: true, noDryRun: true, fields: "old,name", examples: []string{`crm tag rename friends friend`}},
+	"tag merge":      {mutates: true, noDryRun: true, fields: tagMergeFields, examples: []string{`crm tag merge old-tag new-tag -f json`, `crm tag merge old-tag new-tag --apply`}},
+	"tag unused":     {mutates: true, noDryRun: true, fields: "dry_run,count,tags", examples: []string{`crm tag unused -f json`, `crm tag unused --apply`}},
+	"tag duplicates": {mutates: true, noDryRun: true, fields: "groups,applied", examples: []string{`crm tag duplicates -f json`, `crm tag duplicates --apply`}},
+	"tag delete":     {mutates: true, destructive: true, examples: []string{`crm tag delete old-tag --dry-run`, `crm tag delete old-tag --yes`}},
 
 	// duplicates
 	"dupes": {fields: "level,ids,members,reasons", examples: []string{

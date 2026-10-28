@@ -33,3 +33,36 @@ func TestTagRenameAndMergeTools(t *testing.T) {
 	callJSON(t, s, "crm_tag_rename", map[string]any{"tag": "Friend", "new_name": "pals"}, &renamed)
 	assert.Equal(t, "pals", renamed["name"])
 }
+
+func TestTagUnusedAndDuplicatesTools(t *testing.T) {
+	s := setupTestServer(t)
+	for _, n := range []string{"crm_tag_unused", "crm_tag_duplicates"} {
+		assert.Contains(t, toolNames(s.ListTools()), n)
+	}
+	var p map[string]any
+	callJSON(t, s, "crm_person_create", map[string]any{"first_name": "Ann"}, &p)
+	for _, tag := range []string{"Friend", "friend", "gone"} {
+		_, isErr := call(t, s, "crm_tag_apply", map[string]any{"entity_type": "person", "entity_id": p["id"], "tag": tag})
+		assert.False(t, isErr)
+	}
+	_, isErr := call(t, s, "crm_tag_remove", map[string]any{"entity_type": "person", "entity_id": p["id"], "tag": "gone"})
+	assert.False(t, isErr)
+
+	var un map[string]any
+	callJSON(t, s, "crm_tag_unused", map[string]any{}, &un)
+	assert.Equal(t, true, un["dry_run"])
+	assert.EqualValues(t, 1, un["count"])
+	callJSON(t, s, "crm_tag_unused", map[string]any{"apply": true}, &un)
+	assert.Equal(t, false, un["dry_run"])
+	callJSON(t, s, "crm_tag_unused", map[string]any{}, &un)
+	assert.EqualValues(t, 0, un["count"])
+
+	var dup map[string]any
+	callJSON(t, s, "crm_tag_duplicates", map[string]any{}, &dup)
+	assert.Equal(t, false, dup["applied"])
+	assert.Len(t, dup["groups"], 1)
+	callJSON(t, s, "crm_tag_duplicates", map[string]any{"apply": true}, &dup)
+	assert.Equal(t, true, dup["applied"])
+	callJSON(t, s, "crm_tag_duplicates", map[string]any{}, &dup)
+	assert.Empty(t, dup["groups"])
+}

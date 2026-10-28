@@ -30,6 +30,8 @@ func registerTagCommands(rootCmd *cobra.Command) {
 	tagCmd.AddCommand(tagDeleteCmd())
 	tagCmd.AddCommand(tagRenameCmd())
 	tagCmd.AddCommand(tagMergeCmd())
+	tagCmd.AddCommand(tagUnusedCmd())
+	tagCmd.AddCommand(tagDuplicatesCmd())
 
 	rootCmd.AddCommand(tagCmd)
 }
