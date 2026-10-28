@@ -2,8 +2,10 @@ package theme
 
 import (
 	"io"
+	"math"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -235,4 +237,57 @@ func TestSelectionColorsOrReverse(t *testing.T) {
 	out := NewStyles(hc, tc).Sel.Render("x")
 	assert.Contains(t, out, "48;2;255;255;255")
 	assert.NotContains(t, out, ";7m")
+}
+
+// luminance is the WCAG relative luminance of "#rrggbb".
+func luminance(t *testing.T, hex string) float64 {
+	t.Helper()
+	require.Len(t, hex, 7, hex)
+	ch := func(s string) float64 {
+		v, err := strconv.ParseUint(s, 16, 8)
+		require.NoError(t, err)
+		f := float64(v) / 255
+		if f <= 0.03928 {
+			return f / 12.92
+		}
+		return math.Pow((f+0.055)/1.055, 2.4)
+	}
+	return 0.2126*ch(hex[1:3]) + 0.7152*ch(hex[3:5]) + 0.0722*ch(hex[5:7])
+}
+
+// Every built-in has six distinct kind colors that stay readable (contrast of at least 3:1) on a dark
+// background, or on a white one for the light theme.
+func TestKindColorsAreReadableAndDistinctInEveryBuiltin(t *testing.T) {
+	for _, name := range BuiltinNames() {
+		th, _ := Builtin(name, name != "light")
+		bg := 0.0
+		if name == "light" {
+			bg = 1.0
+		}
+		seen := map[string]string{}
+		for kind, role := range KindRoles {
+			c := th.KindColor(kind)
+			require.NotEmpty(t, c, "%s %s", name, role)
+			require.NoError(t, ValidColor(c))
+			l := luminance(t, c)
+			hi, lo := math.Max(l, bg), math.Min(l, bg)
+			assert.GreaterOrEqual(t, (hi+0.05)/(lo+0.05), 3.0, "%s %s %s", name, kind, c)
+			if prev, dup := seen[c]; dup {
+				t.Errorf("%s: %s and %s share %s", name, prev, kind, c)
+			}
+			seen[c] = kind
+		}
+	}
+}
+
+// A custom theme that sets no kind colors still validates and gets fallbacks from its other roles.
+func TestKindColorsFallBackWhenAThemeLeavesThemOut(t *testing.T) {
+	th, err := Parse("plain", "plain.toml", []byte("[colors]\nfg=\"#111111\"\ndim=\"#222222\"\naccent=\"#333333\"\ndanger=\"#444444\"\ngood=\"#555555\"\nwarn=\"#666666\"\nmark=\"#777777\"\ntab_fg=\"#888888\"\ntab_bg=\"#999999\"\n"), true)
+	require.NoError(t, err)
+	assert.Equal(t, "#333333", th.KindColor("person"))
+	assert.Equal(t, "#555555", th.KindColor("organization"))
+	assert.Equal(t, "", th.KindColor("nonsense"))
+	th2, err := Parse("kinds", "kinds.toml", []byte("base = \"nord\"\n[colors]\nkind_tag = \"#abcdef\"\n"), true)
+	require.NoError(t, err)
+	assert.Equal(t, "#abcdef", th2.KindColor("tag"))
 }
