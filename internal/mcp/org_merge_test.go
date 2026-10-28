@@ -62,9 +62,10 @@ func TestModulesTools(t *testing.T) {
 	}
 	var rows []map[string]any
 	callJSON(t, s, "crm_modules_list", map[string]any{}, &rows)
-	require.Len(t, rows, 10)
+	require.Len(t, rows, 11)
 	assert.Equal(t, "home", rows[0]["id"])
 	assert.Equal(t, "deals", rows[5]["id"])
+	assert.Equal(t, "tags", rows[6]["id"], "Tags comes after Deals")
 	for _, r := range rows {
 		assert.Equal(t, true, r["on"], "every module is on by default")
 	}
