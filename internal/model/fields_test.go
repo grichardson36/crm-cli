@@ -48,7 +48,7 @@ func TestFieldRegistryIsClosedAndComplete(t *testing.T) {
 	stage, ok := model.FieldNamed("deal", "stage")
 	require.True(t, ok)
 	assert.Equal(t, model.FieldChoice, stage.Type)
-	assert.Len(t, stage.Choices, len(model.DealStages))
+	assert.Equal(t, model.DealStageKind, stage.Vocabulary, "the stages come from the vocabulary")
 	tier, _ := model.FieldNamed("person", "tier")
 	assert.Equal(t, model.FieldChoice, tier.Type)
 	assert.Equal(t, "Top", tier.ChoiceLabel("1"))

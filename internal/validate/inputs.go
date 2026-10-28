@@ -102,13 +102,11 @@ func orgNative(v *vals, f *model.OrgNativeFields) {
 	v.ptr("description", &f.Description)
 }
 
-// DealCreate checks a new deal. An empty stage is left to the repository default.
+// DealCreate checks a new deal. The stage is a deal stage vocabulary value: the repository checks it
+// against the live list (an empty stage becomes the first open stage).
 func DealCreate(in *model.CreateDealInput) Result {
 	v := newVals()
 	v.req("title", &in.Title)
-	if in.Stage != "" {
-		v.req("stage", &in.Stage)
-	}
 	v.ptr("notes", &in.Notes)
 	r := v.run("deal", false, Options{})
 	checkValue(&r, in.Value)
@@ -119,7 +117,6 @@ func DealCreate(in *model.CreateDealInput) Result {
 func DealUpdate(in *model.UpdateDealInput) Result {
 	v := newVals()
 	v.ptr("title", &in.Title)
-	v.ptr("stage", &in.Stage)
 	v.ptr("notes", &in.Notes)
 	r := v.run("deal", true, Options{})
 	checkValue(&r, in.Value)

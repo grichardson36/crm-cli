@@ -367,7 +367,7 @@ func TestVocab_FieldAndResolve(t *testing.T) {
 	}
 	t.Run("not a vocabulary field", func(t *testing.T) {
 		vr := repo.NewVocabRepo(setupLinks(t).links.DB())
-		_, _, err := vr.Resolve(ctx, "deal", "stage", "lead", false)
+		_, _, err := vr.Resolve(ctx, "person", "first", "lead", false)
 		assert.ErrorIs(t, err, model.ErrValidation)
 	})
 }

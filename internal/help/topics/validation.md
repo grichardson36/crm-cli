@@ -20,10 +20,14 @@ One validation framework checks every value from the CLI, MCP, the terminal UI, 
 | E_NUMBER_TOO_LOW | below the field's minimum |
 | E_PRIMARY_MEMBERSHIP_MULTIPLE | more than one primary membership |
 | E_ORG_PARENT_CYCLE | an organization would be its own ancestor |
-| E_VOCAB_UNKNOWN | a value is not on a list you manage (a deal role not on the list): add it first or pass `--create` |
+| E_VOCAB_UNKNOWN | a value is not on a list you manage (a deal role or deal stage not on the list): add it first or pass `--create` |
 | E_VOCAB_DUPLICATE | a value with that name is already on the list |
-| E_VOCAB_IN_USE | a listed value is still used: name a replacement (`--replace-with`) or `--keep` it as plain text |
+| E_VOCAB_IN_USE | a listed value is still used: name a replacement (`--replace-with`) or `--keep` it as plain text (a deal stage always needs a replacement) |
 | E_VOCAB_INVALID | a list value is empty, too long, or holds a pipe or control character |
+| E_STAGE_NO_OPEN | the change would leave no open deal stage |
+| E_STAGE_NO_WON | the change would leave no won deal stage |
+| E_STAGE_NO_LOST | the change would leave no lost deal stage |
+| E_STAGE_OUTCOME_INVALID | a deal stage outcome is not open, won or lost |
 | W_ENCODING_DAMAGED | warning: text holds U+FFFD (damaged encoding) |
 | S_PHONE_IN_TEXT_FIELD | suggestion: phone-like text in another field |
 | S_EMAIL_IN_TEXT_FIELD | suggestion: email-like text in another field |

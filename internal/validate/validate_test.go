@@ -61,10 +61,10 @@ func TestFieldTable(t *testing.T) {
 		{"number rejects words", "deal", "value", "lots", "", validate.CodeNumberInvalid, false},
 		{"number below min", "deal", "value", "-5", "", validate.CodeNumberTooLow, false},
 		// choice
-		{"choice by value", "deal", "stage", "won", "won", "", true},
-		{"choice by label any case", "deal", "stage", "NEGOTIATION", "negotiation", "", true},
-		{"choice by position", "deal", "stage", "2", "prospect", "", true},
-		{"choice rejects other", "deal", "stage", "maybe", "", validate.CodeChoiceInvalid, false},
+		{"choice by value", "task", "priority", "high", "high", "", true},
+		{"choice by label any case", "task", "priority", "HIGH", "high", "", true},
+		{"choice by position", "task", "priority", "2", "medium", "", true},
+		{"choice rejects other", "task", "priority", "maybe", "", validate.CodeChoiceInvalid, false},
 		{"choice with clear value takes labels", "person", "tier", "high", "2", "", true},
 		{"choice with clear value takes no positions", "person", "tier", "7", "", validate.CodeChoiceInvalid, false},
 		// date
@@ -123,7 +123,7 @@ func TestEveryErrorCodeIsReachable(t *testing.T) {
 	}{
 		{"person", "first", ""}, {"person", "last", strings.Repeat("x", 600)}, {"person", "email", "x"},
 		{"organization", "website", "a b"}, {"person", "phone", "abc"}, {"organization", "domain", "a b"},
-		{"task", "due", "zzz"}, {"deal", "stage", "zzz"}, {"deal", "value", "zzz"}, {"deal", "value", "-1"},
+		{"task", "due", "zzz"}, {"task", "priority", "zzz"}, {"deal", "value", "zzz"}, {"deal", "value", "-1"},
 	} {
 		note(validate.Field(spec(t, c.kind, c.key), c.v, validate.Options{}).Err())
 	}
@@ -137,6 +137,11 @@ func TestEveryErrorCodeIsReachable(t *testing.T) {
 	note(vErr)
 	note(validate.VocabDuplicate("deal_role", "champion"))
 	note(validate.VocabInUse("deal_role", "champion", 2))
+	note(validate.StageRules([]validate.StageState{{Name: "won", Outcome: "won"}, {Name: "lost", Outcome: "lost"}}))
+	note(validate.StageRules([]validate.StageState{{Name: "a", Outcome: "open"}, {Name: "lost", Outcome: "lost"}}))
+	note(validate.StageRules([]validate.StageState{{Name: "a", Outcome: "open"}, {Name: "won", Outcome: "won"}}))
+	_, oErr := validate.StageOutcome("maybe")
+	note(oErr)
 	for _, c := range validate.Codes {
 		if c.Kind == validate.KindError {
 			assert.True(t, seen[c.Code], "no test reaches "+c.Code)
@@ -154,7 +159,7 @@ func TestCodeVocabulary(t *testing.T) {
 		assert.True(t, strings.HasPrefix(c.Code, prefix), c.Code)
 		assert.Equal(t, c.Kind, validate.KindOf(c.Code))
 	}
-	assert.Len(t, validate.Codes, 23)
+	assert.Len(t, validate.Codes, 27)
 }
 
 func TestSanitize(t *testing.T) {
@@ -236,14 +241,14 @@ func TestSuggestions(t *testing.T) {
 
 func TestObject(t *testing.T) {
 	t.Run("create needs required fields", func(t *testing.T) {
-		res := validate.Object("deal", map[string]string{"stage": "won"}, false, validate.Options{})
+		res := validate.Object("task", map[string]string{"priority": "high"}, false, validate.Options{})
 		require.False(t, res.OK())
 		assert.Equal(t, validate.CodeFieldRequired, res.Errors()[0].Code)
 	})
 	t.Run("partial skips missing fields", func(t *testing.T) {
-		res := validate.Object("deal", map[string]string{"stage": "won"}, true, validate.Options{})
+		res := validate.Object("task", map[string]string{"priority": "high"}, true, validate.Options{})
 		assert.True(t, res.OK())
-		assert.Equal(t, "won", res.Values["stage"])
+		assert.Equal(t, "high", res.Values["priority"])
 	})
 	t.Run("partial refuses emptying a required field", func(t *testing.T) {
 		res := validate.Object("deal", map[string]string{"title": " "}, true, validate.Options{})
@@ -254,7 +259,7 @@ func TestObject(t *testing.T) {
 		assert.Equal(t, validate.CodeFieldUnknown, res.Errors()[0].Code)
 	})
 	t.Run("collects every error", func(t *testing.T) {
-		res := validate.Object("deal", map[string]string{"title": "", "stage": "zzz"}, false, validate.Options{})
+		res := validate.Object("task", map[string]string{"title": "", "priority": "zzz"}, false, validate.Options{})
 		assert.Len(t, res.Errors(), 2)
 	})
 }
@@ -286,7 +291,7 @@ func TestInputAdapters(t *testing.T) {
 	t.Run("deal", func(t *testing.T) {
 		neg := -1.0
 		assert.False(t, validate.DealCreate(&model.CreateDealInput{Title: "T", Stage: "prospect", Value: &neg}).OK())
-		assert.False(t, validate.DealUpdate(&model.UpdateDealInput{Stage: s("zzz")}).OK())
+		assert.True(t, validate.DealUpdate(&model.UpdateDealInput{Stage: s("zzz")}).OK(), "the stage is checked against the live list by the repository")
 		assert.True(t, validate.DealCreate(&model.CreateDealInput{Title: "T"}).OK())
 	})
 	t.Run("task", func(t *testing.T) {
@@ -324,4 +329,46 @@ func TestHelpTopicListsEveryCode(t *testing.T) {
 	for _, c := range validate.Codes {
 		assert.Contains(t, topic.Body, c.Code)
 	}
+}
+
+func TestStageRules(t *testing.T) {
+	st := func(o ...string) []validate.StageState {
+		var out []validate.StageState
+		for i, x := range o {
+			out = append(out, validate.StageState{Name: string(rune('a' + i)), Outcome: x})
+		}
+		return out
+	}
+	tests := []struct {
+		name  string
+		after []validate.StageState
+		code  string
+	}{
+		{"open won lost", st("open", "won", "lost"), ""},
+		{"several of each", st("open", "open", "won", "won", "lost", "lost"), ""},
+		{"no open", st("won", "lost"), validate.CodeStageNoOpen},
+		{"no stages", nil, validate.CodeStageNoOpen},
+		{"no won", st("open", "lost"), validate.CodeStageNoWon},
+		{"no lost", st("open", "won", "open"), validate.CodeStageNoLost},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validate.StageRules(tt.after)
+			if tt.code == "" {
+				assert.NoError(t, err)
+				return
+			}
+			e, ok := validate.As(err)
+			require.True(t, ok)
+			assert.Equal(t, tt.code, e.Issues[0].Code)
+			assert.NotEmpty(t, e.Issues[0].Fix)
+		})
+	}
+	t.Run("outcome names", func(t *testing.T) {
+		o, err := validate.StageOutcome(" WON ")
+		require.NoError(t, err)
+		assert.Equal(t, "won", o)
+		_, err = validate.StageOutcome("closed")
+		assert.Error(t, err)
+	})
 }

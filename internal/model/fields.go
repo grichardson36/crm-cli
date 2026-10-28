@@ -136,14 +136,6 @@ func tierChoices() []FieldChoiceOption {
 	return []FieldChoiceOption{{"0", "clear"}, {"1", "Top"}, {"2", "High"}, {"3", "Medium"}, {"4", "Low"}, {"5", "None"}}
 }
 
-func stageChoices() []FieldChoiceOption {
-	out := make([]FieldChoiceOption, len(DealStages))
-	for i, s := range DealStages {
-		out[i] = FieldChoiceOption{s, s}
-	}
-	return out
-}
-
 func priorityChoices() []FieldChoiceOption {
 	out := make([]FieldChoiceOption, len(Priorities))
 	for i, s := range Priorities {
@@ -185,7 +177,7 @@ var Fields = map[string][]FieldSpec{
 	},
 	"deal": {
 		{Key: "title", Label: "title", Type: FieldText, Required: true},
-		{Key: "stage", Label: "stage", Type: FieldChoice, Choices: stageChoices()},
+		{Key: "stage", Label: "stage", Type: FieldChoice, Vocabulary: DealStageKind, Hint: "type to filter, enter picks, a new name offers Create stage"},
 		{Key: "value", Label: "value", Type: FieldNumber, Min: &zero},
 		{Key: "notes", Label: "notes", Type: FieldLongText},
 		{Key: "organization", Label: "organizations", Type: FieldRelation, Kind: "organization"},

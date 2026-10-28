@@ -25,6 +25,10 @@ const (
 	CodeVocabDuplicate   = "E_VOCAB_DUPLICATE"
 	CodeVocabInUse       = "E_VOCAB_IN_USE"
 	CodeVocabInvalid     = "E_VOCAB_INVALID"
+	CodeStageNoOpen      = "E_STAGE_NO_OPEN"
+	CodeStageNoWon       = "E_STAGE_NO_WON"
+	CodeStageNoLost      = "E_STAGE_NO_LOST"
+	CodeStageOutcome     = "E_STAGE_OUTCOME_INVALID"
 	CodeEncodingDamaged  = "W_ENCODING_DAMAGED"
 	CodePhoneInTextField = "S_PHONE_IN_TEXT_FIELD"
 	CodeEmailInTextField = "S_EMAIL_IN_TEXT_FIELD"
@@ -62,10 +66,14 @@ var Codes = []CodeInfo{
 	{CodeNumberTooLow, KindError, "a number is below the field's minimum"},
 	{CodePrimaryMultiple, KindError, "a person would have more than one primary membership"},
 	{CodeOrgParentCycle, KindError, "an organization would become its own ancestor"},
-	{CodeVocabUnknown, KindError, "the value is not in the list the user manages (a deal role that is not on the list), create it first or pass --create"},
+	{CodeVocabUnknown, KindError, "the value is not in the list the user manages (a deal role or deal stage that is not on the list), create it first or pass --create"},
 	{CodeVocabDuplicate, KindError, "a value with that name is already on the list the user manages"},
-	{CodeVocabInUse, KindError, "a value on the list the user manages is still used by records, name a replacement or keep it as plain text"},
+	{CodeVocabInUse, KindError, "a value on the list the user manages is still used by records, name a replacement or keep it as plain text (a deal stage always needs a replacement)"},
 	{CodeVocabInvalid, KindError, "a value for the list the user manages is empty, too long or has a line break or a pipe"},
+	{CodeStageNoOpen, KindError, "the change would leave no open deal stage, at least one stage must stay open"},
+	{CodeStageNoWon, KindError, "the change would leave no won deal stage, at least one stage must have the outcome won"},
+	{CodeStageNoLost, KindError, "the change would leave no lost deal stage, at least one stage must have the outcome lost"},
+	{CodeStageOutcome, KindError, "a deal stage outcome is not open, won or lost"},
 	{CodeEncodingDamaged, KindWarning, "the text holds U+FFFD, the mark of a damaged encoding"},
 	{CodePhoneInTextField, KindSuggestion, "phone-like text sits in a field that is not a phone"},
 	{CodeEmailInTextField, KindSuggestion, "email-like text sits in a field that is not an email"},

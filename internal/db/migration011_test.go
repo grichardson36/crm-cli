@@ -28,7 +28,7 @@ func TestMigration011_TaggingsKeepRowsAndGainSyncColumns(t *testing.T) {
 	d, err = db.Open(path)
 	require.NoError(t, err)
 	defer d.Close()
-	assert.Equal(t, 13, scalar(t, d, `PRAGMA user_version`))
+	assert.Equal(t, 14, scalar(t, d, `PRAGMA user_version`))
 	assert.Equal(t, 3, scalar(t, d, `SELECT COUNT(*) FROM taggings WHERE deleted_at IS NULL AND uuid <> '' AND updated_at <> ''`))
 	assert.Equal(t, 3, scalar(t, d, `SELECT COUNT(DISTINCT uuid) FROM taggings`), "every tagging has its own uuid")
 	assert.Equal(t, 2, scalar(t, d, `SELECT id FROM taggings WHERE tag_id = 1 AND entity_id = 2`), "ids are kept")

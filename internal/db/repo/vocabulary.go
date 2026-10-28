@@ -14,21 +14,24 @@ import (
 )
 
 // VocabRepo manages the user-managed vocabularies (table vocabulary, registry model.Vocabularies).
-// It is kind-agnostic: deal roles use it today, deal stages and note types can move onto it later by
+// It is kind-agnostic: deal roles and deal stages use it, note types can move onto it later by
 // registering a kind. Every door (CLI, MCP, TUI) calls these functions.
 type VocabRepo struct{ db *sql.DB }
 
 // NewVocabRepo creates a VocabRepo.
 func NewVocabRepo(db *sql.DB) *VocabRepo { return &VocabRepo{db: db} }
 
-const vocabCols = "id, uuid, kind, name, position, archived, created_at, updated_at"
+const vocabCols = "id, uuid, kind, name, position, outcome, archived, created_at, updated_at"
 
 type rowScanner interface{ Scan(...any) error }
 
 func scanVocab(r rowScanner) (*model.VocabEntry, error) {
 	var e model.VocabEntry
-	if err := r.Scan(&e.ID, &e.UUID, &e.Kind, &e.Name, &e.Position, &e.Removed, &e.CreatedAt, &e.UpdatedAt); err != nil {
+	if err := r.Scan(&e.ID, &e.UUID, &e.Kind, &e.Name, &e.Position, &e.Outcome, &e.Removed, &e.CreatedAt, &e.UpdatedAt); err != nil {
 		return nil, err
+	}
+	if vs, ok := model.VocabularyNamed(e.Kind); !ok || !vs.Outcomes {
+		e.Outcome = "" // only a vocabulary with outcomes has them
 	}
 	return &e, nil
 }
@@ -293,7 +296,9 @@ type RemoveResult struct {
 
 // Remove takes a value off the list. When records still use it, the call needs a replacement
 // (they are moved to it) or keep (they keep the text, shown as plain text and no longer a listed
-// value). Neither is E_VOCAB_IN_USE. Nothing in the records is lost either way.
+// value). Neither is E_VOCAB_IN_USE. Nothing in the records is lost either way. A strict vocabulary
+// (deal stages) has no keep: records must hold a listed value, so a used value needs a replacement.
+// A vocabulary with outcomes also keeps the stage rules (validate.StageRules) true afterwards.
 func (r *VocabRepo) Remove(ctx context.Context, kind, name, replaceWith string, keep bool) (RemoveResult, error) {
 	vs, err := vocabSpec(kind)
 	if err != nil {
@@ -301,6 +306,9 @@ func (r *VocabRepo) Remove(ctx context.Context, kind, name, replaceWith string, 
 	}
 	if replaceWith != "" && keep {
 		return RemoveResult{}, fmt.Errorf("use a replacement or keep, not both: %w", model.ErrValidation)
+	}
+	if vs.Strict {
+		keep = false
 	}
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -310,6 +318,11 @@ func (r *VocabRepo) Remove(ctx context.Context, kind, name, replaceWith string, 
 	cur, err := findVocab(ctx, tx, kind, name)
 	if err != nil || cur.Removed {
 		return RemoveResult{}, vocabNotFound(vs, name)
+	}
+	if vs.Outcomes {
+		if err := stageRulesWith(ctx, tx, kind, cur.ID, 0, ""); err != nil {
+			return RemoveResult{}, err
+		}
 	}
 	n, err := usage(ctx, tx, vs, cur.Name)
 	if err != nil {
@@ -328,7 +341,11 @@ func (r *VocabRepo) Remove(ctx context.Context, kind, name, replaceWith string, 
 			return RemoveResult{}, fmt.Errorf("the replacement must be another %s: %w", vs.Noun, model.ErrValidation)
 		}
 		for _, u := range vs.Usages {
-			out, err := tx.ExecContext(ctx, fmt.Sprintf("UPDATE %s SET %s = ?, updated_at = datetime('now') WHERE %s = ? COLLATE NOCASE", u.Table, u.Column, u.Column), rep.Name, cur.Name)
+			extra := ""
+			if kind == model.DealStageKind {
+				extra = closedAtOnMove(cur.Outcome, rep.Outcome)
+			}
+			out, err := tx.ExecContext(ctx, fmt.Sprintf("UPDATE %s SET %s = ?, updated_at = datetime('now')%s WHERE %s = ? COLLATE NOCASE", u.Table, u.Column, extra, u.Column), rep.Name, cur.Name)
 			if err != nil {
 				return RemoveResult{}, fmt.Errorf("move %s.%s: %w", u.Table, u.Column, err)
 			}
@@ -341,6 +358,107 @@ func (r *VocabRepo) Remove(ctx context.Context, kind, name, replaceWith string, 
 	}
 	if _, err := tx.ExecContext(ctx, "UPDATE vocabulary SET archived = 1, updated_at = datetime('now') WHERE id = ?", cur.ID); err != nil {
 		return RemoveResult{}, fmt.Errorf("remove value: %w", err)
+	}
+	return res, tx.Commit()
+}
+
+// closedAtOnMove is the closed_at clause for deals that move from a stage with outcome from to a
+// stage with outcome to because the old stage was removed. A move into an open stage reopens the deal
+// (closed_at cleared). A move into a closed stage stamps now when the deal was open or had the other
+// closed outcome, and keeps the date when the outcome is the same (the list was tidied, nothing
+// was won or lost again).
+func closedAtOnMove(from, to string) string {
+	switch {
+	case !model.OutcomeClosed(to):
+		return ", closed_at = NULL"
+	case from == to:
+		return ", closed_at = COALESCE(closed_at, datetime('now'))"
+	}
+	return ", closed_at = datetime('now')"
+}
+
+// stageRulesWith checks validate.StageRules on the live stages of a kind as they would be after
+// dropping the stage dropID (0 for none) and giving the stage setID the outcome setOutcome.
+func stageRulesWith(ctx context.Context, q vocabQuerier, kind string, dropID, setID int64, setOutcome string) error {
+	rows, err := q.QueryContext(ctx, "SELECT id, name, outcome FROM vocabulary WHERE kind = ? AND archived = 0", kind)
+	if err != nil {
+		return fmt.Errorf("read stages: %w", err)
+	}
+	defer rows.Close()
+	var after []validate.StageState
+	for rows.Next() {
+		var id int64
+		var st validate.StageState
+		if err := rows.Scan(&id, &st.Name, &st.Outcome); err != nil {
+			return err
+		}
+		if id == dropID {
+			continue
+		}
+		if id == setID {
+			st.Outcome = setOutcome
+		}
+		after = append(after, st)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	return validate.StageRules(after)
+}
+
+// OutcomeResult says what an outcome change did.
+type OutcomeResult struct {
+	Name string `json:"name"`
+	Old  string `json:"old"`
+	New  string `json:"new"`
+	// Closed is how many deals without a close date got one because their stage now closes them.
+	Closed int `json:"closed"`
+}
+
+// SetOutcome sets the outcome of a value of a vocabulary with outcomes (a deal stage): open, won or
+// lost. The change is refused with E_STAGE_NO_OPEN, E_STAGE_NO_WON or E_STAGE_NO_LOST when the list
+// would no longer have an open, a won and a lost stage. Deals in a stage that now closes them get a
+// close date when they have none. Deals in a stage that now stays open keep their date.
+func (r *VocabRepo) SetOutcome(ctx context.Context, kind, name, outcome string) (OutcomeResult, error) {
+	vs, err := vocabSpec(kind)
+	if err != nil {
+		return OutcomeResult{}, err
+	}
+	if !vs.Outcomes {
+		return OutcomeResult{}, fmt.Errorf("a %s has no outcome: %w", vs.Noun, model.ErrValidation)
+	}
+	outcome, err = validate.StageOutcome(outcome)
+	if err != nil {
+		return OutcomeResult{}, err
+	}
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return OutcomeResult{}, err
+	}
+	defer tx.Rollback()
+	cur, err := findVocab(ctx, tx, kind, name)
+	if err != nil || cur.Removed {
+		return OutcomeResult{}, vocabNotFound(vs, name)
+	}
+	res := OutcomeResult{Name: cur.Name, Old: cur.Outcome, New: outcome}
+	if cur.Outcome == outcome {
+		return res, nil
+	}
+	if err := stageRulesWith(ctx, tx, kind, 0, cur.ID, outcome); err != nil {
+		return OutcomeResult{}, err
+	}
+	if _, err := tx.ExecContext(ctx, "UPDATE vocabulary SET outcome = ?, updated_at = datetime('now') WHERE id = ?", outcome, cur.ID); err != nil {
+		return OutcomeResult{}, fmt.Errorf("set outcome: %w", err)
+	}
+	if model.OutcomeClosed(outcome) && kind == model.DealStageKind {
+		for _, u := range vs.Usages {
+			out, err := tx.ExecContext(ctx, fmt.Sprintf("UPDATE %s SET closed_at = datetime('now'), updated_at = datetime('now') WHERE %s = ? COLLATE NOCASE AND closed_at IS NULL", u.Table, u.Column), cur.Name)
+			if err != nil {
+				return OutcomeResult{}, fmt.Errorf("stamp close date: %w", err)
+			}
+			c, _ := out.RowsAffected()
+			res.Closed += int(c)
+		}
 	}
 	return res, tx.Commit()
 }

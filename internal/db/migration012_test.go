@@ -21,7 +21,7 @@ func TestMigration012_AddsNameAliases(t *testing.T) {
 	d, err = db.Open(path)
 	require.NoError(t, err)
 	defer d.Close()
-	assert.Equal(t, 13, scalar(t, d, `PRAGMA user_version`))
+	assert.Equal(t, 14, scalar(t, d, `PRAGMA user_version`))
 	assert.Equal(t, 1, scalar(t, d, `SELECT COUNT(*) FROM people`))
 	assert.Equal(t, 0, scalar(t, d, `SELECT COUNT(*) FROM name_aliases`))
 	_, err = d.Exec(`INSERT INTO name_aliases (uuid, alias, canonical) VALUES ('a1', 'zeke', 'zachary')`)

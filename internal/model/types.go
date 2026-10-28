@@ -276,7 +276,9 @@ type DealFilters struct {
 
 // PipelineStage represents a summary of deals in a stage.
 type PipelineStage struct {
-	Stage      string  `json:"stage"`
+	Stage string `json:"stage"`
+	// Outcome is the outcome of the stage: open, won or lost.
+	Outcome    string  `json:"outcome"`
 	Count      int     `json:"count"`
 	TotalValue float64 `json:"total_value"`
 }
@@ -397,19 +399,6 @@ var InteractionDirections = []string{"inbound", "outbound"}
 func ValidInteractionDirection(d string) bool {
 	for _, id := range InteractionDirections {
 		if id == d {
-			return true
-		}
-	}
-	return false
-}
-
-// Deal stages
-var DealStages = []string{"lead", "prospect", "proposal", "negotiation", "won", "lost"}
-
-// ValidDealStage checks if the given stage is valid.
-func ValidDealStage(s string) bool {
-	for _, ds := range DealStages {
-		if ds == s {
 			return true
 		}
 	}

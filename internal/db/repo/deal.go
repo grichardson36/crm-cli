@@ -94,23 +94,69 @@ func (r *DealRepo) linkInput(ctx context.Context, dealID int64, personID, orgID 
 	return nil
 }
 
-func closedStage(stage string) bool { return stage == "won" || stage == "lost" }
+// OpenDealCond is the SQL condition for a deal that is still open: its stage has the outcome open.
+// col is the stage column of the query. Stats and lists use it, never the names won and lost, because
+// the stages are a list the user manages (patterns/deal-stages).
+func OpenDealCond(col string) string {
+	return col + " COLLATE NOCASE NOT IN (SELECT name FROM vocabulary WHERE kind = '" + model.DealStageKind + "' AND outcome <> '" + model.OutcomeOpen + "')"
+}
+
+// stageOutcome is the outcome of a listed deal stage.
+func (r *DealRepo) stageOutcome(ctx context.Context, stage string) (string, error) {
+	var o string
+	err := r.db.QueryRowContext(ctx, "SELECT outcome FROM vocabulary WHERE kind = ? AND name = ?", model.DealStageKind, stage).Scan(&o)
+	if err != nil {
+		return "", fmt.Errorf("stage %q: %w", stage, err)
+	}
+	return o, nil
+}
+
+// resolveStage checks a typed stage against the live deal stage list and returns the listed spelling
+// and its outcome. An empty stage is the first open stage when orDefault is set (a new deal), else the
+// field is required. An unlisted stage is E_VOCAB_UNKNOWN with a fix.
+func (r *DealRepo) resolveStage(ctx context.Context, raw string, orDefault bool) (stage, outcome string, err error) {
+	vr := NewVocabRepo(r.db)
+	if strings.TrimSpace(raw) == "" {
+		if !orDefault {
+			return "", "", validate.Fail(validate.Issue{Code: validate.CodeFieldRequired, Field: "stage", Expected: "a stage from the list",
+				Fix: "pick one from `crm deal stages list`"})
+		}
+		list, err := vr.live(ctx, model.DealStageKind)
+		if err != nil {
+			return "", "", err
+		}
+		for _, e := range list {
+			if e.Outcome == model.OutcomeOpen {
+				return e.Name, e.Outcome, nil
+			}
+		}
+		return "", "", validate.StageRules(nil)
+	}
+	stage, _, err = vr.Resolve(ctx, "deal", "stage", raw, false)
+	if err != nil {
+		return "", "", err
+	}
+	outcome, err = r.stageOutcome(ctx, stage)
+	return stage, outcome, err
+}
 
 // Create inserts a new deal.
 func (r *DealRepo) Create(ctx context.Context, input model.CreateDealInput) (*model.Deal, error) {
 	if err := validate.DealCreate(&input).Err(); err != nil {
 		return nil, err
 	}
-	if _, err := validate.OneOf("stage", input.Stage, model.DealStages); err != nil {
+	stage, outcome, err := r.resolveStage(ctx, input.Stage, true)
+	if err != nil {
 		return nil, err
 	}
 
 	id := uuid.New().String()
-	// closed_at is set when a deal starts out won or lost (patterns/one-verb-set).
+	// closed_at is set when a deal starts out in a stage with the outcome won or lost
+	// (patterns/one-verb-set, patterns/deal-stages).
 	result, err := r.db.ExecContext(ctx,
 		`INSERT INTO deals (uuid, title, value, stage, notes, closed_at)
-		 VALUES (?, ?, ?, ?, ?, CASE WHEN ? IN ('won', 'lost') THEN datetime('now') END)`,
-		id, input.Title, input.Value, input.Stage, input.Notes, input.Stage)
+		 VALUES (?, ?, ?, ?, ?, CASE WHEN ? THEN datetime('now') END)`,
+		id, input.Title, input.Value, stage, input.Notes, model.OutcomeClosed(outcome))
 	if err != nil {
 		return nil, fmt.Errorf("create deal: %w", err)
 	}
@@ -156,7 +202,7 @@ func (r *DealRepo) FindAll(ctx context.Context, filters model.DealFilters) ([]*m
 		args = append(args, *filters.OrgID)
 	}
 	if filters.ExcludeClosed {
-		query += " AND stage NOT IN ('won', 'lost')"
+		query += " AND " + OpenDealCond("stage")
 	}
 
 	query += " ORDER BY created_at DESC"
@@ -207,14 +253,19 @@ func (r *DealRepo) Update(ctx context.Context, id int64, input model.UpdateDealI
 		args = append(args, *input.Value)
 	}
 	if input.Stage != nil {
+		stage, outcome, err := r.resolveStage(ctx, *input.Stage, false)
+		if err != nil {
+			return nil, err
+		}
 		setClauses = append(setClauses, "stage = ?")
-		args = append(args, *input.Stage)
-		// closed_at follows the stage (Salesforce): re-stamped to now on every move into won or
-		// lost, including won to lost, and cleared when the deal reopens.
+		args = append(args, stage)
+		// closed_at follows the outcome of the stage (Salesforce): re-stamped to now on every move
+		// into a won or lost stage, including won to lost, and cleared when the deal reopens. The
+		// names of the stages do not matter, a renamed or new stage closes a deal by its outcome.
 		if input.ClosedAt == nil {
-			if closedStage(*input.Stage) {
+			if model.OutcomeClosed(outcome) {
 				setClauses = append(setClauses, "closed_at = CASE WHEN stage <> ? THEN datetime('now') ELSE closed_at END")
-				args = append(args, *input.Stage)
+				args = append(args, stage)
 			} else {
 				setClauses = append(setClauses, "closed_at = NULL")
 			}
@@ -305,20 +356,15 @@ func (r *DealRepo) Search(ctx context.Context, query string, limit int) ([]*mode
 	return deals, nil
 }
 
-// Pipeline returns a summary of deals grouped by stage.
+// Pipeline returns a summary of deals grouped by stage, in the order of the deal stage list. A stage
+// with no deals is not shown. Each stage carries its outcome (open, won or lost).
 func (r *DealRepo) Pipeline(ctx context.Context) ([]*model.PipelineStage, error) {
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT stage, COUNT(*) as count, COALESCE(SUM(value), 0) as total_value
-		 FROM deals WHERE archived = 0
-		 GROUP BY stage
-		 ORDER BY CASE stage
-		   WHEN 'lead' THEN 1
-		   WHEN 'prospect' THEN 2
-		   WHEN 'proposal' THEN 3
-		   WHEN 'negotiation' THEN 4
-		   WHEN 'won' THEN 5
-		   WHEN 'lost' THEN 6
-		 END`)
+		`SELECT d.stage, COALESCE(v.outcome, 'open'), COUNT(*) as count, COALESCE(SUM(d.value), 0) as total_value
+		 FROM deals d LEFT JOIN vocabulary v ON v.kind = ? AND v.name = d.stage
+		 WHERE d.archived = 0
+		 GROUP BY d.stage
+		 ORDER BY v.id IS NULL, COALESCE(v.archived, 0), v.position, d.stage`, model.DealStageKind)
 	if err != nil {
 		return nil, fmt.Errorf("pipeline: %w", err)
 	}
@@ -327,7 +373,7 @@ func (r *DealRepo) Pipeline(ctx context.Context) ([]*model.PipelineStage, error)
 	var stages []*model.PipelineStage
 	for rows.Next() {
 		var s model.PipelineStage
-		if err := rows.Scan(&s.Stage, &s.Count, &s.TotalValue); err != nil {
+		if err := rows.Scan(&s.Stage, &s.Outcome, &s.Count, &s.TotalValue); err != nil {
 			return nil, fmt.Errorf("scan pipeline stage: %w", err)
 		}
 		stages = append(stages, &s)
@@ -351,14 +397,15 @@ func (r *DealRepo) Restore(ctx context.Context, id int64) error {
 // Overwrite sets every editable field to the values of d, including empty ones. Undo and redo
 // use it so a field that was empty goes back to empty.
 func (r *DealRepo) Overwrite(ctx context.Context, id int64, d *model.Deal) error {
-	if _, err := validate.OneOf("stage", d.Stage, model.DealStages); err != nil {
+	stage, _, err := r.resolveStage(ctx, d.Stage, false)
+	if err != nil {
 		return err
 	}
 	result, err := r.db.ExecContext(ctx,
 		`UPDATE deals SET title = ?, value = ?, stage = ?, notes = ?, closed_at = ?,
 		        updated_at = datetime('now')
 		 WHERE id = ? AND archived = 0`,
-		d.Title, d.Value, d.Stage, d.Notes, d.ClosedAt, id)
+		d.Title, d.Value, stage, d.Notes, d.ClosedAt, id)
 	if err != nil {
 		return fmt.Errorf("overwrite deal %d: %w", id, err)
 	}
