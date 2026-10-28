@@ -197,7 +197,7 @@ func (r *LinkRepo) orient(ctx context.Context, a, b Ref) (model.Relation, Ref, R
 }
 
 // validateAttrs rejects attributes the relation does not carry and bad dates.
-func (r *LinkRepo) validateAttrs(rel model.Relation, at model.LinkAttrs) (model.LinkAttrs, error) {
+func (r *LinkRepo) validateAttrs(ctx context.Context, rel model.Relation, at model.LinkAttrs, current *string) (model.LinkAttrs, error) {
 	has := map[string]bool{
 		model.AttrRole: at.Role != nil, model.AttrFrom: at.StartedOn != nil, model.AttrTo: at.EndedOn != nil,
 		model.AttrPrimary: at.Primary != nil, model.AttrKind: at.Kind != nil, model.AttrNotes: at.Notes != nil,
@@ -220,6 +220,17 @@ func (r *LinkRepo) validateAttrs(rel model.Relation, at model.LinkAttrs) (model.
 	if at.Role != nil {
 		v := strings.TrimSpace(*at.Role)
 		at.Role = &v
+		// A deal role is a value of the deal role vocabulary (patterns/deal-roles). The same text
+		// the link already holds passes, so a free-text role from before the vocabulary stays editable
+		// in its other attributes. Other relations keep free text roles.
+		same := current != nil && strings.EqualFold(strings.TrimSpace(*current), v)
+		if rel.Name == model.DealPersonKind && v != "" && !same {
+			name, _, err := NewVocabRepo(r.db).Resolve(ctx, model.DealPersonKind, model.AttrRole, v, at.CreateRole)
+			if err != nil {
+				return at, err
+			}
+			at.Role = &name
+		}
 	}
 	return at, nil
 }
@@ -259,7 +270,7 @@ func (r *LinkRepo) link(ctx context.Context, a, b Ref, attrs model.LinkAttrs, fo
 	if forceNew && rel.Unique {
 		return LinkResult{}, fmt.Errorf("%s links are unique per pair: %w", rel.Name, model.ErrValidation)
 	}
-	attrs, err = r.validateAttrs(rel, attrs)
+	attrs, err = r.validateAttrs(ctx, rel, attrs, nil)
 	if err != nil {
 		return LinkResult{}, err
 	}
@@ -638,7 +649,7 @@ func (r *LinkRepo) Update(ctx context.Context, relation string, id int64, attrs 
 	if cur.Deleted {
 		return LinkResult{}, fmt.Errorf("%s link %d: %w", relation, id, model.ErrNotFound)
 	}
-	attrs, err = r.validateAttrs(rel, attrs)
+	attrs, err = r.validateAttrs(ctx, rel, attrs, cur.Role)
 	if err != nil {
 		return LinkResult{}, err
 	}

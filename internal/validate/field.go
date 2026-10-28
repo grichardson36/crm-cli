@@ -33,6 +33,10 @@ type Options struct {
 	Kind string
 	// ParseDate turns a natural phrase ("next friday") into a stored date. Nil accepts ISO dates only.
 	ParseDate model.DateParser
+	// Create lets a field backed by a vocabulary take a value that is not on the list yet. The check
+	// then passes and returns the S_VOCAB_CREATE suggestion, and the caller adds the value to the list.
+	// Without it an unknown value is E_VOCAB_UNKNOWN.
+	Create bool
 }
 
 // Field checks one value typed for a field. It sanitizes the text, then applies the check of the
@@ -78,6 +82,10 @@ func Field(spec model.FieldSpec, raw string, opt Options) Result {
 		}
 		r.Value = strconv.FormatFloat(n, 'f', -1, 64)
 	case model.FieldChoice:
+		if spec.Vocabulary != "" {
+			vocabChoice(&r, spec, v, opt)
+			return r
+		}
 		for i, c := range spec.Choices {
 			if strings.EqualFold(v, c.Value) || strings.EqualFold(v, c.Label) || (v == strconv.Itoa(i+1) && spec.Clear == "") {
 				r.Value = c.Value

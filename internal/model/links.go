@@ -41,6 +41,9 @@ type LinkAttrs struct {
 	// Kind is a relation kind name (person and organization relations).
 	Kind  *string `json:"kind,omitempty"`
 	Notes *string `json:"notes,omitempty"`
+	// CreateRole lets a deal link take a role that is not on the deal role list: it is added to the
+	// list while the link is saved (--create, create in MCP). It is a switch, not stored.
+	CreateRole bool `json:"-"`
 }
 
 // Empty reports whether no attribute is set.

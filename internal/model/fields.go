@@ -81,6 +81,11 @@ type FieldSpec struct {
 	Max int
 	// Hint is the grayscale text shown after the cursor while the field is edited.
 	Hint string
+	// Vocabulary is the kind of the user-managed vocabulary (Vocabularies) that backs a choice field.
+	// The options are the live values of that vocabulary: the caller sets Choices from it
+	// (WithVocabulary) before editing or checking. A value that is not in the list is unknown: the TUI
+	// offers to create it, the CLI and MCP refuse it unless told to create it.
+	Vocabulary string
 }
 
 // DateParser turns a natural date phrase into the stored form. ok is false when it is not a date. The
@@ -194,6 +199,11 @@ var Fields = map[string][]FieldSpec{
 	},
 	NoteKind: {
 		{Key: "text", Label: "text", Type: FieldLongText, Required: true},
+	},
+	// The role of a person on a deal is a sales role from the deal role vocabulary, not the free text
+	// of a membership role. The options are loaded from the vocabulary (patterns/deal-roles).
+	DealPersonKind: {
+		{Key: "role", Label: "deal role", Type: FieldChoice, Vocabulary: DealRoleKind, Hint: "type to filter, enter picks, a new name offers Create role"},
 	},
 }
 

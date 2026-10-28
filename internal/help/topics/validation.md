@@ -20,10 +20,15 @@ One validation framework checks every value from the CLI, MCP, the terminal UI, 
 | E_NUMBER_TOO_LOW | below the field's minimum |
 | E_PRIMARY_MEMBERSHIP_MULTIPLE | more than one primary membership |
 | E_ORG_PARENT_CYCLE | an organization would be its own ancestor |
+| E_VOCAB_UNKNOWN | a value is not on a list you manage (a deal role not on the list): add it first or pass `--create` |
+| E_VOCAB_DUPLICATE | a value with that name is already on the list |
+| E_VOCAB_IN_USE | a listed value is still used: name a replacement (`--replace-with`) or `--keep` it as plain text |
+| E_VOCAB_INVALID | a list value is empty, too long, or holds a pipe or control character |
 | W_ENCODING_DAMAGED | warning: text holds U+FFFD (damaged encoding) |
 | S_PHONE_IN_TEXT_FIELD | suggestion: phone-like text in another field |
 | S_EMAIL_IN_TEXT_FIELD | suggestion: email-like text in another field |
 | S_URL_IN_TEXT_FIELD | suggestion: web-address-like text in another field |
+| S_VOCAB_CREATE | suggestion: the value is not on the list yet and can be created (the terminal UI offers `Create role X`) |
 
 Only `E_` codes fail a command. Every write trims text, collapses whitespace and strips control characters. Text with U+FFFD is kept as typed and flagged. A suggestion is never applied: the CLI prints `crm: hint: ...` on stderr and the command succeeds, so move the value yourself.
 

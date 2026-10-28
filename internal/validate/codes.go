@@ -21,10 +21,15 @@ const (
 	CodeNumberTooLow     = "E_NUMBER_TOO_LOW"
 	CodePrimaryMultiple  = "E_PRIMARY_MEMBERSHIP_MULTIPLE"
 	CodeOrgParentCycle   = "E_ORG_PARENT_CYCLE"
+	CodeVocabUnknown     = "E_VOCAB_UNKNOWN"
+	CodeVocabDuplicate   = "E_VOCAB_DUPLICATE"
+	CodeVocabInUse       = "E_VOCAB_IN_USE"
+	CodeVocabInvalid     = "E_VOCAB_INVALID"
 	CodeEncodingDamaged  = "W_ENCODING_DAMAGED"
 	CodePhoneInTextField = "S_PHONE_IN_TEXT_FIELD"
 	CodeEmailInTextField = "S_EMAIL_IN_TEXT_FIELD"
 	CodeURLInTextField   = "S_URL_IN_TEXT_FIELD"
+	CodeVocabCreate      = "S_VOCAB_CREATE"
 )
 
 // Kinds of code. E_ codes fail the write, W_ codes warn and S_ codes suggest. Only errors fail.
@@ -57,10 +62,15 @@ var Codes = []CodeInfo{
 	{CodeNumberTooLow, KindError, "a number is below the field's minimum"},
 	{CodePrimaryMultiple, KindError, "a person would have more than one primary membership"},
 	{CodeOrgParentCycle, KindError, "an organization would become its own ancestor"},
+	{CodeVocabUnknown, KindError, "the value is not in the list the user manages (a deal role that is not on the list), create it first or pass --create"},
+	{CodeVocabDuplicate, KindError, "a value with that name is already on the list the user manages"},
+	{CodeVocabInUse, KindError, "a value on the list the user manages is still used by records, name a replacement or keep it as plain text"},
+	{CodeVocabInvalid, KindError, "a value for the list the user manages is empty, too long or has a line break or a pipe"},
 	{CodeEncodingDamaged, KindWarning, "the text holds U+FFFD, the mark of a damaged encoding"},
 	{CodePhoneInTextField, KindSuggestion, "phone-like text sits in a field that is not a phone"},
 	{CodeEmailInTextField, KindSuggestion, "email-like text sits in a field that is not an email"},
 	{CodeURLInTextField, KindSuggestion, "web-address-like text sits in a field that is not a web address"},
+	{CodeVocabCreate, KindSuggestion, "the value is not on the list the user manages yet, it can be created from the typed text"},
 }
 
 // KindOf returns the kind of a code ("" when unknown).

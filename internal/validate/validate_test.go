@@ -131,6 +131,12 @@ func TestEveryErrorCodeIsReachable(t *testing.T) {
 	note(validate.DateOrder("start date", "2026-02-01", "end date", "2026-01-01"))
 	note(validate.OrgParentCycle(1, 2, true))
 	note(validate.OnePrimaryMembership(7, 2))
+	roleSpec := spec(t, "deal_person", "role").WithVocabulary([]string{"champion"})
+	note(validate.Field(roleSpec, "zzz", validate.Options{}).Err())
+	_, vErr := validate.VocabName("deal_role", "  ")
+	note(vErr)
+	note(validate.VocabDuplicate("deal_role", "champion"))
+	note(validate.VocabInUse("deal_role", "champion", 2))
 	for _, c := range validate.Codes {
 		if c.Kind == validate.KindError {
 			assert.True(t, seen[c.Code], "no test reaches "+c.Code)
@@ -148,7 +154,7 @@ func TestCodeVocabulary(t *testing.T) {
 		assert.True(t, strings.HasPrefix(c.Code, prefix), c.Code)
 		assert.Equal(t, c.Kind, validate.KindOf(c.Code))
 	}
-	assert.Len(t, validate.Codes, 18)
+	assert.Len(t, validate.Codes, 23)
 }
 
 func TestSanitize(t *testing.T) {

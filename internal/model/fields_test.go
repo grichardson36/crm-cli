@@ -24,11 +24,20 @@ func TestFieldRegistryIsClosedAndComplete(t *testing.T) {
 			assert.NotEmpty(t, f.Label, id)
 			switch f.Type {
 			case model.FieldChoice:
-				assert.NotEmpty(t, f.Choices, id)
+				if f.Vocabulary != "" {
+					_, ok := model.VocabularyNamed(f.Vocabulary)
+					assert.True(t, ok, id+" names a registered vocabulary")
+					assert.Empty(t, f.Choices, id+" loads its options from the vocabulary")
+				} else {
+					assert.NotEmpty(t, f.Choices, id)
+				}
 			case model.FieldRelation:
 				assert.NotEmpty(t, f.Kind, id)
 			case model.FieldList:
 				assert.NotEmpty(t, f.Item, id)
+			}
+			if f.Vocabulary != "" {
+				assert.Equal(t, model.FieldChoice, f.Type, id)
 			}
 			if f.Type != model.FieldChoice {
 				assert.Empty(t, f.Choices, id)
