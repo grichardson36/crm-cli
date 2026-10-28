@@ -227,7 +227,7 @@ db, err := sql.Open("sqlite", dbPath)
 - Each file has `-- up` and `-- down` sections
 - Track current version via `PRAGMA user_version`
 - Run inside a transaction for atomicity
-- Auto-backup database file before running migrations
+- Before applying pending migrations to an existing file database with data, `db.Open` writes a `VACUUM INTO` copy to `<data dir>/backups/<name>-pre-v<old>-<YYYYMMDD-HHMMSS>.db`, aborts if that fails, keeps the newest 5, and takes a `<db>.migrate.lock` file so only one process migrates (`internal/db/backup.go`). A schema newer than the build is refused (`NewerSchemaError`). The notice goes to stderr only, silenced for `crm mcp serve`
 - **Never modify existing migrations** — always create a new one
 
 ### Schema

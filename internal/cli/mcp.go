@@ -1,6 +1,9 @@
 package cli
 
 import (
+	"io"
+
+	dbpkg "github.com/jdanielnd/crm-cli/internal/db"
 	crmmcp "github.com/jdanielnd/crm-cli/internal/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/spf13/cobra"
@@ -16,6 +19,8 @@ func registerMCPCommands(rootCmd *cobra.Command) {
 		Use:   "serve",
 		Short: "Start the MCP server (stdio transport)",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Standard output is the JSON-RPC channel, so the migration backup notice stays silent.
+			dbpkg.Notice = io.Discard
 			db, err := openDB()
 			if err != nil {
 				return err
