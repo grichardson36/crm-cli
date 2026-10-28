@@ -122,7 +122,7 @@ func TestANoteOfferedAnOrganizationLinksItOnTab(t *testing.T) {
 	m.settle()
 	press(m, "a", "n")
 	require.Equal(t, modePrompt, m.mode)
-	typeText(m, "met their CEO||")
+	typeText(m, "met their CEO|")
 	assert.Contains(t, m.View(), "Acme")
 	press(m, "tab", "enter")
 	notes, err := m.ir.FindAll(m.ctx, model.InteractionFilters{OrgID: &o.ID, Limit: 10})

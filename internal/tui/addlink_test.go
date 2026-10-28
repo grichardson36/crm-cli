@@ -224,7 +224,7 @@ func TestAddPersonWithAnOrganizationHighlightedLinksOnTab(t *testing.T) {
 	m.cursorOn(func(r row) bool { return r.orgID == o.ID })
 	press(m, "a", "p")
 	require.True(t, m.creating, "the person form opens")
-	typeText(m, "Nina Park||")
+	typeText(m, "Nina Park|")
 	assert.Contains(t, m.View(), "highlighted", "the organizations segment offers the highlighted organization")
 	assert.NotContains(t, m.View(), "tab: link")
 	press(m, "tab")

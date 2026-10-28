@@ -169,19 +169,20 @@ func TestPopupRowsComeFromTheFieldType(t *testing.T) {
 	}
 }
 
-func TestPopupHasAtMostSixRowsAndTagsComeFromExistingTags(t *testing.T) {
+func TestHashNarrowsTheRelatedPopupToExistingTags(t *testing.T) {
 	m, _ := newTestModel(t)
 	for _, n := range []string{"alpha", "alpine", "alto", "also", "alms", "alum", "alder", "algae"} {
 		require.NoError(t, m.tagr.Apply(m.ctx, "person", 1, n))
 	}
 	m.qtags = nil // read the tags again
 	m.pendingCmd = objectByKind("task").add(m)
-	typeText(m, "Call|||||al")
+	typeText(m, "Call||#al")
 	s := m.pipeRefresh()
 	rows := s.ac.Rows()
-	assert.Len(t, rows, acMaxRows, "at most six rows")
+	assert.Len(t, rows, 8, "all eight tags fit the related popup")
+	assert.LessOrEqual(t, len(s.ac.Lines(40, m.st)), acMaxLines, "the popup scrolls inside its lines")
 	for _, r := range rows {
-		assert.NotEmpty(t, r.Tag, "the rows are existing tags")
+		assert.NotEmpty(t, r.Tag, "a # looks among the existing tags only")
 	}
 	typeText(m, "g")
 	assert.Equal(t, []string{"algae"}, rowLabels(s.ac.Rows()))
@@ -399,7 +400,7 @@ func TestNoteLineLinksPeopleAndOrganizations(t *testing.T) {
 	m.afterWrite()
 	m.startInput("note-free", "note: ", "")
 	_ = m.input.Focus()
-	typeText(m, "met the team #vip|Bob Baker|Acme")
+	typeText(m, "met the team #vip|Bob Baker, Acme")
 	press(m, "enter")
 	bob := int64(2)
 	notes, err := m.ir.FindAll(m.ctx, model.InteractionFilters{PersonID: &bob, Limit: 10})
@@ -420,7 +421,7 @@ func TestSyntaxHintStillShowsAlongsideThePopup(t *testing.T) {
 	typeText(m, "Call|fr")
 	require.True(t, m.pipeRefresh().ac.Open())
 	screen := plainView(m)
-	assert.Contains(t, screen, "| people | organizations", "the hint of the remaining segments")
+	assert.Contains(t, screen, "| related", "the hint of the remaining segments")
 	assert.Contains(t, screen, "fri", "and the popup")
 	assert.Equal(t, "Call|fr", m.input.Value(), "neither is part of the text")
 }
