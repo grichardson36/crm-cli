@@ -11,7 +11,7 @@ crm tui --read-only
 
 ## Views
 
-Every view is a module you can turn on or off and reorder (see modules). Jump with the number keys, cycle with `[` and `]`, or press `v` for the view list. Every module is on by default. The keys below are the default order, the tenth module takes `0`.
+Every view is a module you can turn on or off and reorder (see modules). Jump with the number keys, cycle with `[` and `]`, or press `v` for the Views screen, which also shows, hides and reorders them. Archived and Sync are hidden by default and open from Settings, the bar or the Hidden group of the Views screen. The keys below are the default order, the tenth module takes `0`.
 
 | Key | View | Shows |
 |---|---|---|
@@ -23,8 +23,8 @@ Every view is a module you can turn on or off and reorder (see modules). Jump wi
 | 6 | Deals | deals with stage and value |
 | 7 | Birthdays | upcoming birthdays |
 | 8 | Merge | groups of probable duplicates |
-| 9 | Archived | archived records |
-| 0 | Sync | sync sources and the inbox of unmatched records |
+| 9 | Settings | every setting, with where it is stored (device, synced or session) |
+| hidden | Archived, Sync | archived records, sync sources and the inbox (Settings: "Open Archived", "Open Sync") |
 
 ## Palette actions that mirror CLI commands
 

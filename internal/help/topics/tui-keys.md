@@ -15,7 +15,8 @@ The palette (`ctrl+k` or `/`) runs any action by name, as "Verb object" (Add org
 
 - Arrow keys, `tab` and `shift+tab` (`h j k l g G` and `ctrl+n`, `ctrl+p` are gone). `ctrl+u` / `ctrl+d` half a page, `pgup` / `pgdown` a full page, `home` / `end` first and last row in every view.
 - `ctrl+up` / `ctrl+down` jump by the unit the view declares: a day in Birthdays, a confidence level in Merge, the next first letter in People and Organizations, a page elsewhere. `ctrl+shift+up` / `ctrl+shift+down` go to the home destination of the view (today in Birthdays), else the first and last row. Some terminals do not report these chords, and `home` and `end` always work.
-- `tab` moves into the detail form, `esc` or `tab` back. Views: `1` to `9` and `0`, `[` and `]` (also `ctrl+left` and `ctrl+right`), `v` for the picker.
+- `tab` moves into the detail form, `esc` or `tab` back. Views: `1` to `9` and `0`, `[` and `]` (also `ctrl+left` and `ctrl+right`), `v` for the Views screen.
+- Views screen (`v`): lists every view, the shown ones first, then a Hidden divider and the hidden ones. `enter` goes to the view, `x` shows or hides it, `shift+up` and `shift+down` reorder inside the group, `esc` closes. Settings cannot be hidden. Archived and Sync start hidden. Settings view (key 9): a list with a divider per section. Each row shows its value and where it is stored: `device` (this computer, `config.toml`), `synced` (the database) or `session` (until you close the program). `enter` or `e` edits a text or choice setting in place, `d` resets it, any other row opens the screen it belongs to. The `=` prefix of the bar lists the same settings.
 - `ctrl+o` opens the view options, one overlay for every list view: Sort in People and Organizations, Minimum level in Merge, Type in Archived. `left` and `right` change a value. `ctrl+t` and `ctrl+up` as go-to-today are retired: "Go to today" is a palette entry.
 
 ## App keys and palette entries
@@ -31,7 +32,7 @@ A relation field shows its linked rows as a small table whose cells (role, dates
 ## Merge, archive, sync, bar
 
 - Merge view: every candidate is listed, grouped by confidence level (HIGH, MEDIUM, LOW, FUZZY) under divider headings. `enter`, `e` or `m` compare, `d` dismiss the group (all selected groups). `ctrl+o` sets the minimum level. Compare: `left`/`right` keep that candidate's value, `tab` moves to the next field (from the last to the first), `space` toggles a value or a list item, `ctrl+e` survivor, `d` dismiss, `m` or `enter` merge, `esc` back. `q` no longer leaves the compare.
-- Organizations: `space` selects, `m` merges the selected. Archived view lists people, organizations, deals, tasks and notes. Sync inbox: `enter` or `e` accepts a record, `d` ignores it. Home: `enter` opens the person.
+- Organizations: `space` selects, `m` merges the selected. Archived view (hidden by default, open it from Settings, the bar or the Views screen) lists people, organizations, deals, tasks and notes. Sync inbox: `enter` or `e` accepts a record, `d` ignores it. Home: `enter` opens the person.
 - Bar (`ctrl+k`): `tab` on a person, organization, deal, task or tag row moves the focus to the results, where the universal verbs act on that row (`x`, `s`, `f`, `e`, `d`, `l`, `u`, `ctrl+z`) and `a` opens the add picker with the row's kind preselected. A tag row has `d` delete, `l` give, `u` take off, `e` rename, `m` merge into another tag, `enter` opens its people.
 - `crm keys set` warns about chords terminals swallow: `ctrl+i`, `ctrl+m`, `ctrl+h`, `ctrl+[`, `ctrl+j`, `ctrl+shift+c` and the `ctrl+shift` arrows. A `[keys]` entry for an action or key that is gone is reported, never a crash.
 
