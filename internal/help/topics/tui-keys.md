@@ -26,7 +26,7 @@ The palette (`ctrl+k` or `/`) runs any action by name, as "Verb object" (Add org
 
 `enter` or `e` edits a row in place by its field type: text, number and date ("next friday" works) in the row, longtext in the row (`alt+enter` is a new line), choice (deal stage, priority) with `up`/`down` or a letter, relation rows with a typeahead (`enter` picks, the last row is Create 'X', `tab` completes). `enter` or `tab` saves, `esc` cancels. `u` unlinks the focused linked row. `a` adds a row. `d` deletes the row (asks y/n).
 
-A relation field shows its linked rows as a small table whose cells (role, dates, primary, kind, notes, note type) are edited in place: `right`, `left` and `tab` move across them, `enter` edits (see tui-selection). `E` is gone. While you type in a prompt such as `title | due`, the rest of the line shows dimmed after the cursor. The hint is never submitted.
+A relation field shows its linked rows as a small table whose cells (role, dates, primary, kind, notes, note type) are edited in place: `right`, `left` and `tab` move across them, `enter` edits (see tui-selection). The deal role of a deal link is a pick-or-create list: type to filter, a new name offers `Create role X` (see deal-roles). `E` is gone. While you type in a prompt such as `title | due`, the rest of the line shows dimmed after the cursor. The hint is never submitted.
 
 ## Merge, archive, sync, bar
 

@@ -147,7 +147,7 @@ func rolesCmd() *cobra.Command {
 	var relation string
 	cmd := &cobra.Command{
 		Use:   "roles",
-		Short: "List the roles already used on links, most used first (roles are free text)",
+		Short: "List the roles already used on links, most used first (for deal roles use: crm deal roles list)",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			db, err := openDB()
