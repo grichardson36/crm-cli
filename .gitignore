@@ -32,3 +32,10 @@ vendor/
 
 # Agent scratch directories
 .claude/
+
+# Pattern vault (Obsidian) per-machine state
+patterns/.obsidian/workspace*.json
+patterns/.obsidian/cache
+patterns/.obsidian/plugins/
+patterns/.obsidian/.trash/
+patterns/.trash/

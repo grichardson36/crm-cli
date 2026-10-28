@@ -1,0 +1,11 @@
+---
+type: discrepancies
+---
+# Open discrepancies (code versus patterns, 2026-10-16)
+
+Remove an item when it is fixed. Add an item when you find one. Provide them in /grilling skill format with you question and initial recommendation. Surface new ones to the user ([[surface-gaps-before-deciding]]). %%Denotes direct comments from the user that get removed with the item on fix.%%
+
+- X12. Open and Mark are one verb with one key now (`enter` and `e` are the action `activate`, `x` is `mark-state`, `m` is `merge`, [[universal-verbs]]), but the handlers behind them are still written per view (Home row, linked row, org and deal edit, task edit, inbox accept) and found by a short list in `internal/tui/verbs.go` (`activateTargets`, `mergeTargets`). Reduced in feat/keymap-a. Breaks [[objects-first]] and [[one-verb-set]] only on the handler side. Question: should each object register its own activate handler in the object registry? Recommendation: yes, when the next object is added, not before.
+- X17. The command bar and `crm do` cannot attach a note or task to an organization or deal. The only sigil is `@` for a person ([[at-sign-means-person]]). Notes reach organizations and deals through `log add --org|--deal`, MCP `org_ids`, and `a n` then `tab` on the org or deal page. Breaks [[three-doors-one-core]] for the bar.
+- X28. Reduced in feat/keymap-a. The bare keys `o`, `m`, `T`, `r` no longer move the view (sort is `ctrl+o`, duplicate level `ctrl+l`, archive type filter `ctrl+f`, reload `ctrl+r`) and `C` is gone with the Company review screen. Still bare: the digits, `[ ]` and `v` (view switching, framework layer), and `ctrl+z`, `ctrl+y` still act on history. Breaks [[ctrl-moves-the-view-bare-moves-the-object]]. Decided 2026-10-28: keep the digits, `[ ]` and `v`, and add `ctrl+left`/`ctrl+right` as aliases of `[ ]`. Remove this item when the owner accepts the breach.
+- X23. The device-to-device sync contract is decided ([[sync-contract]]) but not built. The DAV phone mapping is still open: DAV ORG has a decided rule ([[sync-maps-structure-to-flat-fields]]), but other flat fields (address, phone, email, title vs role) have no accepted mapping, and the round trip rewrites the phone's text. Proposed rules are in [[research-sync-standard]].
