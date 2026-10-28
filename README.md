@@ -388,6 +388,10 @@ Requires Go 1.24+. No CGO — builds anywhere Go runs.
 | MCP | [mcp-go](https://github.com/mark3labs/mcp-go) |
 | Search | SQLite FTS5 |
 
+## Design decisions and features
+
+The `patterns/` folder is the project's knowledge base: a vault of small linked notes (open it in [Obsidian](https://obsidian.md) or read the files). It is the source of truth for design decisions, the feature list and open questions. Start at [`patterns/index.md`](patterns/index.md). Every feature has a row with a stable ID (for example M27) in a `patterns/features-*.md` note.
+
 ## License
 
 MIT. This project is a fork of [jdanielnd/crm-cli](https://github.com/jdanielnd/crm-cli), Copyright (c) the original authors, released under the MIT License. The original copyright and license notice stay with all copies of this software.

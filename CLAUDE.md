@@ -4,6 +4,15 @@
 
 `crm` is a local-first personal CRM for the terminal. Go, SQLite (`modernc.org/sqlite`), Cobra CLI, built-in MCP server. Distributed as a single static binary for macOS, Linux, and Windows. See `README.md` for full product spec and `overview.md` for the technology-agnostic product vision.
 
+## Pattern vault (read first)
+
+`patterns/` is an Obsidian vault and the source of truth for design decisions and features. Consult `patterns/index.md` before any design or feature change, then the notes it links.
+
+- Feature rows (IDs such as M27) are in `patterns/features-*.md`. There is no FEATURES.md. Update the rows you change in the same session.
+- Surface discrepancies and missing standards to the owner with a recommendation. Do not decide alone. The live list is `patterns/open-discrepancies.md`.
+- Log each new rule as one atomic note in `patterns/`, linked from `patterns/index.md`.
+- Commit messages: `docs:` for vault changes, no co-author lines.
+
 ## Quick Reference
 
 - **Language:** Go 1.23+
