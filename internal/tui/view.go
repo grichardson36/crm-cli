@@ -209,6 +209,8 @@ func (m *Model) countText() string {
 		return fmt.Sprintf("%d organizations", len(m.rows))
 	case viewDeals:
 		return fmt.Sprintf("%d deals", len(m.rows))
+	case viewSettings:
+		return fmt.Sprintf("%d settings", len(m.settingList()))
 	case viewSync:
 		sources, inbox := 0, 0
 		for _, r := range m.rows {
@@ -268,6 +270,8 @@ func (m *Model) listView(w, h int) string {
 			return m.st.Dim.Render("No organizations. a adds one.")
 		case m.view == viewDeals:
 			return m.st.Dim.Render("No deals. a adds one.")
+		case m.view == viewSettings:
+			return m.st.Dim.Render("No settings.")
 		}
 		return m.st.Dim.Render("Nothing here yet.")
 	}

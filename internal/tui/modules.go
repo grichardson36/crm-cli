@@ -11,12 +11,13 @@ import (
 
 // Modules (M14). Every view is a module that can be turned on or off and put in any order. The
 // arrangement is in config.toml (internal/modules) and per device. An off module disappears from
-// the tabs, the number keys, [ and ], the view list and the palette. Links, record pages and every
-// other route still reach its data, a hidden view that was opened from a link shows as "v Name".
+// the tabs, the number keys, [ and ] and the palette. It stays in the Views screen under Hidden.
+// Links, record pages and every other route still reach its data, a hidden view that was opened
+// from a link shows as "v Name".
 
 var moduleViews = map[string]viewKind{
 	"home": viewHome, "people": viewPeople, "follow-up": viewDue, "tasks": viewTasks, "organizations": viewOrgs,
-	"birthdays": viewBirthdays, "merge": viewMerge, "archived": viewArchived, "sync": viewSync, "deals": viewDeals,
+	"birthdays": viewBirthdays, "merge": viewMerge, "archived": viewArchived, "sync": viewSync, "deals": viewDeals, "settings": viewSettings,
 }
 
 // moduleOf is the module id of a view. Every view here is a module or opens from a link.
@@ -132,54 +133,80 @@ func (m *Model) setModules(a modules.Arrangement) error {
 	return nil
 }
 
-// moduleItems lists every module with its state and key.
-func (m *Model) moduleItems() []overlayItem {
-	var items []overlayItem
-	for _, id := range m.mods.Normalize().Order {
+// The Views screen (v) is the one place that lists every view, shows or hides it and orders it. It
+// is an overlay with a grouped list (patterns/views-screen): the views that are shown first, then the
+// hidden ones under a divider. enter goes to the view, x (the universal mark) shows or hides it,
+// shift+up and shift+down move it inside its group, esc closes. The screen itself is not a module,
+// and Settings cannot be hidden, so the user can always get back to both.
+
+// viewItems lists every module as the Views screen shows it: shown views in order, then a divider and
+// the hidden views.
+func (m *Model) viewItems() []overlayItem {
+	arr := m.mods.Normalize()
+	var shown, hidden []overlayItem
+	for _, id := range arr.Order {
 		mod, _ := modules.Lookup(id)
-		state := "off"
-		hint := ""
-		if pos := m.mods.Position(id); pos > 0 {
-			state = "on"
-			hint = modules.Key(pos)
+		v := moduleViews[id]
+		it := overlayItem{id: "view:" + id, label: mod.Name, value: id, desc: mod.Blurb}
+		if v == m.view {
+			it.desc = "current view. " + mod.Blurb
 		}
-		if a := m.actionByID(viewActionID(moduleViews[id])); a != nil && len(a.keys) > 0 && m.mods.Position(id) > 0 {
-			hint = keys.Display(a.keys[0])
+		if mod.Always {
+			it.desc += " (always shown)"
 		}
-		items = append(items, overlayItem{id: "module:" + id, label: fmt.Sprintf("%-14s %s", mod.Name, state), hint: hint, desc: mod.Blurb, value: id})
+		if pos := arr.Position(id); pos > 0 {
+			it.hint = modules.Key(pos)
+			if a := m.actionByID(viewActionID(v)); a != nil && len(a.keys) > 0 {
+				it.hint = keys.Display(a.keys[0])
+			}
+			shown = append(shown, it)
+		} else {
+			hidden = append(hidden, it)
+		}
+	}
+	items := shown
+	if len(hidden) > 0 {
+		items = append(items, overlayItem{id: "divider:hidden", label: "Hidden", desc: fmt.Sprintf("%d, x shows", len(hidden)), divider: true})
+		items = append(items, hidden...)
 	}
 	return items
 }
 
-// openModules shows the Modules screen: space or enter turns the module under the cursor on or off,
-// shift+up and shift+down move it up and down, esc closes. The palette entry "Modules: reset" puts the default arrangement back.
-func (m *Model) openModules() tea.Cmd {
-	return m.showModules("")
-}
+// openViews shows the Views screen.
+func (m *Model) openViews() tea.Cmd { return m.showViews("") }
 
-func (m *Model) showModules(focusID string) tea.Cmd {
-	o := m.newOverlay("Modules: space toggles, shift+up / shift+down moves, esc closes", m.moduleItems(), false)
+func (m *Model) showViews(focusID string) tea.Cmd {
+	o := m.newOverlay("Views", m.viewItems(), false)
 	o.noFilter = true
-	if focusID != "" {
-		for i, it := range o.items {
-			if it.value == focusID {
+	o.digits = true
+	o.help = "enter go  x show/hide  shift+up/down move  esc close"
+	o.note = "Number keys go to a shown view. Settings and this screen (v) are always available."
+	focus := func(id string) {
+		for i, idx := range o.shown {
+			if id != "" && o.items[idx].value == id {
 				o.cursor = i
 			}
 		}
 		o.move(0, m.overlayPage())
+	}
+	focus(focusID)
+	o.onPick = func(m *Model, it overlayItem) {
+		if v, ok := moduleViews[it.value]; ok {
+			m.switchView(v)
+		}
 	}
 	o.onKey = func(m *Model, key string) bool {
 		cur := ""
 		if o.cursor >= 0 && o.cursor < len(o.shown) {
 			cur = o.items[o.shown[o.cursor]].value
 		}
+		if cur == "" {
+			return false
+		}
 		var err error
 		next := m.mods
 		switch key {
-		case " ", "enter":
-			if cur == "" {
-				return true
-			}
+		case "x":
 			next, err = m.mods.With(cur, m.mods.Position(cur) == 0)
 		case "shift+up":
 			next, err = m.shiftModule(cur, -1)
@@ -196,26 +223,32 @@ func (m *Model) showModules(focusID string) tea.Cmd {
 			m.pendingCmd = m.showToast(err.Error(), true)
 			return true
 		}
-		o.items = m.moduleItems()
+		o.items = m.viewItems()
 		o.refilter()
-		for i, idx := range o.shown {
-			if cur != "" && o.items[idx].value == cur {
-				o.cursor = i
-			}
-		}
-		o.move(0, m.overlayPage())
+		focus(cur)
 		m.setStatus("", false)
 		return true
 	}
 	return m.showOverlay(o)
 }
 
-// shiftModule moves a module one place up or down among all modules.
+// shiftModule moves a module one place up or down among the modules of its own group (shown or
+// hidden), so a view never jumps across the divider.
 func (m *Model) shiftModule(id string, d int) (modules.Arrangement, error) {
-	order := m.mods.Normalize().Order
-	for i, x := range order {
+	n := m.mods.Normalize()
+	idx := -1
+	for i, x := range n.Order {
 		if x == id {
-			return m.mods.Moved(id, i+1+d)
+			idx = i
+		}
+	}
+	if idx < 0 {
+		return m.mods, nil
+	}
+	hidden := n.IsHidden(id)
+	for j := idx + d; j >= 0 && j < len(n.Order); j += d {
+		if n.IsHidden(n.Order[j]) == hidden {
+			return m.mods.Moved(id, j+1)
 		}
 	}
 	return m.mods, nil
@@ -230,9 +263,7 @@ func viewActionID(v viewKind) string {
 
 func moduleActions() []action {
 	return []action{
-		{id: "modules", title: "Modules", group: "App", desc: "turn views on or off and put them in order (same as crm modules). Per device, in config.toml",
-			run: func(m *Model) tea.Cmd { return m.openModules() }},
-		{id: "modules-reset", title: "Modules: reset", group: "App", desc: "put the default module arrangement back: every view on, in the default order (palette, no key)", write: true,
+		{id: "modules-reset", title: "Modules: reset", group: "App", desc: "put the default view arrangement back: Archived and Sync hidden, the rest shown in the default order (palette, no key)", write: true,
 			run: func(m *Model) tea.Cmd {
 				if err := m.setModules(modules.Default()); err != nil {
 					m.setStatus(err.Error(), true)

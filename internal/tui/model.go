@@ -45,10 +45,11 @@ const (
 const (
 	viewOrgs viewKind = numViews + iota
 	viewDeals
+	viewSettings
 	numAllViews
 )
 
-var viewNames = [numAllViews]string{"Home", "People", "Follow-up", "Tasks", "Birthdays", "Merge", "Archived", "Sync", "Organizations", "Deals"}
+var viewNames = [numAllViews]string{"Home", "People", "Follow-up", "Tasks", "Birthdays", "Merge", "Archived", "Sync", "Organizations", "Deals", "Settings"}
 
 type mode int
 
@@ -91,6 +92,8 @@ type row struct {
 	jump int
 	// sync carries the Sync view data of the row.
 	sync *syncItem
+	// setting is the id of the setting a row of the Settings view stands for.
+	setting string
 	// dupe is the index of the duplicate group in m.groups plus one, 0 for a row that is not a group.
 	dupe int
 }
@@ -454,6 +457,8 @@ func (m *Model) rebuild(keep bool) error {
 			return err
 		}
 		rows = dr
+	case viewSettings:
+		rows = m.settingRows()
 	case viewMerge:
 		groups, err := m.dr.Find(m.ctx, m.minLevel)
 		if err != nil {

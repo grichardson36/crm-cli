@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"github.com/jdanielnd/crm-cli/internal/modules"
 	"strings"
 	"testing"
 	"time"
@@ -49,9 +50,24 @@ func newTestModel(t *testing.T) (*Model, *repo.PersonRepo) {
 	m.open = func(string) error { return nil }
 	m.registry = crmsync.NewRegistry() // no adapters unless a test installs the fake
 	m.runner = crmsync.NewRunner(d, m.registry)
+	useAllViews(m)
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 	m.switchView(viewPeople) // most tests start on the People list; Home has its own tests
 	return m, pr
+}
+
+// useAllViews shows every view with the number keys of the arrangement an existing user has, who
+// keeps Archived and Sync on: 9 is Archived and 0 is Sync. The tests of the shipped default (Archived
+// and Sync hidden, Settings on 9) call useDefaultViews.
+func useAllViews(m *Model) {
+	m.mods = modules.Arrangement{}.Normalize()
+	m.patchModuleActions()
+}
+
+// useDefaultViews installs the arrangement the program ships with.
+func useDefaultViews(m *Model) {
+	m.mods = modules.Default()
+	m.patchModuleActions()
 }
 
 func press(m *Model, keys ...string) {
@@ -243,9 +259,11 @@ func TestViewsDueBirthdaysTasks(t *testing.T) {
 	press(m, "]", "]", "]")
 	assert.Equal(t, viewSync, m.view)
 	press(m, "]")
+	assert.Equal(t, viewSettings, m.view, "Settings is the last view")
+	press(m, "]")
 	assert.Equal(t, viewHome, m.view, "] wraps around")
 	press(m, "[")
-	assert.Equal(t, viewSync, m.view, "[ wraps back")
+	assert.Equal(t, viewSettings, m.view, "[ wraps back")
 }
 
 func TestMarkContactedRemovesFromDue(t *testing.T) {

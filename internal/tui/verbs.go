@@ -23,7 +23,7 @@ import (
 
 // activateTargets are the handlers of activate, tried in order. The first one that applies in the
 // current context runs.
-var activateTargets = []string{"edit", "home-open", "compare", "org-edit", "deal-edit", "task-edit", "person-edit", "inbox-accept", "tag-rename"}
+var activateTargets = []string{"edit", "setting-open", "home-open", "compare", "org-edit", "deal-edit", "task-edit", "person-edit", "inbox-accept", "tag-rename"}
 
 // mergeTargets are the handlers of merge, tried in order.
 var mergeTargets = []string{"compare", "org-merge", "merge-marked"}

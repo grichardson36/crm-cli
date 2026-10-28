@@ -57,7 +57,7 @@ func TestOrgsAndDealsAreOnByDefaultAndFollowTheArrangement(t *testing.T) {
 	assert.Equal(t, viewHome, m.view, "] leaves a view that is off")
 	m.switchView(viewDeals)
 	press(m, "[")
-	assert.Equal(t, viewSync, m.view)
+	assert.Equal(t, viewSettings, m.view)
 }
 
 func TestOrgAddEditDeleteRestoreWithUndo(t *testing.T) {

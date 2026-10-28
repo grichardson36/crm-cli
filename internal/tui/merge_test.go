@@ -418,10 +418,15 @@ func TestNewActionsInPaletteWithCorrectGreying(t *testing.T) {
 
 func TestTabBarFitsAndClicksWork(t *testing.T) {
 	m, _ := dupeModel(t)
+	useDefaultViews(m)
 	for _, w := range []int{80, 100, 120} {
 		m.Update(tea.WindowSizeMsg{Width: w, Height: 30})
 		for i, v := range m.visibleViews() {
-			press(m, modules.Key(i+1))
+			if k := modules.Key(i + 1); k != "" {
+				press(m, k)
+			} else {
+				m.switchView(v)
+			}
 			require.Equal(t, v, m.view)
 			line := strings.Split(m.screen(), "\n")[0]
 			assert.LessOrEqual(t, lipgloss.Width(line), w, "tab bar at width %d view %d", w, v)
@@ -443,7 +448,7 @@ func TestTabBarFitsAndClicksWork(t *testing.T) {
 		if seg.more {
 			assert.Equal(t, modeOverlay, m.mode, "More opens the switcher")
 			require.NotNil(t, m.ov)
-			assert.Equal(t, "Go to view", m.ov.title)
+			assert.Equal(t, "Views", m.ov.title)
 			press(m, "esc")
 			continue
 		}
@@ -465,14 +470,18 @@ func TestTabBarFitsAndClicksWork(t *testing.T) {
 func TestNumberAndBracketKeysCoverEveryView(t *testing.T) {
 	m, _ := newTestModel(t)
 	for i, v := range m.visibleViews() {
-		press(m, modules.Key(i+1))
+		if k := modules.Key(i + 1); k != "" {
+			press(m, k)
+		} else {
+			m.switchView(v)
+		}
 		assert.Equal(t, v, m.view)
 	}
-	assert.Equal(t, viewSync, m.view)
+	assert.Equal(t, viewSettings, m.view)
 	press(m, "]")
-	assert.Equal(t, viewHome, m.view, "] wraps around, also from Sync")
+	assert.Equal(t, viewHome, m.view, "] wraps around, also from Settings")
 	press(m, "[")
-	assert.Equal(t, viewSync, m.view, "[ wraps back")
+	assert.Equal(t, viewSettings, m.view, "[ wraps back")
 }
 
 func TestCompareAndNewViewsFitTerminals(t *testing.T) {

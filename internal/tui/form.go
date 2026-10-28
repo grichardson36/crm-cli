@@ -324,7 +324,7 @@ func (m *Model) refreshDetail(force bool) {
 	if m.view == viewOrgs || m.view == viewDeals {
 		key += fmt.Sprintf("/%d/%d", r.orgID, r.dealID)
 	}
-	if m.view == viewMerge || m.view == viewSync {
+	if m.view == viewMerge || m.view == viewSync || m.view == viewSettings {
 		key += fmt.Sprintf("/%d", m.cursor)
 	}
 	if !ok {
@@ -341,6 +341,8 @@ func (m *Model) refreshDetail(force bool) {
 		m.form = m.buildOrgForm(r.orgID)
 	case ok && m.view == viewDeals:
 		m.form = m.buildDealForm(r.dealID)
+	case ok && m.view == viewSettings:
+		m.form = m.buildSettingForm(r.setting)
 	case ok && m.view != viewArchived:
 		m.form = m.buildForm(r.personID, r.taskID)
 	default:
