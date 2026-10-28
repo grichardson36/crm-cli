@@ -25,7 +25,7 @@ You have access to a local CRM via MCP tools (prefixed with `crm_`). The CRM sto
 ### When the user mentions a deal or opportunity
 
 1. Check if a deal already exists with `crm_search`
-2. Create or update the deal with the right stage: lead → prospect → proposal → negotiation → won/lost
+2. Create or update the deal with the right stage: a stage from `crm deal stages list` (lead, prospect, proposal, negotiation, won, lost by default)
 3. Link the deal to the right person and organization
 4. If a deal moves to "won" or "lost", set the `closed_at` date
 
