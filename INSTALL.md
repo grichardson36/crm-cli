@@ -229,4 +229,4 @@ Tell the user: the installed version, the database path, the result of `crm doct
 
 ## Update
 
-Download the new archive (step 3), run `crm backup` first, then replace the binary (step 4). The next command migrates the database. Run `crm doctor`.
+Download the new archive (step 3), then replace the binary (step 4) and reopen the program. The database is backed up to `~/.crm/backups/` and migrated automatically. Run `crm doctor`.

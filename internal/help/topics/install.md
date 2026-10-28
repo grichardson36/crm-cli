@@ -32,6 +32,6 @@ crm due
 
 `crm doctor` checks the binary, data directory, database, integrity, schema version, write-ahead log, backups, disk space, synced folders, sync sources and MCP. Each check is `ok`, `warn` or `fail` with a one-line fix. Exit code 1 only when a check fails. The last three commands add a first person, log a note and show who is due.
 
-Back up before upgrading. To upgrade, replace the binary. The next command migrates the database. See `crm help backup`.
+To upgrade, replace the binary and reopen the program. The database is backed up and migrated automatically. See `crm help backup`.
 
 See also: backup, overview, domains, agents.

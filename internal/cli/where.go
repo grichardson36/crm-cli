@@ -69,7 +69,7 @@ func collectWhere() (*whereInfo, error) {
 		info.Note = "file is not a CRM database"
 	}
 	if info.NeedsMigration {
-		info.Note = "older schema: the next crm command that opens it migrates it (run 'crm backup' first)"
+		info.Note = "older schema: the next crm command that opens it backs it up to the backups folder and migrates it"
 	}
 	return info, nil
 }

@@ -167,7 +167,7 @@ func checkSchema(d *sql.DB) Check {
 	case v == latest:
 		return Check{Name: "schema", Status: OK, Message: fmt.Sprintf("schema version %d is current", v)}
 	case v < latest:
-		return Check{Name: "schema", Status: Warn, Message: fmt.Sprintf("schema version %d, this build expects %d", v, latest), Fix: "run 'crm backup <file>' then any crm command to migrate"}
+		return Check{Name: "schema", Status: Warn, Message: fmt.Sprintf("schema version %d, this build expects %d", v, latest), Fix: "run any crm command: the database is backed up to the backups folder and migrated automatically"}
 	default:
 		return Check{Name: "schema", Status: Fail, Message: fmt.Sprintf("schema version %d is newer than this build (%d)", v, latest), Fix: "install a newer crm binary: see INSTALL.md"}
 	}

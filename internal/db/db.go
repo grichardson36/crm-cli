@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"embed"
+	"errors"
 	"fmt"
 	"io/fs"
 	"strings"
@@ -28,8 +29,12 @@ func Open(dbPath string) (*sql.DB, error) {
 		return nil, fmt.Errorf("set pragmas: %w", err)
 	}
 
-	if err := runMigrations(db, 0); err != nil {
+	if err := migrateWithBackup(db, dbPath); err != nil {
 		db.Close()
+		var ns *NewerSchemaError
+		if errors.As(err, &ns) {
+			return nil, err
+		}
 		return nil, fmt.Errorf("run migrations: %w", err)
 	}
 
