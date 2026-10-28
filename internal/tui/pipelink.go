@@ -49,9 +49,18 @@ func resKey(kinds []string, text string) string {
 // autoResolve reads one name of a link segment. An answer given before (accepted from the popup or picked
 // at enter) wins. Then an id, an exact name, and a name that only one object fits. A tag name is the tag.
 func (m *Model) autoResolve(s *pipeSession, seg pipeSeg, text string) resolution {
+	hash := strings.HasPrefix(strings.TrimSpace(text), "#")
 	text = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(text), "#"))
 	if l, ok := m.pipeRes[resKey(seg.Kinds, text)]; ok {
 		return resolution{state: resolved, link: l}
+	}
+	if hash && segTakes(seg, tagKind) && text != "" { // #name is a tag, new or not
+		for _, it := range m.pipeCandidates(s, tagKind) {
+			if strings.EqualFold(it.label, text) {
+				text = it.label
+			}
+		}
+		return resolution{state: resolved, link: pendingLink{tag: text, label: "#" + text}}
 	}
 	if len(seg.Kinds) == 1 && seg.Kinds[0] == tagKind {
 		for _, it := range m.pipeCandidates(s, tagKind) {
@@ -67,6 +76,9 @@ func (m *Model) autoResolve(s *pipeSession, seg pipeSeg, text string) resolution
 	}
 	var all []cand
 	for _, k := range seg.Kinds {
+		if k == tagKind {
+			continue // tags are named with a #, or match below when nothing else does
+		}
 		for _, it := range m.pipeCandidates(s, k) {
 			all = append(all, cand{k, it})
 		}
@@ -110,6 +122,13 @@ func (m *Model) autoResolve(s *pipeSession, seg pipeSeg, text string) resolution
 			return one(list)
 		default:
 			return many(list)
+		}
+	}
+	if segTakes(seg, tagKind) { // a plain word that names an existing tag and nothing else
+		for _, it := range m.pipeCandidates(s, tagKind) {
+			if strings.EqualFold(it.label, text) {
+				return resolution{state: resolved, link: pendingLink{tag: it.label, label: "#" + it.label}}
+			}
 		}
 	}
 	res := resolution{state: unresolved}
@@ -172,23 +191,38 @@ func (m *Model) pickLinkToken(kind, value string, seg pipeSeg, text string, res 
 	for _, r := range res.matches {
 		items = append(items, overlayItem{id: "pick", label: r.Label, desc: r.Desc, ref: r.Ref.ID, value: r.Ref.Kind})
 	}
-	word := linkWord(seg.Kinds[0], false)
+	word := linkWord(seg.Kinds[0])
 	title := fmt.Sprintf("%s: %q", word, text)
 	if !single {
 		title = fmt.Sprintf("Which one is %q", text)
 	}
-	if len(items) == 0 && !single {
-		msg := fmt.Sprintf("no object named %q", text)
-		m.setStatus(msg, true)
-		m.pendingCmd = m.showToast(msg, true)
-		reopen()
-		return
+	if !single { // one related segment: the picker also offers to create the name as any kind the segment takes
+		title = fmt.Sprintf("Which one is %q", text)
+		if len(items) == 0 {
+			title = fmt.Sprintf("%q is new", text)
+		}
+		for _, k := range seg.Kinds {
+			if k == tagKind {
+				items = append(items, overlayItem{id: "tag", label: fmt.Sprintf("Tag #%s", text), desc: "put the tag on it", value: tagKind})
+			} else if o := objectByKind(k); o != nil && o.create != nil {
+				items = append(items, overlayItem{id: "create", label: fmt.Sprintf("Create %s %q", relationLabel(k), text), desc: "make it and link it", value: k})
+			}
+		}
 	}
 	key := resKey(seg.Kinds, text)
 	again := func(m *Model) { m.runPrompt(kind, value) }
 	m.openPicker(title, items, func(m *Model, it overlayItem) {
+		if it.id == "tag" {
+			m.pipeRes[key] = pendingLink{tag: text, label: "#" + text}
+			again(m)
+			return
+		}
 		if it.id == "create" {
-			o := objectByKind(seg.Kinds[0])
+			ckind := seg.Kinds[0]
+			if !single {
+				ckind = it.value
+			}
+			o := objectByKind(ckind)
 			if o != nil && o.kind == "organization" && !m.orgCreateAnyway {
 				if dup, reason, err := m.orr.FindDuplicate(m.ctx, text, nil); err == nil && dup != nil {
 					m.askOrgDuplicate(dup, reason, func(d *model.Organization) {
@@ -202,7 +236,7 @@ func (m *Model) pickLinkToken(kind, value string, seg pipeSeg, text string, res 
 					return
 				}
 			}
-			m.pipeRes[key] = pendingLink{ref: repo.Ref{Kind: seg.Kinds[0]}, create: text, label: text}
+			m.pipeRes[key] = pendingLink{ref: repo.Ref{Kind: ckind}, create: text, label: text}
 		} else {
 			m.pipeRes[key] = pendingLink{ref: repo.Ref{Kind: it.value, ID: it.ref}, label: it.label}
 		}

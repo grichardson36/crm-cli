@@ -30,6 +30,11 @@ type Suggestion struct {
 	Ref repo.Ref
 	// Tag is set when the row stands for a tag.
 	Tag string
+	// Kind is the object kind of the row (tagKind for a tag) in a popup that mixes kinds. It gives the row
+	// its color and its short prefix (p:, o:, #). Empty for a popup of one kind.
+	Kind string
+	// Group is the heading drawn above the row. A completer sets it on the first row of each run of rows.
+	Group string
 }
 
 // Completer is what an input implements to get a popup. Cursor and the returned cursor are rune
@@ -41,14 +46,19 @@ type Completer interface {
 	Accept(text string, cursor int, s Suggestion) (string, int)
 }
 
-// acMaxRows is the most rows the popup shows.
+// acMaxRows is the most rows the popup shows. A completer that groups its rows may ask for more
+// through Autocomplete.limit, and the popup then scrolls inside acMaxLines lines.
 const acMaxRows = 6
+
+// acMaxLines is the most lines (rows and headings) the popup draws.
+const acMaxLines = 10
 
 // Autocomplete is the popup state of one input.
 type Autocomplete struct {
 	src    Completer
 	rows   []Suggestion
 	cur    int
+	limit  int    // most rows kept, acMaxRows when zero
 	closed bool   // esc closed the popup, it opens again when the text changes
 	sig    string // text and cursor of the last refresh
 }
@@ -65,8 +75,12 @@ func (a *Autocomplete) Refresh(text string, cursor int) {
 	}
 	a.sig = sig
 	a.rows = a.src.Suggest(text, cursor)
-	if len(a.rows) > acMaxRows {
-		a.rows = a.rows[:acMaxRows]
+	lim := acMaxRows
+	if a.limit > 0 {
+		lim = a.limit
+	}
+	if len(a.rows) > lim {
+		a.rows = a.rows[:lim]
 	}
 	a.cur, a.closed = 0, false
 }
@@ -125,36 +139,83 @@ func (a *Autocomplete) Accept(in *textinput.Model, s Suggestion) {
 	a.sig = "" // the text changed: the next Refresh recomputes
 }
 
+// rowLabel is the text of a row in the popup: the short kind prefix, then the label.
+func rowLabel(r Suggestion) string { return kindPrefix(r.Kind) + cleanCell(r.Label) }
+
 // Lines draws the popup, one string per row, each exactly width cells wide. The highlighted row is
-// in the selection style, the description is dim.
+// in the selection style, the description is dim. Rows that carry a Group are drawn under a dim rule
+// heading, built with the grouped-list component (groupRows, grouped.go). A row with a Kind draws its
+// prefix and label in the color of the kind. At most acMaxLines lines are drawn, scrolled to keep the
+// highlighted row in view.
 func (a *Autocomplete) Lines(width int, st theme.Styles) []string {
 	if !a.Open() || width < 4 {
 		return nil
 	}
-	var out []string
+	type idxRow struct {
+		i int
+		r Suggestion
+	}
+	var items []idxRow
 	for i, r := range a.rows {
-		label := runewidth.Truncate(cleanCell(r.Label), max(1, width-2), "…")
-		desc := ""
-		if d := cleanCell(r.Desc); d != "" {
-			desc = runewidth.Truncate("  "+d, max(0, width-2-runewidth.StringWidth(label)), "…")
+		items = append(items, idxRow{i, r})
+	}
+	// A heading starts wherever a row carries a Group. The key is the row's position so two runs of the
+	// same kind would not merge.
+	grouped := groupRows(items, func(it idxRow) []groupHead {
+		if it.r.Group == "" {
+			return nil
 		}
-		line := fit(" "+label+desc, width)
-		if i == a.cur {
-			out = append(out, st.Sel.Render(line))
+		return []groupHead{{key: fmt.Sprintf("%d", it.i), title: it.r.Group, rule: true}}
+	}, func(it idxRow) row { return row{title: it.r.Label} })
+	var lines []string
+	curLine := 0
+	idx := 0
+	for _, gr := range grouped.rows {
+		if gr.skip {
+			lines = append(lines, st.Dim.Render(fit(" "+ruleLine(gr.title, "", width-1), width)))
 			continue
 		}
-		out = append(out, st.Dim.Render(" ")+strings.TrimRight(label, " ")+st.Dim.Render(desc)+strings.Repeat(" ", max(0, width-1-runewidth.StringWidth(label)-runewidth.StringWidth(desc))))
+		r := a.rows[idx]
+		if idx == a.cur {
+			curLine = len(lines)
+		}
+		lines = append(lines, a.line(r, idx == a.cur, width, st))
+		idx++
 	}
-	return out
+	if len(lines) > acMaxLines {
+		start := clampInt(curLine-acMaxLines/2, 0, len(lines)-acMaxLines)
+		lines = lines[start : start+acMaxLines]
+	}
+	return lines
+}
+
+// line draws one row.
+func (a *Autocomplete) line(r Suggestion, selected bool, width int, st theme.Styles) string {
+	label := runewidth.Truncate(rowLabel(r), max(1, width-2), "…")
+	desc := ""
+	if d := cleanCell(r.Desc); d != "" {
+		desc = runewidth.Truncate("  "+d, max(0, width-2-runewidth.StringWidth(label)), "…")
+	}
+	if selected {
+		return st.Sel.Render(fit(" "+label+desc, width))
+	}
+	body := strings.TrimRight(label, " ")
+	if r.Kind != "" {
+		body = st.KindStyle(r.Kind).Render(body)
+	}
+	return st.Dim.Render(" ") + body + st.Dim.Render(desc) + strings.Repeat(" ", max(0, width-1-runewidth.StringWidth(label)-runewidth.StringWidth(desc)))
 }
 
 // popupWidth is the width the popup needs for its rows, between min and max.
 func popupWidth(rows []Suggestion, minW, maxW int) int {
 	w := minW
 	for _, r := range rows {
-		n := 2 + runewidth.StringWidth(cleanCell(r.Label))
+		n := 2 + runewidth.StringWidth(rowLabel(r))
 		if d := cleanCell(r.Desc); d != "" {
 			n += 2 + runewidth.StringWidth(d)
+		}
+		if g := runewidth.StringWidth(r.Group) + 4; r.Group != "" && g > n {
+			n = g
 		}
 		if n > w {
 			w = n

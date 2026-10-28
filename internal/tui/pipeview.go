@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/x/ansi"
+	"github.com/jdanielnd/crm-cli/internal/theme"
 	"github.com/mattn/go-runewidth"
 )
 
@@ -14,6 +15,7 @@ import (
 //	! E_DATE_INVALID due: ...        the error of a segment that was closed with a pipe (dim error style)
 //	 fri        Fri Nov 7            the popup, at most six rows, anchored under the segment being typed
 //	 next friday -> Fri Nov 7        the soft indicator of the segment being typed
+//	[p:Zed Adams] [p:Pia Lane]  [o:Acme]   the chosen related objects as chips grouped by kind, above the rest
 //
 // The grayscale syntax hint after the cursor (hint.go) is untouched and still draws beside the input.
 
@@ -63,6 +65,9 @@ func (m *Model) pipeStack() []stackLine {
 		return col(p)
 	}
 	var out []stackLine
+	for _, ln := range m.chipLines(s, text, cursor, max(10, m.width-x0)) {
+		out = append(out, stackLine{x0, ln})
+	}
 	if rep.hasErr {
 		out = append(out, stackLine{segCol(rep.errSeg), m.st.Err.Faint(true).Render("! " + issueText(rep.errIssue))})
 	}
@@ -129,4 +134,62 @@ func overlayAt(base string, x int, text string, width int) string {
 	}
 	right := ansi.TruncateLeft(base, x+w, "")
 	return left + ansi.ResetStyle + text + ansi.ResetStyle + right
+}
+
+// chipLines draws the objects chosen in the link segments of the line as chips, grouped by kind in the
+// stable order (people, organizations, deals, tasks, notes, tags). Each group is in the color of its kind
+// and each chip carries the short kind prefix, so the kinds read without color. The chips wrap onto more
+// lines when they do not fit in width. The name still being typed is not chosen yet. The prompt itself
+// stays one line: the chips are feedback drawn above it.
+func (m *Model) chipLines(s *pipeSession, text string, cursor, width int) []string {
+	rs := []rune(text)
+	idx, start, end := segBounds(rs, cursor)
+	tok := ""
+	if idx < len(s.pl.segs) && s.pl.segs[idx].Link {
+		ts, te := tokenBounds(rs, start, end, cursor)
+		tok = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(string(rs[ts:te])), "#"))
+	}
+	chosen, _ := m.chosenLinks(s, text, tok, idx)
+	return renderChips(chipGroups(chosen), width, m.st)
+}
+
+// renderChips lays the chips out in lines of at most width cells. A chip is never split. Groups are
+// separated by two spaces, chips of a group by one.
+func renderChips(groups []chipGroup, width int, st theme.Styles) []string {
+	var lines []string
+	var cur strings.Builder
+	curW := 0
+	flush := func() {
+		if curW > 0 {
+			lines = append(lines, cur.String())
+			cur.Reset()
+			curW = 0
+		}
+	}
+	for gi, g := range groups {
+		for ci, name := range g.names {
+			chip := "[" + kindPrefix(g.kind) + cleanCell(name) + "]"
+			w := runewidth.StringWidth(chip)
+			if w > width {
+				chip = runewidth.Truncate(chip, width-1, "…") + "]"
+				w = runewidth.StringWidth(chip)
+			}
+			gap := 0
+			if curW > 0 {
+				gap = 1
+				if ci == 0 && gi > 0 {
+					gap = 2
+				}
+			}
+			if curW+gap+w > width {
+				flush()
+				gap = 0
+			}
+			cur.WriteString(strings.Repeat(" ", gap))
+			cur.WriteString(st.KindStyle(g.kind).Render(chip))
+			curW += gap + w
+		}
+	}
+	flush()
+	return lines
 }
