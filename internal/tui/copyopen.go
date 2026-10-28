@@ -7,14 +7,14 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/BurntSushi/toml"
 	tea "charm.land/bubbletea/v2"
+	"github.com/BurntSushi/toml"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/emersion/go-vcard"
 	"github.com/jdanielnd/crm-cli/internal/dav"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/jdanielnd/crm-cli/internal/modules"
-	"github.com/mattn/go-runewidth"
 )
 
 // Copy and open (owner decisions 2026-10-28).
@@ -101,7 +101,7 @@ func (m *Model) searchFor(text string) (string, string, bool) {
 	if text == "" {
 		return "", "", false
 	}
-	return searchURLFor(m.env.DataDir, text), "web search for " + runewidth.Truncate(text, 40, "…"), true
+	return searchURLFor(m.env.DataDir, text), "web search for " + ansi.Truncate(text, 40, "…"), true
 }
 
 // openForObject is o on an object: its own link when it has one, else a web search for its name.
@@ -184,7 +184,7 @@ func (m *Model) openOutside() {
 		m.setStatus("open failed: "+err.Error(), true)
 		return
 	}
-	m.setStatus("opened "+runewidth.Truncate(what, 60, "…"), false)
+	m.setStatus("opened "+ansi.Truncate(what, 60, "…"), false)
 }
 
 func whenOpenable(m *Model) bool {

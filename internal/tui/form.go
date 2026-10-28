@@ -8,10 +8,10 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/jdanielnd/crm-cli/internal/validate"
-	"github.com/mattn/go-runewidth"
 )
 
 type rowKind int
@@ -380,7 +380,7 @@ func (m *Model) syncDetail() {
 		m.lineRow = append(m.lineRow, row)
 	}
 	if m.formTitle != "" {
-		title := runewidth.Truncate(m.formTitle, max(1, w), "…")
+		title := ansi.Truncate(m.formTitle, max(1, w), "…")
 		push(lipgloss.NewStyle().MaxWidth(max(1, w)).Render(m.st.Name.Render(title)), -1)
 		push("", -1)
 	}
@@ -392,7 +392,7 @@ func (m *Model) syncDetail() {
 			if len(r.cells) > 0 && !r.empty {
 				push(m.cellHeader(i, r, w), -1)
 			} else {
-				push(m.st.Head.Render(runewidth.Truncate(r.head, max(1, w), "…")), -1)
+				push(m.st.Head.Render(ansi.Truncate(r.head, max(1, w), "…")), -1)
 			}
 		}
 		m.rowStart[i] = len(lines)
@@ -420,7 +420,7 @@ func (m *Model) renderRow(i int, r formRow, w int) []string {
 	selected := m.focus == focusDetail && i == m.fcur
 	label := fit(r.label, labelWidth)
 	if len(r.label) > labelWidth-1 {
-		label = fit(runewidth.Truncate(r.label, labelWidth-1, "…"), labelWidth)
+		label = fit(ansi.Truncate(r.label, labelWidth-1, "…"), labelWidth)
 	}
 
 	if m.mode == modeEdit && m.edit != nil && m.edit.row == i && m.edit.typed != nil {
@@ -435,9 +435,9 @@ func (m *Model) renderRow(i int, r formRow, w int) []string {
 	if m.mode == modeEdit && m.edit != nil && m.edit.row == i {
 		line := m.st.Dim.Render(label) + strings.TrimRight(m.rowInput.View(), " ")
 		if m.creating {
-			line += m.st.Dim.Render(cutHint(hintSpacing(m.rowInput.Value())+pipeHint(m.pipeFor(personAddKind).labels(), m.rowInput.Value()), w-labelWidth-runewidth.StringWidth(m.rowInput.Value())-2))
+			line += m.st.Dim.Render(cutHint(hintSpacing(m.rowInput.Value())+pipeHint(m.pipeFor(personAddKind).labels(), m.rowInput.Value()), w-labelWidth-ansi.StringWidth(m.rowInput.Value())-2))
 		} else if r.spec != nil {
-			line += m.st.Dim.Render(m.fieldHint(*r.spec, m.rowInput.Value(), w-labelWidth-runewidth.StringWidth(m.rowInput.Value())-2))
+			line += m.st.Dim.Render(m.fieldHint(*r.spec, m.rowInput.Value(), w-labelWidth-ansi.StringWidth(m.rowInput.Value())-2))
 		}
 		return []string{lipgloss.NewStyle().MaxWidth(w).Render(line)}
 	}
@@ -455,7 +455,7 @@ func (m *Model) renderRow(i int, r formRow, w int) []string {
 				rest = append(rest[:3], "…")
 			}
 			for _, l := range rest {
-				out = append(out, m.st.Dim.Render(fit(strings.Repeat(" ", labelWidth)+runewidth.Truncate(l, max(1, w-labelWidth), "…"), w)))
+				out = append(out, m.st.Dim.Render(fit(strings.Repeat(" ", labelWidth)+ansi.Truncate(l, max(1, w-labelWidth), "…"), w)))
 			}
 		}
 		return out
@@ -476,11 +476,11 @@ func (m *Model) renderRow(i int, r formRow, w int) []string {
 		valueStyled = true
 	}
 	suffix := r.suffix
-	vw := w - labelWidth - runewidth.StringWidth(suffix)
+	vw := w - labelWidth - ansi.StringWidth(suffix)
 	if vw < 1 {
 		vw, suffix = max(1, w-labelWidth), ""
 	}
-	first = runewidth.Truncate(first, vw, "…")
+	first = ansi.Truncate(first, vw, "…")
 
 	var out []string
 	plain := label + first + suffix
@@ -510,7 +510,7 @@ func (m *Model) renderRow(i int, r formRow, w int) []string {
 		more = rest
 	}
 	for _, l := range more {
-		out = append(out, m.st.Dim.Render(fit(strings.Repeat(" ", labelWidth)+runewidth.Truncate(l, max(1, w-labelWidth), "…"), w)))
+		out = append(out, m.st.Dim.Render(fit(strings.Repeat(" ", labelWidth)+ansi.Truncate(l, max(1, w-labelWidth), "…"), w)))
 	}
 	return out
 }
@@ -1097,7 +1097,7 @@ func (m *Model) copyRow() {
 	if m.clip != nil {
 		m.clip(v)
 	}
-	short := runewidth.Truncate(strings.ReplaceAll(v, "\n", " "), 40, "…")
+	short := ansi.Truncate(strings.ReplaceAll(v, "\n", " "), 40, "…")
 	m.setStatus("copied: "+short, false)
 }
 

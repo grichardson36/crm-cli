@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/jdanielnd/crm-cli/internal/keys"
-	"github.com/mattn/go-runewidth"
 )
 
 // Results act like views (pattern bar-results-act-like-views). In the bar, Tab moves focus from the
@@ -230,7 +230,7 @@ func (m *Model) barVerbLine(it overlayItem) string {
 	if line == "" {
 		line = "no verbs for this " + t.kind
 	}
-	return runewidth.Truncate(line, max(10, m.width-24), "…") + "   tab or esc: input"
+	return ansi.Truncate(line, max(10, m.width-24), "…") + "   tab or esc: input"
 }
 
 // highlighted returns the row under the bar cursor.

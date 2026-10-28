@@ -9,9 +9,10 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/jdanielnd/crm-cli/internal/keys"
 	"github.com/jdanielnd/crm-cli/internal/modules"
-	"github.com/mattn/go-runewidth"
+	sg "github.com/jdanielnd/crm-cli/internal/suggest"
 )
 
 // overlayItem is one choice in the palette or a picker.
@@ -76,29 +77,6 @@ type overlay struct {
 
 const overlayTop = 2 // title line, filter line
 
-// fuzzyScore returns a rank (lower is better) when every word of query matches text.
-func fuzzyScore(query, text string) (int, bool) {
-	text = strings.ToLower(text)
-	score := 0
-	for _, w := range strings.Fields(strings.ToLower(query)) {
-		if i := strings.Index(text, w); i >= 0 {
-			score += min(i, 20) / 4
-			continue
-		}
-		// Subsequence match.
-		pos := 0
-		for _, r := range w {
-			j := strings.IndexRune(text[pos:], r)
-			if j < 0 {
-				return 0, false
-			}
-			pos += j + len(string(r))
-		}
-		score += 30
-	}
-	return score, true
-}
-
 func (o *overlay) refilter() {
 	if o.palette {
 		o.refilterBar()
@@ -114,7 +92,7 @@ func (o *overlay) refilter() {
 		o.items = o.items[:o.baseLen]
 	}
 	for i, it := range o.items {
-		s, ok := fuzzyScore(q, it.label+" "+it.hint+" "+it.id+" "+it.desc)
+		s, ok := sg.Fuzzy(q, it.label+" "+it.hint+" "+it.id+" "+it.desc)
 		if !ok {
 			continue
 		}
@@ -432,7 +410,7 @@ func (m *Model) overlayView() string {
 		b.WriteString(m.barListView(o, end))
 		if o.focusResults {
 			if it, ok := o.highlighted(); ok {
-				b.WriteString("\n" + m.st.Head.Render(runewidth.Truncate(m.barVerbLine(it), m.width, "…")))
+				b.WriteString("\n" + m.st.Head.Render(ansi.Truncate(m.barVerbLine(it), m.width, "…")))
 			}
 		}
 		return b.String()
@@ -444,7 +422,7 @@ func (m *Model) overlayView() string {
 			desc = "(" + it.disabled + ") " + desc
 		}
 		left := fit(it.hint, hintW) + fit(it.label, titleW)
-		room := m.width - runewidth.StringWidth(left)
+		room := m.width - ansi.StringWidth(left)
 		line := left + fit(desc, max(0, room))
 		line = fit(line, m.width)
 		switch {
@@ -582,14 +560,14 @@ func (m *Model) barListView(o *overlay, end int) string {
 		}
 		titleW := min(34, max(12, m.width/3))
 		room := max(0, m.width-groupW-titleW-keyW)
-		plainLine := fit(tag, groupW) + fit(it.label, titleW) + fit(desc, room) + runewidth.FillLeft(it.hint, keyW)
+		plainLine := fit(tag, groupW) + fit(it.label, titleW) + fit(desc, room) + padLeft(it.hint, keyW)
 		switch {
 		case i == o.cursor:
 			b.WriteString(m.st.Sel.Render(fit(plainLine, m.width)))
 		case it.disabled != "":
 			b.WriteString(m.st.Dim.Render(fit(plainLine, m.width)))
 		default:
-			b.WriteString(m.st.Head.Render(fit(tag, groupW)) + m.st.Name.Render(fit(it.label, titleW)) + m.st.Dim.Render(fit(desc, room)) + m.st.Dim.Render(runewidth.FillLeft(it.hint, keyW)))
+			b.WriteString(m.st.Head.Render(fit(tag, groupW)) + m.st.Name.Render(fit(it.label, titleW)) + m.st.Dim.Render(fit(desc, room)) + m.st.Dim.Render(padLeft(it.hint, keyW)))
 		}
 		if i < end-1 {
 			b.WriteString("\n")

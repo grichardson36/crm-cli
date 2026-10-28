@@ -5,7 +5,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/mattn/go-runewidth"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // A toast is a one-line message on the bottom line of the screen that goes away by itself. It is
@@ -61,8 +61,8 @@ func (m *Model) screen() string {
 
 func (m *Model) toastLine() string {
 	text := " " + m.toast.text + " "
-	text = runewidth.Truncate(text, m.width, "…")
-	if pad := m.width - runewidth.StringWidth(text); pad > 0 {
+	text = ansi.Truncate(text, m.width, "…")
+	if pad := m.width - ansi.StringWidth(text); pad > 0 {
 		text += strings.Repeat(" ", pad)
 	}
 	st := m.st.Ok

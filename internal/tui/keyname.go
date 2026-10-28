@@ -14,7 +14,8 @@ import (
 //
 //   - a space is " " (v2 says "space"), a space with a modifier is "alt+space"
 //   - modifiers come in the order alt, ctrl, shift ("alt+ctrl+up"), v2 says ctrl, alt, shift
-//   - ctrl+shift+letter is "ctrl+<letter>" and alt+shift+letter is "alt+<LETTER>", as before
+//   - alt+shift+letter is "alt+<LETTER>", as before. ctrl+shift+letter stays "ctrl+shift+<letter>":
+//     v1 could not tell it from ctrl+<letter>, v2 can on terminals that report modifiers
 //   - text keeps its case: "A", "?", and typed text with ctrl or alt held is never taken as text
 //
 // Everything else (enter, esc, tab, shift+tab, up, pgup, pgdown, home, end, f5, ctrl+shift+up) is
@@ -36,11 +37,8 @@ func keyName(msg tea.KeyPressMsg) string {
 	shift := k.Mod.Contains(tea.ModShift)
 	alt := k.Mod.Contains(tea.ModAlt)
 	ctrl := k.Mod.Contains(tea.ModCtrl)
-	if r, n := utf8.DecodeRuneInString(name); n == len(name) && unicode.IsLetter(r) && shift {
-		if !ctrl {
-			name = strings.ToUpper(name)
-		}
-		shift = false
+	if r, n := utf8.DecodeRuneInString(name); n == len(name) && unicode.IsLetter(r) && shift && alt && !ctrl {
+		name, shift = strings.ToUpper(name), false
 	}
 	var b strings.Builder
 	if alt {

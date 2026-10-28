@@ -109,7 +109,7 @@ type Model struct {
 	ml  *repo.MergeLogRepo
 	ntr *repo.NoteTypeRepo
 	// vr is the user-managed vocabularies (deal roles).
-	vr *repo.VocabRepo
+	vr  *repo.VocabRepo
 	db  *sql.DB
 	now func() time.Time
 
@@ -179,19 +179,19 @@ type Model struct {
 	// linkAlso are the other selected objects of a bulk link, taken by the link form (linkmany.go).
 	linkAlso []repo.Ref
 	// setField is the bulk set-field waiting for its typed value (setfield.go).
-	setField    *setFieldState
+	setField *setFieldState
 	// setFieldDeal and setFieldCreate carry a bulk deal role: the deal it is set on and a role to add to the list first.
-	setFieldDeal   repo.Ref
+	setFieldDeal repo.Ref
 	// vocabName is the vocabulary value a rename prompt is for.
-	vocabName string
+	vocabName      string
 	setFieldCreate string
-	detail      viewport.Model
-	detailKey   string
-	input       textinput.Model
-	promptKind  string
-	status      string
-	statusIsErr bool
-	readOnly    bool
+	detail         viewport.Model
+	detailKey      string
+	input          textinput.Model
+	promptKind     string
+	status         string
+	statusIsErr    bool
+	readOnly       bool
 
 	// Detail form.
 	form       []formRow
@@ -229,8 +229,8 @@ type Model struct {
 
 	// st holds every style of the active theme. Views draw only with it. See theme.go.
 	st        theme.Styles
-	themeName string // name of the active theme
-	darkBG    bool   // terminal has a dark background (resolves the auto theme)
+	themeName string               // name of the active theme
+	darkBG    bool                 // terminal has a dark background (resolves the auto theme)
 	profile   colorprofile.Profile // what colors the terminal can show (NO_COLOR gives Ascii)
 	// Command bar: caches for the quick package, the person the palette opened on, the changes of
 	// command lines run this session (newest last) for Undo, and the short syntax switch.

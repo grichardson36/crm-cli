@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-		"github.com/jdanielnd/crm-cli/internal/db/repo"
+	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
 
 	"github.com/stretchr/testify/require"
@@ -74,7 +74,7 @@ func auditContexts(t *testing.T) []auditCtx {
 	}
 	m, _ := newTestModel(t)
 	ctx := m.ctx
-		acme, err := m.orr.Create(ctx, model.CreateOrgInput{Name: "Acme"})
+	acme, err := m.orr.Create(ctx, model.CreateOrgInput{Name: "Acme"})
 	require.NoError(t, err)
 	_, err = m.links.Link(ctx, repo.Ref{Kind: "person", ID: 1}, repo.Ref{Kind: "organization", ID: acme.ID}, model.LinkAttrs{Role: sp("CTO")})
 	require.NoError(t, err)
@@ -102,7 +102,7 @@ func auditContexts(t *testing.T) []auditCtx {
 		m.focus = focusList
 	}
 
-		// A person's detail form with the cursor on a linked row, which has cells: left, right and tab
+	// A person's detail form with the cursor on a linked row, which has cells: left, right and tab
 	// move across them.
 	m.switchView(viewPeople)
 	m.settle()

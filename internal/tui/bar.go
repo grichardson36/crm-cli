@@ -9,6 +9,7 @@ import (
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/help"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	sg "github.com/jdanielnd/crm-cli/internal/suggest"
 )
 
 // The unified bar (ctrl+k) is one box for three jobs: run an action, find a record, and type a
@@ -101,12 +102,12 @@ func (o *overlay) refilterBar() {
 		switch it.kind {
 		case kindAction, kindVerb:
 			if q != "" {
-				s, ok := fuzzyScore(q, it.label+" "+it.hint+" "+it.id+" "+it.desc)
+				s, ok := sg.Fuzzy(q, it.label+" "+it.hint+" "+it.id+" "+it.desc)
 				if !ok {
 					continue
 				}
 				score = s
-				weak[i] = s >= 30
+				weak[i] = s >= sg.FuzzyWeak
 			}
 			if it.disabled != "" {
 				score += 1000 // after every enabled action
@@ -213,7 +214,7 @@ func (m *Model) barSearch(scope byte, q string) []overlayItem {
 		}
 		var hits []hit
 		for _, t := range help.List() {
-			if s, ok := fuzzyScore(q, t.Name+" "+t.Summary); ok {
+			if s, ok := sg.Fuzzy(q, t.Name+" "+t.Summary); ok {
 				hits = append(hits, hit{overlayItem{id: "help:" + t.Name, kind: kindHelp, label: t.Name, desc: t.Summary, value: t.Name}, s})
 			}
 		}

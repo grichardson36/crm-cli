@@ -6,9 +6,9 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
-	"github.com/mattn/go-runewidth"
 )
 
 // Link attributes and note type as cells (owner decision 2026-10-28, patterns/field-types-drive-editors).
@@ -310,7 +310,7 @@ func (m *Model) renderCellRow(i int, r formRow, w int) string {
 	focusedRow := m.focus == focusDetail && i == m.fcur
 	label := fit(r.label, labelWidth)
 	if len(r.label) > labelWidth-1 {
-		label = fit(runewidth.Truncate(r.label, labelWidth-1, "…"), labelWidth)
+		label = fit(ansi.Truncate(r.label, labelWidth-1, "…"), labelWidth)
 	}
 	nameW, first, last := cellLayout(r.cells, w, sel)
 	name := r.value
@@ -324,7 +324,7 @@ func (m *Model) renderCellRow(i int, r formRow, w int) string {
 	if name == "" {
 		name = "-"
 	}
-	name = fit(runewidth.Truncate(name, nameW, "…"), nameW)
+	name = fit(ansi.Truncate(name, nameW, "…"), nameW)
 	dim := r.dim
 	style := func(s string, active bool) string {
 		switch {
@@ -340,7 +340,7 @@ func (m *Model) renderCellRow(i int, r formRow, w int) string {
 	b.WriteString(style(name, focusedRow && sel == 0))
 	for c := first; c <= last && c < len(r.cells); c++ {
 		cw := cellWidth(r.cells[c].key)
-		txt := fit(runewidth.Truncate(cellText(r.cells[c]), cw, "…"), cw)
+		txt := fit(ansi.Truncate(cellText(r.cells[c]), cw, "…"), cw)
 		b.WriteString("  ")
 		if focusedRow && sel == c+1 {
 			b.WriteString(m.st.Sel.Render(txt))
@@ -356,11 +356,11 @@ func (m *Model) cellHeader(i int, r formRow, w int) string {
 	sel := m.tableSel(i)
 	nameW, first, last := cellLayout(r.cells, w, sel)
 	var b strings.Builder
-	b.WriteString(m.st.Head.Render(fit(runewidth.Truncate(r.head, labelWidth+nameW-1, "…"), labelWidth+nameW)))
+	b.WriteString(m.st.Head.Render(fit(ansi.Truncate(r.head, labelWidth+nameW-1, "…"), labelWidth+nameW)))
 	for c := first; c <= last && c < len(r.cells); c++ {
 		cw := cellWidth(r.cells[c].key)
 		b.WriteString("  ")
-		b.WriteString(m.st.Dim.Render(fit(runewidth.Truncate(r.cells[c].label, cw, "…"), cw)))
+		b.WriteString(m.st.Dim.Render(fit(ansi.Truncate(r.cells[c].label, cw, "…"), cw)))
 	}
 	return lipgloss.NewStyle().MaxWidth(w).Render(b.String())
 }

@@ -5,11 +5,11 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/dedupe"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/jdanielnd/crm-cli/internal/theme"
-	"github.com/mattn/go-runewidth"
 )
 
 // The compare screen: [candidate 1] | [candidate 2] | [final contact]. Rows are aligned across the
@@ -961,7 +961,7 @@ func (m *Model) compareView() string {
 	for i := range lines {
 		lines[i] = cut.Render(lines[i])
 	}
-	return cut.Render(c.st.Head.Render(runewidth.Truncate(title, m.width, "…"))) + "\n" + strings.Join(lines, "\n") + "\n" + m.footerView()
+	return cut.Render(c.st.Head.Render(ansi.Truncate(title, m.width, "…"))) + "\n" + strings.Join(lines, "\n") + "\n" + m.footerView()
 }
 
 // --- mouse ---

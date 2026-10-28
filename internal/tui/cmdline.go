@@ -7,10 +7,10 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/jdanielnd/crm-cli/internal/quick"
 	"github.com/jdanielnd/crm-cli/internal/shortsyntax"
-	"github.com/mattn/go-runewidth"
 )
 
 // The command bar is the palette with a command line in it. Type a verb and a space (n, t, log,
@@ -386,7 +386,7 @@ func (m *Model) cmdInputLine(o *overlay) string {
 			cursorIdx = len(cells)
 			st = st.Reverse(true)
 		}
-		cells = append(cells, cell{string(r), st, runewidth.RuneWidth(r)})
+		cells = append(cells, cell{string(r), st, ansi.StringWidth(string(r))})
 	}
 	atEnd := cursor >= len(val)
 	if atEnd {
@@ -434,7 +434,7 @@ func (m *Model) cmdView() string {
 	case !p.Ready():
 		style = m.st.Dim
 	}
-	preview = runewidth.Truncate(preview, 3*max(1, m.width)-3, "…")
+	preview = ansi.Truncate(preview, 3*max(1, m.width)-3, "…")
 	lines = append(lines, lipgloss.NewStyle().Width(max(1, m.width)).Render(style.Render(preview)))
 
 	if c.confirming {

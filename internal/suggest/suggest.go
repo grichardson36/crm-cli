@@ -120,6 +120,36 @@ func Score(name, low string, words []string, tbl *alias.Table) int {
 	return best
 }
 
+// FuzzyWeak is the rank Fuzzy adds for a word that only matches as scattered letters. A rank at or
+// above it means some word matched that loosely.
+const FuzzyWeak = 30
+
+// Fuzzy ranks free text against a haystack of words, for the palette and the pickers where the
+// candidate is a title plus its hint, id and description. It returns a rank (lower is better) when
+// every typed word is found in text: a word found as a substring ranks by how early it appears, and
+// a word that only has its letters in order ranks FuzzyWeak. An empty query matches everything with
+// rank 0. Rank is the sibling for names, where a typo or a nickname should still find the person.
+func Fuzzy(query, text string) (int, bool) {
+	text = strings.ToLower(text)
+	score := 0
+	for _, w := range strings.Fields(strings.ToLower(query)) {
+		if i := strings.Index(text, w); i >= 0 {
+			score += min(i, 20) / 4
+			continue
+		}
+		pos := 0
+		for _, r := range w {
+			j := strings.IndexRune(text[pos:], r)
+			if j < 0 {
+				return 0, false
+			}
+			pos += j + len(string(r))
+		}
+		score += FuzzyWeak
+	}
+	return score, true
+}
+
 // Typo says whether the text is a misspelling of the name: the whole text close to the whole name, or
 // each typed word close to a word of the name (dedupe.Ratio).
 func Typo(name, low string, words []string) bool {

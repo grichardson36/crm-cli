@@ -5,7 +5,6 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 	"github.com/jdanielnd/crm-cli/internal/theme"
-	"github.com/mattn/go-runewidth"
 )
 
 // Drawing of the pipe line feedback (patterns/autocomplete-component, patterns/show-syntax-inline-as-you-type).
@@ -30,7 +29,7 @@ func (m *Model) pipeInputColumn(kind string) int {
 	if kind == personAddKind {
 		return m.listWidth() + 2 + labelWidth
 	}
-	return runewidth.StringWidth(m.input.Prompt)
+	return ansi.StringWidth(m.input.Prompt)
 }
 
 // pipeStack builds the feedback lines for the pipe input that has the focus, top to bottom.
@@ -45,7 +44,7 @@ func (m *Model) pipeStack() []stackLine {
 	rep := m.pipeReportFor(s, text, cursor)
 	x0 := m.pipeInputColumn(s.kind)
 	col := func(runePos int) int {
-		return x0 + runewidth.StringWidth(string(rs[:clampInt(runePos, 0, len(rs))]))
+		return x0 + ansi.StringWidth(string(rs[:clampInt(runePos, 0, len(rs))]))
 	}
 	// Where each segment's text starts, skipping the space after its pipe.
 	starts := []int{0}
@@ -169,10 +168,10 @@ func renderChips(groups []chipGroup, width int, st theme.Styles) []string {
 	for gi, g := range groups {
 		for ci, name := range g.names {
 			chip := "[" + kindPrefix(g.kind) + cleanCell(name) + "]"
-			w := runewidth.StringWidth(chip)
+			w := ansi.StringWidth(chip)
 			if w > width {
-				chip = runewidth.Truncate(chip, width-1, "…") + "]"
-				w = runewidth.StringWidth(chip)
+				chip = ansi.Truncate(chip, width-1, "…") + "]"
+				w = ansi.StringWidth(chip)
 			}
 			gap := 0
 			if curW > 0 {

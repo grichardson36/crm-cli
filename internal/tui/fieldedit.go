@@ -8,11 +8,11 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
-	"github.com/jdanielnd/crm-cli/internal/validate"
 	"github.com/jdanielnd/crm-cli/internal/shortsyntax"
-	"github.com/mattn/go-runewidth"
+	"github.com/jdanielnd/crm-cli/internal/validate"
 )
 
 // Typed field editors (owner decision 2026-10-28, patterns/field-types-drive-editors). A record page
@@ -388,7 +388,7 @@ func (m *Model) typedEditLine(label string, w int) string {
 		return lipgloss.NewStyle().MaxWidth(w).Render(line)
 	}
 	line := m.st.Dim.Render(label) + strings.TrimRight(m.rowInput.View(), " ")
-	line += m.st.Dim.Render(m.fieldHint(t.spec, m.rowInput.Value(), w-labelWidth-runewidth.StringWidth(m.rowInput.Value())-2))
+	line += m.st.Dim.Render(m.fieldHint(t.spec, m.rowInput.Value(), w-labelWidth-ansi.StringWidth(m.rowInput.Value())-2))
 	return lipgloss.NewStyle().MaxWidth(w).Render(line)
 }
 

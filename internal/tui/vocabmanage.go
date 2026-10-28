@@ -209,4 +209,3 @@ func dealRolesAction() action {
 		desc:  "the roles a person has on a deal (champion, decision maker, ...): add, rename, reorder, remove, and add the free-text roles already in use. The deal role cell of a deal's people edits one link",
 		write: true, run: func(m *Model) tea.Cmd { return m.openDealRoles() }}
 }
-

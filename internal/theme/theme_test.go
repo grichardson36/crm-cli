@@ -214,7 +214,7 @@ func TestStylesDegradeByProfile(t *testing.T) {
 	out = render(colorprofile.ANSI, NewStyles(th, colorprofile.ANSI).Name, "x")
 	assert.NotContains(t, out, "38;2;")
 	assert.NotContains(t, out, "38;5;")
-	assert.Contains(t, out, "[")
+	assert.Contains(t, out, "\x1b[")
 }
 
 func TestNoColorKeepsAttributesNotColors(t *testing.T) {
@@ -225,10 +225,10 @@ func TestNoColorKeepsAttributesNotColors(t *testing.T) {
 		assert.NotContains(t, out, "38;", name)
 		assert.NotContains(t, out, "48;", name)
 	}
-	assert.Contains(t, render(colorprofile.Ascii, st.Sel, "row"), "[7m", "the selected row stays visible as reverse video")
+	assert.Contains(t, render(colorprofile.Ascii, st.Sel, "row"), "\x1b[7m", "the selected row stays visible as reverse video")
 	assert.Contains(t, render(colorprofile.Ascii, st.TabOn, "tab"), "7m", "the active tab stays visible")
 	// The writer for an Ascii terminal keeps text attributes and drops only colors.
-	assert.Contains(t, render(colorprofile.Ascii, st.Name, "x"), "[1m")
+	assert.Contains(t, render(colorprofile.Ascii, st.Name, "x"), "\x1b[1m")
 }
 
 func TestSelectionColorsOrReverse(t *testing.T) {

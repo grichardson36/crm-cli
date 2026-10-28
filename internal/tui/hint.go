@@ -3,9 +3,9 @@ package tui
 import (
 	"strings"
 
+	"github.com/charmbracelet/x/ansi"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/jdanielnd/crm-cli/internal/quick"
-	"github.com/mattn/go-runewidth"
 )
 
 // The inline syntax hint (patterns/show-syntax-inline-as-you-type). Any single-line input that
@@ -155,5 +155,5 @@ func cutHint(h string, room int) string {
 	if h == "" || room <= 0 {
 		return ""
 	}
-	return runewidth.Truncate(h, room, "…")
+	return ansi.Truncate(h, room, "…")
 }

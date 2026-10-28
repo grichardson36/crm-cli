@@ -1,8 +1,8 @@
 package tui
 
 import (
-	"strings"
 	"fmt"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
@@ -21,7 +21,6 @@ type setFieldState struct {
 	refs []repo.Ref
 	spec model.FieldSpec
 }
-
 
 // settableFields are the fields of a kind that a bulk set can take: choice, date and number fields
 // the record editors can save. The deal role of people (the role of a person on a deal, a field of

@@ -7,9 +7,9 @@ import (
 	"unicode"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/jdanielnd/crm-cli/internal/modules"
-	"github.com/mattn/go-runewidth"
 )
 
 // cleanCell removes emoji and control characters that break column widths in list cells.
@@ -35,8 +35,8 @@ func fit(s string, width int) string {
 	if width <= 0 {
 		return ""
 	}
-	s = runewidth.Truncate(s, width, "…")
-	if pad := width - runewidth.StringWidth(s); pad > 0 {
+	s = ansi.Truncate(s, width, "…")
+	if pad := width - ansi.StringWidth(s); pad > 0 {
 		s += strings.Repeat(" ", pad)
 	}
 	return s
@@ -129,7 +129,7 @@ func (m *Model) tabLayout() []tabSeg {
 	for ; level < 2; level++ {
 		total := 0
 		for i, it := range items {
-			total += runewidth.StringWidth(labelAt(level, i, it)) + 2
+			total += ansi.StringWidth(labelAt(level, i, it)) + 2
 		}
 		need := total
 		if need <= m.width {
@@ -142,7 +142,7 @@ func (m *Model) tabLayout() []tabSeg {
 	total := 0
 	for i, it := range items {
 		labels[i] = labelAt(level, i, it)
-		total += runewidth.StringWidth(labels[i]) + 2
+		total += ansi.StringWidth(labels[i]) + 2
 	}
 	dropped := 0
 	for total > m.width {
@@ -156,16 +156,16 @@ func (m *Model) tabLayout() []tabSeg {
 		if drop < 0 {
 			break
 		}
-		total -= runewidth.StringWidth(labels[drop]) + 2
+		total -= ansi.StringWidth(labels[drop]) + 2
 		items = append(items[:drop], items[drop+1:]...)
 		labels = append(labels[:drop], labels[drop+1:]...)
 		dropped++
 		// The More entry counts what no longer fits: "v +3" opens the full view list.
 		for i := range items {
 			if items[i].seg.more && !items[i].seg.on {
-				total -= runewidth.StringWidth(labels[i]) + 2
+				total -= ansi.StringWidth(labels[i]) + 2
 				labels[i] = fmt.Sprintf("v +%d", dropped)
-				total += runewidth.StringWidth(labels[i]) + 2
+				total += ansi.StringWidth(labels[i]) + 2
 			}
 		}
 	}
@@ -173,7 +173,7 @@ func (m *Model) tabLayout() []tabSeg {
 	x := 0
 	for i, it := range items {
 		label := labels[i]
-		w := runewidth.StringWidth(label) + 2
+		w := ansi.StringWidth(label) + 2
 		seg := it.seg
 		seg.label, seg.x0, seg.x1 = label, x, x+w
 		segs = append(segs, seg)
@@ -184,11 +184,11 @@ func (m *Model) tabLayout() []tabSeg {
 
 // ruleLine draws a divider: left text, a line of dashes, right text at the edge of width w.
 func ruleLine(left, right string, w int) string {
-	rw := runewidth.StringWidth(right)
-	left = runewidth.Truncate(left, max(1, w-rw-4), "…")
-	fill := w - runewidth.StringWidth(left) - rw - 2
+	rw := ansi.StringWidth(right)
+	left = ansi.Truncate(left, max(1, w-rw-4), "…")
+	fill := w - ansi.StringWidth(left) - rw - 2
 	if fill < 1 {
-		return runewidth.Truncate(left+" "+right, w, "…")
+		return ansi.Truncate(left+" "+right, w, "…")
 	}
 	return left + " " + strings.Repeat("─", fill) + " " + right
 }
@@ -296,8 +296,8 @@ func (m *Model) listView(w, h int) string {
 			continue
 		}
 		if r.skip {
-			meta := runewidth.Truncate(cleanCell(r.meta), w/2, "…")
-			metaW := runewidth.StringWidth(meta)
+			meta := ansi.Truncate(cleanCell(r.meta), w/2, "…")
+			metaW := ansi.StringWidth(meta)
 			b.WriteString(m.st.Name.Render(fit(title, w-metaW-1)) + m.st.Dim.Render(" "+meta))
 			if i < end-1 {
 				b.WriteString("\n")
@@ -311,8 +311,8 @@ func (m *Model) listView(w, h int) string {
 				title = "  " + title
 			}
 		}
-		meta := runewidth.Truncate(cleanCell(r.meta), w/2, "…")
-		metaW := runewidth.StringWidth(meta)
+		meta := ansi.Truncate(cleanCell(r.meta), w/2, "…")
+		metaW := ansi.StringWidth(meta)
 		left := title
 		if sub != "" {
 			left += "  " + sub
@@ -323,12 +323,12 @@ func (m *Model) listView(w, h int) string {
 			b.WriteString(cursorStyle.Render(line))
 		} else {
 			// Dim the subtitle by rendering name and rest separately.
-			name := runewidth.Truncate(title, w-metaW-1, "…")
+			name := ansi.Truncate(title, w-metaW-1, "…")
 			rest := ""
-			if sub != "" && runewidth.StringWidth(name) == runewidth.StringWidth(title) {
-				rest = fit("  "+sub, w-metaW-1-runewidth.StringWidth(name))
+			if sub != "" && ansi.StringWidth(name) == ansi.StringWidth(title) {
+				rest = fit("  "+sub, w-metaW-1-ansi.StringWidth(name))
 			} else {
-				rest = strings.Repeat(" ", max(0, w-metaW-1-runewidth.StringWidth(name)))
+				rest = strings.Repeat(" ", max(0, w-metaW-1-ansi.StringWidth(name)))
 			}
 			b.WriteString(name + m.st.Dim.Render(rest+" "+meta))
 		}
@@ -395,7 +395,7 @@ func (m *Model) footerSegs() []footSeg {
 		if a.id == "focus-detail" && m.readOnly {
 			label = "detail"
 		}
-		w := runewidth.StringWidth(hint) + 1 + runewidth.StringWidth(label)
+		w := ansi.StringWidth(hint) + 1 + ansi.StringWidth(label)
 		if x+w > m.width {
 			break
 		}
@@ -464,14 +464,14 @@ func (m *Model) hintsLine() string {
 		if m.edit != nil && m.edit.kind == rkHandle {
 			h += "  tab change kind"
 		}
-		return m.st.Dim.Render(runewidth.Truncate(h, m.width, "…"))
+		return m.st.Dim.Render(ansi.Truncate(h, m.width, "…"))
 	case modeConfirm:
 		return m.st.Dim.Render("y yes  n no")
 	case modeCapture:
 		return m.st.Dim.Render("any key binds, esc cancel")
 	case modePrompt:
 		if s := m.pipeRefresh(); s != nil && s.ac.Open() {
-			return m.st.Dim.Render(runewidth.Truncate("enter confirm  tab accept  up/down choose  esc close the list", m.width, "…"))
+			return m.st.Dim.Render(ansi.Truncate("enter confirm  tab accept  up/down choose  esc close the list", m.width, "…"))
 		}
 		if m.promptKind == "note" || m.promptKind == "note-object" || m.promptKind == "note-free" {
 			return m.st.Dim.Render("enter save  tab type  esc cancel")
@@ -503,4 +503,12 @@ func formatBirthdayParts(p *model.Person) string {
 		return fmt.Sprintf("%04d-%02d-%02d", *p.BirthdayYear, *p.BirthdayMonth, *p.BirthdayDay)
 	}
 	return fmt.Sprintf("%02d-%02d", *p.BirthdayMonth, *p.BirthdayDay)
+}
+
+// padLeft right-aligns s in width cells. A longer s is returned unchanged.
+func padLeft(s string, width int) string {
+	if pad := width - ansi.StringWidth(s); pad > 0 {
+		return strings.Repeat(" ", pad) + s
+	}
+	return s
 }

@@ -5,9 +5,9 @@ import (
 	"strings"
 
 	"charm.land/bubbles/v2/textinput"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/theme"
-	"github.com/mattn/go-runewidth"
 )
 
 // The reusable autocomplete component (owner decision 2026-10-29, patterns/autocomplete-component).
@@ -191,10 +191,10 @@ func (a *Autocomplete) Lines(width int, st theme.Styles) []string {
 
 // line draws one row.
 func (a *Autocomplete) line(r Suggestion, selected bool, width int, st theme.Styles) string {
-	label := runewidth.Truncate(rowLabel(r), max(1, width-2), "…")
+	label := ansi.Truncate(rowLabel(r), max(1, width-2), "…")
 	desc := ""
 	if d := cleanCell(r.Desc); d != "" {
-		desc = runewidth.Truncate("  "+d, max(0, width-2-runewidth.StringWidth(label)), "…")
+		desc = ansi.Truncate("  "+d, max(0, width-2-ansi.StringWidth(label)), "…")
 	}
 	if selected {
 		return st.Sel.Render(fit(" "+label+desc, width))
@@ -203,18 +203,18 @@ func (a *Autocomplete) line(r Suggestion, selected bool, width int, st theme.Sty
 	if r.Kind != "" {
 		body = st.KindStyle(r.Kind).Render(body)
 	}
-	return st.Dim.Render(" ") + body + st.Dim.Render(desc) + strings.Repeat(" ", max(0, width-1-runewidth.StringWidth(label)-runewidth.StringWidth(desc)))
+	return st.Dim.Render(" ") + body + st.Dim.Render(desc) + strings.Repeat(" ", max(0, width-1-ansi.StringWidth(label)-ansi.StringWidth(desc)))
 }
 
 // popupWidth is the width the popup needs for its rows, between min and max.
 func popupWidth(rows []Suggestion, minW, maxW int) int {
 	w := minW
 	for _, r := range rows {
-		n := 2 + runewidth.StringWidth(rowLabel(r))
+		n := 2 + ansi.StringWidth(rowLabel(r))
 		if d := cleanCell(r.Desc); d != "" {
-			n += 2 + runewidth.StringWidth(d)
+			n += 2 + ansi.StringWidth(d)
 		}
-		if g := runewidth.StringWidth(r.Group) + 4; r.Group != "" && g > n {
+		if g := ansi.StringWidth(r.Group) + 4; r.Group != "" && g > n {
 			n = g
 		}
 		if n > w {

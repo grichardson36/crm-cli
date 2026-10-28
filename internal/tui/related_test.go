@@ -6,10 +6,10 @@ import (
 	"testing"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/colorprofile"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/jdanielnd/crm-cli/internal/theme"
-	"github.com/charmbracelet/colorprofile"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,9 +19,9 @@ import (
 //	deal "Big deal" -- person Zed Adams (1), organization Acme, tag vip
 //	person Bob Baker (2) -- organization Globex
 type relFixture struct {
-	m                     *Model
-	deal, acme, globex    repo.Ref
-	zed, bob              repo.Ref
+	m                  *Model
+	deal, acme, globex repo.Ref
+	zed, bob           repo.Ref
 }
 
 func newRelFixture(t *testing.T) *relFixture {

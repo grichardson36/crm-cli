@@ -8,9 +8,9 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	crmsync "github.com/jdanielnd/crm-cli/internal/sync"
-	"github.com/mattn/go-runewidth"
 )
 
 // Sync view: sources (adapters, last run, counts, cursor) and the inbox of unmatched records.
@@ -109,7 +109,7 @@ func (m *Model) syncRows() ([]row, error) {
 // syncItemDetail is the detail pane text for the selected Sync row.
 func (m *Model) syncItemDetail(r row) string {
 	w := max(1, m.detail.Width())
-	line := func(s string) string { return runewidth.Truncate(s, w, "…") }
+	line := func(s string) string { return ansi.Truncate(s, w, "…") }
 	kv := func(k, v string) string { return m.st.Dim.Render(fit(k, labelWidth)) + line(v) + "\n" }
 	var b strings.Builder
 	it := r.sync

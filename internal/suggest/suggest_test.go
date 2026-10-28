@@ -43,3 +43,22 @@ func TestPrefixKeepsOrderFoldsCaseAndDropsRepeats(t *testing.T) {
 	assert.Equal(t, []string{"café"}, Prefix([]string{"café", "cat"}, "cafe", 0))
 	assert.Len(t, Prefix([]string{"a1", "a2", "a3"}, "a", 2), 2)
 }
+
+func TestFuzzyMatchesEveryWordAndRanksEarlyAndLoose(t *testing.T) {
+	r, ok := Fuzzy("", "Theme: choose")
+	assert.True(t, ok)
+	assert.Equal(t, 0, r)
+	early, _ := Fuzzy("theme", "Theme: choose")
+	late, _ := Fuzzy("choose", "Theme: choose")
+	assert.Less(t, early, late, "a word found earlier ranks better")
+	two, ok := Fuzzy("choose theme", "Theme: choose")
+	assert.True(t, ok, "words may come in any order")
+	assert.Less(t, two, FuzzyWeak)
+	loose, ok := Fuzzy("thc", "Theme: choose")
+	assert.True(t, ok, "letters in order still match")
+	assert.GreaterOrEqual(t, loose, FuzzyWeak)
+	_, ok = Fuzzy("zzz", "Theme: choose")
+	assert.False(t, ok)
+	_, ok = Fuzzy("theme zzz", "Theme: choose")
+	assert.False(t, ok, "every word must match")
+}

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/colorprofile"
@@ -13,6 +14,7 @@ import (
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/jdanielnd/crm-cli/internal/theme"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
 
 const (
@@ -46,7 +48,7 @@ func loadThemeContext() (*themeContext, error) {
 		return nil, err
 	}
 	name, source := theme.Chosen(dir, os.Getenv)
-	dark := lipgloss.HasDarkBackground(os.Stdin, os.Stdout)
+	dark := hasDarkBackground()
 	return &themeContext{dir: dir, cat: theme.LoadCatalog(dir, dark), active: name, source: source}, nil
 }
 
@@ -152,7 +154,7 @@ func themeShowCmd() *cobra.Command {
 			resolved := ""
 			if t.Name == theme.AutoName {
 				resolved = "dark"
-				if !lipgloss.HasDarkBackground(os.Stdin, os.Stdout) {
+				if !hasDarkBackground() {
 					resolved = "light"
 				}
 			}
@@ -255,5 +257,22 @@ func themeInitCmd() *cobra.Command {
 			fmt.Fprintf(os.Stderr, "edit it, then run: crm theme set %s\n", name)
 			return nil
 		},
+	}
+}
+
+// hasDarkBackground asks the terminal for its background color, for the auto theme in commands that
+// run outside the full-screen UI. Without a terminal on both ends there is nobody to ask, and a
+// terminal that does not answer must not hang the command, so it gives up after a moment and says dark.
+func hasDarkBackground() bool {
+	if !term.IsTerminal(int(os.Stdin.Fd())) || !term.IsTerminal(int(os.Stdout.Fd())) {
+		return true
+	}
+	ch := make(chan bool, 1)
+	go func() { ch <- lipgloss.HasDarkBackground(os.Stdin, os.Stdout) }()
+	select {
+	case dark := <-ch:
+		return dark
+	case <-time.After(time.Second):
+		return true
 	}
 }

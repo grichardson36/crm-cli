@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/x/ansi"
 	"github.com/jdanielnd/crm-cli/internal/dedupe"
 	"github.com/jdanielnd/crm-cli/internal/model"
-	"github.com/mattn/go-runewidth"
 )
 
 // Merge view (duplicate groups) and the compare screen that merges people.
@@ -221,7 +221,7 @@ func isNotFound(err error) bool { return err != nil && strings.Contains(err.Erro
 // emptyDetail is the detail pane content when no form is shown.
 func (m *Model) emptyDetail() string {
 	w := max(1, m.detail.Width())
-	line := func(s string) string { return runewidth.Truncate(s, w, "…") }
+	line := func(s string) string { return ansi.Truncate(s, w, "…") }
 	r, ok := m.selected()
 	if !ok {
 		return m.st.Dim.Render("Nothing selected.")
