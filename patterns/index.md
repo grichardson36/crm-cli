@@ -128,6 +128,7 @@ Feature rows (moved from FEATURES.md, which is retired). Each note lists the pat
 - [[features-tasks-and-notes]] (Tasks, reminders, notes, note types, timeline)
 - [[features-keep-in-touch-and-birthdays]] (Cadences, due, snooze, birthdays, digests, Home)
 - [[features-tags-groups-and-views]] (Tags, groups, saved views, filters, bulk edit, search)
+- [[features-tags-module]] (The Tags view: list, tag page, rename, merge, clean up)
 - [[features-links-and-relations]] (Typed links between all objects)
 - [[features-merge-archive-and-undo]] (Duplicates, merge and merge log, archive, purge, undo)
 - [[features-import-and-export]] (Dex CSV, other importers, export)

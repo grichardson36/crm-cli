@@ -37,7 +37,7 @@ BRANCH feat/keymap-b (owner decisions 2026-10-28, keymap part B2, built on main 
 | bulk tier, bulk stage | palette "Set field on selected" |
 | purge of people only | `d` or palette purge for every archived type |
 
-Views (number jumps, `[`/`]` cycle, `v` switcher): 1 Home, 2 People, 3 Due, 4 Tasks, 5 Birthdays, 6 Merge, 7 Archived, 8 Sync (Organizations and Deals open from the palette). `ctrl+k` or `/` opens the palette. `?` lists the keys live in the current view and mode, framework layer first, then app. `--read-only` blocks writes.
+Views (number jumps, `[`/`]` cycle, `v` switcher): 1 Home, 2 People, 3 Due, 4 Tasks, 5 Birthdays, 6 Merge, 7 Archived, 8 Sync (Organizations and Deals open from the palette). BRANCH feat/tags-module adds the Tags module after Deals in the default arrangement, so with every module on the number keys are 1 Home, 2 People, 3 Follow-up, 4 Tasks, 5 Organizations, 6 Deals, 7 Tags, 8 Birthdays, 9 Merge, 0 Archived, and Sync opens with `v`. `ctrl+k` or `/` opens the palette. `?` lists the keys live in the current view and mode, framework layer first, then app. `--read-only` blocks writes.
 
 **Universal verbs** (framework layer, the same in every view): `a` add (a picker of kinds, the view's own preselected, a letter jumps: `a t` task, `a n` note, `a o` organization, `a p` person, `a d` deal; links are pipe segments of the add prompt: a highlighted object is the first suggestion of the segment that takes its kind and `tab` accepts it, several objects are separated by commas, backspacing over a name is the unlink, `enter` links every name and unresolved names offer pick-or-create (branch feat/pipe-autocomplete, owner decision 2026-10-29, replaces the grayscale offer and the dropped link chip), `enter` and `e` activate (one action id, `activate`), `d` delete, `r` restore (Archived), `l` link (tags are objects), `u` unlink, `x` mark (task done and again reopens, person contacted), `f` favorite, `m` merge (selected rows or the highlighted duplicate), `space` select, `shift+up`/`shift+down` extend the selection, `ctrl+a` select all, `ctrl+z` undo, `ctrl+y` redo, `ctrl+r` refresh. **Navigation**: arrows, `tab`, `shift+tab`, `ctrl+u` `ctrl+d` half page, `pgup` `pgdn` full page, `ctrl+up` `ctrl+down` jump by the view's unit (day in Birthdays, first letter in People and Organizations, page elsewhere), `ctrl+shift+up` `ctrl+shift+down` the view's home (today in Birthdays) else first and last row, `home` `end` first and last row always. Units and homes are declared in `viewNavs` (`internal/tui/navunits.go`). **App layer**: `s` snooze, `F` cadence, `E` edit link or note type, `y` copy, `o` open a form row, `ctrl+o` sort, `ctrl+l` duplicate level, `ctrl+f` Archived type filter, compare `ctrl+e` survivor, `ctrl+b` pair, `ctrl+w` pane.
 
@@ -67,3 +67,23 @@ Views (number jumps, `[`/`]` cycle, `v` switcher): 1 Home, 2 People, 3 Due, 4 Ta
 | `y` confirm in compare | `enter` |
 
 Still open: the digits, `[ ]` and `v` are bare view-moving keys (X28, the owner decided to keep them in B2).
+
+## Tags view (BRANCH feat/tags-module, owner request 2026-10-30)
+
+No tag-specific key. The universal verbs act on the selected tags, else the highlighted one ([[bulk-actions-always]]), and the rows of a tag in the command bar run the same actions. Details: [[features-tags-module]].
+
+| Key | Tags list | Tag page (after `enter`) |
+|---|---|---|
+| `enter` | open the tag page | open the highlighted object |
+| `tab`, then `enter` or `e` | edit the name in place, rename everywhere, a name that exists asks to merge | |
+| `esc` | clear the search | back to the list |
+| `d` | delete (untag everywhere, or remove an unused name), several ask the count typed back | |
+| `m` | merge the selected tags into the highlighted one, nothing selected asks which tag | |
+| `l` | give the tag to an object of any kind (all selected tags) | link another object to the tag |
+| `u` | take the tag off an object that has it | unlink the highlighted or selected objects |
+| `a g` | add a tag | |
+| `space`, `ctrl+a`, `shift+up`/`shift+down` | select tags | select objects |
+| `ctrl+o` | Sort (name, number of objects), Filter (in use, unused, possible case duplicates, all) | |
+| `/` | find a tag by name | |
+
+Palette: "Tags: merge case duplicates", "Tags: delete unused tags", "Rename tag", "Merge tag into another", "Delete tag" (a picker, same code).
