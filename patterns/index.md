@@ -62,6 +62,8 @@ Note types (frontmatter `type`): `pattern` (one decided rule), `feature-area` (f
 - [[delete-asks-yes-no]] (Delete asks y or n)
 - [[sync-safe-data]] (Data is sync-safe from day one)
 - [[sync-maps-structure-to-flat-fields]] (Two-way sync maps structure to flat fields, open standard)
+- [[phone-numbers-are-e164]] (Phone numbers are stored as typed and matched as E.164)
+- [[iphone-vcard-roundtrip-test]] (Manual iPhone vCard round trip checklist)
 - [[enrichment-is-suggested-then-accepted]] (Fetched data is a suggestion until the user accepts it)
 - [[advanced-objects-off-main-path]] (The default navigation is loose and the user arranges it)
 
@@ -172,6 +174,8 @@ Read-only findings that feed the patterns. Verify before relying on them.
 
 - [[schema-er]] (Schema proposal: relationships that match the real world)
 - [[sync-contract]] (Sync contract v1)
+- [[replica-package]] (The replica package: device sync in code)
+- [[peers-cli]] (crm peers: device sync commands)
 - [[audit-keybindings-2026-10]] (Key audit, 2026-10-21)
 - [[audit-keybindings-2026-10-simplify]] (Keys to simplify, 2026-10-27)
 

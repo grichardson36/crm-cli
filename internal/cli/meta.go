@@ -99,6 +99,11 @@ var commandMeta = map[string]cmdMeta{
 	"alias add":    {mutates: true, noDryRun: true, examples: []string{`crm alias add zeke zachary`}},
 	"alias remove": {mutates: true, noDryRun: true, examples: []string{`crm alias remove zeke`}},
 
+	"phone":           {examples: []string{`crm phone normalize -f json`}},
+	"phone normalize": {mutates: true, noDryRun: true, fields: "region,total,fill,current,unparseable,unlikely,duplicates,applied,examples", examples: []string{`crm phone normalize -f json`, `crm phone normalize --apply`, `crm phone normalize --undo`}},
+	"phone region":    {mutates: true, noDryRun: true, examples: []string{`crm phone region`, `crm phone region GB`}},
+	"phone parse":     {fields: "typed,region,e164,key,national,international,number_region,parsed,possible,valid", examples: []string{`crm phone parse "(415) 555-2671"`, `crm phone parse "020 7946 0958" --region GB`}},
+
 	"org add":    {mutates: true, fields: orgFields, examples: []string{`crm org add "Acme Corp" --domain acme.com --industry SaaS`}},
 	"org list":   {fields: orgFields, examples: []string{`crm org list -f json`}},
 	"org show":   {fields: orgFields + ",people", examples: []string{`crm org show 1 --with-people -f json`}},
@@ -229,13 +234,31 @@ var commandMeta = map[string]cmdMeta{
 		`crm dav serve --password-file ~/.crm/dav-password --user grant --base-url https://contacts.example.com --read-only`}},
 	"dav info": {fields: "base_url,user,address_book,address_book_url,address_book_path,discovery_url,listen,password,steps,notes", examples: []string{
 		`crm dav info -f json`, `crm dav info --base-url https://contacts.example.com --user grant`}},
-	"dav status": {fields: "contacts_exposed,device_created,synced_to_device,last_request_at,last_get_at,last_put_at,conflicts,open_conflicts", examples: []string{
+	"dav status": {fields: "contacts_exposed,device_created,synced_to_device,last_request_at,last_get_at,last_put_at,conflicts,open_conflicts,open_issues", examples: []string{
 		`crm dav status -f json`}},
+	"dav issues":         {fields: "id,uuid,dav_id,person_id,kind,message,raw_vcard,created_at,resolved_at", examples: []string{`crm dav issues -f json`}},
+	"dav issues resolve": {mutates: true, noDryRun: true, examples: []string{`crm dav issues resolve 1`}},
 	"dav conflicts": {fields: davConflictFields, examples: []string{`crm dav conflicts -f json`}},
 	"dav conflicts list": {fields: davConflictFields, examples: []string{
 		`crm dav conflicts list -f json`, `crm dav conflicts list --all -f json`}},
 	"dav conflicts show": {fields: davConflictFields, examples: []string{`crm dav conflicts show 1 -f json`}},
 	"dav conflicts undo": {mutates: true, fields: davConflictFields, examples: []string{`crm dav conflicts undo 1`}},
+
+	// device-to-device sync (patterns/sync-contract.md)
+	"peers init": {mutates: true, noDryRun: true, fields: "device,already_enabled,tables,baseline_changes", examples: []string{`crm peers init --name laptop`, `crm peers init -f json`}},
+	"peers status": {fields: "enabled,status,devices", examples: []string{`crm peers status -f json`}},
+	"peers serve": {mutates: true, noDryRun: true, examples: []string{`crm peers serve --addr 100.64.0.1:7478`, `crm peers serve --addr 192.168.1.20:7478 --read-only`}},
+	"peers enroll": {mutates: true, noDryRun: true, fields: "token,label,expires_in,device", examples: []string{`crm peers enroll --label phone -f json`, `crm peers enroll --ttl 1h`}},
+	"peers add": {mutates: true, noDryRun: true, fields: "name,url,device,as", examples: []string{`crm peers add home http://100.64.0.1:7478 --token crmenr_0123 --as laptop`}},
+	"peers list": {fields: "name,device,role,url,last_pull_at,last_push_at,last_error,retired_at,head,cursor", examples: []string{`crm peers list -f json`, `crm peers list --all`}},
+	"peers remove": {mutates: true, noDryRun: true, examples: []string{`crm peers remove home`}},
+	"peers pull": {mutates: true, noDryRun: true, fields: "peer,device,pulled,applied,duplicates,unknown,pushed,push_applied,rejected,rejections,open_reviews,error", examples: []string{`crm peers pull`, `crm peers pull home --full -f json`}},
+	"peers push": {mutates: true, noDryRun: true, fields: "peer,device,pulled,applied,duplicates,unknown,pushed,push_applied,rejected,rejections,open_reviews,error", examples: []string{`crm peers push`, `crm peers push home -f json`}},
+	"peers sync": {mutates: true, noDryRun: true, fields: "peer,device,pulled,applied,duplicates,unknown,pushed,push_applied,rejected,rejections,open_reviews,error", examples: []string{`crm peers sync`, `crm peers sync home -f json`}},
+	"peers retire": {mutates: true, noDryRun: true, examples: []string{`crm peers retire old-phone`}},
+	"peers purge": {mutates: true, noDryRun: true, fields: "purged", examples: []string{`crm peers purge -f json`}},
+	"peers review": {fields: "id,collection,key,label,status,detail,created_at,resolved_at", examples: []string{`crm peers review -f json`, `crm peers review --all`}},
+	"peers resolve": {mutates: true, noDryRun: true, examples: []string{`crm peers resolve 3 --keep`, `crm peers resolve 3 --delete`}},
 
 	// interfaces
 	"mcp serve": {examples: []string{`crm mcp serve`}},

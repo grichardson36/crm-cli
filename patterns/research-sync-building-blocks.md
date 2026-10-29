@@ -23,7 +23,7 @@ Contract recap: field-change records, HLC, per-field LWW, tombstones, version-ve
 
 - P2. **Actual Budget's CRDT layer is the closest design match and is small, but it is TypeScript with no Go port.** `packages/crdt` is a separate npm package `@actual-app/crdt` 3.1.4, license MIT in its package.json, last commit touching it 2026-10-17. Contents: `crdt/timestamp.ts`, `crdt/merkle.ts`, `proto/sync.proto`. Repo: MIT, 29,777 stars, latest release v26.10.0 on 2026-10-02. https://github.com/actualbudget/actual/tree/master/packages/crdt
   - **HLC string form** (from `timestamp.ts`): `ISO-8601 millis` + `-` + 4-hex counter (`MAX_COUNTER` 0xFFFF) + `-` + 16-char node id. Fixed width, sorts as a string. This is the encoding to copy.
-  - **Max drift is 5 minutes** (`maxDrift: 5 * 60 * 1000`, comment "Allow 5 minutes of clock drift"). [[research-sync-standardization]] Y22 and its "Smallest real contract" say 1 minute. That figure does not match the current source. Fix before it goes into the spec.
+  - **Max drift is 5 minutes** (`maxDrift: 5 * 60 * 1000`, comment "Allow 5 minutes of clock drift"). [[research-sync-standardization]] Y22 and its "Smallest real contract" said 1 minute, which did not match the source and is corrected there. Decided 2026-10-29: 5 minutes ([[sync-contract]] rule 3).
   - **Wire message** (`sync.proto`): `Message {dataset, row, column, value}` inside `MessageEnvelope {timestamp, isEncrypted, content}`. `SyncRequest` has `since`, `groupId`, `fileId`. `SyncResponse` has `messages` and a `merkle` string. This is a per-field change record with a clock, same shape as ours, but with no `op`, no `schema_version`, and no device/seq id.
   - **Merkle diff** (`merkle.ts`): base-3 trie keyed by minute of the timestamp, murmurhash of the timestamp string, `diff()` returns the earliest differing minute. It finds where two peers diverge. We chose a version-vector cursor instead, so this is not needed. Study only.
   - **Separability**: `packages/crdt` has no dependency on the rest of the app. `packages/loot-core` (client apply logic in `src/server/sync/`) is licensed ISC in its package.json (differs from the repo-level MIT). The sync server (`packages/sync-server`, `app-sync.ts`) rejects a request with no `since` ("since-required").
@@ -139,8 +139,8 @@ Net: there is nothing in Go to adopt for the core. The contract's novelty is sma
 
 ## Open questions
 
-- Q1. Which maximum drift: Actual's source says 5 minutes, [[research-sync-standardization]] says 1 minute. Pick one for [[sync-contract]] rule 3.
-- Q2. Capture by triggers (pure SQL, adapter-portable) or by the pre-update hook (Go, less SQL to maintain, driver-specific)? Triggers are recommended here.
+- Q1. Which maximum drift. Answered 2026-10-29: 5 minutes, as Actual Budget's source says ([[sync-contract]] rule 3).
+- Q2. Capture by triggers (pure SQL, adapter-portable) or by the pre-update hook (Go, less SQL to maintain, driver-specific)? Answered 2026-10-29: triggers, see [[replica-package]].
 - Q3. Should delete/restore use cr-sqlite's causal length instead of tombstone plus `restore` op? It removes the "delete wins or edit wins" ambiguity for repeated delete/restore cycles but is a different record shape from [[sync-contract]] rule 2.
 - Q4. Per-device token or Tailscale identity via `tsnet` for relay auth?
 - Q5. Is fuzzynote's per-device WAL file model (carried by Syncthing or S3) worth keeping as a no-server transport alongside HTTP? See [[research-sync-engines]] E12.

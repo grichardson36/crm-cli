@@ -69,8 +69,11 @@ func (s *Service) CTag(ctx context.Context) (string, error) {
 
 // Object is one contact as the phone sees it.
 type Object struct {
-	DavID   string
-	Card    vcard.Card
+	DavID string
+	Card  vcard.Card
+	// Raw is the vCard text to send. It is the stored card with only the moved fields edited, so a
+	// line the CRM did not change reaches the phone byte for byte. Empty for a listing stub.
+	Raw     string
 	ETag    string
 	ModTime time.Time
 }
@@ -120,6 +123,17 @@ func (s *Service) loadPerson(ctx context.Context, id int64) (*model.Person, erro
 	} else if org != "" {
 		p.Company = &org
 	}
+	// Job title waterfall (owner decision 2026-10-27): the headline title if set, else the role on
+	// the primary membership. Blanking TITLE on the phone clears the headline, so the role shows again.
+	if nonNil(p.Title) == "" {
+		role, err := repo.PrimaryRole(ctx, s.DB, id)
+		if err != nil {
+			return nil, err
+		}
+		if role != "" {
+			p.Title = &role
+		}
+	}
 	return p, nil
 }
 
@@ -148,10 +162,17 @@ func (s *Service) Get(ctx context.Context, davID string, serving bool) (*Object,
 	}
 	card := Render(p, extra, davID)
 	etag := ETag(p.ID, p.UpdatedAt)
-	if serving && (st == nil || st.BaseJSON == nil || st.ETag == nil || *st.ETag != etag) {
+	raw, source := encodeCard(card), rawSourceServer
+	if patched, ok := patchStored(st, card, p.UpdatedAt); ok {
+		raw, source = patched, *st.RawSource
+		if c, err := decodeCard(patched); err == nil {
+			card = c
+		}
+	}
+	if serving && (st == nil || st.BaseJSON == nil || st.ETag == nil || *st.ETag != etag || st.RawVCard == nil || *st.RawVCard != raw) {
 		view, _ := Parse(card)
 		base := view.MarshalBase()
-		next := model.DavState{PersonID: p.ID, BaseJSON: &base, ETag: &etag}
+		next := model.DavState{PersonID: p.ID, BaseJSON: &base, ETag: &etag, RawVCard: &raw, RawSource: &source}
 		if st != nil {
 			next.ExtraVCard = st.ExtraVCard
 		}
@@ -159,7 +180,7 @@ func (s *Service) Get(ctx context.Context, davID string, serving bool) (*Object,
 			return nil, err
 		}
 	}
-	return &Object{DavID: davID, Card: card, ETag: etag, ModTime: parseTime(p.UpdatedAt)}, nil
+	return &Object{DavID: davID, Card: card, Raw: raw, ETag: etag, ModTime: parseTime(p.UpdatedAt)}, nil
 }
 
 // All renders every visible contact. It backs addressbook-query, which phones rarely use.
@@ -230,13 +251,17 @@ func (s *Service) Put(ctx context.Context, davID string, card vcard.Card, ifMatc
 	defer s.mu.Unlock()
 
 	contact, extra := Parse(card)
+	raw := rawFrom(ctx)
+	if raw == "" {
+		raw = encodeCard(card)
+	}
 	t, err := s.Dav.Resolve(ctx, davID)
 	switch {
 	case errors.Is(err, model.ErrNotFound):
 		if err := s.checkPreconditions(ifMatch, ifNoneMatch, "", nil, false); err != nil {
 			return nil, err
 		}
-		return s.create(ctx, davID, contact, extra)
+		return s.create(ctx, davID, contact, extra, raw)
 	case err != nil:
 		return nil, err
 	}
@@ -258,7 +283,7 @@ func (s *Service) Put(ctx context.Context, davID string, card vcard.Card, ifMatc
 	if err := s.checkPreconditions(ifMatch, ifNoneMatch, ETag(p.ID, p.UpdatedAt), known, true); err != nil {
 		return nil, err
 	}
-	res, err := s.mergeInto(ctx, p, st, davID, contact, extra, modeUpdate)
+	res, err := s.mergeInto(ctx, p, st, davID, contact, extra, raw, modeUpdate)
 	if err != nil {
 		return nil, err
 	}
@@ -305,14 +330,14 @@ func (s *Service) Delete(ctx context.Context, davID string, ifMatch webdav.Condi
 
 // --- create ------------------------------------------------------------------------------
 
-func (s *Service) create(ctx context.Context, davID string, contact *Contact, extra vcard.Card) (*PutResult, error) {
+func (s *Service) create(ctx context.Context, davID string, contact *Contact, extra vcard.Card, raw string) (*PutResult, error) {
 	matchID, err := s.findMatch(ctx, contact)
 	if err != nil {
 		return nil, err
 	}
 	if matchID != 0 {
 		if _, lerr := s.Ext.LookupByLocal(ctx, repo.DavSource, "person", matchID); errors.Is(lerr, model.ErrNotFound) {
-			return s.link(ctx, davID, matchID, contact, extra)
+			return s.link(ctx, davID, matchID, contact, extra, raw)
 		} else if lerr != nil {
 			return nil, lerr
 		}
@@ -348,7 +373,7 @@ func (s *Service) create(ctx context.Context, davID string, contact *Contact, ex
 	if err != nil {
 		return nil, err
 	}
-	res, err := s.mergeInto(ctx, p, nil, davID, contact, extra, modeUpdate)
+	res, err := s.mergeInto(ctx, p, nil, davID, contact, extra, raw, modeUpdate)
 	if err != nil {
 		return nil, err
 	}
@@ -365,7 +390,7 @@ func nilIfEmpty(s string) *string {
 }
 
 // link attaches a new phone contact to an existing person and logs it.
-func (s *Service) link(ctx context.Context, davID string, personID int64, contact *Contact, extra vcard.Card) (*PutResult, error) {
+func (s *Service) link(ctx context.Context, davID string, personID int64, contact *Contact, extra vcard.Card, raw string) (*PutResult, error) {
 	p, err := s.loadPerson(ctx, personID)
 	if err != nil {
 		return nil, err
@@ -383,7 +408,7 @@ func (s *Service) link(ctx context.Context, davID string, personID int64, contac
 	if err != nil {
 		return nil, err
 	}
-	res, err := s.mergeInto(ctx, p, st, davID, contact, extra, modeLink)
+	res, err := s.mergeInto(ctx, p, st, davID, contact, extra, raw, modeLink)
 	if err != nil {
 		return nil, err
 	}
@@ -507,7 +532,7 @@ func rawScalars(p *model.Person) map[string]string {
 }
 
 // mergeInto folds the phone's contact into a person and records the new device state.
-func (s *Service) mergeInto(ctx context.Context, p *model.Person, st *model.DavState, davID string, dev *Contact, extra vcard.Card, mode mergeMode) (*PutResult, error) {
+func (s *Service) mergeInto(ctx context.Context, p *model.Person, st *model.DavState, davID string, dev *Contact, extra vcard.Card, raw string, mode mergeMode) (*PutResult, error) {
 	var oldExtra vcard.Card
 	var base *Contact
 	if st != nil {
@@ -517,30 +542,14 @@ func (s *Service) mergeInto(ctx context.Context, p *model.Person, st *model.DavS
 		base = &Contact{}
 	}
 	crmView, _ := Parse(Render(p, oldExtra, davID))
-	raw := rawScalars(p)
-	now := s.now()
+	crmRawValues := rawScalars(p)
 
-	changedAt := func(field string) string {
-		at, err := repo.FieldChangedAt(ctx, s.DB, "person", p.ID, field)
-		if err != nil {
-			return ""
-		}
-		if field == fieldCompany {
-			// The CRM's ORG is the primary membership, so changing it counts as changing the field.
-			var mt sql.NullString
-			_ = s.DB.QueryRowContext(ctx, `SELECT MAX(updated_at) FROM membership WHERE person_id = ? AND is_primary = 1 AND deleted_at IS NULL`, p.ID).Scan(&mt)
-			if mt.Valid && mt.String > at {
-				at = mt.String
-			}
-		}
-		return at
-	}
-
-	// Scalars. ORG is the primary organization (E4). An ORG edit on the phone is applied by
+	// Scalars, per field. ORG is the primary organization (E4). An ORG edit on the phone is applied by
 	// applyDeviceOrg: it moves the primary membership to the organization of that name, creating the
-	// organization when none matches. Emptying ORG never removes a membership. When both sides
-	// changed ORG since the last sync the usual last-write-wins conflict path decides.
-	decisions := mergeScalars(base.scalars(), crmView.scalars(), dev.scalars(), changedAt, now, mode)
+	// organization when none matches. Emptying ORG never removes a membership. TITLE is the headline
+	// title (see loadPerson): an edit sets it, blanking it clears it so the role shows again, and a
+	// membership is never deleted. A field both sides changed keeps the CRM value and logs the phone's.
+	decisions := mergeScalars(base.scalars(), crmView.scalars(), dev.scalars(), mode)
 	var in model.UpdatePersonInput
 	for _, d := range decisions {
 		if d.Take {
@@ -578,7 +587,7 @@ func (s *Service) mergeInto(ctx context.Context, p *model.Person, st *model.DavS
 		if !d.Conflict {
 			continue
 		}
-		crmRaw, devV := raw[d.Field], d.Device
+		crmRaw, devV := crmRawValues[d.Field], d.Device
 		if _, err := s.Dav.AddConflict(ctx, p.ID, d.Field, &crmRaw, &devV, d.Winner); err != nil {
 			return nil, err
 		}
@@ -590,7 +599,11 @@ func (s *Service) mergeInto(ctx context.Context, p *model.Person, st *model.DavS
 	for _, e := range p.Emails {
 		rawEmail[emailKey(e.Email)] = e.Email
 	}
+	prevE, prevP := previousKeys(st)
 	for _, k := range ep.RemoveKeys {
+		if prevE != nil && !prevE[k] {
+			continue // not in the card we last held: absence is not a delete
+		}
 		if v, ok := rawEmail[k]; ok {
 			if err := s.People.RemoveEmail(ctx, p.ID, v); err != nil && !errors.Is(err, model.ErrNotFound) {
 				return nil, err
@@ -608,6 +621,9 @@ func (s *Service) mergeInto(ctx context.Context, p *model.Person, st *model.DavS
 		rawPhone[phoneKey(ph.PhoneNumber)] = ph.PhoneNumber
 	}
 	for _, k := range pp.RemoveKeys {
+		if prevP != nil && !prevP[k] {
+			continue
+		}
 		if v, ok := rawPhone[k]; ok {
 			if err := s.People.RemovePhone(ctx, p.ID, v); err != nil && !errors.Is(err, model.ErrNotFound) {
 				return nil, err
@@ -624,9 +640,10 @@ func (s *Service) mergeInto(ctx context.Context, p *model.Person, st *model.DavS
 	for _, h := range mergeHandles(base.Handles, crmView.Handles, dev.Handles, mode) {
 		if h.Conflict {
 			crmV, devV := h.CRM, h.Device
-			if _, err := s.Dav.AddConflict(ctx, p.ID, handlePrefix+h.Kind, &crmV, &devV, model.ConflictWinnerDevice); err != nil {
+			if _, err := s.Dav.AddConflict(ctx, p.ID, handlePrefix+h.Kind, &crmV, &devV, model.ConflictWinnerCRM); err != nil {
 				return nil, err
 			}
+			continue
 		}
 		if h.Remove {
 			if err := s.People.RemoveHandle(ctx, p.ID, h.Kind); err != nil && !errors.Is(err, model.ErrNotFound) {
@@ -652,7 +669,8 @@ func (s *Service) mergeInto(ctx context.Context, p *model.Person, st *model.DavS
 		stored = etag
 	}
 	baseJSON := dev.MarshalBase()
-	next := model.DavState{PersonID: p.ID, BaseJSON: &baseJSON, ETag: &stored}
+	source := rawSourceDevice
+	next := model.DavState{PersonID: p.ID, BaseJSON: &baseJSON, ETag: &stored, RawVCard: &raw, RawSource: &source}
 	if enc := EncodeExtra(extra); enc != "" {
 		next.ExtraVCard = &enc
 	}

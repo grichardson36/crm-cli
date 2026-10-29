@@ -107,6 +107,16 @@ func plainSuffix(l *string, primary bool) string {
 	return "  (" + strings.Join(parts, ", ") + ")"
 }
 
+// phoneSuffix is the label and primary mark, plus the number in national or international format when
+// that differs from the text as typed. The row value stays the typed text, which is what an edit changes.
+func phoneSuffix(ph model.PersonPhone) string {
+	s := plainSuffix(ph.Label, ph.IsPrimary)
+	if ph.Display != "" && ph.Display != ph.PhoneNumber {
+		s += "  " + ph.Display
+	}
+	return s
+}
+
 func tierText(t *int) string {
 	if t == nil || *t <= 0 || *t >= len(tierNames) {
 		return ""
@@ -215,7 +225,7 @@ func (m *Model) personRows(p *model.Person) []formRow {
 	}
 	if p != nil && len(p.Phones) > 0 {
 		for _, ph := range p.Phones {
-			add(formRow{kind: rkPhone, label: "phone", value: ph.PhoneNumber, suffix: plainSuffix(ph.Label, ph.IsPrimary), lbl: ph.Label, primary: ph.IsPrimary})
+			add(formRow{kind: rkPhone, label: "phone", value: ph.PhoneNumber, suffix: phoneSuffix(ph), lbl: ph.Label, primary: ph.IsPrimary})
 		}
 	} else {
 		section(rkPhone, "phone")
@@ -838,10 +848,12 @@ func (m *Model) applyEdit(e *editState, v string) error {
 			}
 		} else {
 			old := m.form[e.row]
-			if err := m.hAddPhone(ctx, pid, v, old.lbl, old.primary); err != nil {
+			// Remove first: the same number typed in another format would otherwise match the old row
+			// (matching is on E.164), keep its text and then be removed with it.
+			if err := m.hRemovePhone(ctx, pid, e.oldValue); err != nil {
 				return err
 			}
-			if err := m.hRemovePhone(ctx, pid, e.oldValue); err != nil {
+			if err := m.hAddPhone(ctx, pid, v, old.lbl, old.primary); err != nil {
 				return err
 			}
 		}

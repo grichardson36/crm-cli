@@ -57,6 +57,9 @@ func TestImportDex(t *testing.T) {
 	// Phones lose the formula-guard apostrophe, and the first is primary.
 	assert.Equal(t, "+15551234567", one(`SELECT phone FROM people WHERE first_name='Jane'`))
 	assert.Equal(t, "+15557654321", one(`SELECT phone_number FROM person_phones WHERE is_primary = 0`))
+	// The E.164 form is filled next to the typed text.
+	assert.Equal(t, "+15551234567", one(`SELECT e164 FROM person_phones WHERE is_primary = 1`))
+	assert.Equal(t, "+15557654321", one(`SELECT e164 FROM person_phones WHERE is_primary = 0`))
 
 	// Birthday year is only trusted when the explicit column is filled.
 	assert.Equal(t, "3-14-", one(`SELECT birthday_month || '-' || birthday_day || '-' || COALESCE(birthday_year, '') FROM people WHERE first_name='Jane'`))

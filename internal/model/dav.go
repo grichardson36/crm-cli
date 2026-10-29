@@ -6,8 +6,29 @@ type DavState struct {
 	BaseJSON   *string `json:"-"`
 	ETag       *string `json:"etag"`
 	ExtraVCard *string `json:"-"`
-	SyncedAt   *string `json:"synced_at"`
+	// RawVCard is the last vCard text the phone and the server agreed on, byte for byte. RawSource is
+	// "device" when it is the phone's own PUT and "server" when the CRM rendered it.
+	RawVCard  *string `json:"-"`
+	RawSource *string `json:"-"`
+	SyncedAt  *string `json:"synced_at"`
 }
+
+// DavIssue is a phone contact the server could not use, flagged for review. A vCard that cannot be
+// read is skipped and recorded here, it is never read as an emptied contact.
+type DavIssue struct {
+	ID         int64   `json:"id"`
+	UUID       string  `json:"uuid"`
+	DavID      string  `json:"dav_id"`
+	PersonID   *int64  `json:"person_id"`
+	Kind       string  `json:"kind"`
+	Message    string  `json:"message"`
+	RawVCard   *string `json:"raw_vcard,omitempty"`
+	CreatedAt  string  `json:"created_at"`
+	ResolvedAt *string `json:"resolved_at"`
+}
+
+// Sync issue kinds.
+const DavIssueUnreadable = "unreadable_vcard"
 
 // SyncConflict is one field where the phone and the CRM both changed, or a link of a phone
 // contact to an existing person.
@@ -43,4 +64,5 @@ type DavStatus struct {
 	LastPutAt       *string `json:"last_put_at"`
 	Conflicts       int     `json:"conflicts"`
 	OpenConflicts   int     `json:"open_conflicts"`
+	OpenIssues      int     `json:"open_issues"`
 }

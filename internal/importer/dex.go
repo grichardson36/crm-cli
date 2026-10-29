@@ -470,6 +470,9 @@ func insertContact(ctx context.Context, tx *sql.Tx, t *table, row []string, rep 
 		n, _ := r.RowsAffected()
 		rep.Phones += int(n)
 	}
+	if err := repo.FillPhoneE164(ctx, tx, pid); err != nil {
+		return 0, err
+	}
 	for _, h := range handleColumns {
 		if v := t.get(row, h.column); v != "" {
 			if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO person_handles (person_id, kind, value) VALUES (?, ?, ?)`, pid, h.kind, v); err != nil {

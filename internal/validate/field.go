@@ -9,6 +9,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/phone"
 )
 
 // Default length limits by field type, in characters. A FieldSpec.Max overrides them.
@@ -37,6 +38,9 @@ type Options struct {
 	// then passes and returns the S_VOCAB_CREATE suggestion, and the caller adds the value to the list.
 	// Without it an unknown value is E_VOCAB_UNKNOWN.
 	Create bool
+	// Region is the ISO region (US, GB ...) used to read phone numbers that have no country code. Empty
+	// uses the default region from config.toml (internal/phone).
+	Region string
 }
 
 // Field checks one value typed for a field. It sanitizes the text, then applies the check of the
@@ -75,6 +79,11 @@ func Field(spec model.FieldSpec, raw string, opt Options) Result {
 			return r
 		}
 		r.Value = v
+		if spec.Format == model.FormatPhone {
+			if w := phoneWarning(spec.Label, v, opt.Region); w != nil {
+				r.add(*w)
+			}
+		}
 		if spec.Type == model.FieldText || spec.Type == model.FieldLongText {
 			r.Suggestions = append(r.Suggestions, Suggest(opt.Kind, spec, v)...)
 		}
@@ -157,9 +166,28 @@ func IsEmail(s string) bool { return len(s) <= 254 && emailRe.MatchString(s) }
 // IsURL reports whether s is shaped like a web address, with or without a scheme.
 func IsURL(s string) bool { return urlRe.MatchString(s) }
 
+// phoneWarning is the W_PHONE_UNLIKELY check: the text reads as a phone number for the region but is
+// not a number that exists in that region's numbering plan. The typed text is stored either way, the
+// E.164 form is derived from it by the repository (internal/phone).
+func phoneWarning(label, v, region string) *Issue {
+	n := phone.ParseRegion(v, region)
+	if !n.Parsed || n.Valid {
+		return nil
+	}
+	return &Issue{Code: CodePhoneUnlikely, Field: label, Expected: "a number that exists in region " + regionOrDefault(region),
+		Received: v, Fix: "check the digits and the country code"}
+}
+
+func regionOrDefault(r string) string {
+	if r == "" {
+		return phone.DefaultRegion()
+	}
+	return strings.ToUpper(r)
+}
+
 // IsPhone reports whether s is shaped like a phone number: allowed characters only and 3 to 20 digits.
-// This is the extension point for E.164 normalization, which is a separate roadmap item: add it here
-// as a function that returns the stored form, and Field will store that instead of the typed text.
+// Shape only. Normalization to E.164 is internal/phone, and a number that is shaped right but does not
+// exist in its region gets the W_PHONE_UNLIKELY warning from Field.
 func IsPhone(s string) bool {
 	if !phoneRe.MatchString(s) {
 		return false

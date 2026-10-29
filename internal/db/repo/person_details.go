@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/phone"
 	"github.com/jdanielnd/crm-cli/internal/validate"
 )
 
@@ -72,7 +73,7 @@ func (r *PersonRepo) Emails(ctx context.Context, id int64) ([]model.PersonEmail,
 // Phones lists a person's phone numbers, primary first.
 func (r *PersonRepo) Phones(ctx context.Context, id int64) ([]model.PersonPhone, error) {
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT phone_number, label, country_code, is_primary FROM person_phones WHERE person_id = ? ORDER BY is_primary DESC, id`, id)
+		`SELECT phone_number, label, country_code, is_primary, e164 FROM person_phones WHERE person_id = ? ORDER BY is_primary DESC, id`, id)
 	if err != nil {
 		return nil, fmt.Errorf("list phones: %w", err)
 	}
@@ -80,9 +81,12 @@ func (r *PersonRepo) Phones(ctx context.Context, id int64) ([]model.PersonPhone,
 	var out []model.PersonPhone
 	for rows.Next() {
 		var p model.PersonPhone
-		if err := rows.Scan(&p.PhoneNumber, &p.Label, &p.CountryCode, &p.IsPrimary); err != nil {
+		var e164 sql.NullString
+		if err := rows.Scan(&p.PhoneNumber, &p.Label, &p.CountryCode, &p.IsPrimary, &e164); err != nil {
 			return nil, fmt.Errorf("scan phone: %w", err)
 		}
+		p.E164 = e164.String
+		p.Display = phone.Display(p.PhoneNumber, p.E164)
 		out = append(out, p)
 	}
 	return out, rows.Err()
@@ -185,14 +189,14 @@ func (r *PersonRepo) RemoveEmail(ctx context.Context, id int64, email string) er
 }
 
 // AddPhone adds a phone number. The first number, or one added with primary, becomes people.phone.
-func (r *PersonRepo) AddPhone(ctx context.Context, id int64, phone string, label *string, primary bool) error {
+func (r *PersonRepo) AddPhone(ctx context.Context, id int64, number string, label *string, primary bool) error {
 	spec, _ := model.FieldNamed("person", "phone")
-	fr := validate.Field(spec, phone, validate.Options{Kind: "person"})
+	fr := validate.Field(spec, number, validate.Options{Kind: "person"})
 	if err := fr.Err(); err != nil {
 		return err
 	}
-	phone = fr.Value
-	if phone == "" {
+	phoneText := fr.Value
+	if phoneText == "" {
 		return validate.Fail(validate.Issue{Code: validate.CodeFieldRequired, Field: spec.Label, Expected: "a value is required", Fix: "give a phone number"})
 	}
 	if err := r.mustExist(ctx, id); err != nil {
@@ -204,9 +208,23 @@ func (r *PersonRepo) AddPhone(ctx context.Context, id int64, phone string, label
 	}
 	defer func() { _ = tx.Rollback() }()
 
+	// The typed text is stored as typed and the E.164 form next to it. A number the person already has
+	// in another format is the same number: its row keeps the text it was typed with.
+	num := phone.Parse(phoneText)
+	stored := phoneText
+	if key := num.Key(); key != "" {
+		have, err := samePhone(ctx, tx, id, key)
+		if err != nil {
+			return err
+		}
+		if have != "" {
+			stored = have
+		}
+	}
 	if _, err := tx.ExecContext(ctx,
-		`INSERT INTO person_phones (person_id, phone_number, label) VALUES (?, ?, ?)
-		 ON CONFLICT(person_id, phone_number) DO UPDATE SET label = COALESCE(excluded.label, label)`, id, phone, label); err != nil {
+		`INSERT INTO person_phones (person_id, phone_number, label, e164) VALUES (?, ?, ?, ?)
+		 ON CONFLICT(person_id, phone_number) DO UPDATE SET label = COALESCE(excluded.label, label), e164 = excluded.e164`,
+		id, stored, label, nullIfEmpty(num.E164)); err != nil {
 		return fmt.Errorf("add phone: %w", err)
 	}
 	if err := touchPerson(ctx, tx, id); err != nil {
@@ -217,30 +235,66 @@ func (r *PersonRepo) AddPhone(ctx context.Context, id int64, phone string, label
 		return err
 	}
 	if primary || hasPrimary == 0 {
-		if _, err := tx.ExecContext(ctx, `UPDATE person_phones SET is_primary = (phone_number = ?) WHERE person_id = ?`, phone, id); err != nil {
+		if _, err := tx.ExecContext(ctx, `UPDATE person_phones SET is_primary = (phone_number = ?) WHERE person_id = ?`, stored, id); err != nil {
 			return err
 		}
-		if _, err := tx.ExecContext(ctx, `UPDATE people SET phone = ?, updated_at = datetime('now') WHERE id = ?`, phone, id); err != nil {
+		if _, err := tx.ExecContext(ctx, `UPDATE people SET phone = ?, updated_at = datetime('now') WHERE id = ?`, stored, id); err != nil {
 			return err
 		}
 	}
 	return tx.Commit()
 }
 
+// samePhone returns the stored text of the person's number with the given matching key, "" if none.
+func samePhone(ctx context.Context, q DBTX, id int64, key string) (string, error) {
+	rows, err := q.QueryContext(ctx, `SELECT phone_number FROM person_phones WHERE person_id = ? ORDER BY id`, id)
+	if err != nil {
+		return "", fmt.Errorf("list phones: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var have string
+		if err := rows.Scan(&have); err != nil {
+			return "", fmt.Errorf("scan phone: %w", err)
+		}
+		if phone.Key(have) == key {
+			return have, nil
+		}
+	}
+	return "", rows.Err()
+}
+
 // RemovePhone removes a phone number and promotes another if it was the primary.
-func (r *PersonRepo) RemovePhone(ctx context.Context, id int64, phone string) error {
+func (r *PersonRepo) RemovePhone(ctx context.Context, id int64, number string) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	res, err := tx.ExecContext(ctx, `DELETE FROM person_phones WHERE person_id = ? AND phone_number = ?`, id, phone)
+	res, err := tx.ExecContext(ctx, `DELETE FROM person_phones WHERE person_id = ? AND phone_number = ?`, id, number)
 	if err != nil {
 		return fmt.Errorf("remove phone: %w", err)
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return fmt.Errorf("phone %q on person %d: %w", phone, id, model.ErrNotFound)
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		// The same number in another format counts as the same number.
+		if key := phone.Key(number); key != "" {
+			match, err := samePhone(ctx, tx, id, key)
+			if err != nil {
+				return err
+			}
+			if match != "" {
+				res, err = tx.ExecContext(ctx, `DELETE FROM person_phones WHERE person_id = ? AND phone_number = ?`, id, match)
+				if err != nil {
+					return fmt.Errorf("remove phone: %w", err)
+				}
+				n, _ = res.RowsAffected()
+			}
+		}
+	}
+	if n == 0 {
+		return fmt.Errorf("phone %q on person %d: %w", number, id, model.ErrNotFound)
 	}
 	var next sql.NullString
 	err = tx.QueryRowContext(ctx, `SELECT phone_number FROM person_phones WHERE person_id = ? ORDER BY is_primary DESC, id LIMIT 1`, id).Scan(&next)

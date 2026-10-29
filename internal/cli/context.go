@@ -10,6 +10,7 @@ import (
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/format"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/phone"
 	"github.com/spf13/cobra"
 )
 
@@ -164,7 +165,7 @@ func registerContextCommand(rootCmd *cobra.Command) {
 				fmt.Fprintf(w, "  Email: %s\n", *person.Email)
 			}
 			if person.Phone != nil {
-				fmt.Fprintf(w, "  Phone: %s\n", *person.Phone)
+				fmt.Fprintf(w, "  Phone: %s\n", phone.Display(*person.Phone, ""))
 			}
 			if person.Title != nil {
 				fmt.Fprintf(w, "  Title: %s\n", *person.Title)

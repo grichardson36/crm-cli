@@ -18,6 +18,8 @@ func TestMigration009_AddsNativeOrganizationFields(t *testing.T) {
 	// Step back to schema 8 the way it was: drop the columns, set the version.
 	_, err = d.Exec(migrationSection(t, "018_saved_views.sql", "down"))
 	require.NoError(t, err)
+	_, err = d.Exec(migrationSection(t, "015_phone_e164_dav_raw.sql", "down"))
+	require.NoError(t, err)
 	_, err = d.Exec(migrationSection(t, "013_vocabulary.sql", "down"))
 	require.NoError(t, err)
 	_, err = d.Exec(migrationSection(t, "012_name_aliases.sql", "down"))

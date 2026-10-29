@@ -25,6 +25,8 @@ Read 2026-10-21 from first-party specs and docs. Feeds [[sync-maps-structure-to-
 
 ### 1. Per-field rule (Recommended)
 
+**Status 2026-10-30:** built in feat/phone-dav for phones (matched by E.164, [[phone-numbers-are-e164]]), emails, name, org, title (waterfall: headline title, else the role on the primary membership; blanking TITLE clears the headline and never deletes a membership), notes, birthday (incl. partial), location and handles. Photo and addresses beyond the first stay raw. Decided by the owner (Q14 to Q16).
+
 | Our field | vCard | Rule |
 |---|---|---|
 | name | N, FN | Flat. Write N components (family, given, additional, prefix, suffix) and FN. Inbound: if only FN, keep it as display name and do not split. Field-level. |
@@ -40,6 +42,8 @@ Read 2026-10-21 from first-party specs and docs. Feeds [[sync-maps-structure-to-
 
 ### 2. Avoid rewriting the phone's text (Recommended)
 
+**Status 2026-10-30:** built (migration 015 `dav_state.raw_vcard`). The server stores the exact PUT body, patches it on GET (only moved fields, unchanged lines byte for byte, PRODID/UID/VERSION never touched, REV only on cards the CRM itself rendered) and answers GET and REPORT with that text. "Nothing changed" returns the stored text. If-Match is checked on PUT. Items 5 and 6 are for a CardDAV client, which this server is not. Test on a real iPhone: [[iphone-vcard-roundtrip-test]].
+
 1. Store the last-seen raw vCard text per remote contact, next to its ETag (S1, S6, S7).
 2. Outbound = parse raw, change only properties whose field version moved since last sync, serialize, PUT with If-Match (S3). Keep unchanged lines byte-for-byte, including property order, groups, folding, unknown params.
 3. Do not touch PRODID, UID or REV unless the target client does (S4, S9). Many servers bump REV themselves.
@@ -49,6 +53,8 @@ Read 2026-10-21 from first-party specs and docs. Feeds [[sync-maps-structure-to-
 
 ### 3. Empty-field edits (Recommended)
 
+**Status 2026-10-30:** built. A TEL or EMAIL missing from an incoming card is a delete only when the stored previous card held it. A card that fails to parse (or has no BEGIN/END) is answered 400, skipped and flagged as a `dav_issues` row (`crm dav issues`), never read as emptied.
+
 1. Inbound field became empty: clear only that scalar field (name part, title, birthday, note) after a field-version check. For linked structure, follow the existing rule: emptying ORG never removes a membership. Same for TITLE never deleting the membership, only blanking its role.
 2. Inbound list item removed (a TEL line gone): remove that item only when the previous raw contained it (explicit delete). Absence in a vCard we never saw is not a delete.
 3. Outbound clear: write the property removed or the component empty, never a placeholder. For ADR keep all seven separators (S8).
@@ -57,6 +63,8 @@ Read 2026-10-21 from first-party specs and docs. Feeds [[sync-maps-structure-to-
 
 ### 4. Conflict policy (Recommended)
 
+**Status 2026-10-30:** built. Per field, not per record. A field both sides changed keeps the CRM (server) value and stores the phone value in `sync_conflicts` with winner `crm`, `crm dav conflicts undo` applies the stored phone value. Replaces the earlier newest-change-wins rule of H06.
+
 1. **Field-level, not record-level.** Per field (and per list item), conflict only when both sides changed the same field since last sync. Different fields merge silently (S12, S13). Record-level server-wins (DAVx5, S5) throws away unrelated edits, which is the failure the owner reported on 2026-10-19.
 2. Same-field conflict follows [[conflicts-keep-server-store-local]]: keep the server value, store the local value for review. Notes keep both texts.
 3. Use ETag only as a coarse "did anything change" gate and for If-Match safety. Use our own per-field versions for the decision.
@@ -64,6 +72,6 @@ Read 2026-10-21 from first-party specs and docs. Feeds [[sync-maps-structure-to-
 
 ## Open
 
-- Q1. How iOS and iCloud treat PRODID, REV, `itemN.X-ABLabel` and unknown X- properties on write-back. Test with a real iPhone and keep the before and after raw vCards.
+- Q1. How iOS and iCloud treat PRODID, REV, `itemN.X-ABLabel` and unknown X- properties on write-back. Test with a real iPhone and keep the before and after raw vCards. Checklist: [[iphone-vcard-roundtrip-test]], not run yet.
 - Q2. How Monica and Dex resolve conflicts. No first-party text found.
 - Q3. Whether Google's `updatePersonFields` clears a field sent empty. Not stated in the reference page.

@@ -43,6 +43,7 @@ const (
 	CodeQueryGroup       = "E_QUERY_GROUP_INVALID"
 	CodeQueryTooLarge    = "E_QUERY_TOO_LARGE"
 	CodeEncodingDamaged  = "W_ENCODING_DAMAGED"
+	CodePhoneUnlikely    = "W_PHONE_UNLIKELY"
 	CodePhoneInTextField = "S_PHONE_IN_TEXT_FIELD"
 	CodeEmailInTextField = "S_EMAIL_IN_TEXT_FIELD"
 	CodeURLInTextField   = "S_URL_IN_TEXT_FIELD"
@@ -101,6 +102,7 @@ var Codes = []CodeInfo{
 	{CodeQueryGroup, KindError, "a saved view groups by a field that cannot be grouped, or uses a date bucket other than day, week or month"},
 	{CodeQueryTooLarge, KindError, "a saved view has more conditions, values or columns than the limit"},
 	{CodeEncodingDamaged, KindWarning, "the text holds U+FFFD, the mark of a damaged encoding"},
+	{CodePhoneUnlikely, KindWarning, "the text reads as a phone number but does not exist in the default region numbering plan, it is stored as typed"},
 	{CodePhoneInTextField, KindSuggestion, "phone-like text sits in a field that is not a phone"},
 	{CodeEmailInTextField, KindSuggestion, "email-like text sits in a field that is not an email"},
 	{CodeURLInTextField, KindSuggestion, "web-address-like text sits in a field that is not a web address"},
