@@ -43,6 +43,7 @@ Note types (frontmatter `type`): `pattern` (one decided rule), `feature-area` (f
 - [[one-verb-set]] (One verb set for every object)
 - [[same-input-style]] (Add and edit use the same form for every object)
 - [[one-record-page]] (Every object opens the same three regions)
+- [[notes-feed]] (Notes and interactions are a readable feed on every record page)
 - [[person-workspace-is-the-center]] (The person workspace is the center)
 - [[timeline-upcoming-first]] (Timeline shows upcoming work above completed history)
 - [[link-from-either-side]] (Link from either side)
