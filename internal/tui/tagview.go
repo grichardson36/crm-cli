@@ -440,8 +440,10 @@ func tagViewActions() []action {
 	inRow := func(m *Model) bool { return m.barTag != "" }
 	return []action{
 		{id: "tag-open", title: "Open tag page", group: "Tags", desc: "open the tag page: the objects that carry the tag, grouped by kind. enter on an object opens it. This is enter (activate) in the Tags view",
-			when: func(m *Model) bool { return m.view == viewTags && m.focus == focusList && m.barKind == "" && len(m.rows) > 0 },
-			run:  func(m *Model) tea.Cmd { return m.openTagPage() }},
+			when: func(m *Model) bool {
+				return m.view == viewTags && m.focus == focusList && m.barKind == "" && len(m.rows) > 0
+			},
+			run: func(m *Model) tea.Cmd { return m.openTagPage() }},
 		{id: "tag-back", title: "Back to the tag list", group: "Tags", hint: "esc", keys: []string{"esc"},
 			desc: "close the tag page, or clear the tag search",
 			foot: 15, footIn: inList, footLabel: "back", footIf: func(m *Model) bool { return m.onTagPage() },

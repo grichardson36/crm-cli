@@ -3,6 +3,7 @@ package tui
 import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
+	"github.com/jdanielnd/crm-cli/internal/model"
 )
 
 // Selection and bulk actions (patterns/bulk-actions-always). Every verb acts on the selected rows when
@@ -37,6 +38,8 @@ func kindBase(kind string) int64 {
 // primaryKind is the kind whose ids are stored plain in the selection of the current view.
 func (m *Model) primaryKind() string {
 	switch m.view {
+	case viewNotes:
+		return model.NoteKind
 	case viewTasks:
 		return "task"
 	case viewOrgs:
@@ -68,6 +71,10 @@ func (m *Model) rowRef(r row) (repo.Ref, bool) {
 		return repo.Ref{}, false
 	}
 	switch m.view {
+	case viewNotes:
+		if r.noteID != 0 {
+			return repo.Ref{Kind: model.NoteKind, ID: r.noteID}, true
+		}
 	case viewTasks:
 		if r.taskID != 0 {
 			return repo.Ref{Kind: "task", ID: r.taskID}, true

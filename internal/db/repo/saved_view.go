@@ -474,3 +474,20 @@ func (r *SavedViewRepo) ImportFile(ctx context.Context, data []byte, name string
 	}
 	return r.Create(ctx, SavedViewInput{Name: name, Kind: f.Kind, Query: f.Query, ShowInTabs: tabs})
 }
+
+// TagNames lists the names of the tags in use, for the typeahead of a tag condition.
+func (r *SavedViewRepo) TagNames(ctx context.Context) []string {
+	rows, err := r.db.QueryContext(ctx, `SELECT t.name FROM tags t WHERE EXISTS (SELECT 1 FROM taggings g WHERE g.tag_id = t.id AND g.deleted_at IS NULL) ORDER BY t.name COLLATE NOCASE`)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var n string
+		if rows.Scan(&n) == nil {
+			out = append(out, n)
+		}
+	}
+	return out
+}

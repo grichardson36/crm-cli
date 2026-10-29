@@ -36,7 +36,7 @@ func relationLabel(kind string) string {
 // view, an organization or deal in their views, otherwise the person under the cursor.
 func (m *Model) cursorObject() (repo.Ref, bool) {
 	for _, o := range objectDefs() {
-		if o.kind == "person" {
+		if o.kind == "person" || o.kind == model.SavedViewKind {
 			continue
 		}
 		if id := o.selected(m); id != 0 {

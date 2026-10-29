@@ -153,3 +153,6 @@ func DescribeOrder(q Query) string {
 	}
 	return strings.Join(parts, ", ")
 }
+
+// ChoiceLabelOf is the label of a stored choice value.
+func (f Field) ChoiceLabelOf(v string) string { return f.choiceLabel(v) }

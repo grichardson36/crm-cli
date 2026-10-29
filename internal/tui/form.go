@@ -331,6 +331,12 @@ func (m *Model) refreshDetail(force bool) {
 	}
 	r, ok := m.selected()
 	key := fmt.Sprintf("%d/%d", r.personID, r.taskID)
+	if m.view == viewNotes {
+		key += fmt.Sprintf("/%d", r.noteID)
+	}
+	if m.svActive() {
+		key += "/sv" + m.sv.v.UUID
+	}
 	if m.view == viewOrgs || m.view == viewDeals {
 		key += fmt.Sprintf("/%d/%d", r.orgID, r.dealID)
 	}
@@ -354,6 +360,8 @@ func (m *Model) refreshDetail(force bool) {
 		m.form = m.buildOrgForm(r.orgID)
 	case ok && m.view == viewDeals:
 		m.form = m.buildDealForm(r.dealID)
+	case ok && m.view == viewNotes:
+		m.form = m.buildNoteListForm(r.noteID)
 	case ok && m.view == viewTags:
 		m.form = m.buildTagForm(r)
 	case ok && m.view == viewSettings:

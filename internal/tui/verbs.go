@@ -125,9 +125,11 @@ func verbActions() []action {
 		{id: "merge", title: "Merge", group: "Verbs", hint: "m", keys: []string{"m"},
 			desc:  "merge the space-selected rows (people, organizations) or the highlighted duplicate group (opens the compare). m on a tag row moves it into another tag",
 			write: true, foot: 34, footIn: inList, footLabel: "merge",
-			footIf: func(m *Model) bool { return len(m.markedIDs()) >= 2 || len(m.markedOrgIDs()) >= 2 || whenMergeRows(m) || whenTagList(m) },
-			when:   func(m *Model) bool { return m.whenMerge() },
-			run:    func(m *Model) tea.Cmd { return m.runMerge() }},
+			footIf: func(m *Model) bool {
+				return len(m.markedIDs()) >= 2 || len(m.markedOrgIDs()) >= 2 || whenMergeRows(m) || whenTagList(m)
+			},
+			when: func(m *Model) bool { return m.whenMerge() },
+			run:  func(m *Model) tea.Cmd { return m.runMerge() }},
 		{id: "prompt-tab", title: "Prompt: tab", group: "Verbs", hint: "tab", keys: []string{"tab"}, mode: keyText,
 			desc: "in a footer prompt: accept the highlighted suggestion of the popup, else change the note type, else complete a role",
 			when: func(m *Model) bool { return m.mode == modePrompt },

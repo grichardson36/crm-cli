@@ -54,7 +54,7 @@ type overlay struct {
 	noFilter bool
 	// help replaces the key hints in the title line, note replaces the filter line of a noFilter list.
 	help, note string
-	onPick   func(m *Model, it overlayItem)
+	onPick     func(m *Model, it overlayItem)
 	// onCursor runs when the cursor lands on a different item (live preview). onCancel runs when
 	// the overlay is closed without a pick. Both are optional.
 	onCursor  func(m *Model, it overlayItem)

@@ -165,10 +165,30 @@ func (m *Model) viewItems() []overlayItem {
 			hidden = append(hidden, it)
 		}
 	}
+	// The saved views follow the built-in ones, shown first, then hidden (patterns/saved-views).
+	nShown := 0
+	for _, v := range m.svs {
+		it := m.savedItem(v)
+		if v.ShowInTabs {
+			nShown++
+			it.hint = modules.Key(len(arr.Visible()) + nShown)
+			shown = append(shown, it)
+		} else {
+			hidden = append(hidden, it)
+		}
+	}
 	items := shown
 	if len(hidden) > 0 {
 		items = append(items, overlayItem{id: "divider:hidden", label: "Hidden", desc: fmt.Sprintf("%d, x shows", len(hidden)), divider: true})
 		items = append(items, hidden...)
+	}
+	if len(m.svDeleted) > 0 {
+		items = append(items, overlayItem{id: "divider:deleted", label: "Deleted views", desc: fmt.Sprintf("%d, r restores", len(m.svDeleted)), divider: true})
+		for _, v := range m.svDeleted {
+			it := m.savedItem(v)
+			it.disabled = ""
+			items = append(items, it)
+		}
 	}
 	return items
 }
@@ -180,7 +200,7 @@ func (m *Model) showViews(focusID string) tea.Cmd {
 	o := m.newOverlay("Views", m.viewItems(), false)
 	o.noFilter = true
 	o.digits = true
-	o.help = "enter go  x show/hide  shift+up/down move  esc close"
+	o.help = "enter go  x show/hide  shift+up/down move  e edit  d delete  r restore  esc close"
 	o.note = "Number keys go to a shown view. Settings and this screen (v) are always available."
 	focus := func(id string) {
 		for i, idx := range o.shown {
@@ -192,6 +212,10 @@ func (m *Model) showViews(focusID string) tea.Cmd {
 	}
 	focus(focusID)
 	o.onPick = func(m *Model, it overlayItem) {
+		if uuid, ok := strings.CutPrefix(it.value, savedPrefix); ok {
+			m.openSaved(uuid)
+			return
+		}
 		if v, ok := moduleViews[it.value]; ok {
 			m.switchView(v)
 		}
@@ -203,6 +227,14 @@ func (m *Model) showViews(focusID string) tea.Cmd {
 		}
 		if cur == "" {
 			return false
+		}
+		if strings.HasPrefix(cur, savedPrefix) {
+			return m.savedViewsKey(o, key, cur, focus)
+		}
+		switch key {
+		case "e", "d", "r":
+			m.setStatus("a built-in view cannot be edited, deleted or restored, x hides it", true)
+			return true
 		}
 		var err error
 		next := m.mods

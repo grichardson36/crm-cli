@@ -2,6 +2,7 @@ package tui
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/jdanielnd/crm-cli/internal/modules"
@@ -22,6 +23,9 @@ func viewsScreen(m *Model) []string {
 	var out []string
 	for _, idx := range m.ov.shown {
 		it := m.ov.items[idx]
+		if strings.HasPrefix(it.value, savedPrefix) {
+			continue // the saved views are tested in savedview_test.go
+		}
 		if it.divider {
 			out = append(out, "|")
 		} else {

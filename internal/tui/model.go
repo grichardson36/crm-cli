@@ -17,7 +17,6 @@ import (
 	"github.com/jdanielnd/crm-cli/internal/alias"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/dedupe"
-	"github.com/jdanielnd/crm-cli/internal/tree"
 	"github.com/jdanielnd/crm-cli/internal/keys"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/jdanielnd/crm-cli/internal/modules"
@@ -25,6 +24,7 @@ import (
 	"github.com/jdanielnd/crm-cli/internal/shortsyntax"
 	crmsync "github.com/jdanielnd/crm-cli/internal/sync"
 	"github.com/jdanielnd/crm-cli/internal/theme"
+	"github.com/jdanielnd/crm-cli/internal/tree"
 )
 
 type viewKind int
@@ -48,10 +48,12 @@ const (
 	viewDeals
 	viewTags
 	viewSettings
+	// viewNotes lists the notes of a saved view of kind note (savedview.go). It is not a module.
+	viewNotes
 	numAllViews
 )
 
-var viewNames = [numAllViews]string{"Home", "People", "Follow-up", "Tasks", "Birthdays", "Merge", "Archived", "Sync", "Organizations", "Deals", "Tags", "Settings"}
+var viewNames = [numAllViews]string{"Home", "People", "Follow-up", "Tasks", "Birthdays", "Merge", "Archived", "Sync", "Organizations", "Deals", "Tags", "Settings", "Notes"}
 
 type mode int
 
@@ -280,8 +282,15 @@ type Model struct {
 	addSugg *addSuggestion
 	// barKind is the kind of the bar row whose verb is running (enterBarContext), "" outside the bar.
 	barKind string
+	// Saved views (savedview.go): the repository, the live and the deleted views, the one shown now
+	// (nil outside a saved view) and the open editor.
+	svr       *repo.SavedViewRepo
+	svs       []repo.SavedView
+	svDeleted []repo.SavedView
+	sv        *svState
+	sve       *svEditor
 	// mods is the module arrangement (modules.go): which views are on and in what order.
-	mods        modules.Arrangement
+	mods modules.Arrangement
 	// Tags view (tagview.go): the tag whose page is open ("" shows the list), the filter of the list
 	// (view options) and the counts read for the rows.
 	tagPage   string
@@ -337,6 +346,7 @@ func New(ctx context.Context, db *sql.DB) (*Model, error) {
 		ml:         repo.NewMergeLogRepo(db),
 		ntr:        repo.NewNoteTypeRepo(db),
 		vr:         repo.NewVocabRepo(db),
+		svr:        repo.NewSavedViewRepo(db),
 		minLevel:   dedupe.Fuzzy, // the Merge view lists every candidate, grouped by level; ctrl+o narrows it
 		noteType:   "note",
 		now:        time.Now,
@@ -400,6 +410,7 @@ func (m *Model) reload() error {
 	}
 	m.people = people
 	m.qix, m.qtags, m.qtypes = nil, nil, nil
+	m.loadSaved()
 	return m.rebuild(true)
 }
 
@@ -422,92 +433,82 @@ func (m *Model) rebuild(keep bool) error {
 	}
 
 	var rows []row
-	switch m.view {
-	case viewHome:
-		hr, err := m.homeRows()
-		if err != nil {
-			return err
-		}
-		rows = hr
-	case viewSync:
-		sr, err := m.syncRows()
-		if err != nil {
-			return err
-		}
-		rows = sr
-	case viewPeople:
-		rows = m.peopleRows()
-	case viewDue:
-		due, err := m.pr.Due(m.ctx, 0, 1000)
-		if err != nil {
-			return err
-		}
-		for _, d := range due {
-			rows = append(rows, row{personID: d.PersonID, title: cleanCell(d.Name), sub: d.KeepInTouch, meta: fmt.Sprintf("%dd overdue", d.DaysOverdue)})
-		}
-	case viewBirthdays:
-		br, err := m.birthdayRows()
-		if err != nil {
-			return err
-		}
-		rows = br
-	case viewTasks:
-		tasks, err := m.tr.FindAll(m.ctx, model.TaskFilters{})
-		if err != nil {
-			return err
-		}
-		for _, t := range tasks {
-			r := row{taskID: t.ID, title: cleanCell(t.Title)}
-			if len(t.PersonIDs) > 0 {
-				r.personID = t.PersonIDs[0]
+	svRows, svOn, svErr := m.savedRowsIfActive()
+	if svErr != nil {
+		return svErr
+	}
+	if svOn {
+		rows = svRows
+	} else {
+		switch m.view {
+		case viewHome:
+			hr, err := m.homeRows()
+			if err != nil {
+				return err
 			}
-			if t.DueAt != nil {
-				r.meta = *t.DueAt
+			rows = hr
+		case viewSync:
+			sr, err := m.syncRows()
+			if err != nil {
+				return err
 			}
-			if t.Recurrence != nil {
-				r.sub = "repeats " + *t.Recurrence
+			rows = sr
+		case viewPeople:
+			rows = m.peopleRows()
+		case viewDue:
+			due, err := m.pr.Due(m.ctx, 0, 1000)
+			if err != nil {
+				return err
 			}
-			for _, tg := range t.Tags {
-				if r.sub != "" {
-					r.sub += " "
-				}
-				r.sub += "#" + tg
+			for _, d := range due {
+				rows = append(rows, row{personID: d.PersonID, title: cleanCell(d.Name), sub: d.KeepInTouch, meta: fmt.Sprintf("%dd overdue", d.DaysOverdue)})
 			}
-			rows = append(rows, r)
+		case viewBirthdays:
+			br, err := m.birthdayRows()
+			if err != nil {
+				return err
+			}
+			rows = br
+		case viewTasks:
+			tr, err := m.openTaskRows()
+			if err != nil {
+				return err
+			}
+			rows = tr
+		case viewOrgs:
+			or, err := m.orgRows()
+			if err != nil {
+				return err
+			}
+			rows = or
+		case viewDeals:
+			dr, err := m.dealRows()
+			if err != nil {
+				return err
+			}
+			rows = dr
+		case viewTags:
+			tr, err := m.tagRows()
+			if err != nil {
+				return err
+			}
+			rows = tr
+		case viewSettings:
+			rows = m.settingRows()
+		case viewMerge:
+			groups, err := m.dr.Find(m.ctx, m.minLevel)
+			if err != nil {
+				return err
+			}
+			m.groups = groups
+			rows = m.mergeRows(groups)
+		case viewArchived:
+			ar, err := m.archivedRows()
+			if err != nil {
+				return err
+			}
+			rows = ar
 		}
-	case viewOrgs:
-		or, err := m.orgRows()
-		if err != nil {
-			return err
-		}
-		rows = or
-	case viewDeals:
-		dr, err := m.dealRows()
-		if err != nil {
-			return err
-		}
-		rows = dr
-	case viewTags:
-		tr, err := m.tagRows()
-		if err != nil {
-			return err
-		}
-		rows = tr
-	case viewSettings:
-		rows = m.settingRows()
-	case viewMerge:
-		groups, err := m.dr.Find(m.ctx, m.minLevel)
-		if err != nil {
-			return err
-		}
-		m.groups = groups
-		rows = m.mergeRows(groups)
-	case viewArchived:
-		ar, err := m.archivedRows()
-		if err != nil {
-			return err
-		}
-		rows = ar
 	}
 	m.rows = rows
 
@@ -565,6 +566,35 @@ func (m *Model) settle() {
 	}
 }
 
+// openTaskRows lists the open tasks as rows.
+func (m *Model) openTaskRows() ([]row, error) {
+	tasks, err := m.tr.FindAll(m.ctx, model.TaskFilters{})
+	if err != nil {
+		return nil, err
+	}
+	var rows []row
+	for _, t := range tasks {
+		r := row{taskID: t.ID, title: cleanCell(t.Title)}
+		if len(t.PersonIDs) > 0 {
+			r.personID = t.PersonIDs[0]
+		}
+		if t.DueAt != nil {
+			r.meta = *t.DueAt
+		}
+		if t.Recurrence != nil {
+			r.sub = "repeats " + *t.Recurrence
+		}
+		for _, tg := range t.Tags {
+			if r.sub != "" {
+				r.sub += " "
+			}
+			r.sub += "#" + tg
+		}
+		rows = append(rows, r)
+	}
+	return rows, nil
+}
+
 func (m *Model) peopleRows() []row {
 	people := m.people
 	if m.sortedRecent(viewPeople) {
@@ -578,17 +608,22 @@ func (m *Model) peopleRows() []row {
 		if !matchesAlias(p, terms, m.aliasTable()) {
 			continue
 		}
-		name := cleanCell(p.Name)
-		if p.IsFavorite {
-			name = "★ " + name
-		}
-		sub := cleanCell(p.Company)
-		if sub == "" {
-			sub = cleanCell(p.Title)
-		}
-		rows = append(rows, row{personID: p.ID, title: name, sub: sub, meta: p.KeepInTouch})
+		rows = append(rows, personRowOf(p))
 	}
 	return rows
+}
+
+// personRowOf is the list row of a person.
+func personRowOf(p model.PersonSummary) row {
+	name := cleanCell(p.Name)
+	if p.IsFavorite {
+		name = "★ " + name
+	}
+	sub := cleanCell(p.Company)
+	if sub == "" {
+		sub = cleanCell(p.Title)
+	}
+	return row{personID: p.ID, title: name, sub: sub, meta: p.KeepInTouch}
 }
 
 func matches(p model.PersonSummary, terms []string) bool { return matchesAlias(p, terms, nil) }
@@ -825,6 +860,9 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.mode == modeNames {
 			return m.handleNamesKey(msg)
 		}
+		if m.sve != nil {
+			return m.handleSVEKey(msg)
+		}
 		if m.tv != nil {
 			return m.handleTextKey(msg)
 		}
@@ -845,9 +883,10 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) switchView(v viewKind) {
-	if v == m.view {
+	if v == m.view && m.sv == nil {
 		return
 	}
+	m.sv = nil // leaving a saved view, or opening the plain view of the same kind
 	m.view = v
 	m.cursor, m.offset = 0, 0
 	m.marked = map[int64]bool{}
@@ -1026,6 +1065,10 @@ func (m *Model) runPrompt(kind, value string) {
 	}
 	if kind == "tag-rename" {
 		m.runTagRename(value)
+		return
+	}
+	if kind == "sview-name" {
+		m.runSaveViewName(value)
 		return
 	}
 	if strings.HasPrefix(kind, "org-") || strings.HasPrefix(kind, "deal-") {

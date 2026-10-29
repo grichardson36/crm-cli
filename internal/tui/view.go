@@ -53,6 +53,9 @@ func (m *Model) baseView() string {
 	if m.mode == modeNames && m.names != nil {
 		return m.namesView()
 	}
+	if m.sve != nil {
+		return m.sveView()
+	}
 	if m.tv != nil {
 		return m.textViewRender()
 	}
@@ -87,6 +90,7 @@ type tabSeg struct {
 	label  string
 	x0, x1 int
 	view   viewKind
+	sv     string // uuid of the saved view this tab opens
 	more   bool
 	on     bool
 }
@@ -103,16 +107,26 @@ func (m *Model) tabLayout() []tabSeg {
 		seg         tabSeg
 	}
 	var items []item
-	for i, v := range m.visibleViews() {
-		full, short := viewNames[v], viewNames[v][:1]
-		if k := modules.Key(i + 1); k != "" {
-			full, short = k+" "+viewNames[v], k
+	anyOn := false
+	for i, e := range m.visibleEntries() {
+		name := viewNames[e.view]
+		if e.sv != "" {
+			name = m.svName(e.sv)
 		}
-		items = append(items, item{full: full, short: short, seg: tabSeg{view: v, on: v == m.view}})
+		full, short := name, ([]rune(name))[0:1]
+		if k := modules.Key(i + 1); k != "" {
+			full, short = k+" "+name, []rune(k)
+		}
+		on := m.entryOn(e)
+		anyOn = anyOn || on
+		items = append(items, item{full: full, short: string(short), seg: tabSeg{view: e.view, sv: e.sv, on: on}})
 	}
 	more := item{full: "v More", short: "v", seg: tabSeg{more: true, view: m.view}}
-	if !m.isMainTab(m.view) {
+	if !anyOn {
 		more.full = "v " + viewNames[m.view]
+		if m.sv != nil {
+			more.full = "v " + m.sv.v.Name
+		}
 		more.seg.on = true
 	}
 	items = append(items, more)
@@ -195,6 +209,9 @@ func ruleLine(left, right string, w int) string {
 
 // countText is the right side of the tab bar.
 func (m *Model) countText() string {
+	if m.svActive() {
+		return m.svCountText()
+	}
 	switch m.view {
 	case viewHome:
 		return ""
@@ -249,6 +266,8 @@ func (m *Model) tabsView() string {
 func (m *Model) listView(w, h int) string {
 	if len(m.rows) == 0 {
 		switch {
+		case m.svActive():
+			return m.st.Dim.Render(m.svEmptyText())
 		case m.view == viewHome:
 			return m.st.Dim.Render("Nothing needs attention today.")
 		case m.view == viewPeople && m.query != "":

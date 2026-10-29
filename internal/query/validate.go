@@ -211,3 +211,15 @@ func ParseNumber(raw string) (float64, error) {
 	}
 	return f, nil
 }
+
+// ValidateCondition checks one condition of a kind, for an editor that checks each cell as it is
+// typed. It returns nil or a *validate.Error.
+func ValidateCondition(kind string, c Condition, env Env) error {
+	d, ok := catalog[kind]
+	if !ok {
+		return Validate(kind, Query{}, env)
+	}
+	var res validate.Result
+	res.Issues = validateCondition(kind, d, c, env)
+	return res.Err()
+}

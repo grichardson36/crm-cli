@@ -16,7 +16,7 @@ func TestViewSwitcherListsEveryViewWithItsKey(t *testing.T) {
 	press(m, "v")
 	require.Equal(t, modeOverlay, m.mode)
 	assert.Equal(t, "Views", m.ov.title)
-	require.Len(t, m.ov.items, 13, "every module is listed, Tags hidden under the divider")
+	require.Len(t, m.ov.items, 13+len(m.svs), "every module is listed, Tags hidden under the divider, then the saved views")
 	for i, v := range m.visibleViews() {
 		assert.Equal(t, viewNames[v], m.ov.items[i].label)
 		assert.Equal(t, modules.Key(i+1), m.ov.items[i].hint)

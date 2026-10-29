@@ -23,10 +23,10 @@ import (
 type jumpUnit int
 
 const (
-	unitPage   jumpUnit = iota // a page, the default
-	unitGroup                  // the next or previous group divider: a day in Birthdays, a confidence level in Merge
-	unitLetter                 // the next or previous first-letter group (People, Organizations)
-	unitSibling                // the next or previous row at the same level of a tree, else the node one level out (Tags tree layout)
+	unitPage    jumpUnit = iota // a page, the default
+	unitGroup                   // the next or previous group divider: a day in Birthdays, a confidence level in Merge
+	unitLetter                  // the next or previous first-letter group (People, Organizations)
+	unitSibling                 // the next or previous row at the same level of a tree, else the node one level out (Tags tree layout)
 )
 
 // viewNav is what a view declares about navigation.
@@ -57,7 +57,7 @@ func (m *Model) jump(dir int) {
 		return
 	}
 	var starts []int
-	switch navOf(m.view).unit {
+	switch m.navUnit() {
 	case unitSibling:
 		if m.view == viewTags && whenTagTree(m) {
 			m.treeJump(dir) // the sibling group of a tree (treeview.go)

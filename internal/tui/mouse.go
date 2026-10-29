@@ -65,7 +65,7 @@ func (m *Model) handleMouse(msg mouseEvent) (tea.Model, tea.Cmd) {
 					if seg.more {
 						return m, m.openViews()
 					}
-					m.switchView(seg.view)
+					m.goEntry(tabEntry{view: seg.view, sv: seg.sv})
 					break
 				}
 			}

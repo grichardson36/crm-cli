@@ -327,9 +327,9 @@ func buildActions() []action {
 		{id: "goto-view", title: "Go to view", group: "Views", hint: "v", keys: []string{"v"}, desc: "the Views screen: every view, shown ones first, hidden ones under a divider. enter goes to the view, x shows or hides it, shift+up and shift+down reorder, esc closes. Per device",
 			foot: 85, footIn: inList, run: func(m *Model) tea.Cmd { return m.openViews() }},
 		{id: "next-view", title: "Next view", group: "Views", hint: "]", keys: []string{"]", "ctrl+right"}, desc: "next view (also ctrl+right)",
-			run: func(m *Model) tea.Cmd { m.switchView(m.nextView(m.view, 1)); return nil }},
+			run: func(m *Model) tea.Cmd { m.stepView(1); return nil }},
 		{id: "prev-view", title: "Previous view", group: "Views", hint: "[", keys: []string{"[", "ctrl+left"}, desc: "previous view (also ctrl+left)",
-			run: func(m *Model) tea.Cmd { m.switchView(m.nextView(m.view, -1)); return nil }},
+			run: func(m *Model) tea.Cmd { m.stepView(-1); return nil }},
 		{id: "clear-search", title: "Clear search", group: "Views", hint: "esc", keys: []string{"esc"}, desc: "clear the People filter set from the bar (a tag, an organization or Show all)",
 			when: func(m *Model) bool { return m.focus == focusList && m.query != "" },
 			run: func(m *Model) tea.Cmd {
@@ -404,6 +404,7 @@ func buildActions() []action {
 	out = append(out, acts[at:]...)
 	out = append(out, orgMergeActions()...)
 	out = append(out, moduleActions()...)
+	out = append(out, savedViewActions()...)
 	out = append(out, settingActions()...)
 	annotateActions(out)
 	return out

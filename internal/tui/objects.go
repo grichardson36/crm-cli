@@ -106,7 +106,7 @@ func (o *objDef) actionID(v verb) string {
 
 // objectDefs registers every object, in key-resolution order.
 func objectDefs() []*objDef {
-	return []*objDef{orgDef(), dealDef(), taskDef(), noteDef(), personDef(), tagDef()}
+	return []*objDef{orgDef(), dealDef(), taskDef(), noteDef(), personDef(), tagDef(), savedViewDef()}
 }
 
 func objectByKind(kind string) *objDef {
@@ -461,6 +461,10 @@ func (o *objDef) deleteAction() action {
 	}
 	if o.kind == "task" {
 		a.footIf = func(m *Model) bool { return m.view == viewTasks }
+	}
+	if o.kind == model.SavedViewKind {
+		a.hint, a.foot, a.keys = "", 0, nil // d deletes the object in the list, the Views screen has its own d
+		a.desc = "delete the saved view on screen (asks y/n, the same soft delete as crm views delete). ctrl+z undoes it, the Views screen (v) restores with r"
 	}
 	if o.kind == model.NoteKind {
 		a.hint, a.foot = "d", 0

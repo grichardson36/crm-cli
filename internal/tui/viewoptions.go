@@ -139,7 +139,7 @@ func (o viewOption) current(m *Model) string { return o.choiceLabel(o.get(m)) }
 
 // openViewOptions shows the overlay for the current view.
 func (m *Model) openViewOptions() tea.Cmd {
-	opts := viewOptionsFor(m.view)
+	opts := m.optionsForView()
 	view := m.view
 	ov := m.newOverlay("View options, "+viewNames[view]+": left / right changes, esc closes", m.viewOptionItems(opts), false)
 	ov.noFilter = true

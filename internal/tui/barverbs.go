@@ -88,6 +88,7 @@ type barSaved struct {
 	status         string
 	statusIsErr    bool
 	kind           string
+	sv             *svState
 }
 
 // barResume remembers a bar that is waiting for a verb to finish (a prompt, a confirm, a picker).
@@ -103,7 +104,8 @@ type barResume struct {
 // returns what restoreBarContext needs. Nothing is read from the database here.
 func (m *Model) enterBarContext(t barTarget) barSaved {
 	s := barSaved{view: m.view, rows: m.rows, cursor: m.cursor, offset: m.offset, focus: m.focus, query: m.query, marked: m.marked, tag: m.barTag,
-		status: m.status, statusIsErr: m.statusIsErr, kind: m.barKind}
+		status: m.status, statusIsErr: m.statusIsErr, kind: m.barKind, sv: m.sv}
+	m.sv = nil
 	m.barKind = t.kind
 	m.query = ""
 	m.marked = map[int64]bool{}
@@ -140,6 +142,7 @@ func (m *Model) enterBarContext(t barTarget) barSaved {
 // leaveBarContext puts the screen back and refreshes it, because the verb may have changed data.
 func (m *Model) leaveBarContext(s barSaved) {
 	m.view, m.rows, m.cursor, m.offset, m.focus, m.query, m.marked, m.barTag, m.barKind = s.view, s.rows, s.cursor, s.offset, s.focus, s.query, s.marked, s.tag, s.kind
+	m.sv = s.sv
 	m.report(m.rebuild(true))
 }
 
@@ -181,6 +184,7 @@ func (m *Model) barVerbs(t barTarget) []barVerb {
 	saved := m.enterBarContext(t)
 	defer func() {
 		m.view, m.rows, m.cursor, m.offset, m.focus, m.query, m.marked, m.barTag, m.barKind = saved.view, saved.rows, saved.cursor, saved.offset, saved.focus, saved.query, saved.marked, saved.tag, saved.kind
+		m.sv = saved.sv
 	}()
 	var out []barVerb
 	seen := map[string]bool{}

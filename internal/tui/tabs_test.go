@@ -81,5 +81,5 @@ func TestTabBarOverflowCountsWhatDidNotFit(t *testing.T) {
 	click(m, last.x0+1, 0)
 	require.Equal(t, modeOverlay, m.mode)
 	assert.Equal(t, "Views", m.ov.title)
-	assert.Len(t, m.ov.items, 13, "the Views screen has every module and the divider of the hidden group")
+	assert.Len(t, m.ov.items, 13+len(m.svs), "the Views screen has every module, the divider of the hidden group and the saved views")
 }
