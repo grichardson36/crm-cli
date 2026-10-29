@@ -62,7 +62,7 @@ func TestSettingsViewIsAGroupedListWithASectionDividerEach(t *testing.T) {
 func TestSettingsRowsShowTheScopeTag(t *testing.T) {
 	m := settingsModel(t)
 	want := map[string]string{
-		"theme": "device", "keys": "device", "views": "device", "search-url": "device", "backups": "device",
+		"theme": "device", "keys": "device", "views": "device", "web-search": "device", "backups": "device",
 		"deal-stages": "synced", "deal-roles": "synced", "note-types": "synced", "aliases": "synced", "company-ignore": "synced", "archived": "synced",
 		"syntax": "session", "read-only": "session",
 	}
@@ -149,32 +149,17 @@ func TestSettingsEnterOpensTheThingBehindARow(t *testing.T) {
 func TestSettingsEditInPlaceWithTheFieldEditors(t *testing.T) {
 	m := settingsModel(t)
 
-	// A text setting of this device: the web search address, saved in config.toml [open].
-	cursorToSetting(t, m, "search-url")
-	assert.Contains(t, m.screen(), defaultSearchURL)
+	// A choice setting of this device: the web search engine, saved in config.toml [open].
+	cursorToSetting(t, m, "web-search")
+	assert.Contains(t, m.screen(), "Google")
 	press(m, "enter")
 	require.Equal(t, modeEdit, m.mode)
-	assert.Equal(t, defaultSearchURL, m.rowInput.Value())
-	m.rowInput.SetValue("https://duckduckgo.com/?q={query}")
+	m.edit.typed.choice = engineIndex("duckduckgo")
 	press(m, "enter")
 	assert.Equal(t, modeNormal, m.mode)
 	assert.False(t, m.statusIsErr, m.status)
-	data, err := os.ReadFile(modules.ConfigFile(m.env.DataDir))
-	require.NoError(t, err)
-	assert.Contains(t, string(data), "search_url")
 	assert.Equal(t, "https://duckduckgo.com/?q=hello", searchURLFor(m.env.DataDir, "hello"))
-	assert.Contains(t, m.rows[m.cursor].sub, "duckduckgo", "the list shows the new value")
-
-	// d resets it to the default after a yes.
-	cursorToSetting(t, m, "search-url")
-	if m.focus != focusDetail {
-		press(m, "tab")
-	}
-	goTo(t, m, "Web search")
-	press(m, "d", "y")
-	data, _ = os.ReadFile(modules.ConfigFile(m.env.DataDir))
-	assert.NotContains(t, string(data), "search_url")
-	assert.Equal(t, defaultSearchURL, m.settingByID("search-url").valueOf(m))
+	assert.Contains(t, m.rows[m.cursor].sub, "DuckDuckGo", "the list shows the new value")
 
 	// A choice setting: short syntax, edited with the options in the row (session scope).
 	cursorToSetting(t, m, "syntax")
@@ -189,7 +174,7 @@ func TestSettingsEditInPlaceWithTheFieldEditors(t *testing.T) {
 func TestSettingsEditIsBlockedInReadOnlyMode(t *testing.T) {
 	m := settingsModel(t)
 	m.readOnly = true
-	cursorToSetting(t, m, "search-url")
+	cursorToSetting(t, m, "web-search")
 	press(m, "enter")
 	assert.NotEqual(t, modeEdit, m.mode)
 	assert.True(t, m.statusIsErr)
@@ -204,7 +189,7 @@ func TestBarSettingThatIsOnlyEditedInPlaceGoesToItsRow(t *testing.T) {
 	typeText(m, "=web search")
 	press(m, "enter")
 	assert.Equal(t, viewSettings, m.view)
-	assert.Equal(t, "search-url", m.rows[m.cursor].setting)
+	assert.Equal(t, "web-search", m.rows[m.cursor].setting)
 }
 
 func TestBackupsListsThePreMigrationCopies(t *testing.T) {

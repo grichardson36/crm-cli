@@ -18,6 +18,6 @@ A relation field shows its linked rows as a small table. The first column is the
 - `ctrl+c` copies the value of the focused field when a field is focused (the detail pane). Everywhere else it keeps its old job: it quits from a list and cancels in a prompt or picker.
 - The palette has Copy value and Copy contact as vCard. `ctrl+shift+c` is bound to the vCard copy, but terminals such as Windows Terminal keep that chord for themselves, so use the palette entry.
 - `o` opens the focused thing outside the app, for every object. A URL, mail address or phone number opens the browser, the mail app or the dialer. Any other text, or an object with no link of its own, opens a web search for it. `enter` stays "open further inside the app".
-- The search address is a template in `config.toml`: `[open]` `search_url = "https://duckduckgo.com/?q={query}"`. The default is Google.
+- Settings > Behavior > Web search picks the engine (Google, Bing, DuckDuckGo, Brave, Ecosia, LinkedIn, Facebook, Instagram, TikTok, YouTube, X, Reddit, GitHub, Wikipedia, Google Maps, Google Images, Amazon, or Custom with your own address and `{query}`). Mark more engines under "offer on o" and `o` opens a small picker with the default first. Stored per device in `config.toml` under `[open]`.
 
 See also: tui-keys, tui-key-changes, links, purge, keys.

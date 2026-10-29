@@ -379,6 +379,7 @@ func Run(ctx context.Context, db *sql.DB, readOnly bool, noColor bool, env Env) 
 	m.env = env
 	m.applyStartupTheme()
 	m.applyStartupKeys()
+	_, _ = migrateSearchConfig(env.DataDir) // [open] search_url becomes engine and custom_url
 	m.applyStartupModules()
 	m.loadTagPrefs()
 	opts := []tea.ProgramOption{tea.WithContext(ctx)}

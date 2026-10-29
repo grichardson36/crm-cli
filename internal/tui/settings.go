@@ -9,7 +9,7 @@ import (
 	"github.com/jdanielnd/crm-cli/internal/db"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
-	"github.com/jdanielnd/crm-cli/internal/modules"
+	"github.com/jdanielnd/crm-cli/internal/validate"
 )
 
 // The settings registry (patterns/settings-view). Every setting is declared once, here: its id, the
@@ -96,19 +96,22 @@ func countText(n int, one string) string {
 	return fmt.Sprintf("%d %ss", n, one)
 }
 
-// searchTemplate is the web search address template of `o`: the configured one or the default.
-func (m *Model) searchTemplate() string {
-	if t := configuredSearchURL(m.env.DataDir); t != "" {
-		return t
-	}
-	return defaultSearchURL
-}
+var webSearchField = engineField()
 
 var syntaxField = model.FieldSpec{Key: "syntax", Label: "Short syntax", Type: model.FieldChoice,
 	Choices: []model.FieldChoiceOption{{Value: "on", Label: "on"}, {Value: "off", Label: "off"}}}
 
-var searchURLField = model.FieldSpec{Key: "search-url", Label: "Web search", Type: model.FieldText, Max: 500,
-	Hint: "an address with {query} where the text goes, for example https://duckduckgo.com/?q={query}. d resets it"}
+// engineField is the default web search engine, a choice over the catalog.
+func engineField() model.FieldSpec {
+	f := model.FieldSpec{Key: "web-search", Label: "Web search", Type: model.FieldChoice}
+	for _, e := range searchEngines {
+		f.Choices = append(f.Choices, model.FieldChoiceOption{Value: e.id, Label: e.name})
+	}
+	return f
+}
+
+var customSearchField = model.FieldSpec{Key: "web-search-custom", Label: "Custom address", Type: model.FieldText, Max: validate.MaxSearchTemplate,
+	Hint: "https://example.com/search?q={query}"}
 
 // settingList is the registry. The bar and the Settings view both read it.
 func (m *Model) settingList() []setting {
@@ -182,14 +185,36 @@ func (m *Model) settingList() []setting {
 			run: func(m *Model) tea.Cmd {
 				return m.showToast("read-only is "+onOff(m.readOnly)+". Start crm tui --read-only to turn it on", false)
 			}},
-		{id: "search-url", section: secBehavior, name: "Web search", words: "open o google duckduckgo url template browser", desc: "the address o uses to search the web for the focused text. {query} is where the text goes", scope: scopeDevice,
-			value: func(m *Model) string { return m.searchTemplate() }, field: &searchURLField,
+		{id: "web-search", section: secBehavior, name: "Web search", words: "open o engine google bing duckduckgo brave ecosia linkedin youtube maps browser default", desc: "the search engine o uses for the focused text. Custom takes your own address", scope: scopeDevice,
+			value: func(m *Model) string {
+				c := loadSearchConfig(m.env.DataDir)
+				return c.nameOf(c.Engine)
+			}, field: &webSearchField,
 			set: func(m *Model, v string) error {
-				if m.env.DataDir == "" {
-					return fmt.Errorf("no data directory in this session, so the setting cannot be saved: %w", model.ErrValidation)
+				c := loadSearchConfig(m.env.DataDir)
+				if v == engineCustom && c.Custom == "" {
+					return fmt.Errorf("type the custom address first (Web search: custom address): %w", model.ErrValidation)
 				}
-				return modules.SetValue(m.env.DataDir, "open", "search_url", strings.TrimSpace(v))
+				c.Engine = v
+				return c.save(m.env.DataDir)
 			}},
+		{id: "web-search-custom", section: secBehavior, name: "Web search: custom address", words: "open o url template query custom engine", desc: "your own search address, with {query} where the text goes. Used when Web search is Custom", scope: scopeDevice,
+			value: func(m *Model) string { return loadSearchConfig(m.env.DataDir).Custom }, field: &customSearchField,
+			set: func(m *Model, v string) error {
+				res := validate.SearchTemplate(v)
+				if err := res.Err(); err != nil {
+					return err
+				}
+				c := loadSearchConfig(m.env.DataDir)
+				c.Custom = res.Value
+				if c.Custom == "" && c.Engine == engineCustom {
+					c.Engine = defaultEngine
+				}
+				return c.save(m.env.DataDir)
+			}},
+		{id: "web-search-offer", section: secBehavior, name: "Web search: offer on o", words: "open o engines picker several choose mark", desc: "mark engines to choose from when you press o. With more than one marked, o opens a small picker with the default first", scope: scopeDevice,
+			value: func(m *Model) string { return loadSearchConfig(m.env.DataDir).summary() },
+			run:   func(m *Model) tea.Cmd { m.openOfferPicker(0); return nil }},
 
 		// Data
 		{id: "database", section: secData, name: "Database", words: "db where path file domain schema size info", desc: "the open database: path, schema version, size", scope: scopeDevice,

@@ -2,19 +2,15 @@ package tui
 
 import (
 	"bytes"
-	"net/url"
-	"os"
 	"regexp"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/BurntSushi/toml"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/emersion/go-vcard"
 	"github.com/jdanielnd/crm-cli/internal/dav"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
-	"github.com/jdanielnd/crm-cli/internal/modules"
 )
 
 // Copy and open (owner decisions 2026-10-28).
@@ -27,45 +23,12 @@ import (
 // o opens the focused thing outside the app, for every object type. A URL, mail address or phone number
 // opens the browser, the mail app or the dialer. Any other focused text, or an object with no link of
 // its own, opens a web search for it in the browser. enter stays "open further inside the app". The
-// search address is a template in config.toml, with a default:
-//
-//	[open]
-//	search_url = "https://duckduckgo.com/?q={query}"
+// search engine is chosen in Settings and stored in config.toml (websearch.go).
 
-// defaultSearchURL is the web search used when config.toml has no [open] search_url.
-const defaultSearchURL = "https://www.google.com/search?q={query}"
-
-// configuredSearchURL is the [open] search_url of config.toml, empty when it is not set.
-func configuredSearchURL(dataDir string) string {
-	if dataDir == "" {
-		return ""
-	}
-	data, err := os.ReadFile(modules.ConfigFile(dataDir))
-	if err != nil {
-		return ""
-	}
-	var cfg struct {
-		Open struct {
-			SearchURL string `toml:"search_url"`
-		} `toml:"open"`
-	}
-	if _, err := toml.Decode(string(data), &cfg); err != nil {
-		return ""
-	}
-	return strings.TrimSpace(cfg.Open.SearchURL)
-}
-
-// searchURLFor builds the web search address for a query from the template in config.toml.
-func searchURLFor(dataDir, query string) string {
-	tmpl := configuredSearchURL(dataDir)
-	if tmpl == "" {
-		tmpl = defaultSearchURL
-	}
-	q := url.QueryEscape(strings.TrimSpace(query))
-	if strings.Contains(tmpl, "{query}") {
-		return strings.ReplaceAll(tmpl, "{query}", q)
-	}
-	return tmpl + q
+// openPlan is what o will open: the address, a short description for the status line, and for a web
+// search the text searched, so the engine picker can build the address of another engine.
+type openPlan struct {
+	url, what, query string
 }
 
 var (
@@ -94,35 +57,38 @@ func urlForValue(v string) string {
 }
 
 // openTarget decides what o opens: the address, and a short description of it for the status line.
-func (m *Model) openTarget() (u, what string, ok bool) {
+func (m *Model) openTarget() (openPlan, bool) {
 	if m.focus == focusDetail {
 		if r, has := m.rowFocused(); has {
 			return m.openForRow(r)
 		}
-		return "", "", false
+		return openPlan{}, false
 	}
 	if ref, has := m.cursorRef(); has {
 		return m.openForObject(ref)
 	}
-	return "", "", false
+	return openPlan{}, false
 }
 
-func (m *Model) searchFor(text string) (string, string, bool) {
+func (m *Model) searchFor(text string) (openPlan, bool) {
 	text = strings.TrimSpace(strings.Join(strings.Fields(text), " "))
 	if text == "" {
-		return "", "", false
+		return openPlan{}, false
 	}
-	return searchURLFor(m.env.DataDir, text), "web search for " + ansi.Truncate(text, 40, "…"), true
+	return openPlan{url: searchURLFor(m.env.DataDir, text), what: "web search for " + ansi.Truncate(text, 40, "…"), query: text}, true
 }
 
+// linkPlan is a plan for an address that opens as it is.
+func linkPlan(u string) (openPlan, bool) { return openPlan{url: u, what: u}, true }
+
 // openForObject is o on an object: its own link when it has one, else a web search for its name.
-func (m *Model) openForObject(ref repo.Ref) (string, string, bool) {
+func (m *Model) openForObject(ref repo.Ref) (openPlan, bool) {
 	switch ref.Kind {
 	case "organization":
 		if o, err := m.orr.FindByID(m.ctx, ref.ID); err == nil {
 			for _, v := range []*string{o.Website, o.Domain, o.LinkedinURL} {
 				if u := urlForValue(str(v)); u != "" {
-					return u, u, true
+					return linkPlan(u)
 				}
 			}
 		}
@@ -132,7 +98,7 @@ func (m *Model) openForObject(ref repo.Ref) (string, string, bool) {
 				for _, h := range p.Handles {
 					if h.Kind == kind {
 						if u := linkFor(formRow{kind: rkHandle, key: h.Kind, value: h.Value}); u != "" {
-							return u, u, true
+							return linkPlan(u)
 						}
 					}
 				}
@@ -142,21 +108,21 @@ func (m *Model) openForObject(ref repo.Ref) (string, string, bool) {
 	if o := objectByKind(ref.Kind); o != nil && o.nameOf != nil {
 		return m.searchFor(strings.TrimPrefix(o.nameOf(m, ref.ID), "★ "))
 	}
-	return "", "", false
+	return openPlan{}, false
 }
 
 // openForRow is o on a row of the detail pane.
-func (m *Model) openForRow(r formRow) (string, string, bool) {
+func (m *Model) openForRow(r formRow) (openPlan, bool) {
 	if c, ok := m.focusedCell(); ok && strings.TrimSpace(c.value) != "" {
 		if u := urlForValue(c.value); u != "" {
-			return u, u, true
+			return linkPlan(u)
 		}
 		return m.searchFor(c.value)
 	}
 	if u := linkFor(r); u != "" {
-		return u, u, true
+		return linkPlan(u)
 	}
-	pageObject := func() (string, string, bool) { return m.openForObject(m.pageRef()) }
+	pageObject := func() (openPlan, bool) { return m.openForObject(m.pageRef()) }
 	switch r.kind {
 	case rkLinked:
 		if !r.empty {
@@ -171,7 +137,7 @@ func (m *Model) openForRow(r formRow) (string, string, bool) {
 	case rkField, rkTyped:
 		v := r.value
 		if u := urlForValue(v); u != "" {
-			return u, u, true
+			return linkPlan(u)
 		}
 		long := strings.Contains(v, "\n") || len([]rune(v)) > 100 || (r.spec != nil && r.spec.Type == model.FieldLongText) || (r.kind == rkField && r.field == "notes")
 		if strings.TrimSpace(v) != "" && !long {
@@ -181,9 +147,9 @@ func (m *Model) openForRow(r formRow) (string, string, bool) {
 	return pageObject()
 }
 
-// openOutside is the o key.
+// openOutside is the o key. A web search with several engines offered opens a picker of them.
 func (m *Model) openOutside() {
-	u, what, ok := m.openTarget()
+	plan, ok := m.openTarget()
 	if !ok {
 		m.setStatus("nothing to open here", true)
 		return
@@ -191,11 +157,37 @@ func (m *Model) openOutside() {
 	if m.open == nil {
 		return
 	}
+	if plan.query != "" {
+		if cfg := loadSearchConfig(m.env.DataDir); len(cfg.offered()) > 1 {
+			m.openEnginePicker(cfg, plan.query)
+			return
+		}
+	}
+	m.openAddress(plan.url, plan.what)
+}
+
+// openAddress opens an address outside the app and reports it.
+func (m *Model) openAddress(u, what string) {
 	if err := m.open(u); err != nil {
 		m.setStatus("open failed: "+err.Error(), true)
 		return
 	}
 	m.setStatus("opened "+ansi.Truncate(what, 60, "…"), false)
+}
+
+// openEnginePicker lists the engines offered when o is pressed, the default first.
+func (m *Model) openEnginePicker(cfg searchConfig, query string) {
+	var items []overlayItem
+	for i, id := range cfg.offered() {
+		it := overlayItem{id: id, label: cfg.nameOf(id)}
+		if i == 0 {
+			it.desc = "default"
+		}
+		items = append(items, it)
+	}
+	m.openPicker("Search the web for "+ansi.Truncate(query, 30, "…"), items, func(m *Model, it overlayItem) {
+		m.openAddress(searchAddress(cfg.templateOf(it.id), query), it.label+" search for "+ansi.Truncate(query, 30, "…"))
+	})
 }
 
 func whenOpenable(m *Model) bool {
@@ -262,7 +254,7 @@ func copyOpenActions() []action {
 			desc: "copy the person as a vCard (the card the phone sync serves) to the clipboard. Many terminals take ctrl+shift+c for themselves, so this palette entry always works",
 			when: func(m *Model) bool { return m.vcardPerson() != 0 }, run: func(m *Model) tea.Cmd { m.copyVCard(); return nil }},
 		{id: "open", title: "Open outside the app", group: "Edit pane", hint: "o", keys: []string{"o"},
-			desc:  "open the focused thing outside the app, for any object: a URL, mail address or phone number opens the browser, mail app or dialer, any other text or an object with no link opens a web search for it (search_url under [open] in config.toml). enter opens further inside the app",
+			desc:  "open the focused thing outside the app, for any object: a URL, mail address or phone number opens the browser, mail app or dialer, any other text or an object with no link opens a web search for it with your default engine (Settings, Behavior, Web search), or a small picker of the engines you marked to offer. enter opens further inside the app",
 			write: true, foot: 14, footIn: inDetail, footLabel: "outside", when: whenOpenable, run: func(m *Model) tea.Cmd { m.openOutside(); return nil }},
 	}
 }
