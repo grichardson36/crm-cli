@@ -170,6 +170,8 @@ Read-only findings that feed the patterns. Verify before relying on them.
 
 - [[schema-er]] (Schema proposal: relationships that match the real world)
 - [[sync-contract]] (Sync contract v1)
+- [[replica-package]] (The replica package: device sync in code)
+- [[peers-cli]] (crm peers: device sync commands)
 - [[audit-keybindings-2026-10]] (Key audit, 2026-10-21)
 - [[audit-keybindings-2026-10-simplify]] (Keys to simplify, 2026-10-27)
 
