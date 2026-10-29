@@ -216,6 +216,7 @@ type Model struct {
 	formTitle  string
 	formPerson int64
 	fcur       int
+	feed       feedState // expanded and selected entries of the activity feed (feed.go)
 	fcol       int // the cell under the cursor in a row with cells (cells.go), 0 is the row itself
 
 	lineRow  []int // screen line in the detail content -> form row index, -1 for none

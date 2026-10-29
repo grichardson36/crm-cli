@@ -52,6 +52,9 @@ func navOf(v viewKind) viewNav { return viewNavs[v] }
 // by a page, because they have no groups.
 func (m *Model) jump(dir int) {
 	page := max(1, m.bodyHeight()-1)
+	if m.cmp == nil && m.focus == focusDetail && m.feedJump(dir) {
+		return
+	}
 	if m.cmp != nil || m.focus != focusList {
 		m.step(dir * page)
 		return

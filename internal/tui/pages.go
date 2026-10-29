@@ -102,24 +102,34 @@ func infoRow(label, value string) formRow { return formRow{kind: rkInfo, label: 
 // Every record page builds them here, with one dim placeholder row when there are none, so Enter on
 // it adds the first note.
 func (m *Model) timelineRows(f model.InteractionFilters) []formRow {
-	f.Limit = 8
+	f.Limit = feedLimit + 1
 	ints, err := m.ir.FindAll(m.ctx, f)
 	if err != nil || len(ints) == 0 {
 		return []formRow{{kind: rkNote, label: "note", empty: true, head: "Recent"}}
 	}
+	more := len(ints) > feedLimit
+	if more {
+		ints = ints[:feedLimit]
+	}
 	var rows []formRow
 	cells := m.noteCells("")
+	own, names := timelineRef(f), map[repo.Ref]string{}
 	for i, it := range ints {
 		val := it.Type
 		if it.Subject != nil && *it.Subject != "" {
 			val += ": " + *it.Subject
 		}
-		r := formRow{kind: rkNote, label: shortDate(it.OccurredAt), key: val, value: str(it.Content), id: it.ID, typ: it.Type}
+		r := formRow{kind: rkNote, label: shortDate(it.OccurredAt), key: val, value: str(it.Content), id: it.ID, typ: it.Type,
+			feed: &feedData{subject: str(it.Subject), links: m.feedLinksOf(it, own, names)}}
 		r.cells = []rowCell{{key: "type", label: "type", value: it.Type, spec: cells[0].spec}}
 		if i == 0 {
 			r.head = "Recent"
 		}
 		rows = append(rows, r)
+	}
+	if more {
+		rows = append(rows, infoRow("", "older entries are not shown"))
+		rows[len(rows)-1].dim = true
 	}
 	return rows
 }

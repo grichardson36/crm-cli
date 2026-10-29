@@ -417,6 +417,9 @@ func (m *Model) step(delta int) {
 		return
 	}
 	if m.focus == focusDetail {
+		if m.feedScroll(delta) {
+			return
+		}
 		m.fcur = clampInt(m.fcur+delta, 0, len(m.form)-1)
 		m.fcol = 0
 		m.syncDetail()
