@@ -26,6 +26,7 @@ const (
 	unitPage   jumpUnit = iota // a page, the default
 	unitGroup                  // the next or previous group divider: a day in Birthdays, a confidence level in Merge
 	unitLetter                 // the next or previous first-letter group (People, Organizations)
+	unitSibling                // the next or previous row at the same level of a tree, else the node one level out (Tags tree layout)
 )
 
 // viewNav is what a view declares about navigation.
@@ -42,6 +43,7 @@ var viewNavs = map[viewKind]viewNav{
 	viewSettings:  {unit: unitGroup},
 	viewPeople:    {unit: unitLetter},
 	viewOrgs:      {unit: unitLetter},
+	viewTags:      {unit: unitSibling},
 }
 
 func navOf(v viewKind) viewNav { return viewNavs[v] }
@@ -56,6 +58,13 @@ func (m *Model) jump(dir int) {
 	}
 	var starts []int
 	switch navOf(m.view).unit {
+	case unitSibling:
+		if m.view == viewTags && whenTagTree(m) {
+			m.treeJump(dir) // the sibling group of a tree (treeview.go)
+		} else {
+			m.move(dir * page)
+		}
+		return
 	case unitGroup:
 		starts = m.groupStarts()
 	case unitLetter:

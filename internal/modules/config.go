@@ -43,3 +43,22 @@ func SetValue(dataDir, table, key, value string) error {
 	}
 	return os.WriteFile(path, []byte(b.String()), 0o644)
 }
+
+// Value reads one string setting under [table] in config.toml. It is "" when the file, the table or the
+// key is missing or the file is not valid TOML. The Tags view reads its per-device layout with it.
+func Value(dataDir, table, key string) string {
+	if dataDir == "" {
+		return ""
+	}
+	data, err := os.ReadFile(ConfigFile(dataDir))
+	if err != nil {
+		return ""
+	}
+	var raw map[string]any
+	if _, err := toml.Decode(string(data), &raw); err != nil {
+		return ""
+	}
+	t, _ := raw[table].(map[string]any)
+	v, _ := t[key].(string)
+	return v
+}

@@ -230,6 +230,7 @@ var frameworkIDs = map[string]bool{
 	"down": true, "up": true, "half-down": true, "half-up": true, "page-down": true, "page-up": true,
 	"jump-down": true, "jump-up": true, "top": true, "bottom": true, "home-top": true, "home-bottom": true,
 	"focus-detail": true, "back": true, "cell-next": true, "cell-prev": true,
+	"tag-tree-expand": true, "tag-tree-collapse": true,
 	// app chrome
 	"palette": true, "options": true, "help": true, "quit": true, "goto-view": true, "next-view": true, "prev-view": true, "clear-search": true,
 	// merge compare screen
@@ -255,6 +256,8 @@ var scopeByID = map[string]string{
 	// Tags in the bar
 	"tags-delete": "type:tag", "tag-link": "type:tag", "tag-unlink": "type:tag", "tag-rename": "type:tag", "tag-merge": "type:tag",
 	"tag-open": "type:tag", "tag-back": "type:tag", "tag-merge-marked": "type:tag",
+	// The tree layout of the Tags view: right and left win over focus-detail in this view only
+	"tag-tree-expand": "view:tags", "tag-tree-collapse": "view:tags",
 	// The detail form
 	"delete": "form", "add": "form", "copy": "form", "back": "form", "cell-next": "cells", "cell-prev": "cells",
 	// The compare screen

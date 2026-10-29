@@ -202,7 +202,9 @@ type TagTreeResult struct {
 	Renamed int         `json:"renamed"` // tags that got a new name
 	Merged  int         `json:"merged"`  // tags merged into a tag that existed
 	Records int         `json:"records"` // records that moved onto another tag by the merges
-	moves   []tagMove
+	// Duplicates counts the taggings a merge target already had, which fold into the existing ones.
+	Duplicates int `json:"duplicates"`
+	moves      []tagMove
 }
 
 type tagMove struct{ from, to string }
@@ -455,6 +457,9 @@ func (r *TagRepo) moveTrees(ctx context.Context, action string, moves []tagMove,
 				default:
 					op.merge, op.Records = m, m.Total
 					res.Records += m.Total
+					for _, n := range m.Duplicates {
+						res.Duplicates += n
+					}
 				}
 				res.Merged++
 			} else {
@@ -501,7 +506,7 @@ func (r *TagRepo) RedoTree(ctx context.Context, res *TagTreeResult) error {
 	if err != nil {
 		return err
 	}
-	res.Ops, res.Renamed, res.Merged, res.Records = again.Ops, again.Renamed, again.Merged, again.Records
+	res.Ops, res.Renamed, res.Merged, res.Records, res.Duplicates = again.Ops, again.Renamed, again.Merged, again.Records, again.Duplicates
 	return nil
 }
 

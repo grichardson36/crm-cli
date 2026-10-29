@@ -397,6 +397,7 @@ func buildActions() []action {
 		}
 	}
 	out := append(append(append(append(append(append(cellActions(), tagViewActions()...), todayActions()...), globalAddActions()...), verbActions()...), orgAutoActions()...), acts[:at]...)
+	out = append(out, tagTreeActions()...)
 	out = append(out, objectActions()...)
 	out = append(out, selectionActions()...)
 	out = append(out, copyOpenActions()...)

@@ -9,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/tree"
 )
 
 // The Tags module (patterns/features-tags-module). Tags are a view of their own: a list with the name,
@@ -150,6 +151,28 @@ func tagViewOptions() []viewOption {
 			get:     func(m *Model) string { return m.tagFilter },
 			set:     func(m *Model, value string) { m.tagFilter = value },
 		},
+		{
+			id: "layout", label: "Layout",
+			choices: []optChoice{{layoutFlat, "flat list"}, {layoutTree, "tree (work/clients under work)"}},
+			get: func(m *Model) string {
+				if m.tagLayout == layoutTree {
+					return layoutTree
+				}
+				return layoutFlat
+			},
+			set: func(m *Model, value string) { m.setTagLayout(value) },
+		},
+		{
+			id: "page", label: "Tag page",
+			choices: []optChoice{{"own", "own objects"}, {"children", "include children"}},
+			get: func(m *Model) string {
+				if m.tagChildren {
+					return "children"
+				}
+				return "own"
+			},
+			set: func(m *Model, value string) { m.setTagChildren(value == "children") },
+		},
 	}
 }
 
@@ -209,6 +232,9 @@ func (m *Model) tagRows() ([]row, error) {
 			list = append(list, s)
 		}
 	}
+	if m.tagTreeOn() {
+		return m.tagTreeRows(list)
+	}
 	rowOf := func(s repo.TagStat) row {
 		return row{tagID: s.ID, tag: s.Name, title: cleanCell(s.Name), sub: tagBreakdown(s), meta: strconv.Itoa(s.Count)}
 	}
@@ -239,7 +265,13 @@ func (m *Model) tagRows() ([]row, error) {
 
 // tagPageRows lists the objects that carry the open tag, grouped by kind under headings in the kind color.
 func (m *Model) tagPageRows() ([]row, error) {
-	objs, err := m.tagr.TaggedObjects(m.ctx, m.tagPage)
+	var objs []repo.TaggedObject
+	var err error
+	if m.tagChildren {
+		objs, err = m.tagr.TaggedObjectsWithChildren(m.ctx, m.tagPage)
+	} else {
+		objs, err = m.tagr.TaggedObjects(m.ctx, m.tagPage)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -250,7 +282,11 @@ func (m *Model) tagPageRows() ([]row, error) {
 	g := groupRows(objs, func(o repo.TaggedObject) []groupHead {
 		return []groupHead{{key: o.Kind, title: kindHeading[o.Kind], meta: strconv.Itoa(counts[o.Kind]), rule: true}}
 	}, func(o repo.TaggedObject) row {
-		return row{tag: m.tagPage, akind: o.Kind, objID: o.ID, title: cleanCell(o.Name), sub: cleanCell(o.Detail)}
+		sub := cleanCell(o.Detail)
+		if o.Tag != "" && o.Tag != m.tagPage {
+			sub = strings.TrimSpace(sub + " #" + o.Tag) // came in through a child tag
+		}
+		return row{tag: m.tagPage, akind: o.Kind, objID: o.ID, title: cleanCell(o.Name), sub: sub}
 	})
 	// A divider takes the kind of the rows under it, so it is drawn in that kind's color.
 	for i := range g.rows {
@@ -268,6 +304,9 @@ func (m *Model) tagCountText() string {
 			if !r.skip {
 				n++
 			}
+		}
+		if m.tagChildren {
+			return fmt.Sprintf("#%s, %d objects with children", m.tagPage, n)
 		}
 		return fmt.Sprintf("#%s, %d objects", m.tagPage, n)
 	}
@@ -313,12 +352,18 @@ func (m *Model) buildTagForm(r row) []formRow {
 	}
 	s, ok := m.tagStats[r.tag]
 	if !ok {
+		if r.virtual {
+			return m.virtualTagForm(r.tag)
+		}
 		return []formRow{infoRow("tag", r.tag)}
 	}
 	m.formTitle = "#" + s.Name
 	name := specRow(repo.Ref{Kind: tagKind, ID: s.ID}, tagNameSpec(), s.Name)
 	name.head = "Tag"
 	rows := []formRow{name, infoRow("objects", strconv.Itoa(s.Count))}
+	if n, ok := m.tagNodeOf(s.Name); ok && n.Children > 0 {
+		rows = append(rows, infoRow("with children", strconv.Itoa(n.Total)), infoRow("children", strconv.Itoa(n.Children)))
+	}
 	for _, k := range model.TaggableTypes {
 		if n := s.ByKind[k]; n > 0 {
 			rows = append(rows, infoRow(tagKindWords[k][1], strconv.Itoa(n)))
@@ -340,9 +385,12 @@ func (m *Model) buildTagForm(r row) []formRow {
 	return rows
 }
 
+// tagNameSpec is the name field of a tag: the hierarchy field the schema declares (model.Fields["tag"]),
+// so the editor and the validator treat the name as a path.
 func tagNameSpec() model.FieldSpec {
-	return model.FieldSpec{Key: "name", Label: "name", Type: model.FieldText, Required: true,
-		Hint: "renames the tag on every object. A name another tag has offers to merge into it"}
+	f, _ := model.HierarchyOf("tag")
+	f.Hint = "a new path renames the tag and the tags below it. A name another tag has offers to merge into it"
+	return f
 }
 
 // commitTagName is the end of the in-place edit of a tag name: rename, or when the name is another tag's
@@ -475,8 +523,13 @@ func (m *Model) mergeTagVerb() tea.Cmd {
 		return nil
 	}
 	var sources []string
-	for _, n := range m.bulkTagNames() {
-		if n != cur {
+	names := m.bulkTagNames()
+	for _, n := range names {
+		under := false
+		for _, o := range names {
+			under = under || tree.IsUnder(n, o) // a tag below another selected tag goes with it
+		}
+		if n != cur && !under {
 			sources = append(sources, n)
 		}
 	}
@@ -495,7 +548,7 @@ func (m *Model) mergeTagVerb() tea.Cmd {
 func (m *Model) runTagMerges(sources []string, target string) {
 	m.beginGroup()
 	for _, s := range sources {
-		res, err := m.tagr.Merge(m.ctx, s, target)
+		res, err := m.tagr.MergeTree(m.ctx, s, target)
 		if err != nil {
 			m.endGroup(fmt.Sprintf("merge tags into #%s", target))
 			m.afterWrite()
@@ -503,8 +556,8 @@ func (m *Model) runTagMerges(sources []string, target string) {
 			return
 		}
 		m.record(res.Label(),
-			func() error { return m.tagr.UndoMerge(m.ctx, res) },
-			func() error { return m.tagr.RedoMerge(m.ctx, res) })
+			func() error { return m.tagr.UndoTree(m.ctx, res) },
+			func() error { return m.tagr.RedoTree(m.ctx, res) })
 	}
 	m.endGroup(fmt.Sprintf("merge %d tags into #%s", len(sources), target))
 	m.marked = map[int64]bool{}
@@ -513,17 +566,38 @@ func (m *Model) runTagMerges(sources []string, target string) {
 	m.pendingCmd = m.showToast(fmt.Sprintf("%d tags merged into #%s · ctrl+z undoes", len(sources), target), false)
 }
 
-// deleteTagsVerb is d: delete the highlighted or selected tags. One tag asks y/n, several the count typed back.
+// deleteTagsVerb is d: delete the highlighted or selected tags with the tags below them. One plain tag
+// asks y/n. A parent, a virtual parent or several tags show the count of taggings and ask for it typed
+// back (patterns/delete-asks-yes-no, bulk-actions-always).
 func (m *Model) deleteTagsVerb() tea.Cmd {
-	names := m.bulkTagNames()
-	switch len(names) {
-	case 0:
-		return nil
-	case 1:
-		m.askDeleteTag(names[0])
+	roots := m.tagRoots()
+	if len(roots) == 0 {
 		return nil
 	}
-	return m.askTyped(fmt.Sprintf("delete %d tags", len(names)), bulkWord("delete", len(names)), func() { m.deleteTags(names) })
+	var tags, taggings int
+	for _, r := range roots {
+		st, err := m.tagr.SubtreeStat(m.ctx, r)
+		if err != nil {
+			m.setStatus(err.Error(), true)
+			return nil
+		}
+		tags += st.Tags
+		taggings += st.Taggings
+	}
+	if len(roots) == 1 && tags == 1 {
+		if virtual, _ := m.tagr.IsVirtual(m.ctx, roots[0]); !virtual {
+			m.askDeleteTag(roots[0])
+			return nil
+		}
+	}
+	what := fmt.Sprintf("delete %d tags (%d taggings)", tags, taggings)
+	if len(roots) == 1 {
+		what = fmt.Sprintf("delete #%s and %d tags below it (%d taggings)", roots[0], tags-1, taggings)
+		if v, _ := m.tagr.IsVirtual(m.ctx, roots[0]); v {
+			what = fmt.Sprintf("delete the %d tags below #%s (%d taggings)", tags, roots[0], taggings)
+		}
+	}
+	return m.askTyped(what, bulkWord("delete", tags), func() { m.deleteTags(roots) })
 }
 
 // askDeleteTag asks y/n before deleting one tag.
@@ -554,21 +628,26 @@ func (m *Model) tagStat(name string) (repo.TagStat, error) {
 	return repo.TagStat{}, fmt.Errorf("tag %q: %w", name, model.ErrNotFound)
 }
 
-// deleteTags deletes tags as one undo step: a used tag is untagged everywhere, an unused one is removed.
+// deleteTags deletes tags and everything below them as one undo step: a used subtree is untagged
+// everywhere, a subtree no object carries is removed.
 func (m *Model) deleteTags(names []string) {
 	stats, err := m.tagr.Stats(m.ctx)
 	if err != nil {
 		m.setStatus(err.Error(), true)
 		return
 	}
-	unused := map[string]bool{}
-	for _, s := range stats {
-		unused[s.Name] = s.Unused()
-	}
 	m.beginGroup()
 	for _, n := range names {
-		if unused[n] {
-			res, err := m.tagr.DeleteUnused(m.ctx, false, n)
+		var members []string
+		used := false
+		for _, s := range stats {
+			if tree.InSubtree(s.Name, n) {
+				members = append(members, s.Name)
+				used = used || s.Count+s.Archived > 0
+			}
+		}
+		if !used && len(members) > 0 {
+			res, err := m.tagr.DeleteUnused(m.ctx, false, members...)
 			if err != nil {
 				m.endGroup("")
 				m.afterWrite()
@@ -580,7 +659,7 @@ func (m *Model) deleteTags(names []string) {
 				func() error { return m.tagr.RedoDeleteUnused(m.ctx, res) })
 			continue
 		}
-		res, err := m.tagr.DeleteTag(m.ctx, n)
+		res, err := m.tagr.DeleteTagTree(m.ctx, n)
 		if err != nil {
 			m.endGroup("")
 			m.afterWrite()
