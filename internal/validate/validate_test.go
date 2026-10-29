@@ -7,6 +7,7 @@ import (
 
 	"github.com/jdanielnd/crm-cli/internal/help"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/query"
 	"github.com/jdanielnd/crm-cli/internal/validate"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -146,6 +147,27 @@ func TestEveryErrorCodeIsReachable(t *testing.T) {
 	note(validate.StageRules([]validate.StageState{{Name: "a", Outcome: "open"}, {Name: "won", Outcome: "won"}}))
 	_, oErr := validate.StageOutcome("maybe")
 	note(oErr)
+	// Saved views: the codes are declared here, raised by internal/query.
+	_, nErr := query.ValidName(" ")
+	note(nErr)
+	many := make([]query.Condition, query.MaxConditions+1)
+	for i := range many {
+		many[i] = query.Condition{Field: "first", Op: query.OpEmpty}
+	}
+	for _, q := range []struct {
+		kind string
+		q    query.Query
+	}{
+		{"widget", query.Query{}},
+		{"person", query.Query{Filter: []query.Condition{{Field: "nope", Op: query.OpEmpty}}}},
+		{"person", query.Query{Filter: []query.Condition{{Field: "first", Op: "regex"}}}},
+		{"person", query.Query{Filter: []query.Condition{{Field: "first", Op: query.OpIs}}}},
+		{"person", query.Query{Sort: []query.Sort{{Field: "organization"}}}},
+		{"person", query.Query{GroupBy: "email"}},
+		{"person", query.Query{Filter: many}},
+	} {
+		note(query.Validate(q.kind, q.q, query.Env{}))
+	}
 	for _, c := range validate.Codes {
 		if c.Kind == validate.KindError {
 			assert.True(t, seen[c.Code], "no test reaches "+c.Code)
@@ -163,7 +185,7 @@ func TestCodeVocabulary(t *testing.T) {
 		assert.True(t, strings.HasPrefix(c.Code, prefix), c.Code)
 		assert.Equal(t, c.Kind, validate.KindOf(c.Code))
 	}
-	assert.Len(t, validate.Codes, 33)
+	assert.Len(t, validate.Codes, 41)
 }
 
 func TestSanitize(t *testing.T) {
@@ -175,7 +197,7 @@ func TestSanitize(t *testing.T) {
 		{"trim", "  a  ", "a", false, false},
 		{"collapse", "a \t b\n c", "a b c", false, false},
 		{"control characters", "a\x00b\x1fc​d", "abc​d", false, false},
-		{"byte order mark", string(rune(0xFEFF))+"Acme", "Acme", false, false},
+		{"byte order mark", string(rune(0xFEFF)) + "Acme", "Acme", false, false},
 		{"multiline keeps breaks", "a  b\r\n\r\n\r\n\r\nc", "a b\n\nc", true, false},
 		{"damaged encoding is kept and flagged", "Acme � Corp", "Acme � Corp", false, true},
 	}

@@ -25,6 +25,7 @@ One validation framework checks every value from the CLI, MCP, the terminal UI, 
 | E_STAGE_NO_OPEN, E_STAGE_NO_WON, E_STAGE_NO_LOST | the change would leave no open, no won or no lost deal stage |
 | E_STAGE_OUTCOME_INVALID | a deal stage outcome is not open, won or lost |
 | E_PATH_EMPTY_SEGMENT, E_PATH_EDGE_SLASH, E_PATH_TOO_DEEP, E_PATH_TOO_LONG, E_PATH_CYCLE | a nested tag name such as work/clients is malformed (empty segment, leading or trailing /, over 8 levels or 200 characters), or a move puts a tag under itself |
+| E_VIEW_KIND_UNKNOWN, E_VIEW_NAME_INVALID, E_QUERY_FIELD_UNKNOWN, E_QUERY_OPERATOR_INVALID, E_QUERY_VALUE_INVALID, E_QUERY_SORT_INVALID, E_QUERY_GROUP_INVALID, E_QUERY_TOO_LARGE | a saved view has an unknown kind, a bad name, or a filter, sort or group that names a missing field, a wrong operator or a malformed value (see `crm help views`) |
 | W_ENCODING_DAMAGED, W_PHONE_UNLIKELY | warnings: text holds U+FFFD, or a phone number does not exist in the default region (stored as typed) |
 | S_PHONE_IN_TEXT_FIELD, S_EMAIL_IN_TEXT_FIELD, S_URL_IN_TEXT_FIELD | suggestion: phone-, email- or web-address-like text in another field |
 | S_VOCAB_CREATE | suggestion: the value is not on the list yet and can be created (the terminal UI offers `Create role X`) |
