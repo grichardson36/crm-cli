@@ -22,6 +22,7 @@ func defaultStyles() theme.Styles {
 // setTheme makes t the active theme for this session.
 func (m *Model) setTheme(t theme.Theme) {
 	m.st = theme.NewStyles(t, m.profile)
+	m.applyKindColors()
 	m.themeName = t.Name
 }
 

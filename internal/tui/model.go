@@ -214,6 +214,11 @@ type Model struct {
 	// Detail form.
 	form       []formRow
 	formTitle  string
+
+	// Per-kind colors (kindcolors.go): the saved overrides, and the state of the custom hex prompt.
+	kindColors       map[string]string
+	colorKindEditing string
+	colorBase        map[string]string
 	formPerson int64
 	fcur       int
 	fcol       int // the cell under the cursor in a row with cells (cells.go), 0 is the row itself
@@ -377,6 +382,7 @@ func Run(ctx context.Context, db *sql.DB, readOnly bool, noColor bool, env Env) 
 	}
 	m.readOnly = readOnly
 	m.env = env
+	m.kindColors = loadKindColors(env.DataDir)
 	m.applyStartupTheme()
 	m.applyStartupKeys()
 	_, _ = migrateSearchConfig(env.DataDir) // [open] search_url becomes engine and custom_url
@@ -968,6 +974,7 @@ func (m *Model) handlePromptKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		m.mode = modeNormal
 		m.input.Blur()
+		m.endKindColorPrompt()
 		m.addSugg, m.pipe = nil, nil
 		m.pipeRes, m.pipeLinks = map[string]pendingLink{}, nil
 		return m, nil
@@ -980,6 +987,7 @@ func (m *Model) handlePromptKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	m.input, cmd = m.input.Update(msg)
 	m.pipeRefresh()
+	m.previewKindColorHex()
 	return m, cmd
 }
 
@@ -1094,6 +1102,9 @@ func (m *Model) runPrompt(kind, value string) {
 		return
 	case "task-edit":
 		m.saveTaskEdit(m.lineID, value)
+		return
+	case "kind-color-hex":
+		m.saveKindColorHex(value)
 		return
 	case "notetype-add":
 		m.addNoteType(value)

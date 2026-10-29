@@ -406,7 +406,7 @@ func (m *Model) syncDetail() {
 	}
 	if m.formTitle != "" {
 		title := ansi.Truncate(m.formTitle, max(1, w), "…")
-		push(lipgloss.NewStyle().MaxWidth(max(1, w)).Render(m.st.Name.Render(title)), -1)
+		push(lipgloss.NewStyle().MaxWidth(max(1, w)).Render(m.headingStyle().Render(title)), -1)
 		push("", -1)
 	}
 	for i, r := range m.form {

@@ -296,6 +296,7 @@ func (m *Model) openOfferPicker(at int) {
 			}
 		}
 		m.openOfferPicker(at)
+		_ = m.rebuild(true)
 		m.refreshDetail(true)
 	})
 	if m.ov != nil && at < len(m.ov.shown) {

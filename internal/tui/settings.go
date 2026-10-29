@@ -52,6 +52,7 @@ func (s settingScope) note() string {
 // Section names, in the order the Settings view shows them.
 const (
 	secAppearance = "Appearance"
+	secColors     = "Colors"
 	secKeys       = "Keys"
 	secViews      = "Views"
 	secDeals      = "Deals"
@@ -63,7 +64,7 @@ const (
 	secArchive    = "Archive"
 )
 
-var settingSections = []string{secAppearance, secKeys, secViews, secDeals, secTypes, secNames, secBehavior, secData, secSync, secArchive}
+var settingSections = []string{secAppearance, secColors, secKeys, secViews, secDeals, secTypes, secNames, secBehavior, secData, secSync, secArchive}
 
 type setting struct {
 	id      string
@@ -80,6 +81,8 @@ type setting struct {
 	// field editor when both exist.
 	action string
 	run    func(m *Model) tea.Cmd
+	// colorKind is set on the rows of the Colors section: the detail pane shows a live sample in it.
+	colorKind string
 }
 
 func onOff(b bool) string {
@@ -124,7 +127,7 @@ func (m *Model) settingList() []setting {
 			return countText(len(list), noun)
 		}
 	}
-	return []setting{
+	return append(m.colorSettings(), []setting{
 		// Appearance
 		{id: "theme", section: secAppearance, name: "Theme", words: "colors colours dark light appearance look", desc: "choose a color theme, previewed live", scope: scopeDevice,
 			value: func(m *Model) string { return m.themeName }, action: "theme-choose"},
@@ -247,7 +250,7 @@ func (m *Model) settingList() []setting {
 		// Archive
 		{id: "archived", section: secArchive, name: "Open Archived", words: "archive restore purge deleted trash", desc: "open the Archived view: restore or purge archived records", scope: scopeSynced,
 			run: func(m *Model) tea.Cmd { m.switchView(viewArchived); return nil }},
-	}
+	}...)
 }
 
 // settingByID finds a setting of the registry.
@@ -400,6 +403,11 @@ func (m *Model) buildSettingForm(id string) []formRow {
 		rows = append(rows, r)
 	default:
 		v := s.valueOf(m)
+		if s.colorKind != "" {
+			sr := infoRow("preview", m.colorSample(s.colorKind, s.name))
+			sr.head = "Preview"
+			rows = append(rows, sr)
+		}
 		if v != "" {
 			vr := infoRow("value", v)
 			vr.head = "Value"
