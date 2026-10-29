@@ -18,7 +18,7 @@ Sanitization trims, collapses whitespace and strips control characters. U+FFFD i
 
 Smart correction, first three: phone-like, email-like and URL-like text in a text field. A suggestion names the target field and the value and is never applied.
 
-Phone E.164 normalization is a separate roadmap item. The extension point is `validate.IsPhone` and the phone format check in `Field`: return the normalized form as `Result.Value`.
+Phone E.164 normalization is built ([[phone-numbers-are-e164]]): `Field` keeps the typed text as `Result.Value`, the repository stores the E.164 form from `internal/phone` next to it, and the warning `W_PHONE_UNLIKELY` flags a number that parses but does not exist in the default region.
 
 Live in pipe lines (2026-10-29): a segment closed with `|` is checked at once and the error shows inline, the segment being typed shows a soft indicator only, smart corrections show as hints ([[one-line-pipe-prompt]], [[autocomplete-component]]).
 

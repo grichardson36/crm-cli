@@ -11,7 +11,7 @@ crm person phone add 1 "+1 555 0100" --label Mobile
 crm person email rm 1 jane@example.com
 ```
 
-Removing is by value. `--primary` makes that address or number the primary one. The primary email is also the `email` field in list output.
+Removing is by value (a phone by any format of the same number, see `crm help phone-numbers`). `--primary` makes that address or number the primary one. The primary email is also the `email` field in list output.
 
 ## Social links and website
 
@@ -33,4 +33,4 @@ crm person show 1 -f json
 
 In JSON the person has `emails`, `phones` and `handles` arrays. In the table view they appear as comma separated columns. Duplicate detection (`crm help duplicates`) and sync matching (`crm help sync`) use emails, phones and links. Keep them accurate.
 
-See also: people, duplicates, sync.
+See also: people, duplicates, sync, phone-numbers.

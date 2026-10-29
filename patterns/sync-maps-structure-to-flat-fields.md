@@ -12,7 +12,7 @@ status: open (decided for DAV ORG only, standard still to research). Rule change
 
 **Because.** Owner decision 2026-10-19 (Q-H): "why can't I make changes on my phone that propagate?" The first build dropped phone ORG edits. That was our modeling limit, not a conflict.
 
-**Applied so far.** DAV ORG: a match repoints the primary membership in place, a miss creates the organization and repoints or creates the primary membership, `people.company` takes the phone's text. Emptying ORG keeps the membership. Outbound ORG is the primary organization name. See [[schema-er]] E4 and open discrepancy X23.
+**Applied so far.** DAV phones (2026-10-30, [[phone-numbers-are-e164]]): matched by E.164, the stored phone card is patched and not re-rendered, TITLE follows the headline-title-else-role waterfall, a missing TEL or EMAIL is a delete only if the previous card held it ([[research-sync-standard]] sections 1 to 4). DAV ORG: a match repoints the primary membership in place, a miss creates the organization and repoints or creates the primary membership, `people.company` takes the phone's text. Emptying ORG keeps the membership. Outbound ORG is the primary organization name. See [[schema-er]] E4 and open discrepancy X23.
 
 **Larger patterns.** [[local-first]]
 
