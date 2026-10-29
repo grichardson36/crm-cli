@@ -105,7 +105,7 @@ Proposed list. "Shape" is the data a module expects from its query, stated field
 | text (markdown) | one text value, optional links | link target | read or edit. Links can set context |
 | map | rows with a point or polygon, label | row id | needs a tile or geometry source. TUI renderer is hard (gap) |
 | chart (bar, line, spark) | rows or aggregates with x, y, series | point | a Vega-Lite subset is the precedent (V27) |
-| tree / outline | rows with a parent id | node id | k9s xray and Embark outline are precedents |
+| tree / outline | rows with a parent id, or a field with a hierarchy path | node id | k9s xray and Embark outline are precedents. Built for the TUI as [[tree-view-module]] (2026-10-29, feat/nested-tags): rows declare `hierarchy: path`, arrows move and expand, ctrl+arrow jumps siblings |
 | form | one row, fields with types and rules | none | JSON Forms precedent (V26) |
 | stat | one aggregate value, label, optional delta | none | dashboard use |
 | container: split / stack / tabs | child module list, arrangement | child focus | holds modules. The nesting mechanism |

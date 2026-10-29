@@ -69,6 +69,7 @@ Note types (frontmatter `type`): `pattern` (one decided rule), `feature-area` (f
 *UI decisions.*
 
 - [[home-is-an-action-queue]] (Home is a short queue of relationship actions)
+- [[tree-view-module]] (One reusable tree renders any collection with a hierarchy path field)
 - [[views-screen]] (One Views screen lists, opens, shows, hides and orders every view)
 - [[settings-view]] (Settings is one module over one registry, with a scope on each row)
 - [[one-bar]] (One bar finds objects and runs verbs)
@@ -111,6 +112,7 @@ Note types (frontmatter `type`): `pattern` (one decided rule), `feature-area` (f
 - [[sigils-for-things-words-for-time]] (Sigils name things, plain words name time)
 - [[at-sign-means-person]] (@ means a person)
 - [[hash-means-tag]] (# means a tag)
+- [[nested-tags]] (A tag named parent/child is a child of parent, the hierarchy is the name)
 - [[dates-are-plain-words]] (Dates are plain words)
 - [[by-means-deadline]] (by means deadline)
 - [[every-means-recurrence]] (every means recurrence)
@@ -131,7 +133,7 @@ Feature rows (moved from FEATURES.md, which is retired). Each note lists the pat
 - [[features-tasks-and-notes]] (Tasks, reminders, notes, note types, timeline)
 - [[features-keep-in-touch-and-birthdays]] (Cadences, due, snooze, birthdays, digests, Home)
 - [[features-tags-groups-and-views]] (Tags, groups, saved views, filters, bulk edit, search)
-- [[features-tags-module]] (The Tags view: list, tag page, rename, merge, clean up)
+- [[features-tags-module]] (The Tags view: list, tree, tag page, rename, merge, nest, clean up)
 - [[features-links-and-relations]] (Typed links between all objects)
 - [[features-merge-archive-and-undo]] (Duplicates, merge and merge log, archive, purge, undo)
 - [[features-import-and-export]] (Dex CSV, other importers, export)

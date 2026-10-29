@@ -85,7 +85,11 @@ No tag-specific key. The universal verbs act on the selected tags, else the high
 | `u` | take the tag off an object that has it | unlink the highlighted or selected objects |
 | `a g` | add a tag | |
 | `space`, `ctrl+a`, `shift+up`/`shift+down` | select tags | select objects |
-| `ctrl+o` | Sort (name, number of objects), Filter (in use, unused, possible case duplicates, all) | |
+| `ctrl+o` | Sort (name, number of objects), Filter (in use, unused, possible case duplicates, all), Layout (flat or tree), Tag page (own objects or include children) | |
 | `/` | find a tag by name | |
+| `right`, `left` (tree layout) | open a node or go to its first child, close it or go to the parent | |
+| `ctrl+up`, `ctrl+down` (tree layout) | previous or next sibling, else out one level | |
 
-Palette: "Tags: merge case duplicates", "Tags: delete unused tags", "Rename tag", "Merge tag into another", "Delete tag" (a picker, same code).
+Palette: "Tags: merge case duplicates", "Tags: delete unused tags", "Tags: nest under...", "Tags: unnest", "Tags: tree or flat layout", "Tags: include children on tag pages", "Tree: expand all", "Tree: collapse all", "Rename tag", "Merge tag into another", "Delete tag" (a picker, same code).
+
+Nested tags (BRANCH feat/nested-tags, owner decisions 2026-10-29): the tree layout adds no bare key. `right` and `left` are the existing focus-detail and back keys, the Tags view takes them for expand and collapse only while a node has something to open or close, so a leaf still moves into the detail pane with `right`. `d` on a parent deletes the subtree (count typed back), `m` merges the children along, rename of a parent renames the children. Details: [[nested-tags]], [[tree-view-module]].
