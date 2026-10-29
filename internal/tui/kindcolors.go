@@ -312,7 +312,7 @@ func (m *Model) colorSettings() []setting {
 	var out []setting
 	for _, ck := range colorKinds() {
 		ck := ck
-		out = append(out, setting{id: "color-" + ck.kind, section: secColors, name: ck.label, colorKind: ck.kind,
+		out = append(out, setting{id: "color-" + ck.kind, section: secColors, name: strings.ToUpper(ck.label[:1]) + ck.label[1:] + " color", colorKind: ck.kind,
 			words: "color colour highlight kind chip palette hex " + ck.kind, scope: scopeDevice,
 			desc:  "the highlight color of " + ck.label + " in related chips, pickers, lists and record page headings. Pick a palette color, type a hex color or reset to the theme",
 			value: func(m *Model) string { return m.colorChoiceLabel(ck.kind) },

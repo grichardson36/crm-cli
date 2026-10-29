@@ -209,15 +209,18 @@ type captureState struct {
 
 // openKeysCustomize lists the actions; picking one waits for the new key.
 func (m *Model) openKeysCustomize() {
-	items := make([]overlayItem, 0, len(m.actions))
+	defaults := defaultKeysByID()
+	var acts []*action
 	for i := range m.actions {
-		a := &m.actions[i]
-		it := overlayItem{id: a.id, label: a.title, hint: joinKeys(a.keys), desc: a.group + ": " + a.desc}
-		if _, custom := m.keyOverrides[a.id]; custom {
-			it.desc = "(custom) " + it.desc
-		}
-		items = append(items, it)
+		acts = append(acts, &m.actions[i])
 	}
+	items := groupedKeyItems(acts, func(a *action) overlayItem {
+		it := overlayItem{id: a.id, label: a.title, hint: keyCurrent(a), desc: a.desc}
+		if d, changed := keyChanged(a, defaults); changed {
+			it.desc = "(default " + d + ") " + it.desc
+		}
+		return it
+	})
 	m.openPicker("Keys: choose the action to rebind", items, func(m *Model, it overlayItem) {
 		m.startCapture(it.id)
 	})
@@ -289,19 +292,21 @@ func (m *Model) openKeysReset() {
 		m.pendingCmd = m.showToast("Keys: no custom keys to reset", false)
 		return
 	}
-	items := []overlayItem{{id: "*", label: "All actions", desc: "remove every custom key"}}
-	ids := make([]string, 0, len(m.keyOverrides))
+	defaults := defaultKeysByID()
+	var acts []*action
 	for id := range m.keyOverrides {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
-	for _, id := range ids {
-		title := id
 		if a := m.actionByID(id); a != nil {
-			title = a.title
+			acts = append(acts, a)
 		}
-		items = append(items, overlayItem{id: id, label: title, hint: joinKeys(m.keyOverrides[id]), desc: "reset to the default key"})
 	}
+	items := []overlayItem{{id: "*", label: "All actions", desc: "remove every custom key"}}
+	items = append(items, groupedKeyItems(acts, func(a *action) overlayItem {
+		d, _ := keyChanged(a, defaults)
+		if d == "" {
+			d = "no key"
+		}
+		return overlayItem{id: a.id, label: a.title, hint: joinKeys(m.keyOverrides[a.id]), desc: "reset to the default key (" + d + ")"}
+	})...)
 	m.openPicker("Keys: reset", items, func(m *Model, it overlayItem) {
 		o := keys.Overrides{}
 		if it.id != "*" {

@@ -64,7 +64,7 @@ const (
 	secArchive    = "Archive"
 )
 
-var settingSections = []string{secAppearance, secColors, secKeys, secViews, secDeals, secTypes, secNames, secBehavior, secData, secSync, secArchive}
+var settingSections = []string{secAppearance, secColors, secViews, secDeals, secTypes, secNames, secBehavior, secData, secSync, secArchive, secKeys}
 
 type setting struct {
 	id      string
@@ -337,23 +337,54 @@ func (m *Model) runSetting(it overlayItem) tea.Cmd {
 // component), then the settings of the section with the value and the scope tag.
 func (m *Model) settingRows() []row {
 	list := m.settingList()
-	var ordered []setting
+	// An item is a setting or, in the Keys section, an action with its key.
+	type item struct {
+		s   *setting
+		act *action
+	}
+	var ordered []item
 	for _, sec := range settingSections {
-		for _, s := range list {
-			if s.section == sec {
-				ordered = append(ordered, s)
+		for i := range list {
+			if list[i].section == sec {
+				ordered = append(ordered, item{s: &list[i]})
+			}
+		}
+		if sec == secKeys {
+			for _, a := range m.keyActions() {
+				ordered = append(ordered, item{act: a})
 			}
 		}
 	}
 	counts := map[string]int{}
-	for _, s := range ordered {
-		counts[s.section]++
+	var keyActs []*action
+	for _, it := range ordered {
+		switch {
+		case it.act != nil:
+			counts[secKeys]++
+			keyActs = append(keyActs, it.act)
+		default:
+			counts[it.s.section]++
+		}
 	}
+	layerN, areaN := keyCounts(keyActs)
+	defaults := defaultKeysByID()
 	g := groupRows(ordered,
-		func(s setting) []groupHead {
-			return []groupHead{{key: s.section, title: s.section, meta: countText(counts[s.section], "setting"), rule: true}}
+		func(it item) []groupHead {
+			sec := secKeys
+			if it.s != nil {
+				sec = it.s.section
+			}
+			heads := []groupHead{{key: sec, title: sec, meta: countText(counts[sec], "setting"), rule: true}}
+			if it.act != nil {
+				heads = append(heads, keyHeads(it.act, layerN, areaN)...)
+			}
+			return heads
 		},
-		func(s setting) row {
+		func(it item) row {
+			if it.act != nil {
+				return keyRowFor(it.act, defaults)
+			}
+			s := it.s
 			return row{setting: s.id, title: s.name, sub: cleanCell(s.valueOf(m)), meta: string(s.scope)}
 		})
 	return g.rows
@@ -387,6 +418,9 @@ func (m *Model) curSetting() *setting {
 // buildSettingForm is the detail pane of a setting: what it is, where it is stored and, for a field
 // setting, the value as a typed row that enter or e edits in place.
 func (m *Model) buildSettingForm(id string) []formRow {
+	if strings.HasPrefix(id, "key:") {
+		return m.keyDetail(strings.TrimPrefix(id, "key:"))
+	}
 	m.formTitle = ""
 	s := m.settingByID(id)
 	if s == nil {
@@ -425,6 +459,14 @@ func (m *Model) buildSettingForm(id string) []formRow {
 // openSetting is enter on a row of the Settings view: a field setting starts its in-place editor,
 // any other setting opens what it is for.
 func (m *Model) openSetting() tea.Cmd {
+	if a := m.curKeyAction(); a != nil {
+		if m.readOnly {
+			m.setStatus("read-only: keys cannot be changed", true)
+			return nil
+		}
+		m.startCapture(a.id)
+		return nil
+	}
 	s := m.curSetting()
 	if s == nil {
 		return nil
@@ -459,7 +501,7 @@ func (m *Model) saveSetting(id, v string) error {
 func settingActions() []action {
 	return []action{
 		{id: "setting-open", title: "Open setting", group: "Verbs", desc: "in Settings: edit the setting under the cursor in place, or open the screen it belongs to (same as enter)",
-			when: func(m *Model) bool { return m.view == viewSettings && m.focus == focusList && m.curSetting() != nil },
+			when: func(m *Model) bool { return m.view == viewSettings && m.focus == focusList && (m.curSetting() != nil || m.curKeyAction() != nil) },
 			run:  func(m *Model) tea.Cmd { return m.openSetting() }},
 	}
 }

@@ -47,8 +47,8 @@ func TestSettingsViewIsAGroupedListWithASectionDividerEach(t *testing.T) {
 	m := settingsModel(t)
 	var sections []string
 	for _, r := range m.rows {
-		if r.skip {
-			assert.True(t, r.rule, "a section divider is drawn as a rule")
+		// inside Keys a layer is a rule and an area a plain heading (keygroups.go)
+		if r.skip && r.rule && orderIndex(keyLayerOrder, r.title) == len(keyLayerOrder) {
 			sections = append(sections, r.title)
 		}
 	}
@@ -68,7 +68,7 @@ func TestSettingsRowsShowTheScopeTag(t *testing.T) {
 	}
 	got := map[string]string{}
 	for _, r := range m.rows {
-		if r.setting != "" {
+		if r.setting != "" && !strings.HasPrefix(r.setting, "key:") { // key rows show their key, not a scope
 			got[r.setting] = r.meta
 			assert.Contains(t, []string{"device", "synced", "session"}, r.meta, r.setting)
 		}
@@ -87,7 +87,7 @@ func TestTheBarAndTheViewReadTheSameRegistry(t *testing.T) {
 		registry = append(registry, s.id)
 	}
 	for _, r := range m.rows {
-		if r.setting != "" {
+		if r.setting != "" && !strings.HasPrefix(r.setting, "key:") {
 			view = append(view, r.setting)
 		}
 	}
