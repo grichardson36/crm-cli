@@ -23,6 +23,26 @@ const (
 // Kinds lists the kinds a saved view supports, in display order.
 var Kinds = []string{KindPerson, KindOrganization, KindDeal, KindTask, KindNote, KindTag}
 
+// NormalizeKind maps the words people use to the kind: org, organisation, interaction, people and so on.
+func NormalizeKind(k string) string {
+	k = strings.ToLower(strings.TrimSpace(k))
+	switch k {
+	case "org", "orgs", "organisation", "organizations":
+		return KindOrganization
+	case "interaction", "notes":
+		return KindNote
+	case "people", "persons":
+		return KindPerson
+	case "deals":
+		return KindDeal
+	case "tasks":
+		return KindTask
+	case "tags":
+		return KindTag
+	}
+	return k
+}
+
 // ValidKind reports whether k is a kind a saved view can be about.
 func ValidKind(k string) bool {
 	for _, x := range Kinds {

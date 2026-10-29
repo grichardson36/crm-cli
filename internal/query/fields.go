@@ -421,3 +421,35 @@ func (f Field) FarTable() string {
 	}
 	return f.rel.far
 }
+
+// FieldInfo describes a field for a listing: what a person or an agent needs to write a condition.
+type FieldInfo struct {
+	Field     string   `json:"field"`
+	Label     string   `json:"label"`
+	Type      string   `json:"type"`
+	Operators []string `json:"operators"`
+	Options   []string `json:"options,omitempty"`
+	Sortable  bool     `json:"sortable"`
+	Groupable bool     `json:"groupable"`
+}
+
+// FieldInfos lists the queryable fields of a kind with their operators. The kind may be written as a
+// person writes it (org). It returns false for an unknown kind.
+func FieldInfos(kind string) ([]FieldInfo, bool) {
+	kind = NormalizeKind(kind)
+	if !ValidKind(kind) {
+		return nil, false
+	}
+	var out []FieldInfo
+	for _, f := range Fields(kind) {
+		fi := FieldInfo{Field: f.Key, Label: f.Label, Type: string(f.Class), Operators: OperatorsFor(f.Class), Sortable: f.Sortable(), Groupable: f.Groupable()}
+		for _, c := range f.Choices {
+			fi.Options = append(fi.Options, c.Value)
+		}
+		if f.Vocabulary != "" {
+			fi.Options = append(fi.Options, "(your list)")
+		}
+		out = append(out, fi)
+	}
+	return out, true
+}

@@ -21,6 +21,8 @@ func ArchiveObject(ctx context.Context, db *sql.DB, kind string, id int64) error
 		return NewTaskRepo(db).Archive(ctx, id)
 	case "interaction":
 		return NewInteractionRepo(db).Archive(ctx, id)
+	case model.SavedViewKind:
+		return NewSavedViewRepo(db).Delete(ctx, id)
 	}
 	return fmt.Errorf("unknown object %q: %w", kind, model.ErrValidation)
 }
@@ -38,6 +40,9 @@ func RestoreObject(ctx context.Context, db *sql.DB, kind string, id int64) error
 		return NewTaskRepo(db).Restore(ctx, id)
 	case "interaction":
 		return NewInteractionRepo(db).Restore(ctx, id)
+	case model.SavedViewKind:
+		_, err := NewSavedViewRepo(db).Restore(ctx, id)
+		return err
 	}
 	return fmt.Errorf("unknown object %q: %w", kind, model.ErrValidation)
 }

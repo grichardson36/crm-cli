@@ -163,6 +163,21 @@ func (f FieldSpec) DefaultHint() string {
 	return ""
 }
 
+// SavedViewKind is the object kind of a saved view. Its rows are the saved_view table. Delete and
+// restore are soft like every other object, link and unlink do not apply.
+const SavedViewKind = "saved_view"
+
+// SavedViewObjectKinds are the object kinds a saved view can be about, in the words the CLI uses.
+var SavedViewObjectKinds = []string{"person", "organization", "deal", "task", "note", "tag"}
+
+func savedViewKindChoices() []FieldChoiceOption {
+	out := make([]FieldChoiceOption, len(SavedViewObjectKinds))
+	for i, k := range SavedViewObjectKinds {
+		out[i] = FieldChoiceOption{Value: k, Label: k}
+	}
+	return out
+}
+
 func tierChoices() []FieldChoiceOption {
 	return []FieldChoiceOption{{"0", "clear"}, {"1", "Top"}, {"2", "High"}, {"3", "Medium"}, {"4", "Low"}, {"5", "None"}}
 }
@@ -228,6 +243,14 @@ var Fields = map[string][]FieldSpec{
 	},
 	NoteKind: {
 		{Key: "text", Label: "text", Type: FieldLongText, Required: true},
+	},
+	// A saved view (patterns/saved-views): a name, the kind it is about and whether it takes a tab. Its
+	// filter, sort and group are the neutral query of internal/query, checked there with the E_QUERY_*
+	// codes, so the registry lists only the plain fields.
+	SavedViewKind: {
+		{Key: "name", Label: "name", Type: FieldText, Required: true, Max: 80},
+		{Key: "kind", Label: "kind", Type: FieldChoice, Required: true, Choices: savedViewKindChoices()},
+		{Key: "tabs", Label: "in the tabs", Type: FieldChoice, Choices: []FieldChoiceOption{{Value: "no", Label: "no"}, {Value: "yes", Label: "yes"}}},
 	},
 	// The role of a person on a deal is a sales role from the deal role vocabulary, not the free text
 	// of a membership role. The options are loaded from the vocabulary (patterns/deal-roles).

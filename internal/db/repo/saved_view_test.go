@@ -271,3 +271,45 @@ func TestSavedView_RelationValuesAreStoredAsUUIDs(t *testing.T) {
 		assert.Contains(t, ve.First().Expected, "have that name")
 	})
 }
+
+func TestSavedView_IsAnObjectKindOfTheUniversalVerbs(t *testing.T) {
+	f := setupLinks(t)
+	ctx := context.Background()
+	d := f.links.DB()
+	r := repo.NewSavedViewRepo(d)
+	v, err := r.Find(ctx, "Overdue follow-up")
+	require.NoError(t, err)
+
+	require.NoError(t, repo.ArchiveObject(ctx, d, model.SavedViewKind, v.ID), "delete")
+	got, _ := r.FindByID(ctx, v.ID)
+	assert.True(t, got.Deleted)
+	lk, err := repo.LookupRecord(ctx, d, model.SavedViewKind, v.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "Overdue follow-up", lk.Label)
+	assert.True(t, lk.Archived)
+
+	require.NoError(t, repo.RestoreObject(ctx, d, model.SavedViewKind, v.ID), "restore")
+	got, _ = r.FindByID(ctx, v.ID)
+	assert.False(t, got.Deleted)
+	assert.Error(t, repo.RestoreObject(ctx, d, model.SavedViewKind, v.ID), "restoring a live view is refused")
+}
+
+func TestSavedView_ExportFileWritesNamesAndImportReadsThem(t *testing.T) {
+	f := setupLinks(t)
+	ctx := context.Background()
+	r := repo.NewSavedViewRepo(f.links.DB())
+	v, err := r.Create(ctx, repo.SavedViewInput{Name: "At Globex", Kind: "person",
+		Query: query.Query{Filter: []query.Condition{{Field: "organization", Op: query.OpLinkedTo, Values: []string{"Globex"}}}}})
+	require.NoError(t, err)
+	file := r.ExportFile(ctx, v)
+	assert.Equal(t, []string{"Globex"}, file.Query.Filter[0].Values, "the file holds the name, not the uuid")
+	assert.NotEqual(t, v.Query.Filter[0].Values, file.Query.Filter[0].Values)
+	text, err := file.Encode()
+	require.NoError(t, err)
+	assert.NotContains(t, text, v.UUID)
+
+	back, err := r.ImportFile(ctx, []byte(text), "At Globex again", true)
+	require.NoError(t, err)
+	assert.Equal(t, v.Query, back.Query, "the name resolves to the same uuid")
+	assert.True(t, back.ShowInTabs)
+}

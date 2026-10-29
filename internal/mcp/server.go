@@ -377,6 +377,7 @@ func NewServer(db *sql.DB, version string, opts ...Option) *server.MCPServer {
 	registerTagManageTools(s, db)
 	registerTagTreeTools(s, db)
 	registerModuleTools(s, o.dataDir)
+	registerViewTools(s, db)
 	registerDedupeTools(s, db)
 	registerLogEditTools(s, ir)
 	registerNoteTools(s, ir)

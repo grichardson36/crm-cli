@@ -19,11 +19,12 @@ type Lookup struct {
 
 // lookupSQL maps an entity to a query returning its label and archived flag.
 var lookupSQL = map[string]string{
-	"person":       "SELECT trim(first_name || ' ' || coalesce(last_name, '')), archived FROM people WHERE id = ?",
-	"organization": "SELECT name, archived FROM organizations WHERE id = ?",
-	"deal":         "SELECT title, archived FROM deals WHERE id = ?",
-	"task":         "SELECT title, archived FROM tasks WHERE id = ?",
-	"interaction":  "SELECT coalesce(subject, type), archived FROM interactions WHERE id = ?",
+	"person":            "SELECT trim(first_name || ' ' || coalesce(last_name, '')), archived FROM people WHERE id = ?",
+	"organization":      "SELECT name, archived FROM organizations WHERE id = ?",
+	"deal":              "SELECT title, archived FROM deals WHERE id = ?",
+	"task":              "SELECT title, archived FROM tasks WHERE id = ?",
+	"interaction":       "SELECT coalesce(subject, type), archived FROM interactions WHERE id = ?",
+	model.SavedViewKind: "SELECT name, deleted_at IS NOT NULL FROM saved_view WHERE id = ?",
 }
 
 // LookupRecord finds a record by entity and ID, archived or not. It returns ErrNotFound when

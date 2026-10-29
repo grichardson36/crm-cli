@@ -92,27 +92,32 @@ func (r *SavedViewRepo) nameTaken(ctx context.Context, name string, exceptID int
 }
 
 // check validates the name, the kind and the query, and settles the relation values to uuids.
-func (r *SavedViewRepo) check(ctx context.Context, name, kind string, q *query.Query, now time.Time) (string, error) {
+func (r *SavedViewRepo) check(ctx context.Context, name, kind string, q *query.Query, now time.Time) (string, string, error) {
 	n, err := query.ValidName(name)
 	if err != nil {
-		return "", err
+		return "", "", err
+	}
+	kind = query.NormalizeKind(kind)
+	if !query.ValidKind(kind) {
+		return "", "", query.Validate(kind, *q, r.Env(ctx, now))
 	}
 	if err := r.Canonicalize(ctx, kind, q); err != nil {
-		return "", err
+		return "", "", err
 	}
 	if err := query.Validate(kind, *q, r.Env(ctx, now)); err != nil {
-		return "", err
+		return "", "", err
 	}
-	return n, nil
+	return n, kind, nil
 }
 
 // Create stores a new saved view at the end of the list.
 func (r *SavedViewRepo) Create(ctx context.Context, in SavedViewInput) (*SavedView, error) {
 	q := in.Query.Clone()
-	name, err := r.check(ctx, in.Name, in.Kind, &q, time.Now())
+	name, kind, err := r.check(ctx, in.Name, in.Kind, &q, time.Now())
 	if err != nil {
 		return nil, err
 	}
+	in.Kind = kind
 	if taken, err := r.nameTaken(ctx, name, 0); err != nil {
 		return nil, fmt.Errorf("create saved view: %w", err)
 	} else if taken {
@@ -206,7 +211,7 @@ func (r *SavedViewRepo) Update(ctx context.Context, id int64, p SavedViewPatch) 
 	if p.ShowInTabs != nil {
 		tabs = *p.ShowInTabs
 	}
-	name, err = r.check(ctx, name, kind, &q, time.Now())
+	name, kind, err = r.check(ctx, name, kind, &q, time.Now())
 	if err != nil {
 		return nil, err
 	}
@@ -415,4 +420,57 @@ func (r *SavedViewRepo) RelationCandidates(ctx context.Context, farTable string)
 		out = append(out, p)
 	}
 	return out, rows.Err()
+}
+
+// labeler maps a stored relation value to the name to show, for query.Describe.
+func (r *SavedViewRepo) labeler(ctx context.Context, q query.Query, kind string) func(far, value string) string {
+	need := map[string][]string{}
+	for _, c := range q.Filter {
+		f, ok := query.FieldOf(kind, c.Field)
+		if ok && f.Class == query.ClassRelation {
+			need[f.FarTable()] = append(need[f.FarTable()], c.Values...)
+		}
+	}
+	names := map[string]map[string]string{}
+	for far, uuids := range need {
+		names[far] = r.RelationLabels(ctx, far, uuids)
+	}
+	return func(far, value string) string { return names[far][value] }
+}
+
+// Describe is the filter of a view in words, with relation values shown as names.
+func (r *SavedViewRepo) Describe(ctx context.Context, v *SavedView) string {
+	return query.Describe(v.Kind, v.Query, r.labeler(ctx, v.Query, v.Kind))
+}
+
+// ExportFile turns a view into the file that is shared. Relation values become names, so the file
+// holds nothing that belongs to this database. A value whose row is gone stays as it is.
+func (r *SavedViewRepo) ExportFile(ctx context.Context, v *SavedView) query.File {
+	q := v.Query.Clone()
+	label := r.labeler(ctx, q, v.Kind)
+	for i := range q.Filter {
+		f, ok := query.FieldOf(v.Kind, q.Filter[i].Field)
+		if !ok || f.Class != query.ClassRelation {
+			continue
+		}
+		for j, val := range q.Filter[i].Values {
+			if l := label(f.FarTable(), val); l != "" {
+				q.Filter[i].Values[j] = l
+			}
+		}
+	}
+	return query.File{Name: v.Name, Kind: v.Kind, Query: q}
+}
+
+// ImportFile creates a view from a shared file. name replaces the name in the file when it is not
+// empty. Relation names are looked up here. The view starts in the tabs only when tabs is set.
+func (r *SavedViewRepo) ImportFile(ctx context.Context, data []byte, name string, tabs bool) (*SavedView, error) {
+	f, err := query.DecodeFile(data)
+	if err != nil {
+		return nil, err
+	}
+	if name == "" {
+		name = f.Name
+	}
+	return r.Create(ctx, SavedViewInput{Name: name, Kind: f.Kind, Query: f.Query, ShowInTabs: tabs})
 }
