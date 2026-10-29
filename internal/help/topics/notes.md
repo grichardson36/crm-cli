@@ -24,6 +24,10 @@ crm note list --type call -f json
 
 `crm log <type> <person id>...` records one for several people. `crm log edit` and `crm log rm` are the older names of `note edit` and `note delete`. A deleted note leaves lists and stays in the database.
 
+## In the terminal UI
+
+Recent on a person, organization or deal page is a feed: newest first, the date once per day with the type beside it, linked objects in color on the left, the text wrapped on the right. An entry shows 5 lines and ends with a dim `...` when text is hidden. `enter` or `e` expands it in place and again collapses it, `space` selects entries for bulk `d`, `ctrl+up` and `ctrl+down` jump by entry, and `alt+enter` is a new line while editing.
+
 Types are data, not a fixed list, and each says whether logging it resets the keep-in-touch clock. See `crm help note-types`.
 
 See also: short-syntax, note-types, keep-in-touch, tags, tui-keys.
