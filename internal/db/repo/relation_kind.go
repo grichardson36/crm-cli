@@ -19,11 +19,11 @@ type KindRepo struct {
 // NewKindRepo creates a KindRepo.
 func NewKindRepo(db *sql.DB) *KindRepo { return &KindRepo{db: db} }
 
-const kindColumns = "id, uuid, object_type, name, inverse_name, symmetric, phrase, builtin, created_at, updated_at"
+const kindColumns = "id, uuid, object_type, name, inverse_name, symmetric, phrase, builtin, position, created_at, updated_at"
 
 func scanKind(row interface{ Scan(...any) error }) (*model.RelationKind, error) {
 	var k model.RelationKind
-	err := row.Scan(&k.ID, &k.UUID, &k.ObjectType, &k.Name, &k.InverseName, &k.Symmetric, &k.Phrase, &k.Builtin, &k.CreatedAt, &k.UpdatedAt)
+	err := row.Scan(&k.ID, &k.UUID, &k.ObjectType, &k.Name, &k.InverseName, &k.Symmetric, &k.Phrase, &k.Builtin, &k.Position, &k.CreatedAt, &k.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +38,7 @@ func (r *KindRepo) List(ctx context.Context, objectType string) ([]*model.Relati
 		q += " AND object_type = ?"
 		args = append(args, objectType)
 	}
-	q += " ORDER BY object_type DESC, builtin DESC, id"
+	q += " ORDER BY object_type DESC, position, builtin DESC, id"
 	rows, err := r.db.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, fmt.Errorf("list relation kinds: %w", err)
@@ -120,8 +120,8 @@ func (r *KindRepo) AddKind(ctx context.Context, objectType, name, inverse string
 	if n > 0 {
 		return nil, fmt.Errorf("a %s kind named %q or %q already exists: %w", objectType, name, inverse, model.ErrConflict)
 	}
-	res, err := r.db.ExecContext(ctx, `INSERT INTO relation_kind (uuid, object_type, name, inverse_name, symmetric, phrase, builtin)
-		VALUES (?, ?, ?, ?, ?, ?, 0)`, uuid.New().String(), objectType, name, inverse, symmetric, phrase && !symmetric)
+	res, err := r.db.ExecContext(ctx, `INSERT INTO relation_kind (uuid, object_type, name, inverse_name, symmetric, phrase, builtin, position)
+		VALUES (?, ?, ?, ?, ?, ?, 0, (SELECT COALESCE(MAX(position), 0) + 1 FROM relation_kind WHERE object_type = ?))`, uuid.New().String(), objectType, name, inverse, symmetric, phrase && !symmetric, objectType)
 	if err != nil {
 		return nil, fmt.Errorf("add kind: %w", err)
 	}

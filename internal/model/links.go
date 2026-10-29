@@ -27,6 +27,8 @@ type RelationKind struct {
 	// shows b as Name, the page of b shows a as InverseName. Other kinds show the other person's role.
 	Phrase  bool `json:"phrase"`
 	Builtin bool `json:"builtin"`
+	// Position is the order inside the object type (migration 019), the list editor reorders it.
+	Position int `json:"position"`
 	CreatedAt   string `json:"created_at"`
 	UpdatedAt   string `json:"updated_at"`
 }
