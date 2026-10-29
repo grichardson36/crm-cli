@@ -67,6 +67,7 @@ func NewRootCmd() *cobra.Command {
 	// sync runner and inbox
 	registerSyncCommands(rootCmd)
 	registerDavCommands(rootCmd)
+	registerPeersCommands(rootCmd)
 
 	// link, unlink and restore for every object, built from the object list
 	addObjectVerbs(rootCmd)

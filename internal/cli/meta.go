@@ -234,6 +234,22 @@ var commandMeta = map[string]cmdMeta{
 	"dav conflicts show": {fields: davConflictFields, examples: []string{`crm dav conflicts show 1 -f json`}},
 	"dav conflicts undo": {mutates: true, fields: davConflictFields, examples: []string{`crm dav conflicts undo 1`}},
 
+	// device-to-device sync (patterns/sync-contract.md)
+	"peers init": {mutates: true, noDryRun: true, fields: "device,already_enabled,tables,baseline_changes", examples: []string{`crm peers init --name laptop`, `crm peers init -f json`}},
+	"peers status": {fields: "enabled,status,devices", examples: []string{`crm peers status -f json`}},
+	"peers serve": {mutates: true, noDryRun: true, examples: []string{`crm peers serve --addr 100.64.0.1:7478`, `crm peers serve --addr 192.168.1.20:7478 --read-only`}},
+	"peers enroll": {mutates: true, noDryRun: true, fields: "token,label,expires_in,device", examples: []string{`crm peers enroll --label phone -f json`, `crm peers enroll --ttl 1h`}},
+	"peers add": {mutates: true, noDryRun: true, fields: "name,url,device,as", examples: []string{`crm peers add home http://100.64.0.1:7478 --token crmenr_0123 --as laptop`}},
+	"peers list": {fields: "name,device,role,url,last_pull_at,last_push_at,last_error,retired_at,head,cursor", examples: []string{`crm peers list -f json`, `crm peers list --all`}},
+	"peers remove": {mutates: true, noDryRun: true, examples: []string{`crm peers remove home`}},
+	"peers pull": {mutates: true, noDryRun: true, fields: "peer,device,pulled,applied,duplicates,unknown,pushed,push_applied,rejected,rejections,open_reviews,error", examples: []string{`crm peers pull`, `crm peers pull home --full -f json`}},
+	"peers push": {mutates: true, noDryRun: true, fields: "peer,device,pulled,applied,duplicates,unknown,pushed,push_applied,rejected,rejections,open_reviews,error", examples: []string{`crm peers push`, `crm peers push home -f json`}},
+	"peers sync": {mutates: true, noDryRun: true, fields: "peer,device,pulled,applied,duplicates,unknown,pushed,push_applied,rejected,rejections,open_reviews,error", examples: []string{`crm peers sync`, `crm peers sync home -f json`}},
+	"peers retire": {mutates: true, noDryRun: true, examples: []string{`crm peers retire old-phone`}},
+	"peers purge": {mutates: true, noDryRun: true, fields: "purged", examples: []string{`crm peers purge -f json`}},
+	"peers review": {fields: "id,collection,key,label,status,detail,created_at,resolved_at", examples: []string{`crm peers review -f json`, `crm peers review --all`}},
+	"peers resolve": {mutates: true, noDryRun: true, examples: []string{`crm peers resolve 3 --keep`, `crm peers resolve 3 --delete`}},
+
 	// interfaces
 	"mcp serve": {examples: []string{`crm mcp serve`}},
 	"tui":       {mutates: true, noDryRun: true, examples: []string{`crm tui`, `crm tui --read-only`}},
