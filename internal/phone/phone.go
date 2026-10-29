@@ -158,3 +158,14 @@ func DisplayRegion(raw, stored, region string) string {
 	}
 	return n.International()
 }
+
+// NormalizeRegion upper-cases and trims a region code.
+func NormalizeRegion(code string) string { return strings.ToUpper(strings.TrimSpace(code)) }
+
+// DefaultRegionOr returns region (normalized) when given, else the default region.
+func DefaultRegionOr(region string) string {
+	if r := NormalizeRegion(region); r != "" {
+		return r
+	}
+	return DefaultRegion()
+}

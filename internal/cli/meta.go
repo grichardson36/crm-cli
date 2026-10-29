@@ -99,6 +99,11 @@ var commandMeta = map[string]cmdMeta{
 	"alias add":    {mutates: true, noDryRun: true, examples: []string{`crm alias add zeke zachary`}},
 	"alias remove": {mutates: true, noDryRun: true, examples: []string{`crm alias remove zeke`}},
 
+	"phone":           {examples: []string{`crm phone normalize -f json`}},
+	"phone normalize": {mutates: true, noDryRun: true, fields: "region,total,fill,current,unparseable,unlikely,duplicates,applied,examples", examples: []string{`crm phone normalize -f json`, `crm phone normalize --apply`, `crm phone normalize --undo`}},
+	"phone region":    {mutates: true, noDryRun: true, examples: []string{`crm phone region`, `crm phone region GB`}},
+	"phone parse":     {fields: "typed,region,e164,key,national,international,number_region,parsed,possible,valid", examples: []string{`crm phone parse "(415) 555-2671"`, `crm phone parse "020 7946 0958" --region GB`}},
+
 	"org add":    {mutates: true, fields: orgFields, examples: []string{`crm org add "Acme Corp" --domain acme.com --industry SaaS`}},
 	"org list":   {fields: orgFields, examples: []string{`crm org list -f json`}},
 	"org show":   {fields: orgFields + ",people", examples: []string{`crm org show 1 --with-people -f json`}},

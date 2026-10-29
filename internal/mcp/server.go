@@ -368,6 +368,7 @@ func NewServer(db *sql.DB, version string, opts ...Option) *server.MCPServer {
 	registerRelationTools(s, db)
 	registerOrgAutoTools(s, db)
 	registerAliasTools(s, db)
+	registerPhoneTools(s, db)
 	registerDealRoleTools(s, db)
 	registerDealStageTools(s, db)
 	registerPurgeTools(s, db)

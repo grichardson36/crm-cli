@@ -650,7 +650,7 @@ func TestMergeMatrix(t *testing.T) {
 		assert.Equal(t, "Beta", next.Value(vcard.FieldOrganization))
 	})
 
-	t.Run("both changed, the phone is newer, the phone wins and the clash is logged", func(t *testing.T) {
+	t.Run("both changed, the CRM value is kept per field and the phone value is stored", func(t *testing.T) {
 		e, p, card, etag := setup(t)
 		_, err := e.people.Update(ctx, p.ID, model.UpdatePersonInput{Title: ptr("Manager")})
 		require.NoError(t, err)
@@ -658,19 +658,19 @@ func TestMergeMatrix(t *testing.T) {
 		set(card, vcard.FieldTitle, "Director")
 		_, err = e.push(p.UUID, card, etagHeader(etag))
 		require.NoError(t, err)
-		assert.Equal(t, "Director", *e.reload(p.ID).Title)
+		assert.Equal(t, "Manager", *e.reload(p.ID).Title)
 		cs := e.conflicts()
 		require.Len(t, cs, 1)
 		assert.Equal(t, "title", cs[0].Field)
-		assert.Equal(t, "device", cs[0].Winner)
+		assert.Equal(t, "crm", cs[0].Winner)
 		assert.Equal(t, "Manager", *cs[0].CRMValue)
 		assert.Equal(t, "Director", *cs[0].DeviceValue)
 
-		// undo restores the CRM value through the repo
+		// undo applies the stored phone value through the repo
 		undone, err := dav.UndoConflict(ctx, e.db, cs[0].ID)
 		require.NoError(t, err)
 		assert.True(t, undone.Undone)
-		assert.Equal(t, "Manager", *e.reload(p.ID).Title)
+		assert.Equal(t, "Director", *e.reload(p.ID).Title)
 		_, err = dav.UndoConflict(ctx, e.db, cs[0].ID)
 		assert.ErrorIs(t, err, model.ErrConflict, "cannot undo twice")
 	})
@@ -800,7 +800,7 @@ func TestMergeMatrix(t *testing.T) {
 		assert.Equal(t, "JJ", next.Value("NICKNAME"))
 		assert.Equal(t, "keep me", next.Value("X-CUSTOM"))
 		assert.Equal(t, "Smith;Jane;Marie;Dr.;PhD", next.Value(vcard.FieldName))
-		assert.Equal(t, "Dr. Jane Marie Smith PhD", next.Value(vcard.FieldFormattedName))
+		assert.Equal(t, "Jane Smith", next.Value(vcard.FieldFormattedName), "the phone's FN line is kept as it was sent")
 		require.Len(t, next[vcard.FieldAddress], 2)
 		assert.Equal(t, "Jane", e.reload(p.ID).FirstName, "the CRM columns stay clean")
 		// the phone drops one: it is gone

@@ -46,6 +46,10 @@ type PersonPhone struct {
 	Label       *string `json:"label"`
 	CountryCode *string `json:"country_code"`
 	IsPrimary   bool    `json:"is_primary"`
+	// PhoneNumber is the text as typed. E164 is the normalized form ("" when it cannot be parsed).
+	// Display is how people see it: national format in the default region, international elsewhere.
+	E164    string `json:"e164,omitempty"`
+	Display string `json:"display,omitempty"`
 }
 
 // PersonHandle is a social profile or website of a person.

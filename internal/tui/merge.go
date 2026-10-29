@@ -293,11 +293,20 @@ func (m *Model) emptyDetail() string {
 			b.WriteString(m.st.Dim.Render(fit("email", labelWidth)) + line(e.Email) + "\n")
 		}
 		for _, ph := range p.Phones {
-			b.WriteString(m.st.Dim.Render(fit("phone", labelWidth)) + line(ph.PhoneNumber) + "\n")
+			b.WriteString(m.st.Dim.Render(fit("phone", labelWidth)) + line(phoneShown(ph)) + "\n")
 		}
 		b.WriteString("\n" + m.st.Dim.Render("r restores, d purges forever, ctrl+o filters by type"))
 	default:
 		return m.st.Dim.Render("Nothing selected.")
 	}
 	return strings.TrimRight(b.String(), "\n")
+}
+
+// phoneShown is a stored number the way people read it: national or international format, or the
+// typed text when it cannot be parsed.
+func phoneShown(ph model.PersonPhone) string {
+	if ph.Display != "" {
+		return ph.Display
+	}
+	return ph.PhoneNumber
 }

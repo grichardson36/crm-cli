@@ -6,17 +6,20 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/emersion/go-webdav"
 	"github.com/emersion/go-webdav/carddav"
+	"github.com/jdanielnd/crm-cli/internal/model"
 )
 
 // Options configures the HTTP handler.
@@ -141,6 +144,18 @@ func (h *handler) serve(w http.ResponseWriter, r *http.Request) {
 	r = r.WithContext(ctx)
 
 	if r.Method == "PROPFIND" && h.collectionPropfind(w, r) {
+		return
+	}
+	if r.Method == http.MethodPut && !h.capturePut(w, r) {
+		return
+	}
+	if r.Method == http.MethodGet || r.Method == http.MethodHead {
+		if h.serveRaw(w, r) {
+			return
+		}
+	}
+	if r.Method == "REPORT" {
+		h.serveReport(w, r)
 		return
 	}
 	h.inner.ServeHTTP(w, r)
@@ -280,4 +295,156 @@ func (h *handler) response(href string, requested []xml.Name, known map[xml.Name
 	}
 	sb.WriteString(`</D:response>`)
 	return sb.String()
+}
+
+// --- stored cards ------------------------------------------------------------------------
+
+// maxCardBytes bounds a PUT body.
+const maxCardBytes = 8 << 20
+
+// capturePut reads the PUT body so the exact text the phone sent is stored (patterns/research-sync-standard
+// section 2). A card that cannot be read is skipped and flagged as a sync issue, it is never read as
+// an emptied contact. It returns false when it has answered the request.
+func (h *handler) capturePut(w http.ResponseWriter, r *http.Request) bool {
+	id, ok := h.paths.davIDFromPath(r.URL.Path)
+	if !ok {
+		return true
+	}
+	body, err := io.ReadAll(io.LimitReader(r.Body, maxCardBytes+1))
+	if err != nil {
+		http.Error(w, "could not read the request body", http.StatusBadRequest)
+		return false
+	}
+	if len(body) > maxCardBytes {
+		http.Error(w, "vCard is too large", http.StatusRequestEntityTooLarge)
+		return false
+	}
+	raw := string(body)
+	if problem := unreadable(raw); problem != "" {
+		var personID int64
+		if t, err := h.o.Service.Dav.Resolve(r.Context(), id); err == nil {
+			personID = t.PersonID
+		}
+		_, _ = h.o.Service.Dav.AddIssue(r.Context(), id, personID, model.DavIssueUnreadable, problem, raw)
+		http.Error(w, "the vCard could not be read and was skipped: "+problem, http.StatusBadRequest)
+		return false
+	}
+	r.Body = io.NopCloser(bytes.NewReader(body))
+	*r = *r.WithContext(withRaw(r.Context(), raw))
+	return true
+}
+
+// unreadable returns why a vCard cannot be used, or "" when it parses.
+func unreadable(raw string) string {
+	if strings.TrimSpace(raw) == "" {
+		return "the request body is empty"
+	}
+	if _, err := parseRaw(raw); err != nil {
+		return err.Error()
+	}
+	if _, err := decodeCard(raw); err != nil {
+		return err.Error()
+	}
+	return ""
+}
+
+// serveRaw answers GET and HEAD of one contact with the stored card text, so lines the CRM did not
+// change reach the phone byte for byte. It returns false for paths that are not a contact.
+func (h *handler) serveRaw(w http.ResponseWriter, r *http.Request) bool {
+	id, ok := h.paths.davIDFromPath(r.URL.Path)
+	if !ok {
+		return false
+	}
+	o, err := h.o.Service.Get(r.Context(), id, r.Method == http.MethodGet)
+	if err != nil {
+		http.Error(w, err.Error(), statusFor(err))
+		return true
+	}
+	w.Header().Set("Content-Type", "text/vcard; charset=utf-8")
+	w.Header().Set("ETag", `"`+o.ETag+`"`)
+	w.Header().Set("Last-Modified", o.ModTime.UTC().Format(http.TimeFormat))
+	w.Header().Set("Content-Length", strconv.Itoa(len(o.Raw)))
+	if r.Method == http.MethodGet {
+		_, _ = io.WriteString(w, o.Raw)
+	}
+	return true
+}
+
+// bufferedWriter holds a response so serveReport can rewrite it.
+type bufferedWriter struct {
+	header http.Header
+	code   int
+	body   bytes.Buffer
+}
+
+func (b *bufferedWriter) Header() http.Header         { return b.header }
+func (b *bufferedWriter) WriteHeader(code int)        { b.code = code }
+func (b *bufferedWriter) Write(p []byte) (int, error) { return b.body.Write(p) }
+
+var (
+	reportResponse = regexp.MustCompile(`(?s)<response[^>]*><href>([^<]*)</href>(.*?)</response>`)
+	reportData     = regexp.MustCompile(`(?s)(<address-data[^>]*>)(.*?)(</address-data>)`)
+)
+
+// serveReport answers REPORT (addressbook-multiget and addressbook-query, which phones use to fetch
+// cards). go-webdav writes the cards from a parsed form, so the address-data of each contact is put
+// back to the stored card text: lines the CRM did not change reach the phone byte for byte.
+func (h *handler) serveReport(w http.ResponseWriter, r *http.Request) {
+	bw := &bufferedWriter{header: http.Header{}, code: http.StatusOK}
+	h.inner.ServeHTTP(bw, r)
+	out := bw.body.Bytes()
+	if bw.code == http.StatusMultiStatus && bytes.Contains(out, []byte("address-data")) {
+		out = h.restoreRaw(r.Context(), out)
+	}
+	for k, v := range bw.header {
+		w.Header()[k] = v
+	}
+	w.Header().Set("Content-Length", strconv.Itoa(len(out)))
+	w.WriteHeader(bw.code)
+	_, _ = w.Write(out)
+}
+
+// restoreRaw swaps the address-data of every response for the stored card text of that contact.
+func (h *handler) restoreRaw(ctx context.Context, body []byte) []byte {
+	return reportResponse.ReplaceAllFunc(body, func(resp []byte) []byte {
+		m := reportResponse.FindSubmatch(resp)
+		var href string
+		if err := xml.Unmarshal([]byte("<h>"+string(m[1])+"</h>"), &href); err != nil {
+			return resp
+		}
+		id, ok := h.paths.davIDFromPath(href)
+		if !ok {
+			return resp
+		}
+		t, err := h.o.Service.Dav.Resolve(ctx, id)
+		if err != nil {
+			return resp
+		}
+		st, err := h.o.Service.Dav.GetState(ctx, t.PersonID)
+		if err != nil || st == nil || st.RawVCard == nil || *st.RawVCard == "" {
+			return resp
+		}
+		var esc bytes.Buffer
+		if err := xml.EscapeText(&esc, []byte(*st.RawVCard)); err != nil {
+			return resp
+		}
+		return reportData.ReplaceAll(resp, append(append([]byte("${1}"), esc.Bytes()...), []byte("${3}")...))
+	})
+}
+
+// statusFor is the HTTP status of a service error, the same mapping mapErr uses.
+func statusFor(err error) int {
+	switch {
+	case errors.Is(err, model.ErrNotFound):
+		return http.StatusNotFound
+	case errors.Is(err, ErrPrecondition):
+		return http.StatusPreconditionFailed
+	case errors.Is(err, ErrReadOnly):
+		return http.StatusForbidden
+	case errors.Is(err, model.ErrValidation):
+		return http.StatusBadRequest
+	case errors.Is(err, model.ErrConflict):
+		return http.StatusConflict
+	}
+	return http.StatusInternalServerError
 }

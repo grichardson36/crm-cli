@@ -134,8 +134,8 @@ func (r *DavRepo) DavIDFor(ctx context.Context, personID int64) (string, error) 
 func (r *DavRepo) GetState(ctx context.Context, personID int64) (*model.DavState, error) {
 	var s model.DavState
 	err := r.db.QueryRowContext(ctx,
-		`SELECT person_id, base_json, etag, extra_vcard, synced_at FROM dav_state WHERE person_id = ?`, personID).
-		Scan(&s.PersonID, &s.BaseJSON, &s.ETag, &s.ExtraVCard, &s.SyncedAt)
+		`SELECT person_id, base_json, etag, extra_vcard, raw_vcard, raw_source, synced_at FROM dav_state WHERE person_id = ?`, personID).
+		Scan(&s.PersonID, &s.BaseJSON, &s.ETag, &s.ExtraVCard, &s.RawVCard, &s.RawSource, &s.SyncedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -148,12 +148,13 @@ func (r *DavRepo) GetState(ctx context.Context, personID int64) (*model.DavState
 // SaveState stores the device state of a person.
 func (r *DavRepo) SaveState(ctx context.Context, s model.DavState) error {
 	_, err := r.db.ExecContext(ctx,
-		`INSERT INTO dav_state (person_id, base_json, etag, extra_vcard, synced_at)
-		 VALUES (?, ?, ?, ?, datetime('now'))
+		`INSERT INTO dav_state (person_id, base_json, etag, extra_vcard, raw_vcard, raw_source, synced_at)
+		 VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
 		 ON CONFLICT(person_id) DO UPDATE SET
 		   base_json = excluded.base_json, etag = excluded.etag,
-		   extra_vcard = excluded.extra_vcard, synced_at = excluded.synced_at`,
-		s.PersonID, s.BaseJSON, s.ETag, s.ExtraVCard)
+		   extra_vcard = excluded.extra_vcard, raw_vcard = excluded.raw_vcard,
+		   raw_source = excluded.raw_source, synced_at = excluded.synced_at`,
+		s.PersonID, s.BaseJSON, s.ETag, s.ExtraVCard, s.RawVCard, s.RawSource)
 	if err != nil {
 		return fmt.Errorf("save dav state: %w", err)
 	}
@@ -204,6 +205,9 @@ func (r *DavRepo) Status(ctx context.Context) (*model.DavStatus, error) {
 		return nil, err
 	}
 	if err := q(&st.OpenConflicts, `SELECT COUNT(*) FROM sync_conflicts WHERE undone = 0 AND winner != 'link'`); err != nil {
+		return nil, err
+	}
+	if err := q(&st.OpenIssues, `SELECT COUNT(*) FROM dav_issues WHERE resolved_at IS NULL`); err != nil {
 		return nil, err
 	}
 	var last sql.NullString
@@ -313,4 +317,92 @@ func (r *DavRepo) MarkConflictUndone(ctx context.Context, id int64) error {
 		return fmt.Errorf("sync conflict %d is already undone: %w", id, model.ErrConflict)
 	}
 	return nil
+}
+
+// --- issues ------------------------------------------------------------------------------
+
+// AddIssue flags a phone contact the server could not use. personID is 0 for a contact that is new
+// to the CRM.
+func (r *DavRepo) AddIssue(ctx context.Context, davID string, personID int64, kind, message, raw string) (*model.DavIssue, error) {
+	var pid any
+	if personID != 0 {
+		pid = personID
+	}
+	id := uuid.NewString()
+	if _, err := r.db.ExecContext(ctx,
+		`INSERT INTO dav_issues (uuid, dav_id, person_id, kind, message, raw_vcard) VALUES (?, ?, ?, ?, ?, ?)`,
+		id, davID, pid, kind, message, raw); err != nil {
+		return nil, fmt.Errorf("log sync issue: %w", err)
+	}
+	return r.issueByUUID(ctx, id)
+}
+
+const issueColumns = `id, uuid, dav_id, person_id, kind, message, raw_vcard, created_at, resolved_at`
+
+func scanIssue(row interface{ Scan(...any) error }) (*model.DavIssue, error) {
+	var i model.DavIssue
+	var pid sql.NullInt64
+	if err := row.Scan(&i.ID, &i.UUID, &i.DavID, &pid, &i.Kind, &i.Message, &i.RawVCard, &i.CreatedAt, &i.ResolvedAt); err != nil {
+		return nil, err
+	}
+	if pid.Valid {
+		i.PersonID = &pid.Int64
+	}
+	return &i, nil
+}
+
+func (r *DavRepo) issueByUUID(ctx context.Context, id string) (*model.DavIssue, error) {
+	i, err := scanIssue(r.db.QueryRowContext(ctx, `SELECT `+issueColumns+` FROM dav_issues WHERE uuid = ?`, id))
+	if err != nil {
+		return nil, fmt.Errorf("get sync issue: %w", err)
+	}
+	return i, nil
+}
+
+// Issues lists sync issues, newest first. Resolved ones are left out unless asked for.
+func (r *DavRepo) Issues(ctx context.Context, includeResolved bool) ([]model.DavIssue, error) {
+	q := `SELECT ` + issueColumns + ` FROM dav_issues`
+	if !includeResolved {
+		q += ` WHERE resolved_at IS NULL`
+	}
+	rows, err := r.db.QueryContext(ctx, q+` ORDER BY id DESC`)
+	if err != nil {
+		return nil, fmt.Errorf("list sync issues: %w", err)
+	}
+	defer rows.Close()
+	out := []model.DavIssue{}
+	for rows.Next() {
+		i, err := scanIssue(rows)
+		if err != nil {
+			return nil, fmt.Errorf("scan sync issue: %w", err)
+		}
+		out = append(out, *i)
+	}
+	return out, rows.Err()
+}
+
+// ResolveIssue marks a sync issue as dealt with.
+func (r *DavRepo) ResolveIssue(ctx context.Context, id int64) error {
+	res, err := r.db.ExecContext(ctx, `UPDATE dav_issues SET resolved_at = datetime('now') WHERE id = ? AND resolved_at IS NULL`, id)
+	if err != nil {
+		return fmt.Errorf("resolve sync issue: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return fmt.Errorf("sync issue %d: %w", id, model.ErrNotFound)
+	}
+	return nil
+}
+
+// PrimaryRole is the role on the person's primary organization membership, "" when there is none.
+func PrimaryRole(ctx context.Context, q DBTX, personID int64) (string, error) {
+	var role sql.NullString
+	err := q.QueryRowContext(ctx, `SELECT m.role FROM membership m JOIN organizations o ON o.id = m.org_id
+		WHERE m.person_id = ? AND m.is_primary = 1 AND m.deleted_at IS NULL AND o.archived = 0`, personID).Scan(&role)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("primary role: %w", err)
+	}
+	return strings.TrimSpace(role.String), nil
 }
