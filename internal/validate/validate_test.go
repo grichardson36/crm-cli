@@ -159,7 +159,7 @@ func TestCodeVocabulary(t *testing.T) {
 		assert.True(t, strings.HasPrefix(c.Code, prefix), c.Code)
 		assert.Equal(t, c.Kind, validate.KindOf(c.Code))
 	}
-	assert.Len(t, validate.Codes, 27)
+	assert.Len(t, validate.Codes, 28)
 }
 
 func TestSanitize(t *testing.T) {

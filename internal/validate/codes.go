@@ -30,6 +30,7 @@ const (
 	CodeStageNoLost      = "E_STAGE_NO_LOST"
 	CodeStageOutcome     = "E_STAGE_OUTCOME_INVALID"
 	CodeEncodingDamaged  = "W_ENCODING_DAMAGED"
+	CodePhoneUnlikely    = "W_PHONE_UNLIKELY"
 	CodePhoneInTextField = "S_PHONE_IN_TEXT_FIELD"
 	CodeEmailInTextField = "S_EMAIL_IN_TEXT_FIELD"
 	CodeURLInTextField   = "S_URL_IN_TEXT_FIELD"
@@ -75,6 +76,7 @@ var Codes = []CodeInfo{
 	{CodeStageNoLost, KindError, "the change would leave no lost deal stage, at least one stage must have the outcome lost"},
 	{CodeStageOutcome, KindError, "a deal stage outcome is not open, won or lost"},
 	{CodeEncodingDamaged, KindWarning, "the text holds U+FFFD, the mark of a damaged encoding"},
+	{CodePhoneUnlikely, KindWarning, "the text reads as a phone number but does not exist in the default region numbering plan, it is stored as typed"},
 	{CodePhoneInTextField, KindSuggestion, "phone-like text sits in a field that is not a phone"},
 	{CodeEmailInTextField, KindSuggestion, "email-like text sits in a field that is not an email"},
 	{CodeURLInTextField, KindSuggestion, "web-address-like text sits in a field that is not a web address"},

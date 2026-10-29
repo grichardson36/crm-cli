@@ -32,7 +32,7 @@ func TestMigration014_SeedsDealStagesAndFreesTheStageColumn(t *testing.T) {
 	d, err = db.Open(path)
 	require.NoError(t, err)
 	defer d.Close()
-	assert.Equal(t, 14, scalar(t, d, `PRAGMA user_version`))
+	assert.Equal(t, db.LatestVersion(), scalar(t, d, `PRAGMA user_version`))
 
 	t.Run("the six stages are seeded in order with outcomes", func(t *testing.T) {
 		vs, ok := model.VocabularyNamed(model.DealStageKind)

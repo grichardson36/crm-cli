@@ -5,6 +5,7 @@ import (
 	"unicode"
 
 	"github.com/jdanielnd/crm-cli/internal/alias"
+	"github.com/jdanielnd/crm-cli/internal/phone"
 	"golang.org/x/text/unicode/norm"
 )
 
@@ -95,10 +96,17 @@ func FullName(first, last string) string {
 	return strings.TrimSpace(first + " " + last)
 }
 
-// PhoneKey returns the last 10 digits of a phone number, or "" when fewer than 7 digits are present.
-func PhoneKey(phone string) string {
+// PhoneKey is the matching key of a phone number. A number that parses to a possible E.164 number
+// (internal/phone, default region from config.toml) keys on that form, so "(415) 555-2671",
+// "415.555.2671" and "+1 415 555 2671" match, and an extension keeps two people at one switchboard
+// apart. Text that cannot be parsed keeps the old key: its last 10 digits, or "" when fewer than 7
+// digits are present.
+func PhoneKey(number string) string {
+	if k := phone.Key(number); k != "" {
+		return k
+	}
 	var b strings.Builder
-	for _, r := range phone {
+	for _, r := range number {
 		if r >= '0' && r <= '9' {
 			b.WriteRune(r)
 		}

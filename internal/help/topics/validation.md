@@ -24,7 +24,7 @@ One validation framework checks every value from the CLI, MCP, the terminal UI, 
 | E_VOCAB_DUPLICATE, E_VOCAB_INVALID | a list value is already on the list, or is empty, too long, or holds a pipe or control character |
 | E_STAGE_NO_OPEN, E_STAGE_NO_WON, E_STAGE_NO_LOST | the change would leave no open, no won or no lost deal stage |
 | E_STAGE_OUTCOME_INVALID | a deal stage outcome is not open, won or lost |
-| W_ENCODING_DAMAGED | warning: text holds U+FFFD (damaged encoding) |
+| W_ENCODING_DAMAGED, W_PHONE_UNLIKELY | warnings: text holds U+FFFD, or a phone number does not exist in the default region (stored as typed) |
 | S_PHONE_IN_TEXT_FIELD | suggestion: phone-like text in another field |
 | S_EMAIL_IN_TEXT_FIELD | suggestion: email-like text in another field |
 | S_URL_IN_TEXT_FIELD | suggestion: web-address-like text in another field |
