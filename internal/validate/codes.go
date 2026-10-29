@@ -34,6 +34,14 @@ const (
 	CodePathTooDeep      = "E_PATH_TOO_DEEP"
 	CodePathTooLong      = "E_PATH_TOO_LONG"
 	CodePathCycle        = "E_PATH_CYCLE"
+	CodeViewKind         = "E_VIEW_KIND_UNKNOWN"
+	CodeViewName         = "E_VIEW_NAME_INVALID"
+	CodeQueryField       = "E_QUERY_FIELD_UNKNOWN"
+	CodeQueryOperator    = "E_QUERY_OPERATOR_INVALID"
+	CodeQueryValue       = "E_QUERY_VALUE_INVALID"
+	CodeQuerySort        = "E_QUERY_SORT_INVALID"
+	CodeQueryGroup       = "E_QUERY_GROUP_INVALID"
+	CodeQueryTooLarge    = "E_QUERY_TOO_LARGE"
 	CodeEncodingDamaged  = "W_ENCODING_DAMAGED"
 	CodePhoneInTextField = "S_PHONE_IN_TEXT_FIELD"
 	CodeEmailInTextField = "S_EMAIL_IN_TEXT_FIELD"
@@ -84,6 +92,14 @@ var Codes = []CodeInfo{
 	{CodePathTooDeep, KindError, "a hierarchy path has more segments than the maximum depth"},
 	{CodePathTooLong, KindError, "a hierarchy path is longer than the maximum length"},
 	{CodePathCycle, KindError, "the change would move a hierarchy path under itself"},
+	{CodeViewKind, KindError, "a saved view is for an object kind that does not exist (use person, organization, deal, task, note or tag)"},
+	{CodeViewName, KindError, "a saved view name is empty, too long or has a line break"},
+	{CodeQueryField, KindError, "a saved view condition, sort or group names a field the object kind does not have"},
+	{CodeQueryOperator, KindError, "a saved view condition uses an operator that does not exist or that the field type does not take"},
+	{CodeQueryValue, KindError, "a saved view condition has a missing, extra or malformed value (a date, a number, a choice, a count of days)"},
+	{CodeQuerySort, KindError, "a saved view sorts by a field that cannot be sorted, by more than two fields, or with a direction other than asc or desc"},
+	{CodeQueryGroup, KindError, "a saved view groups by a field that cannot be grouped, or uses a date bucket other than day, week or month"},
+	{CodeQueryTooLarge, KindError, "a saved view has more conditions, values or columns than the limit"},
 	{CodeEncodingDamaged, KindWarning, "the text holds U+FFFD, the mark of a damaged encoding"},
 	{CodePhoneInTextField, KindSuggestion, "phone-like text sits in a field that is not a phone"},
 	{CodeEmailInTextField, KindSuggestion, "email-like text sits in a field that is not an email"},
