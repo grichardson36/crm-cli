@@ -26,9 +26,7 @@ One validation framework checks every value from the CLI, MCP, the terminal UI, 
 | E_STAGE_OUTCOME_INVALID | a deal stage outcome is not open, won or lost |
 | E_PATH_EMPTY_SEGMENT, E_PATH_EDGE_SLASH, E_PATH_TOO_DEEP, E_PATH_TOO_LONG, E_PATH_CYCLE | a nested tag name such as work/clients is malformed (empty segment, leading or trailing /, over 8 levels or 200 characters), or a move puts a tag under itself |
 | W_ENCODING_DAMAGED, W_PHONE_UNLIKELY | warnings: text holds U+FFFD, or a phone number does not exist in the default region (stored as typed) |
-| S_PHONE_IN_TEXT_FIELD | suggestion: phone-like text in another field |
-| S_EMAIL_IN_TEXT_FIELD | suggestion: email-like text in another field |
-| S_URL_IN_TEXT_FIELD | suggestion: web-address-like text in another field |
+| S_PHONE_IN_TEXT_FIELD, S_EMAIL_IN_TEXT_FIELD, S_URL_IN_TEXT_FIELD | suggestion: phone-, email- or web-address-like text in another field |
 | S_VOCAB_CREATE | suggestion: the value is not on the list yet and can be created (the terminal UI offers `Create role X`) |
 
 Only `E_` codes fail a command. Every write trims text, collapses whitespace and strips control characters. Text with U+FFFD is kept as typed and flagged. A suggestion is never applied: the CLI prints `crm: hint: ...` on stderr and the command succeeds, so move the value yourself.
