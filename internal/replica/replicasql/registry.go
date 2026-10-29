@@ -89,6 +89,7 @@ func NotCovered() map[string]string {
 		"sync_inbox":     "source sync inbox of this device",
 		"sync_conflicts": "CardDAV conflict log of this device",
 		"dav_state":      "CardDAV base state of this device",
+		"dav_issues":     "CardDAV cards this device could not read",
 		"field_versions": "per-device change times used by source sync",
 		"tombstones":     "local purge log, replaced by delete changes",
 		"merge_log":      "undo history holds device-local row ids",
