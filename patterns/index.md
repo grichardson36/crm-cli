@@ -62,6 +62,8 @@ Note types (frontmatter `type`): `pattern` (one decided rule), `feature-area` (f
 - [[delete-asks-yes-no]] (Delete asks y or n)
 - [[sync-safe-data]] (Data is sync-safe from day one)
 - [[sync-maps-structure-to-flat-fields]] (Two-way sync maps structure to flat fields, open standard)
+- [[phone-numbers-are-e164]] (Phone numbers are stored as typed and matched as E.164)
+- [[iphone-vcard-roundtrip-test]] (Manual iPhone vCard round trip checklist)
 - [[enrichment-is-suggested-then-accepted]] (Fetched data is a suggestion until the user accepts it)
 - [[advanced-objects-off-main-path]] (The default navigation is loose and the user arranges it)
 
@@ -69,6 +71,7 @@ Note types (frontmatter `type`): `pattern` (one decided rule), `feature-area` (f
 *UI decisions.*
 
 - [[home-is-an-action-queue]] (Home is a short queue of relationship actions)
+- [[tree-view-module]] (One reusable tree renders any collection with a hierarchy path field)
 - [[views-screen]] (One Views screen lists, opens, shows, hides and orders every view)
 - [[settings-view]] (Settings is one module over one registry, with a scope on each row)
 - [[one-bar]] (One bar finds objects and runs verbs)
@@ -111,6 +114,7 @@ Note types (frontmatter `type`): `pattern` (one decided rule), `feature-area` (f
 - [[sigils-for-things-words-for-time]] (Sigils name things, plain words name time)
 - [[at-sign-means-person]] (@ means a person)
 - [[hash-means-tag]] (# means a tag)
+- [[nested-tags]] (A tag named parent/child is a child of parent, the hierarchy is the name)
 - [[dates-are-plain-words]] (Dates are plain words)
 - [[by-means-deadline]] (by means deadline)
 - [[every-means-recurrence]] (every means recurrence)
@@ -131,7 +135,7 @@ Feature rows (moved from FEATURES.md, which is retired). Each note lists the pat
 - [[features-tasks-and-notes]] (Tasks, reminders, notes, note types, timeline)
 - [[features-keep-in-touch-and-birthdays]] (Cadences, due, snooze, birthdays, digests, Home)
 - [[features-tags-groups-and-views]] (Tags, groups, saved views, filters, bulk edit, search)
-- [[features-tags-module]] (The Tags view: list, tag page, rename, merge, clean up)
+- [[features-tags-module]] (The Tags view: list, tree, tag page, rename, merge, nest, clean up)
 - [[features-links-and-relations]] (Typed links between all objects)
 - [[features-merge-archive-and-undo]] (Duplicates, merge and merge log, archive, purge, undo)
 - [[features-import-and-export]] (Dex CSV, other importers, export)

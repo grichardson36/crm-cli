@@ -17,6 +17,7 @@ import (
 	"github.com/jdanielnd/crm-cli/internal/alias"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/dedupe"
+	"github.com/jdanielnd/crm-cli/internal/tree"
 	"github.com/jdanielnd/crm-cli/internal/keys"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/jdanielnd/crm-cli/internal/modules"
@@ -102,6 +103,12 @@ type row struct {
 	tag   string
 	tagID int64
 	objID int64
+	// node marks a row of a tree view (treeview.go): depth is its level (1 at the top), kids the number of
+	// children, open says its children show, mark is the ▾ ▸ or · drawn before the title and virtual says
+	// no row of the collection has this path (a parent that exists because of its children).
+	node, open, virtual bool
+	depth, kids         int
+	mark                string
 }
 
 // Model is the Bubble Tea model.
@@ -282,6 +289,13 @@ type Model struct {
 	tagFilter string
 	tagStats  map[string]repo.TagStat
 	tagDups   map[string]repo.TagDupGroup
+	// tagLayout is "tree" or "flat" (tagtree.go), kept per device in config.toml. tagChildren makes a tag page
+	// list the objects of the tags below it too. treeClosed holds the collapsed paths of each tree view
+	// and treeAll the nodes of its last build (treeview.go).
+	tagLayout   string
+	tagChildren bool
+	treeClosed  map[string]map[string]bool
+	treeAll     map[string][]tree.Node
 	keyProblems []string
 	capture     *captureState
 
@@ -356,6 +370,7 @@ func Run(ctx context.Context, db *sql.DB, readOnly bool, noColor bool, env Env) 
 	m.applyStartupTheme()
 	m.applyStartupKeys()
 	m.applyStartupModules()
+	m.loadTagPrefs()
 	opts := []tea.ProgramOption{tea.WithContext(ctx)}
 	if noColor {
 		opts = append(opts, tea.WithColorProfile(colorprofile.Ascii))

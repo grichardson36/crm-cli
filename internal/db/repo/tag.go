@@ -61,6 +61,7 @@ func (r *TagRepo) FindAll(ctx context.Context) ([]*model.Tag, error) {
 }
 
 // FindOrCreate returns a tag by name, creating it if it doesn't exist.
+// A new name is checked as a hierarchy path (nested tags, internal/validate): work/clients is a child of work.
 func (r *TagRepo) FindOrCreate(ctx context.Context, name string) (*model.Tag, error) {
 	var t model.Tag
 	err := r.db.QueryRowContext(ctx, "SELECT id, name FROM tags WHERE name = ?", name).Scan(&t.ID, &t.Name)
@@ -69,6 +70,12 @@ func (r *TagRepo) FindOrCreate(ctx context.Context, name string) (*model.Tag, er
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("find tag: %w", err)
+	}
+	if name, err = cleanTagName(name); err != nil {
+		return nil, err
+	}
+	if err := r.db.QueryRowContext(ctx, "SELECT id, name FROM tags WHERE name = ?", name).Scan(&t.ID, &t.Name); err == nil {
+		return &t, nil
 	}
 
 	result, err := r.db.ExecContext(ctx,

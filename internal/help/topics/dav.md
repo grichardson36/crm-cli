@@ -20,9 +20,9 @@ Stays in the CRM only: priority tier, tags, keep-in-touch cadence, last contacte
 
 - A new phone contact creates a person. If an existing person has the same email, phone, social link or normalized name, the contact is linked to that person instead and logged.
 - Deleting a contact on the phone archives the person. `crm person restore ID` brings them back.
-- Each field merges on its own against what the phone last held. A change on one side only is taken. If both changed the same field, the newest change wins. The phone's change counts as made when the server receives it.
-- Emails, phones and links merge as sets. A removal on the phone removes only what the phone had been shown.
-- Every clash is logged and can be undone, which restores the value that lost.
+- Each field merges on its own against what the phone last held. A change on one side only is taken. If both changed the same field, the CRM value is kept and the phone value is stored as a conflict. Other fields still merge. `undo` applies the stored phone value.
+- Emails, phones and links merge as sets (phones by E.164, `crm help phone-numbers`). A removal on the phone removes only what the card you last sent or fetched held. A card that cannot be read is skipped and listed by `crm dav issues`.
+- The server keeps the text of each card and changes only the lines whose field moved (PRODID, REV, groups and unknown properties stay as the phone wrote them). TITLE is the headline title, else the role at the primary organization.
 
 ```sh crm-example
 crm dav conflicts

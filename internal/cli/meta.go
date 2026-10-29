@@ -99,6 +99,11 @@ var commandMeta = map[string]cmdMeta{
 	"alias add":    {mutates: true, noDryRun: true, examples: []string{`crm alias add zeke zachary`}},
 	"alias remove": {mutates: true, noDryRun: true, examples: []string{`crm alias remove zeke`}},
 
+	"phone":           {examples: []string{`crm phone normalize -f json`}},
+	"phone normalize": {mutates: true, noDryRun: true, fields: "region,total,fill,current,unparseable,unlikely,duplicates,applied,examples", examples: []string{`crm phone normalize -f json`, `crm phone normalize --apply`, `crm phone normalize --undo`}},
+	"phone region":    {mutates: true, noDryRun: true, examples: []string{`crm phone region`, `crm phone region GB`}},
+	"phone parse":     {fields: "typed,region,e164,key,national,international,number_region,parsed,possible,valid", examples: []string{`crm phone parse "(415) 555-2671"`, `crm phone parse "020 7946 0958" --region GB`}},
+
 	"org add":    {mutates: true, fields: orgFields, examples: []string{`crm org add "Acme Corp" --domain acme.com --industry SaaS`}},
 	"org list":   {fields: orgFields, examples: []string{`crm org list -f json`}},
 	"org show":   {fields: orgFields + ",people", examples: []string{`crm org show 1 --with-people -f json`}},
@@ -193,7 +198,10 @@ var commandMeta = map[string]cmdMeta{
 	"tag merge":      {mutates: true, noDryRun: true, fields: tagMergeFields, examples: []string{`crm tag merge old-tag new-tag -f json`, `crm tag merge old-tag new-tag --apply`}},
 	"tag unused":     {mutates: true, noDryRun: true, fields: "dry_run,count,tags", examples: []string{`crm tag unused -f json`, `crm tag unused --apply`}},
 	"tag duplicates": {mutates: true, noDryRun: true, fields: "groups,applied", examples: []string{`crm tag duplicates -f json`, `crm tag duplicates --apply`}},
-	"tag delete":     {mutates: true, destructive: true, examples: []string{`crm tag delete old-tag --dry-run`, `crm tag delete old-tag --yes`}},
+	"tag tree":       {fields: "path,name,depth,virtual,own,total,children", examples: []string{`crm tag tree`, `crm tag tree -f json`}},
+	"tag nest":       {mutates: true, noDryRun: true, fields: "action,dry_run,ops,renamed,merged,records,duplicates", examples: []string{`crm tag nest home hobbies --under area/life`, `crm tag nest home --under area --dry-run -f json`}},
+	"tag unnest":     {mutates: true, noDryRun: true, fields: "action,dry_run,ops,renamed,merged,records,duplicates", examples: []string{`crm tag unnest area/life/home`}},
+	"tag delete":     {mutates: true, destructive: true, examples: []string{`crm tag delete old-tag --dry-run`, `crm tag delete old-tag --yes`, `crm tag delete old-tag --only-this --yes`}},
 
 	// duplicates
 	"dupes": {fields: "level,ids,members,reasons", examples: []string{
@@ -226,8 +234,10 @@ var commandMeta = map[string]cmdMeta{
 		`crm dav serve --password-file ~/.crm/dav-password --user grant --base-url https://contacts.example.com --read-only`}},
 	"dav info": {fields: "base_url,user,address_book,address_book_url,address_book_path,discovery_url,listen,password,steps,notes", examples: []string{
 		`crm dav info -f json`, `crm dav info --base-url https://contacts.example.com --user grant`}},
-	"dav status": {fields: "contacts_exposed,device_created,synced_to_device,last_request_at,last_get_at,last_put_at,conflicts,open_conflicts", examples: []string{
+	"dav status": {fields: "contacts_exposed,device_created,synced_to_device,last_request_at,last_get_at,last_put_at,conflicts,open_conflicts,open_issues", examples: []string{
 		`crm dav status -f json`}},
+	"dav issues":         {fields: "id,uuid,dav_id,person_id,kind,message,raw_vcard,created_at,resolved_at", examples: []string{`crm dav issues -f json`}},
+	"dav issues resolve": {mutates: true, noDryRun: true, examples: []string{`crm dav issues resolve 1`}},
 	"dav conflicts": {fields: davConflictFields, examples: []string{`crm dav conflicts -f json`}},
 	"dav conflicts list": {fields: davConflictFields, examples: []string{
 		`crm dav conflicts list -f json`, `crm dav conflicts list --all -f json`}},

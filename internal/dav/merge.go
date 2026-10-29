@@ -23,11 +23,11 @@ type scalarDecision struct {
 	Device   string
 }
 
-// mergeScalars decides every scalar field. crmChangedAt returns when the CRM last changed a
-// field ("" when unknown, which counts as oldest). now is the device change time, which is the
-// request time because the phone does not say when the edit happened. Times compare as
-// "2006-01-02 15:04:05" strings in UTC.
-func mergeScalars(base, crm, dev map[string]string, crmChangedAt func(field string) string, now string, mode mergeMode) []scalarDecision {
+// mergeScalars decides every scalar field, per field and never per record. A field only one side
+// changed since the last sync is taken from that side. A field both sides changed to different
+// values is a conflict, and it keeps the CRM value (the server's) and stores the phone's value in the
+// conflict log for review and undo (patterns/conflicts-keep-server-store-local).
+func mergeScalars(base, crm, dev map[string]string, mode mergeMode) []scalarDecision {
 	var out []scalarDecision
 	for _, f := range scalarFields {
 		b, c, d := base[f], crm[f], dev[f]
@@ -45,12 +45,7 @@ func mergeScalars(base, crm, dev map[string]string, crmChangedAt func(field stri
 			dec.Take = true
 		default:
 			dec.Conflict = true
-			dec.Winner = "device"
-			dec.Take = true
-			if at := crmChangedAt(f); at != "" && at > now {
-				dec.Winner = "crm"
-				dec.Take = false
-			}
+			dec.Winner = "crm"
 		}
 		if f == fieldFirst && dec.Take && d == "" {
 			dec.Take = false // a person always keeps a first name
@@ -120,7 +115,7 @@ func mergeItems(base, crm, dev []Item, key func(string) string) listPlan {
 // handleDecision says what to do with one handle kind.
 type handleDecision struct {
 	Kind     string
-	Value    string // the device value to set, empty when Remove
+	Value    string // the device value to set, empty when Remove or Conflict (the CRM value stays)
 	Remove   bool
 	Conflict bool
 	CRM      string
@@ -128,8 +123,7 @@ type handleDecision struct {
 }
 
 // mergeHandles merges social handles and the website by kind. A kind both sides changed to
-// different values is a conflict that the phone wins, because the CRM does not record when a
-// handle changed.
+// different values is a conflict that keeps the CRM value and stores the phone's.
 func mergeHandles(base, crm, dev map[string]string, mode mergeMode) []handleDecision {
 	kinds := map[string]bool{}
 	for _, m := range []map[string]string{base, crm, dev} {
@@ -161,7 +155,6 @@ func mergeHandles(base, crm, dev map[string]string, mode mergeMode) []handleDeci
 			dec.Value = d
 		default:
 			dec.Conflict = true
-			dec.Value = d
 		}
 		out = append(out, dec)
 	}

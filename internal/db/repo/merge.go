@@ -232,6 +232,9 @@ func (m *merger) run() error {
 	if err := m.phones(); err != nil {
 		return err
 	}
+	if err := FillPhoneE164(m.ctx, m.tx, m.keepID); err != nil {
+		return err
+	}
 	if err := m.handles(); err != nil {
 		return err
 	}

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/jdanielnd/crm-cli/internal/dedupe"
+	"github.com/jdanielnd/crm-cli/internal/phone"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -40,8 +41,8 @@ func TestNormalizeName(t *testing.T) {
 }
 
 func TestKeys(t *testing.T) {
-	assert.Equal(t, "5551234567", dedupe.PhoneKey("+1 (555) 123-4567"))
-	assert.Equal(t, "5551234567", dedupe.PhoneKey("555.123.4567"))
+	assert.Equal(t, "+15551234567", dedupe.PhoneKey("+1 (555) 123-4567"))
+	assert.Equal(t, "+15551234567", dedupe.PhoneKey("555.123.4567"))
 	assert.Equal(t, "", dedupe.PhoneKey("12345"))
 	assert.Equal(t, "a@b.com", dedupe.EmailKey("  A@B.com "))
 	assert.Equal(t, "", dedupe.EmailKey("nope"))
@@ -50,6 +51,40 @@ func TestKeys(t *testing.T) {
 	}
 	assert.Equal(t, "jane", dedupe.HandleKey("@Jane"))
 	assert.Equal(t, "jane", dedupe.HandleKey("https://twitter.com/jane"))
+}
+
+// PhoneKey matches on E.164 and keeps the old last-10-digits key for text that cannot be parsed.
+func TestPhoneKeyE164(t *testing.T) {
+	t.Cleanup(func() { phone.SetDefaultRegion("") })
+	tests := []struct {
+		name, a, b string
+		same       bool
+	}{
+		{"formats of one US number", "(415) 555-2671", "+1 415 555 2671", true},
+		{"dots and country prefix", "415.555.2671", "1-415-555-2671", true},
+		{"different numbers", "415-555-2671", "415-555-2672", false},
+		{"extensions keep people apart", "415-555-2671 x1", "415-555-2671 x2", false},
+		{"same extension matches", "415-555-2671 ext 7", "(415) 555-2671 x7", true},
+		{"unparseable numbers keep the old key", "555-1234567", "(555) 123 4567", true},
+		{"short numbers never match", "12345", "12345", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ka, kb := dedupe.PhoneKey(tt.a), dedupe.PhoneKey(tt.b)
+			if tt.same {
+				assert.NotEmpty(t, ka)
+				assert.Equal(t, ka, kb)
+			} else {
+				assert.True(t, ka == "" || ka != kb)
+			}
+		})
+	}
+	t.Run("region default decides a national number", func(t *testing.T) {
+		assert.NotEqual(t, dedupe.PhoneKey("020 7946 0958"), dedupe.PhoneKey("+44 20 7946 0958"))
+		phone.SetDefaultRegion("GB")
+		assert.Equal(t, "+442079460958", dedupe.PhoneKey("020 7946 0958"))
+		assert.Equal(t, dedupe.PhoneKey("020 7946 0958"), dedupe.PhoneKey("+44 20 7946 0958"))
+	})
 }
 
 func p(id int64, first, last string) dedupe.Person {

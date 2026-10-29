@@ -6,7 +6,7 @@
 // The syntax follows what quick-add boxes in other tools do: a symbol for a named thing, plain
 // English for time.
 //
-//	#tag            tag. Must start with a letter. Unknown tags are flagged "new" when KnownTags is set.
+//	#tag            tag. Must start with a letter. #work/clients is the tag work/clients, a child of work. Unknown tags are flagged "new" when KnownTags is set.
 //	@Name           link a person: @Sam, @Sam_Lee, @"Sam Lee" (a known full name also matches @Sam Lee)
 //	!high !!  !!!   priority: !top !high !medium !low !none, !! is medium and !!! is high
 //	~30m  for 30m   duration: 30m, 1h, 1.5h, 1h30m
@@ -544,13 +544,24 @@ func (p *parser) tag(i, lead int) int {
 	j := 0
 	for j < len(body) {
 		r, size := utf8.DecodeRuneInString(body[j:])
+		if r == '/' && j > 0 && body[j-1] != '/' && j+1 < len(body) {
+			// A slash between two names is a nested tag: #work/clients is a child of #work.
+			if next, _ := utf8.DecodeRuneInString(body[j+1:]); unicode.IsLetter(next) || unicode.IsDigit(next) {
+				j += size
+				continue
+			}
+		}
 		if !(unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || r == '-' || unicode.Is(unicode.Mn, r)) {
 			break
 		}
 		j += size
 	}
 	name, rest := body[:j], body[j:]
-	if name == "" || len(name) > 64 {
+	limit := 64
+	if strings.Contains(name, "/") {
+		limit = 200 // a nested tag may be as long as a tag path (model.MaxPathLen)
+	}
+	if name == "" || len(name) > limit || strings.Count(name, "/") >= 8 {
 		return 0
 	}
 	if r, _ := utf8.DecodeRuneInString(name); !unicode.IsLetter(r) {

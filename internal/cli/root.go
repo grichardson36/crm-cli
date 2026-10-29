@@ -9,6 +9,7 @@ import (
 	"github.com/jdanielnd/crm-cli/internal/db"
 	"github.com/jdanielnd/crm-cli/internal/format"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/phone"
 	"github.com/spf13/cobra"
 )
 
@@ -59,6 +60,7 @@ func NewRootCmd() *cobra.Command {
 	registerTUICommand(rootCmd)
 	registerBackupCommand(rootCmd)
 	registerImportCommand(rootCmd)
+	registerPhoneCommands(rootCmd)
 
 	// dedupe (dupes, person merge)
 	registerDupesCommands(rootCmd)
@@ -114,7 +116,18 @@ func openDB() (*sql.DB, error) {
 		}
 	}
 
+	applyPhoneConfig()
 	return db.Open(dbPath)
+}
+
+// applyPhoneConfig sets the default phone region from the [phone] table of ~/.crm/config.toml. A
+// missing file or an unknown code leaves the US default.
+func applyPhoneConfig() {
+	dir, err := defaultDataDir()
+	if err != nil {
+		return
+	}
+	phone.SetDefaultRegion(phone.ConfigRegion(filepath.Join(dir, "config.toml")))
 }
 
 // Sources of the active database path, in priority order.

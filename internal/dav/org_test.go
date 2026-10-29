@@ -182,7 +182,7 @@ func TestPhoneOrgEditForAPersonWithoutAPrimaryMembership(t *testing.T) {
 	assert.Equal(t, "Nowhere Ltd", created.Name)
 }
 
-func TestOrgChangedOnBothSidesIsAConflictDecidedByLastWrite(t *testing.T) {
+func TestOrgChangedOnBothSidesIsAConflictThatKeepsTheCRMValue(t *testing.T) {
 	for _, deviceNewer := range []bool{true, false} {
 		e, p, orgs, links, _ := orgFixture(t)
 		ctx := context.Background()
@@ -208,12 +208,9 @@ func TestOrgChangedOnBothSidesIsAConflictDecidedByLastWrite(t *testing.T) {
 		conflicts := e.conflicts()
 		require.Len(t, conflicts, 1, "both sides changed ORG since the last sync")
 		assert.Equal(t, "company", conflicts[0].Field)
-		if deviceNewer {
-			assert.Equal(t, initech.ID, org, "the newer phone edit wins")
-			assert.Equal(t, "device", conflicts[0].Winner)
-		} else {
-			assert.Equal(t, globex.ID, org, "the newer CRM change wins")
-			assert.Equal(t, "crm", conflicts[0].Winner)
-		}
+		// Per field, the CRM (server) value is kept and the phone's is stored, whoever edited last.
+		assert.Equal(t, globex.ID, org, "the CRM value is kept (deviceNewer=%v)", deviceNewer)
+		assert.Equal(t, "crm", conflicts[0].Winner)
+		_ = initech
 	}
 }

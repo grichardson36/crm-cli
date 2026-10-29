@@ -89,7 +89,10 @@ func addDetailFields(m map[string]any, p *model.Person) {
 		m["phones"] = p.Phones
 		parts := make([]string, len(p.Phones))
 		for i, ph := range p.Phones {
-			parts[i] = ph.PhoneNumber
+			parts[i] = ph.Display
+			if parts[i] == "" {
+				parts[i] = ph.PhoneNumber
+			}
 		}
 		m["phones_text"] = strings.Join(parts, ", ")
 	}

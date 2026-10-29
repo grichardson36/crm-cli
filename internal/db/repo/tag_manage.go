@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/tree"
 )
 
 // Tag management for the Tags module (patterns/features-tags-module): counts per object kind, the
@@ -22,10 +23,13 @@ type TagStat struct {
 	Count    int            `json:"count"`
 	ByKind   map[string]int `json:"by_kind"`
 	Archived int            `json:"archived"`
+	// Parent says a tag below this one (work/clients under work) has objects. Such a tag is a parent in
+	// use, whatever its own count.
+	Parent bool `json:"parent,omitempty"`
 }
 
-// Unused says that no object carries the tag, archived ones included.
-func (t TagStat) Unused() bool { return t.Count == 0 && t.Archived == 0 }
+// Unused says that no object carries the tag, archived ones included, and no tag below it is in use.
+func (t TagStat) Unused() bool { return t.Count == 0 && t.Archived == 0 && !t.Parent }
 
 // Stats lists every tag, unused ones too, by name (case-insensitive), with its counts.
 func (r *TagRepo) Stats(ctx context.Context) ([]TagStat, error) {
@@ -90,6 +94,18 @@ func (r *TagRepo) Stats(ctx context.Context) ([]TagStat, error) {
 		}
 		return out[i].Name < out[j].Name
 	})
+	// A tag with a tag in use below it is a parent in use (nested tags, patterns/nested-tags).
+	parents := map[string]bool{}
+	for _, t := range out {
+		if t.Count > 0 || t.Archived > 0 {
+			for p := tree.Parent(t.Name); p != ""; p = tree.Parent(p) {
+				parents[p] = true
+			}
+		}
+	}
+	for i := range out {
+		out[i].Parent = parents[out[i].Name]
+	}
 	return out, nil
 }
 
@@ -114,6 +130,9 @@ type TaggedObject struct {
 	ID     int64  `json:"id"`
 	Name   string `json:"name"`
 	Detail string `json:"detail,omitempty"`
+	// Tag is the tag the object carries: with the children of a tag included, the first tag (by name)
+	// of the subtree that it carries.
+	Tag string `json:"tag,omitempty"`
 }
 
 var taggedSQL = map[string]string{
@@ -127,33 +146,54 @@ var taggedSQL = map[string]string{
 // TaggedObjects lists the objects that carry the tag, grouped by kind in the order of model.TaggableTypes
 // and by name inside a kind. Archived objects are left out.
 func (r *TagRepo) TaggedObjects(ctx context.Context, tagName string) ([]TaggedObject, error) {
-	tagName = NormalizeTagName(tagName)
-	id, _, err := r.idByName(ctx, r.db, tagName)
+	return r.taggedObjects(ctx, NormalizeTagName(tagName), false)
+}
+
+// taggedObjects lists the objects of a tag, and with children those of the tags below it. A path that
+// is no tag but has tags under it (a virtual parent) lists no objects of its own.
+func (r *TagRepo) taggedObjects(ctx context.Context, tagName string, children bool) ([]TaggedObject, error) {
+	set, err := r.subtreeTags(ctx, r.db, tagName)
 	if err != nil {
 		return nil, err
 	}
+	if len(set) == 0 {
+		return nil, fmt.Errorf("tag %q: %w", tagName, model.ErrNotFound)
+	}
+	var use []tagRow
+	for _, t := range set {
+		if t.Name == tagName || children {
+			use = append(use, t)
+		}
+	}
+	sort.Slice(use, func(i, j int) bool { return use[i].Name < use[j].Name })
 	var out []TaggedObject
 	for _, kind := range model.TaggableTypes {
-		q := taggedSQL[kind] + ` JOIN taggings g ON g.entity_type = ? AND g.entity_id = e.id
-			WHERE g.tag_id = ? AND g.deleted_at IS NULL AND e.archived = 0`
-		rs, err := r.db.QueryContext(ctx, q, kind, id)
-		if err != nil {
-			return nil, fmt.Errorf("list tagged %s: %w", kind, err)
-		}
 		var part []TaggedObject
-		for rs.Next() {
-			o := TaggedObject{Kind: kind}
-			if err := rs.Scan(&o.ID, &o.Name, &o.Detail); err != nil {
+		seen := map[int64]bool{}
+		for _, t := range use {
+			q := taggedSQL[kind] + ` JOIN taggings g ON g.entity_type = ? AND g.entity_id = e.id
+				WHERE g.tag_id = ? AND g.deleted_at IS NULL AND e.archived = 0`
+			rs, err := r.db.QueryContext(ctx, q, kind, t.ID)
+			if err != nil {
+				return nil, fmt.Errorf("list tagged %s: %w", kind, err)
+			}
+			for rs.Next() {
+				o := TaggedObject{Kind: kind, Tag: t.Name}
+				if err := rs.Scan(&o.ID, &o.Name, &o.Detail); err != nil {
+					rs.Close()
+					return nil, err
+				}
+				if !seen[o.ID] {
+					seen[o.ID] = true
+					part = append(part, o)
+				}
+			}
+			if err := rs.Err(); err != nil {
 				rs.Close()
 				return nil, err
 			}
-			part = append(part, o)
-		}
-		if err := rs.Err(); err != nil {
 			rs.Close()
-			return nil, err
 		}
-		rs.Close()
 		sort.SliceStable(part, func(i, j int) bool {
 			a, b := strings.ToLower(part[i].Name), strings.ToLower(part[j].Name)
 			if a != b {
@@ -188,11 +228,40 @@ type TagDupGroup struct {
 	Tags []TagStat `json:"tags"` // Keep first, then the others by use
 }
 
-// Duplicates finds the groups of tags that differ only by case or separators, by key.
+// Duplicates finds the groups of tags that differ only by case or separators, by key. In a tree the
+// paths count, virtual parents too: Work (only a parent of Work/clients) and work are one group, and
+// merging them merges their children (MergeTree). A virtual parent is listed with the objects of its
+// subtree as its count and ID 0.
 func (r *TagRepo) Duplicates(ctx context.Context) ([]TagDupGroup, error) {
 	all, err := r.Stats(ctx)
 	if err != nil {
 		return nil, err
+	}
+	have := map[string]bool{}
+	nested := false
+	for _, t := range all {
+		have[t.Name] = true
+		nested = nested || strings.Contains(t.Name, model.PathSep)
+	}
+	// rank is how used a spelling is. In a tree a tag counts with everything below it.
+	rank := map[string]int{}
+	for _, t := range all {
+		rank[t.Name] = t.Count + t.Archived
+	}
+	if nested {
+		nodes, err := r.TreeOf(ctx, all)
+		if err != nil {
+			return nil, err
+		}
+		for _, n := range nodes {
+			if n.Virtual {
+				all = append(all, TagStat{Name: n.Path, Count: n.Total, ByKind: map[string]int{}})
+			}
+			rank[n.Path] = n.Total
+			if s, ok := n.Data.(TagStat); ok {
+				rank[n.Path] += s.Archived
+			}
+		}
 	}
 	by := map[string][]TagStat{}
 	var keys []string
@@ -214,8 +283,11 @@ func (r *TagRepo) Duplicates(ctx context.Context) ([]TagDupGroup, error) {
 			continue
 		}
 		sort.SliceStable(g, func(i, j int) bool {
-			if g[i].Count+g[i].Archived != g[j].Count+g[j].Archived {
-				return g[i].Count+g[i].Archived > g[j].Count+g[j].Archived
+			if rank[g[i].Name] != rank[g[j].Name] {
+				return rank[g[i].Name] > rank[g[j].Name]
+			}
+			if (g[i].ID == 0) != (g[j].ID == 0) {
+				return g[i].ID != 0 // a tag of its own before a virtual parent
 			}
 			return g[i].ID < g[j].ID
 		})
@@ -232,6 +304,7 @@ type TagDupMergeResult struct {
 	Merged int               `json:"merged"` // tags merged away
 	Total  int               `json:"total"`  // records that now carry a tag because of the merges
 	Merges []*TagMergeResult `json:"merges"`
+	trees  []*TagTreeResult
 }
 
 // Label is a short description for messages and the undo history.
@@ -240,17 +313,29 @@ func (r TagDupMergeResult) Label() string {
 }
 
 // MergeDuplicates merges every tag of a duplicate group into the most used spelling of its group. With
-// only, just the groups that contain one of those names. DryRun writes nothing.
+// only, just the groups that contain one of those names. DryRun writes nothing. A tag merges with its
+// children (MergeTree): merging Work into work also merges Work/clients into work/clients. Groups run
+// parents first, so a group whose tags a parent merge already took is skipped.
 func (r *TagRepo) MergeDuplicates(ctx context.Context, dryRun bool, only ...string) (*TagDupMergeResult, error) {
 	groups, err := r.Duplicates(ctx)
 	if err != nil {
 		return nil, err
 	}
+	sort.SliceStable(groups, func(i, j int) bool { return tree.Depth(groups[i].Keep) < tree.Depth(groups[j].Keep) })
 	want := map[string]bool{}
 	for _, n := range only {
 		want[NormalizeTagName(n)] = true
 	}
 	res := &TagDupMergeResult{DryRun: dryRun}
+	var gone []string // sources merged away in a dry run, whose subtrees are gone too
+	isGone := func(name string) bool {
+		for _, g := range gone {
+			if tree.InSubtree(name, g) {
+				return true
+			}
+		}
+		return false
+	}
 	for _, g := range groups {
 		if len(want) > 0 {
 			hit := false
@@ -261,15 +346,36 @@ func (r *TagRepo) MergeDuplicates(ctx context.Context, dryRun bool, only ...stri
 				continue
 			}
 		}
-		res.Groups++
+		counted := false
 		for _, t := range g.Tags[1:] {
-			m, err := r.merge(ctx, t.Name, g.Keep, dryRun)
+			if isGone(t.Name) || isGone(g.Keep) {
+				continue
+			}
+			if !dryRun {
+				// An earlier merge may have taken this tag along with its parent.
+				if set, err := r.subtreeTags(ctx, r.db, t.Name); err != nil || len(set) == 0 {
+					continue
+				}
+			}
+			tr, err := r.mergeTree(ctx, t.Name, g.Keep, dryRun)
 			if err != nil {
 				return res, err
 			}
-			res.Merges = append(res.Merges, m)
-			res.Merged++
-			res.Total += m.Total
+			if !counted {
+				res.Groups++
+				counted = true
+			}
+			res.trees = append(res.trees, tr)
+			for _, op := range tr.Ops {
+				if op.Kind == "merge" {
+					res.Merged++
+					if op.merge != nil {
+						res.Merges = append(res.Merges, op.merge)
+					}
+				}
+			}
+			res.Total += tr.Records
+			gone = append(gone, t.Name)
 		}
 	}
 	return res, nil
@@ -277,8 +383,8 @@ func (r *TagRepo) MergeDuplicates(ctx context.Context, dryRun bool, only ...stri
 
 // UndoDuplicates undoes the merges of a MergeDuplicates result, newest first.
 func (r *TagRepo) UndoDuplicates(ctx context.Context, res *TagDupMergeResult) error {
-	for i := len(res.Merges) - 1; i >= 0; i-- {
-		if err := r.UndoMerge(ctx, res.Merges[i]); err != nil {
+	for i := len(res.trees) - 1; i >= 0; i-- {
+		if err := r.UndoTree(ctx, res.trees[i]); err != nil {
 			return err
 		}
 	}
@@ -287,8 +393,8 @@ func (r *TagRepo) UndoDuplicates(ctx context.Context, res *TagDupMergeResult) er
 
 // RedoDuplicates repeats the merges of a MergeDuplicates result.
 func (r *TagRepo) RedoDuplicates(ctx context.Context, res *TagDupMergeResult) error {
-	for _, m := range res.Merges {
-		if err := r.RedoMerge(ctx, m); err != nil {
+	for _, tr := range res.trees {
+		if err := r.RedoTree(ctx, tr); err != nil {
 			return err
 		}
 	}

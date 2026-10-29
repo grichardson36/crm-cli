@@ -86,6 +86,37 @@ type FieldSpec struct {
 	// (WithVocabulary) before editing or checking. A value that is not in the list is unknown: the TUI
 	// offers to create it, the CLI and MCP refuse it unless told to create it.
 	Vocabulary string
+	// Hierarchy says the value is a path whose segments form a tree, such as the name of a tag
+	// (work/clients/acme is a child of work/clients). The only value is HierarchyPath. A collection
+	// whose rows have a field with a Hierarchy renders in the tree view module
+	// (patterns/tree-view-module) and its values are checked by internal/validate.Path.
+	Hierarchy string
+}
+
+// Hierarchy kinds (FieldSpec.Hierarchy).
+const (
+	// HierarchyPath means the parent of a row is the row named by the value without its last segment.
+	HierarchyPath = "path"
+)
+
+// The shape of a hierarchy path. The validator (internal/validate) enforces the limits.
+const (
+	// PathSep separates the segments of a hierarchy path.
+	PathSep = "/"
+	// MaxPathDepth is the most segments a path has.
+	MaxPathDepth = 8
+	// MaxPathLen is the most characters a whole path has.
+	MaxPathLen = 200
+)
+
+// HierarchyOf returns the field of a kind that declares a hierarchy, if it has one.
+func HierarchyOf(kind string) (FieldSpec, bool) {
+	for _, f := range Fields[kind] {
+		if f.Hierarchy != "" {
+			return f, true
+		}
+	}
+	return FieldSpec{}, false
 }
 
 // DateParser turns a natural date phrase into the stored form. ok is false when it is not a date. The
@@ -188,6 +219,12 @@ var Fields = map[string][]FieldSpec{
 		{Key: "due", Label: "due", Type: FieldDate},
 		{Key: "priority", Label: "priority", Type: FieldChoice, Choices: priorityChoices()},
 		{Key: "description", Label: "description", Type: FieldLongText},
+	},
+	// A tag is a name on objects. Its name is a path: work/clients/acme is a child of work/clients
+	// (patterns/nested-tags). The relation field "tag" of the other kinds points here.
+	"tag": {
+		{Key: "name", Label: "tag name", Type: FieldText, Required: true, Hierarchy: HierarchyPath, Max: MaxPathLen,
+			Hint: "use / for a child tag, for example work/clients"},
 	},
 	NoteKind: {
 		{Key: "text", Label: "text", Type: FieldLongText, Required: true},

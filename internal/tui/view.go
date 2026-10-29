@@ -316,6 +316,9 @@ func (m *Model) listView(w, h int) string {
 			}
 			continue
 		}
+		if r.node && r.depth > 0 {
+			title = strings.Repeat("  ", r.depth-1) + r.mark + " " + title
+		}
 		if anyMarks {
 			if isMarked(r) {
 				title = "✓ " + title
