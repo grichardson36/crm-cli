@@ -55,6 +55,14 @@ func Field(spec model.FieldSpec, raw string, opt Options) Result {
 		}
 		return r
 	}
+	if spec.Hierarchy == model.HierarchyPath {
+		clean, i := checkPath(spec, v)
+		if i != nil {
+			r.add(*i)
+			return r
+		}
+		v = clean
+	}
 	if max := maxLen(spec); max > 0 && utf8.RuneCountInString(v) > max {
 		r.add(Issue{Code: CodeFieldTooLong, Field: label, Expected: fmt.Sprintf("at most %d characters", max),
 			Received: fmt.Sprintf("%d characters", utf8.RuneCountInString(v)), Fix: "shorten it"})
