@@ -37,7 +37,7 @@ func TestMigration009_AddsNativeOrganizationFields(t *testing.T) {
 	defer d.Close()
 	var version int
 	require.NoError(t, d.QueryRow("PRAGMA user_version").Scan(&version))
-	assert.Equal(t, 14, version)
+	assert.Equal(t, db.LatestVersion(), version)
 
 	var name, domain, notes string
 	var website, size, city, region, country, linkedin, description, logo *string

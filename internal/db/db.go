@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"database/sql"
 	"embed"
 	"errors"
@@ -8,6 +9,7 @@ import (
 	"io/fs"
 	"strings"
 
+	"github.com/jdanielnd/crm-cli/internal/replica/replicasql"
 	_ "modernc.org/sqlite"
 )
 
@@ -36,6 +38,12 @@ func Open(dbPath string) (*sql.DB, error) {
 			return nil, err
 		}
 		return nil, fmt.Errorf("run migrations: %w", err)
+	}
+
+	// With device sync on, keep the capture triggers in step with this build's registry.
+	if err := replicasql.Refresh(context.Background(), db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("refresh sync triggers: %w", err)
 	}
 
 	return db, nil
