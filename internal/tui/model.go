@@ -200,8 +200,6 @@ type Model struct {
 	setField *setFieldState
 	// setFieldDeal and setFieldCreate carry a bulk deal role: the deal it is set on and a role to add to the list first.
 	setFieldDeal repo.Ref
-	// vocabName is the vocabulary value a rename prompt is for.
-	vocabName      string
 	setFieldCreate string
 	detail         viewport.Model
 	detailKey      string
@@ -1094,23 +1092,8 @@ func (m *Model) runPrompt(kind, value string) {
 	case "task-edit":
 		m.saveTaskEdit(m.lineID, value)
 		return
-	case "notetype-add":
-		m.addNoteType(value)
-		return
 	case "tag-new":
 		m.saveNewTag(value)
-		return
-	case "vocab-role-add":
-		m.addDealRole(value)
-		return
-	case "vocab-role-rename":
-		m.renameDealRole(value)
-		return
-	case "vocab-stage-add":
-		m.addDealStage(value)
-		return
-	case "vocab-stage-rename":
-		m.renameDealStage(value)
 		return
 	case "set-field":
 		m.runSetField(value)

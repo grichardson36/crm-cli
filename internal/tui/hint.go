@@ -103,7 +103,7 @@ var barExtraShapes = map[string][]hintField{
 }
 
 // extraPromptFields are pipe prompts that belong to no object.
-var extraPromptFields = map[string][]string{"notetype-add": {"name", "contact"}}
+var extraPromptFields = map[string][]string{}
 
 // promptFieldsFor lists the fields of a pipe prompt: the segments of its pipe line (pipeline.go), the attributes of the link being made, or an extra prompt.
 func (m *Model) promptFieldsFor(kind string) []string {

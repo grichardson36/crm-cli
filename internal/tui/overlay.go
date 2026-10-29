@@ -52,6 +52,11 @@ type overlay struct {
 	// turns the filter line off.
 	onKey    func(m *Model, key string) bool
 	noFilter bool
+	// onMsg sees the whole key event before onKey (a screen with its own text input) and draw
+	// replaces the list drawing. The list editor uses both (listeditor.go), le is its state.
+	onMsg func(m *Model, msg tea.KeyPressMsg) bool
+	draw  func(m *Model) string
+	le    *listEditor
 	// help replaces the key hints in the title line, note replaces the filter line of a noFilter list.
 	help, note string
 	onPick     func(m *Model, it overlayItem)
@@ -61,6 +66,7 @@ type overlay struct {
 	onCancel  func(m *Model)
 	previewed string // id of the item onCursor saw last
 	listTop   int    // first screen line of the item list
+	extraTop  int    // lines between the filter line and the list that a custom draw adds (mouse rows)
 	pageSize  int
 	// cmd is the command-bar state while the palette text is a command line (verb and a space).
 	cmd *cmdState
@@ -293,6 +299,11 @@ func (m *Model) previewCursor() {
 func (m *Model) overlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	o := m.ov
 	page := m.overlayPage()
+	if o.onMsg != nil && o.onMsg(m, msg) {
+		cmd := m.pendingCmd
+		m.pendingCmd = nil
+		return m, cmd
+	}
 	if o.onKey != nil && o.onKey(m, keyName(msg)) {
 		return m, nil
 	}
@@ -384,8 +395,9 @@ func (m *Model) overlayMouse(msg mouseEvent) (tea.Model, tea.Cmd) {
 	case tea.MouseWheelDown:
 		o.move(3, m.overlayPage())
 	case tea.MouseLeft:
-		i := o.offset + msg.Y - overlayTop
-		if msg.Y >= overlayTop && msg.Y < overlayTop+m.overlayPage() {
+		top := overlayTop + o.extraTop
+		i := o.offset + msg.Y - top
+		if msg.Y >= top && msg.Y < top+m.overlayPage() {
 			return m, m.pickOverlay(i)
 		}
 	}
@@ -396,6 +408,9 @@ func (m *Model) overlayView() string {
 	o := m.ov
 	if o.cmd != nil {
 		return m.cmdView()
+	}
+	if o.draw != nil {
+		return o.draw(m)
 	}
 	var b strings.Builder
 	help := "   enter run  esc close  up/down choose"
