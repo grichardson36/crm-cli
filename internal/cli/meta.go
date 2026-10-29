@@ -198,7 +198,10 @@ var commandMeta = map[string]cmdMeta{
 	"tag merge":      {mutates: true, noDryRun: true, fields: tagMergeFields, examples: []string{`crm tag merge old-tag new-tag -f json`, `crm tag merge old-tag new-tag --apply`}},
 	"tag unused":     {mutates: true, noDryRun: true, fields: "dry_run,count,tags", examples: []string{`crm tag unused -f json`, `crm tag unused --apply`}},
 	"tag duplicates": {mutates: true, noDryRun: true, fields: "groups,applied", examples: []string{`crm tag duplicates -f json`, `crm tag duplicates --apply`}},
-	"tag delete":     {mutates: true, destructive: true, examples: []string{`crm tag delete old-tag --dry-run`, `crm tag delete old-tag --yes`}},
+	"tag tree":       {fields: "path,name,depth,virtual,own,total,children", examples: []string{`crm tag tree`, `crm tag tree -f json`}},
+	"tag nest":       {mutates: true, noDryRun: true, fields: "action,dry_run,ops,renamed,merged,records,duplicates", examples: []string{`crm tag nest home hobbies --under area/life`, `crm tag nest home --under area --dry-run -f json`}},
+	"tag unnest":     {mutates: true, noDryRun: true, fields: "action,dry_run,ops,renamed,merged,records,duplicates", examples: []string{`crm tag unnest area/life/home`}},
+	"tag delete":     {mutates: true, destructive: true, examples: []string{`crm tag delete old-tag --dry-run`, `crm tag delete old-tag --yes`, `crm tag delete old-tag --only-this --yes`}},
 
 	// duplicates
 	"dupes": {fields: "level,ids,members,reasons", examples: []string{

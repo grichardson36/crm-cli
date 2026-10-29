@@ -41,15 +41,21 @@ func (m *Model) askTagRename(name string) {
 	m.startInput("tag-rename", "rename #"+name+" to: ", name)
 }
 
-// runTagRename applies the new name typed in the prompt.
+// runTagRename applies the new name typed in the prompt. The tags below the tag follow (RenameTree).
 func (m *Model) runTagRename(value string) {
 	from, to := m.tagRenaming, repo.NormalizeTagName(value)
 	if to == "" || to == from {
 		return
 	}
-	err := m.tagr.Rename(m.ctx, from, to)
+	res, err := m.tagr.RenameTree(m.ctx, from, to, false)
 	var exists *repo.TagExistsError
 	if errors.As(err, &exists) {
+		if exists.From != from {
+			// A tag below it meets a tag of the same name there: offer to merge those.
+			m.runTreeChange("rename", func(merge bool) (*repo.TagTreeResult, error) { return m.tagr.RenameTree(m.ctx, from, to, merge) },
+				func() (*repo.TagTreeResult, error) { return m.tagr.RenameTreeDryRun(m.ctx, from, to, true) })
+			return
+		}
 		// The name is taken: offer the merge the error talks about.
 		m.setStatus(err.Error(), true)
 		m.askTagMergeWith(from, exists.Existing, fmt.Sprintf("tag #%s exists. ", exists.Existing))
@@ -59,9 +65,9 @@ func (m *Model) runTagRename(value string) {
 		m.setStatus(err.Error(), true)
 		return
 	}
-	m.record("rename tag #"+from+" to #"+to,
-		func() error { return m.tagr.Rename(m.ctx, to, from) },
-		func() error { return m.tagr.Rename(m.ctx, from, to) })
+	m.record(res.Label(),
+		func() error { return m.tagr.UndoTree(m.ctx, res) },
+		func() error { return m.tagr.RedoTree(m.ctx, res) })
 	m.afterWrite()
 	m.setStatus("tag #"+from+" renamed to #"+to+" (ctrl+z undoes)", false)
 }
@@ -79,18 +85,17 @@ func (m *Model) confirmTagMerge(source, target string) { m.askTagMergeWith(sourc
 
 // askTagMergeWith is confirmTagMerge with a lead sentence in front of the question.
 func (m *Model) askTagMergeWith(source, target, lead string) {
-	res, err := m.tagr.MergeDryRun(m.ctx, source, target)
+	res, err := m.tagr.MergeTreeDryRun(m.ctx, source, target)
 	if err != nil {
 		m.setStatus(err.Error(), true)
 		return
 	}
-	dups := 0
-	for _, n := range res.Duplicates {
-		dups += n
+	detail := fmt.Sprintf("%d records move", res.Records)
+	if res.Duplicates > 0 {
+		detail += fmt.Sprintf(", %d already have #%s", res.Duplicates, target)
 	}
-	detail := fmt.Sprintf("%d records move", res.Total)
-	if dups > 0 {
-		detail += fmt.Sprintf(", %d already have #%s", dups, target)
+	if kids := res.Renamed + res.Merged - 1; kids > 0 {
+		detail += fmt.Sprintf(", %d tags below follow", kids)
 	}
 	m.mode = modeConfirm
 	m.confirm = &confirmState{
@@ -100,14 +105,14 @@ func (m *Model) askTagMergeWith(source, target, lead string) {
 }
 
 func (m *Model) runTagMerge(source, target string) {
-	res, err := m.tagr.Merge(m.ctx, source, target)
+	res, err := m.tagr.MergeTree(m.ctx, source, target)
 	if err != nil {
 		m.setStatus(err.Error(), true)
 		return
 	}
 	m.record(res.Label(),
-		func() error { return m.tagr.UndoMerge(m.ctx, res) },
-		func() error { return m.tagr.RedoMerge(m.ctx, res) })
+		func() error { return m.tagr.UndoTree(m.ctx, res) },
+		func() error { return m.tagr.RedoTree(m.ctx, res) })
 	m.afterWrite()
-	m.setStatus(fmt.Sprintf("tag #%s merged into #%s, %d records moved (ctrl+z undoes)", source, target, res.Total), false)
+	m.setStatus(fmt.Sprintf("tag #%s merged into #%s, %d records moved (ctrl+z undoes)", source, target, res.Records), false)
 }

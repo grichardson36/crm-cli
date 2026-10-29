@@ -29,6 +29,11 @@ const (
 	CodeStageNoWon       = "E_STAGE_NO_WON"
 	CodeStageNoLost      = "E_STAGE_NO_LOST"
 	CodeStageOutcome     = "E_STAGE_OUTCOME_INVALID"
+	CodePathEmptySegment = "E_PATH_EMPTY_SEGMENT"
+	CodePathEdgeSlash    = "E_PATH_EDGE_SLASH"
+	CodePathTooDeep      = "E_PATH_TOO_DEEP"
+	CodePathTooLong      = "E_PATH_TOO_LONG"
+	CodePathCycle        = "E_PATH_CYCLE"
 	CodeEncodingDamaged  = "W_ENCODING_DAMAGED"
 	CodePhoneUnlikely    = "W_PHONE_UNLIKELY"
 	CodePhoneInTextField = "S_PHONE_IN_TEXT_FIELD"
@@ -75,6 +80,11 @@ var Codes = []CodeInfo{
 	{CodeStageNoWon, KindError, "the change would leave no won deal stage, at least one stage must have the outcome won"},
 	{CodeStageNoLost, KindError, "the change would leave no lost deal stage, at least one stage must have the outcome lost"},
 	{CodeStageOutcome, KindError, "a deal stage outcome is not open, won or lost"},
+	{CodePathEmptySegment, KindError, "a hierarchy path (a nested tag such as work/clients) has an empty segment, as in work//clients"},
+	{CodePathEdgeSlash, KindError, "a hierarchy path starts or ends with /"},
+	{CodePathTooDeep, KindError, "a hierarchy path has more segments than the maximum depth"},
+	{CodePathTooLong, KindError, "a hierarchy path is longer than the maximum length"},
+	{CodePathCycle, KindError, "the change would move a hierarchy path under itself"},
 	{CodeEncodingDamaged, KindWarning, "the text holds U+FFFD, the mark of a damaged encoding"},
 	{CodePhoneUnlikely, KindWarning, "the text reads as a phone number but does not exist in the default region numbering plan, it is stored as typed"},
 	{CodePhoneInTextField, KindSuggestion, "phone-like text sits in a field that is not a phone"},

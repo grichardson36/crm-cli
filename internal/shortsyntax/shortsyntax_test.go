@@ -868,3 +868,25 @@ func TestInvariants(t *testing.T) {
 		}
 	}
 }
+
+func TestNestedTagTokens(t *testing.T) {
+	tests := []struct {
+		in   string
+		want []string
+	}{
+		{"met Ann #work/clients/acme today", []string{"work/clients/acme"}},
+		{"#work/clients and #work", []string{"work/clients", "work"}},
+		{"#a/b-c/d_e", []string{"a/b-c/d_e"}},
+		{"#work/ trailing slash is not part of it", nil},
+		{"#work//clients", nil},
+		{"#/work", nil},
+		{"#work/1st", []string{"work/1st"}},
+		{"see a/b and issue #12/13", nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.in, func(t *testing.T) {
+			res := Parse(tt.in, noteOpts())
+			assert.Equal(t, tt.want, res.Tags)
+		})
+	}
+}

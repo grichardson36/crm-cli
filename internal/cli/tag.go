@@ -32,6 +32,9 @@ func registerTagCommands(rootCmd *cobra.Command) {
 	tagCmd.AddCommand(tagMergeCmd())
 	tagCmd.AddCommand(tagUnusedCmd())
 	tagCmd.AddCommand(tagDuplicatesCmd())
+	tagCmd.AddCommand(tagTreeCmd())
+	tagCmd.AddCommand(tagNestCmd())
+	tagCmd.AddCommand(tagUnnestCmd())
 
 	rootCmd.AddCommand(tagCmd)
 }
@@ -165,11 +168,13 @@ func tagShowCmd() *cobra.Command {
 }
 
 func tagDeleteCmd() *cobra.Command {
-	return &cobra.Command{
+	var onlyThis bool
+	cmd := &cobra.Command{
 		Use:   "delete <tag>",
-		Short: "Delete a tag: untag everything that carries it",
-		Long:  "A tag is a name on objects, so deleting it untags every object that carries it, as one step. The taggings are soft deleted, tagging an object with the name again brings its old tagging back, and undo in the terminal UI restores them all.",
-		Args:  cobra.ExactArgs(1),
+		Short: "Delete a tag and the tags below it: untag everything that carries them",
+		Long: "A tag is a name on objects, so deleting it untags every object that carries it, as one step. Children go too: deleting work also untags work/clients/acme (--only-this keeps the children). " +
+			"The taggings are soft deleted, tagging an object with the name again brings its old tagging back, and undo in the terminal UI restores them all.",
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			db, err := openDB()
 			if err != nil {
@@ -178,13 +183,20 @@ func tagDeleteCmd() *cobra.Command {
 			defer db.Close()
 
 			r := repo.NewTagRepo(db)
-			res, err := r.DeleteTag(cmd.Context(), args[0])
+			var res *repo.TagDeleteResult
+			if onlyThis {
+				res, err = r.DeleteTag(cmd.Context(), args[0])
+			} else {
+				res, err = r.DeleteTagTree(cmd.Context(), args[0])
+			}
 			if err != nil {
 				return err
 			}
 
-			fmt.Fprintf(os.Stderr, "Deleted tag %q (untagged %d records)\n", args[0], len(res.TaggingIDs))
+			fmt.Fprintf(os.Stderr, "Deleted tag %q (%d tags, untagged %d records)\n", args[0], len(res.Tags), len(res.TaggingIDs))
 			return nil
 		},
 	}
+	cmd.Flags().BoolVar(&onlyThis, "only-this", false, "delete only this tag, not the tags below it")
+	return cmd
 }

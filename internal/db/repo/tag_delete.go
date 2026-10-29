@@ -15,53 +15,77 @@ import (
 
 // TagDeleteResult is what deleting a tag did: the taggings it soft deleted. Undo and redo use it.
 type TagDeleteResult struct {
-	Tag        string  `json:"tag"`
+	Tag string `json:"tag"`
+	// Tags are the names of the tags untagged: the tag, and with DeleteTagTree the tags below it.
+	Tags       []string `json:"tags"`
 	TaggingIDs []int64 `json:"tagging_ids"`
 	// Removed counts the objects that lost the tag, by entity type.
 	Removed map[string]int `json:"removed"`
 }
 
 // Label is a short description for messages and the undo history.
-func (r TagDeleteResult) Label() string { return "delete tag #" + r.Tag }
+func (r TagDeleteResult) Label() string {
+	if len(r.Tags) > 1 {
+		return fmt.Sprintf("delete tag #%s and %d tags below it", r.Tag, len(r.Tags)-1)
+	}
+	return "delete tag #" + r.Tag
+}
 
 // DeleteTag untags every object that carries the tag, in one transaction. The result undoes and
 // redoes the whole step. A tag no object carries is not found.
 func (r *TagRepo) DeleteTag(ctx context.Context, tagName string) (*TagDeleteResult, error) {
+	return r.deleteTags(ctx, tagName, []string{tagName})
+}
+
+// deleteTags untags every object that carries one of the named tags. label names the step.
+func (r *TagRepo) deleteTags(ctx context.Context, label string, names []string) (*TagDeleteResult, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("begin transaction: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	var tagID int64
-	if err := tx.QueryRowContext(ctx, "SELECT id FROM tags WHERE name = ?", tagName).Scan(&tagID); err != nil {
-		return nil, fmt.Errorf("tag %q: %w", tagName, model.ErrNotFound)
+	res := &TagDeleteResult{Tag: label, Removed: map[string]int{}}
+	var tagIDs []int64
+	for _, name := range names {
+		var tagID int64
+		if err := tx.QueryRowContext(ctx, "SELECT id FROM tags WHERE name = ?", name).Scan(&tagID); err != nil {
+			continue
+		}
+		tagIDs = append(tagIDs, tagID)
+		res.Tags = append(res.Tags, name)
 	}
-	rows, err := tx.QueryContext(ctx, "SELECT id, entity_type FROM taggings WHERE tag_id = ? AND deleted_at IS NULL ORDER BY id", tagID)
-	if err != nil {
-		return nil, fmt.Errorf("list taggings: %w", err)
+	if len(tagIDs) == 0 {
+		return nil, fmt.Errorf("tag %q: %w", label, model.ErrNotFound)
 	}
-	res := &TagDeleteResult{Tag: tagName, Removed: map[string]int{}}
-	for rows.Next() {
-		var id int64
-		var typ string
-		if err := rows.Scan(&id, &typ); err != nil {
-			rows.Close()
+	for _, tagID := range tagIDs {
+		rows, err := tx.QueryContext(ctx, "SELECT id, entity_type FROM taggings WHERE tag_id = ? AND deleted_at IS NULL ORDER BY id", tagID)
+		if err != nil {
+			return nil, fmt.Errorf("list taggings: %w", err)
+		}
+		for rows.Next() {
+			var id int64
+			var typ string
+			if err := rows.Scan(&id, &typ); err != nil {
+				rows.Close()
+				return nil, err
+			}
+			res.TaggingIDs = append(res.TaggingIDs, id)
+			res.Removed[typ]++
+		}
+		rows.Close()
+	}
+	if len(res.TaggingIDs) == 0 {
+		return nil, fmt.Errorf("tag %q: %w", label, model.ErrNotFound)
+	}
+	for _, tagID := range tagIDs {
+		if err := touchTagged(ctx, tx, tagID); err != nil {
 			return nil, err
 		}
-		res.TaggingIDs = append(res.TaggingIDs, id)
-		res.Removed[typ]++
-	}
-	rows.Close()
-	if len(res.TaggingIDs) == 0 {
-		return nil, fmt.Errorf("tag %q: %w", tagName, model.ErrNotFound)
-	}
-	if err := touchTagged(ctx, tx, tagID); err != nil {
-		return nil, err
-	}
-	if _, err := tx.ExecContext(ctx, `UPDATE taggings SET deleted_at = datetime('now'), updated_at = datetime('now')
-		WHERE tag_id = ? AND deleted_at IS NULL`, tagID); err != nil {
-		return nil, fmt.Errorf("untag: %w", err)
+		if _, err := tx.ExecContext(ctx, `UPDATE taggings SET deleted_at = datetime('now'), updated_at = datetime('now')
+			WHERE tag_id = ? AND deleted_at IS NULL`, tagID); err != nil {
+			return nil, fmt.Errorf("untag: %w", err)
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err

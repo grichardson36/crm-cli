@@ -75,6 +75,10 @@ func (r *TagRepo) Rename(ctx context.Context, oldName, newName string) error {
 	if newName == "" {
 		return fmt.Errorf("a tag needs a name: %w", model.ErrValidation)
 	}
+	newName, err := cleanTagName(newName)
+	if err != nil {
+		return err
+	}
 	id, _, err := r.idByName(ctx, r.db, oldName)
 	if err != nil {
 		return err

@@ -87,13 +87,15 @@ func TestTagsViewOptionsSortAndFilter(t *testing.T) {
 		})
 	}
 
-	// The shared ctrl+o overlay offers both options.
+	// The shared ctrl+o overlay offers the options.
 	m := tagsModel(t)
 	press(m, "ctrl+o")
 	require.NotNil(t, m.ov)
-	require.Len(t, m.ov.items, 2)
+	require.Len(t, m.ov.items, 4)
 	assert.Contains(t, m.ov.items[0].label, "Sort")
 	assert.Contains(t, m.ov.items[1].label, "Filter")
+	assert.Contains(t, m.ov.items[2].label, "Layout")
+	assert.Contains(t, m.ov.items[3].label, "Tag page")
 	press(m, "down", "right") // filter: unused tags
 	assert.Equal(t, "unused", m.tagFilter)
 	assert.Equal(t, []string{"idle", "old"}, tagTitles(m))
