@@ -16,11 +16,13 @@ import (
 //
 //	description = "..."
 //	base = "nord"          # optional built-in to start from
+//	variant = "light"      # optional: "dark" or "light", else derived from colors.bg
 //	[colors]
 //	accent = "#ff8800"
 type file struct {
 	Description string            `toml:"description"`
 	Base        string            `toml:"base"`
+	Variant     string            `toml:"variant"`
 	Colors      map[string]string `toml:"colors"`
 }
 
@@ -64,7 +66,7 @@ func Parse(name, path string, data []byte, darkBackground bool) (Theme, error) {
 		}
 	}
 	if len(unknown) > 0 {
-		return fail("unknown key %s (allowed: description, base, [colors])", strings.Join(unknown, ", "))
+		return fail("unknown key %s (allowed: description, base, variant, [colors])", strings.Join(unknown, ", "))
 	}
 
 	t := Theme{Name: name, Description: f.Description, Path: path, Base: f.Base}
@@ -83,6 +85,14 @@ func Parse(name, path string, data []byte, darkBackground bool) (Theme, error) {
 	}
 	for role, v := range f.Colors {
 		*t.slot(role) = strings.TrimSpace(v)
+	}
+	if f.Variant != "" {
+		if f.Variant != "dark" && f.Variant != "light" {
+			return fail("variant %q is not valid, use \"dark\" or \"light\"", f.Variant)
+		}
+		t.Variant = f.Variant
+	} else if _, set := f.Colors[RoleBg]; set {
+		t.Variant = "" // derived from the new bg by IsDark
 	}
 	if err := t.Validate(); err != nil {
 		hint := ""
@@ -195,7 +205,7 @@ func Example(name string) []byte {
 		RoleMark: "marked rows", RoleTabFg: "active tab text", RoleTabBg: "active tab background",
 		RoleSelFg: "selected row text (optional, set with sel_bg)", RoleSelBg: "selected row background (optional)",
 		RoleKindPerson: "people in the related segment (optional)", RoleKindOrg: "organizations (optional)", RoleKindDeal: "deals (optional)",
-		RoleKindTask: "tasks (optional)", RoleKindNote: "notes (optional)", RoleKindTag: "tags (optional)",
+		RoleKindTask: "tasks (optional)", RoleKindNote: "notes (optional)", RoleKindTag: "tags (optional)", RoleBg: "screen background, painted when fill_background applies (optional)",
 	}
 	for _, r := range Roles {
 		v := base.Color(r)
@@ -246,7 +256,10 @@ func readConfig(dataDir string) map[string]string {
 }
 
 // SaveChoice remembers the theme for this device. Other string settings in the file are kept.
-func SaveChoice(dataDir, name string) error {
+func SaveChoice(dataDir, name string) error { return saveKey(dataDir, "theme", name) }
+
+// saveKey stores one string setting of config.toml and keeps the others.
+func saveKey(dataDir, key, value string) error {
 	if err := os.MkdirAll(dataDir, 0o700); err != nil {
 		return fmt.Errorf("create %s: %w", dataDir, err)
 	}
@@ -254,10 +267,10 @@ func SaveChoice(dataDir, name string) error {
 	raw := map[string]any{}
 	if data, err := os.ReadFile(path); err == nil {
 		if _, err := toml.Decode(string(data), &raw); err != nil {
-			return fmt.Errorf("%s is not valid TOML (%v), fix or remove it before changing the theme", path, err)
+			return fmt.Errorf("%s is not valid TOML (%v), fix or remove it before changing %s", path, err, key)
 		}
 	}
-	raw["theme"] = name
+	raw[key] = value
 	var b strings.Builder
 	b.WriteString("# crm settings for this device. Written by `crm theme set`.\n")
 	if err := toml.NewEncoder(&b).Encode(raw); err != nil {
