@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -377,4 +378,29 @@ func TestTagTreeKeysStayOffFlatListsAndOtherViews(t *testing.T) {
 	require.NoError(t, m.rebuild(false))
 	press(m, "right")
 	assert.Equal(t, focusDetail, m.focus, "a flat Tags list keeps right as the focus key")
+}
+
+// A note line reads #parent/child as one tag, and the related segment of the pipe line takes a path too.
+func TestPipeLineAndTokensCarryTagPaths(t *testing.T) {
+	m, _ := newTestModel(t)
+	m.startInput("note-free", "note: ", "")
+	_ = m.input.Focus()
+	typeText(m, "met them #work/clients/acme|Bob Baker, #area/life")
+	press(m, "enter")
+	bob := int64(2)
+	notes, err := m.ir.FindAll(m.ctx, model.InteractionFilters{PersonID: &bob, Limit: 10})
+	require.NoError(t, err)
+	require.Len(t, notes, 1)
+	tags, err := m.tagr.GetForEntity(m.ctx, "interaction", notes[0].ID)
+	require.NoError(t, err)
+	var got []string
+	for _, tg := range tags {
+		got = append(got, tg.Name)
+	}
+	assert.ElementsMatch(t, []string{"work/clients/acme", "area/life"}, got)
+
+	// A path the validator refuses is not applied and the error names the code.
+	err = m.tagr.Apply(m.ctx, "person", 1, "work//x")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "E_PATH_EMPTY_SEGMENT")
 }
