@@ -9,6 +9,9 @@ Keymap part B2 (owner decisions 2026-10-28). Every function a removed key had is
 | `q` in the compare and in text pages | `esc` |
 | `J`, `K` in Modules | `shift+down`, `shift+up` |
 | `r` in Modules | palette: Modules: reset |
+| The Modules screen (palette), `space` / `enter` toggles | the Views screen on `v`: `x` shows or hides, `enter` goes to the view |
+| `v` view list with a filter | the Views screen on `v`: shown views, then hidden ones under a divider, no filter |
+| 9 Archived, 0 Sync | Archived and Sync are hidden by default, 9 is Settings. Show them in the Views screen |
 | `F` | palette: Set keep-in-touch |
 | `ctrl+b`, `ctrl+w` in the compare | palette: Change pair, Switch pane |
 | `ctrl+o` sort, `ctrl+l` level, `ctrl+f` type | `ctrl+o` view options |

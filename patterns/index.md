@@ -28,6 +28,7 @@ Note types (frontmatter `type`): `pattern` (one decided rule), `feature-area` (f
 - [[local-first]] (The program works with no account and no network)
 - [[relationship-loop-first]] (Build for the relationship loop first)
 - [[modules-are-user-arranged]] (The user arranges the modules and turning one off loses nothing)
+- [[saved-views]] (Planned, not built: user-created saved views that appear as modules)
 - [[extension-ladder]] (Extend in ascending order of cost and risk)
 - [[borrow-before-inventing]] (Borrow a proven pattern before inventing one)
 - [[surface-gaps-before-deciding]] (Surface gaps to the user before deciding)
@@ -68,6 +69,8 @@ Note types (frontmatter `type`): `pattern` (one decided rule), `feature-area` (f
 *UI decisions.*
 
 - [[home-is-an-action-queue]] (Home is a short queue of relationship actions)
+- [[views-screen]] (One Views screen lists, opens, shows, hides and orders every view)
+- [[settings-view]] (Settings is one module over one registry, with a scope on each row)
 - [[one-bar]] (One bar finds objects and runs verbs)
 - [[bar-results-act-like-views]] (Tab into the results and the view hotkeys act on the highlighted object)
 - [[confirm-names-in-one-batch]] (Confirm every unresolved name in one panel)

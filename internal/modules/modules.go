@@ -1,11 +1,12 @@
 // Package modules holds the arrangement of the program's views: which are on and in what order.
 // Every view is a module (Home, People, Follow-up, Tasks, Organizations, Birthdays, Merge,
-// Archived, Sync, Deals). Turning one off hides it from the tabs, the number keys, [ and ], the
-// view list and the palette. Its data, its links and every other way to reach it stay. The
+// Archived, Sync, Deals, Settings). Turning one off hides it from the tabs, the number keys, [ and ],
+// the Views screen's shown group and the palette. Settings can never be turned off, and the Views
+// screen itself (the v key) is not a module, so the user can always get back to both. Its data, its links and every other way to reach it stay. The
 // arrangement is per device, in the [modules] table of ~/.crm/config.toml next to [keys]:
 //
 //	[modules]
-//	order  = ["home", "people", "follow-up", "tasks", "organizations", "deals", "birthdays", "merge", "archived", "sync"]
+//	order  = ["home", "people", "follow-up", "tasks", "organizations", "deals", "birthdays", "merge", "archived", "sync", "settings"]
 //	hidden = ["birthdays"]
 //
 // The rest of config.toml is kept when the table is written.
@@ -25,25 +26,30 @@ type Module struct {
 	ID    string // the name used in config.toml and on the command line
 	Name  string // the name shown in tabs and lists
 	Blurb string
+	// Always marks a module that cannot be turned off, so the user cannot lock themselves out.
+	Always bool
 }
 
 // All lists every module in the default order.
 var All = []Module{
-	{"home", "Home", "what needs attention today"},
-	{"people", "People", "everyone, find with / or ctrl+k"},
-	{"follow-up", "Follow-up", "people to reach out to"},
-	{"tasks", "Tasks", "open tasks"},
-	{"organizations", "Organizations", "companies and groups"},
-	{"deals", "Deals", "deals with stage and value"},
-	{"tags", "Tags", "labels on anything, rename, merge, clean up"},
-	{"birthdays", "Birthdays", "upcoming birthdays"},
-	{"merge", "Merge", "probable duplicates"},
-	{"archived", "Archived", "archived records, restore or purge"},
-	{"sync", "Sync", "sources and the inbox"},
+	{"home", "Home", "what needs attention today", false},
+	{"people", "People", "everyone, find with / or ctrl+k", false},
+	{"follow-up", "Follow-up", "people to reach out to", false},
+	{"tasks", "Tasks", "open tasks", false},
+	{"organizations", "Organizations", "companies and groups", false},
+	{"deals", "Deals", "deals with stage and value", false},
+	{"tags", "Tags", "labels on anything, rename, merge, clean up", false},
+	{"birthdays", "Birthdays", "upcoming birthdays", false},
+	{"merge", "Merge", "probable duplicates", false},
+	{"archived", "Archived", "archived records, restore or purge", false},
+	{"sync", "Sync", "sources and the inbox", false},
+	{"settings", "Settings", "every setting, on this device or synced", true},
 }
 
-// The default is loose: every module is on. The user hides and reorders from there.
-var defaultHidden []string
+// Archived and Sync are reached from Settings, the bar and the Views screen, so they start hidden.
+// An explicit [modules] table in config.toml is respected as it is written. The user shows and
+// reorders from here.
+var defaultHidden = []string{"archived", "sync"}
 
 // Key is the number key of the place among the modules that are on: 1 to 9, then 0 for the tenth.
 // Later places have no number key.
@@ -60,7 +66,7 @@ func Key(pos int) string {
 var aliases = map[string]string{
 	"due": "follow-up", "followup": "follow-up", "follow": "follow-up", "orgs": "organizations", "org": "organizations",
 	"organisations": "organizations", "birthday": "birthdays", "task": "tasks", "person": "people", "contacts": "people",
-	"deal": "deals", "archive": "archived", "duplicates": "merge", "dupes": "merge",
+	"deal": "deals", "archive": "archived", "duplicates": "merge", "dupes": "merge", "setting": "settings", "preferences": "settings",
 }
 
 // Lookup resolves a module name: its id, its shown name, or a common alias, in any case.
@@ -137,7 +143,7 @@ func (a Arrangement) Normalize() Arrangement {
 		}
 	}
 	for _, id := range out.Order {
-		if hid[id] {
+		if m, _ := Lookup(id); hid[id] && !m.Always {
 			out.Hidden = append(out.Hidden, id)
 		}
 	}
@@ -207,6 +213,9 @@ func (a Arrangement) With(name string, on bool) (Arrangement, error) {
 	m, err := resolve(name)
 	if err != nil {
 		return a, err
+	}
+	if !on && m.Always {
+		return a, fmt.Errorf("%s stays on, so you can always change your settings and get back to the other views", m.Name)
 	}
 	n := a.Normalize()
 	var hidden []string
@@ -298,10 +307,16 @@ func Load(dataDir string) (Arrangement, []string) {
 		return out, true
 	}
 	a := Default()
+	a.Hidden = nil // a [modules] table the user wrote is respected as it is: no module is hidden unless it lists one
 	if order, ok := list("order"); ok {
 		a.Order = order
 	}
 	if hidden, ok := list("hidden"); ok {
+		for _, h := range hidden {
+			if mod, _ := Lookup(h); mod.Always {
+				problems = append(problems, fmt.Sprintf("modules.hidden: %s cannot be hidden, it stays on", mod.Name))
+			}
+		}
 		a.Hidden = hidden
 	}
 	a = a.Normalize()

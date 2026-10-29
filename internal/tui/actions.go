@@ -323,9 +323,9 @@ func buildActions() []action {
 			run: func(m *Model) tea.Cmd { m.detail.ScrollUp(3); return nil }},
 
 		// Views and search.
-		viewAction(viewHome), viewAction(viewPeople), viewAction(viewDue), viewAction(viewTasks), viewAction(viewOrgs), viewAction(viewBirthdays), viewAction(viewMerge), viewAction(viewArchived), viewAction(viewSync), viewAction(viewDeals), viewAction(viewTags),
-		{id: "goto-view", title: "Go to view", group: "Views", hint: "v", keys: []string{"v"}, desc: "list the views that are on with their number key (1-9) and jump to one. Turn views on or off with Modules",
-			foot: 85, footIn: inList, run: func(m *Model) tea.Cmd { return m.openViewSwitcher() }},
+		viewAction(viewHome), viewAction(viewPeople), viewAction(viewDue), viewAction(viewTasks), viewAction(viewOrgs), viewAction(viewBirthdays), viewAction(viewMerge), viewAction(viewArchived), viewAction(viewSync), viewAction(viewDeals), viewAction(viewSettings), viewAction(viewTags),
+		{id: "goto-view", title: "Go to view", group: "Views", hint: "v", keys: []string{"v"}, desc: "the Views screen: every view, shown ones first, hidden ones under a divider. enter goes to the view, x shows or hides it, shift+up and shift+down reorder, esc closes. Per device",
+			foot: 85, footIn: inList, run: func(m *Model) tea.Cmd { return m.openViews() }},
 		{id: "next-view", title: "Next view", group: "Views", hint: "]", keys: []string{"]", "ctrl+right"}, desc: "next view (also ctrl+right)",
 			run: func(m *Model) tea.Cmd { m.switchView(m.nextView(m.view, 1)); return nil }},
 		{id: "prev-view", title: "Previous view", group: "Views", hint: "[", keys: []string{"[", "ctrl+left"}, desc: "previous view (also ctrl+left)",
@@ -403,6 +403,7 @@ func buildActions() []action {
 	out = append(out, acts[at:]...)
 	out = append(out, orgMergeActions()...)
 	out = append(out, moduleActions()...)
+	out = append(out, settingActions()...)
 	annotateActions(out)
 	return out
 }

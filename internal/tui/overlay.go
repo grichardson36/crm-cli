@@ -3,7 +3,6 @@ package tui
 import (
 	"fmt"
 	"sort"
-	"strconv"
 	"strings"
 
 	"charm.land/bubbles/v2/textinput"
@@ -11,7 +10,6 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/jdanielnd/crm-cli/internal/keys"
-	"github.com/jdanielnd/crm-cli/internal/modules"
 	sg "github.com/jdanielnd/crm-cli/internal/suggest"
 )
 
@@ -32,6 +30,9 @@ type overlayItem struct {
 	link int64
 	// exact marks a tag row whose name is the whole query: it ranks above the other objects.
 	exact bool
+	// divider marks a heading row of a grouped list (label at the left, desc at the right). The
+	// cursor never lands on it and enter does nothing on it (patterns/grouped-lists-with-dividers).
+	divider bool
 }
 
 // overlay is a filterable list shown instead of the main screen: the command palette or a picker.
@@ -51,6 +52,8 @@ type overlay struct {
 	// turns the filter line off.
 	onKey    func(m *Model, key string) bool
 	noFilter bool
+	// help replaces the key hints in the title line, note replaces the filter line of a noFilter list.
+	help, note string
 	onPick   func(m *Model, it overlayItem)
 	// onCursor runs when the cursor lands on a different item (live preview). onCancel runs when
 	// the overlay is closed without a pick. Both are optional.
@@ -120,8 +123,28 @@ func (o *overlay) refilter() {
 	o.cursor, o.offset = 0, 0
 }
 
+// skipDividers moves the cursor off a divider row, in the direction of the last move first.
+func (o *overlay) skipDividers(d int) {
+	step := 1
+	if d < 0 {
+		step = -1
+	}
+	for range len(o.shown) {
+		if o.cursor < 0 || o.cursor >= len(o.shown) || !o.items[o.shown[o.cursor]].divider {
+			return
+		}
+		next := o.cursor + step
+		if next < 0 || next >= len(o.shown) {
+			step = -step
+			next = o.cursor + step
+		}
+		o.cursor = next
+	}
+}
+
 func (o *overlay) move(d, page int) {
 	o.cursor = clampInt(o.cursor+d, 0, len(o.shown)-1)
+	o.skipDividers(d)
 	if o.cursor < o.offset {
 		o.offset = o.cursor
 	}
@@ -206,27 +229,6 @@ func (m *Model) openPalette() tea.Cmd {
 	return m.showOverlay(o)
 }
 
-// openViewSwitcher lists every view with its number key.
-func (m *Model) openViewSwitcher() tea.Cmd {
-	var items []overlayItem
-	for i, v := range m.visibleViews() {
-		it := overlayItem{id: viewActionID(v), label: viewNames[v], value: strconv.Itoa(int(v))}
-		it.hint = modules.Key(i + 1)
-		if v == m.view {
-			it.desc = "current view"
-		} else {
-			it.desc = viewBlurb(v)
-		}
-		items = append(items, it)
-	}
-	m.openPicker("Go to view", items, func(m *Model, it overlayItem) {
-		n, _ := strconv.Atoi(it.value)
-		m.switchView(viewKind(n))
-	})
-	m.ov.digits = true
-	return nil
-}
-
 // openPicker shows a small list of choices. onPick runs after the overlay closes.
 func (m *Model) openPicker(title string, items []overlayItem, onPick func(m *Model, it overlayItem)) {
 	_ = m.showOverlay(m.newOverlay(title, items, false))
@@ -253,6 +255,9 @@ func (m *Model) pickOverlay(i int) tea.Cmd {
 		return nil
 	}
 	it := o.items[o.shown[i]]
+	if it.divider {
+		return nil
+	}
 	pick := o.onPick
 	m.lastFilter = o.filter.Value()
 	m.closeOverlay()
@@ -394,11 +399,18 @@ func (m *Model) overlayView() string {
 	}
 	var b strings.Builder
 	help := "   enter run  esc close  up/down choose"
+	if o.help != "" {
+		help = "   " + o.help
+	}
 	if o.palette {
 		help = "   enter run  esc close  tab verbs   > actions  @ people  # tags  = settings  ? help"
 	}
 	b.WriteString(lipgloss.NewStyle().MaxWidth(m.width).Render(m.st.Head.Render(o.title)+m.st.Dim.Render(help)) + "\n")
-	b.WriteString(o.filter.View() + "\n")
+	if o.noFilter && o.note != "" {
+		b.WriteString(m.st.Dim.Render(ansi.Truncate(o.note, m.width, "…")) + "\n")
+	} else {
+		b.WriteString(o.filter.View() + "\n")
+	}
 	page := m.overlayPage()
 	if len(o.shown) == 0 {
 		b.WriteString(m.st.Dim.Render("No matches."))
@@ -417,6 +429,13 @@ func (m *Model) overlayView() string {
 	}
 	for i := o.offset; i < end; i++ {
 		it := o.items[o.shown[i]]
+		if it.divider {
+			b.WriteString(m.st.Dim.Render(ruleLine(it.label, it.desc, m.width)))
+			if i < end-1 {
+				b.WriteString("\n")
+			}
+			continue
+		}
 		desc := it.desc
 		if it.disabled != "" {
 			desc = "(" + it.disabled + ") " + desc

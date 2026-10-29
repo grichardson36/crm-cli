@@ -11,6 +11,8 @@ Moved from FEATURES.md on 2026-10-29. Every row keeps its ID and text. Update a 
 
 **See also:** [[open-discrepancies]], [[index]]
 
+**Where the TUI views are (2026-10-29):** the Archived view is hidden by default on a new setup. Reach it from Settings ("Open Archived"), from the bar or from the Hidden group of the Views screen on `v` ([[views-screen]], [[settings-view]]). Its key is no longer 9: key 9 is Settings in the default arrangement. A `[modules]` table you already have keeps Archived where you put it.
+
 ## Rows
 
 | ID | Feature (evidence) | From | State | Now | Open questions | Action plan | Better by | P |

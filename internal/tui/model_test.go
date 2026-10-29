@@ -45,18 +45,36 @@ func newTestModel(t *testing.T) (*Model, *repo.PersonRepo) {
 
 	m, err := New(ctx, d)
 	require.NoError(t, err)
-	// Most tests reach a view by its number key, so they keep the order the number keys had before the Tags
-	// module: Tags is last and off here (tests of the Tags view switch to it). The default order has its own tests (modules_test.go).
-	m.mods = modules.Arrangement{Order: []string{"home", "people", "follow-up", "tasks", "organizations", "deals", "birthdays", "merge", "archived", "sync", "tags"}, Hidden: []string{"tags"}}.Normalize()
-	m.patchModuleActions()
 	m.now = func() time.Time { return time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC) }
 	m.clip = func(string) {}
 	m.open = func(string) error { return nil }
 	m.registry = crmsync.NewRegistry() // no adapters unless a test installs the fake
 	m.runner = crmsync.NewRunner(d, m.registry)
+	useAllViews(m)
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 	m.switchView(viewPeople) // most tests start on the People list; Home has its own tests
 	return m, pr
+}
+
+// useAllViews shows every view with the number keys of the arrangement an existing user has, who
+// keeps Archived and Sync on: 9 is Archived and 0 is Sync. The tests of the shipped default (Archived
+// and Sync hidden, Settings on 9) call useDefaultViews.
+//
+// Tags sits after Deals in the shipped order, so here it is last and off: the number keys stay what these
+// tests assume (tests of the Tags view switch to it with switchView).
+func useAllViews(m *Model) {
+	m.mods = modules.Arrangement{Order: []string{"home", "people", "follow-up", "tasks", "organizations", "deals", "birthdays", "merge", "archived", "sync", "settings", "tags"}, Hidden: []string{"tags"}}.Normalize()
+	m.patchModuleActions()
+}
+
+// useDefaultViews installs the arrangement the program ships with.
+//
+// Tags is hidden here so the number keys these tests assume stay (Settings on 9). The real default
+// order, with Tags on 7 and Settings on 0, is checked in internal/modules and internal/cli, and by
+// TestTagsModuleIsInTheShippedDefaultOrder.
+func useDefaultViews(m *Model) {
+	m.mods, _ = modules.Default().With("tags", false)
+	m.patchModuleActions()
 }
 
 func press(m *Model, keys ...string) {
@@ -248,9 +266,11 @@ func TestViewsDueBirthdaysTasks(t *testing.T) {
 	press(m, "]", "]", "]")
 	assert.Equal(t, viewSync, m.view)
 	press(m, "]")
+	assert.Equal(t, viewSettings, m.view, "Settings is the last view")
+	press(m, "]")
 	assert.Equal(t, viewHome, m.view, "] wraps around")
 	press(m, "[")
-	assert.Equal(t, viewSync, m.view, "[ wraps back")
+	assert.Equal(t, viewSettings, m.view, "[ wraps back")
 }
 
 func TestMarkContactedRemovesFromDue(t *testing.T) {

@@ -35,20 +35,31 @@ import (
 // defaultSearchURL is the web search used when config.toml has no [open] search_url.
 const defaultSearchURL = "https://www.google.com/search?q={query}"
 
+// configuredSearchURL is the [open] search_url of config.toml, empty when it is not set.
+func configuredSearchURL(dataDir string) string {
+	if dataDir == "" {
+		return ""
+	}
+	data, err := os.ReadFile(modules.ConfigFile(dataDir))
+	if err != nil {
+		return ""
+	}
+	var cfg struct {
+		Open struct {
+			SearchURL string `toml:"search_url"`
+		} `toml:"open"`
+	}
+	if _, err := toml.Decode(string(data), &cfg); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(cfg.Open.SearchURL)
+}
+
 // searchURLFor builds the web search address for a query from the template in config.toml.
 func searchURLFor(dataDir, query string) string {
-	tmpl := defaultSearchURL
-	if dataDir != "" {
-		if data, err := os.ReadFile(modules.ConfigFile(dataDir)); err == nil {
-			var cfg struct {
-				Open struct {
-					SearchURL string `toml:"search_url"`
-				} `toml:"open"`
-			}
-			if _, err := toml.Decode(string(data), &cfg); err == nil && strings.TrimSpace(cfg.Open.SearchURL) != "" {
-				tmpl = strings.TrimSpace(cfg.Open.SearchURL)
-			}
-		}
+	tmpl := configuredSearchURL(dataDir)
+	if tmpl == "" {
+		tmpl = defaultSearchURL
 	}
 	q := url.QueryEscape(strings.TrimSpace(query))
 	if strings.Contains(tmpl, "{query}") {

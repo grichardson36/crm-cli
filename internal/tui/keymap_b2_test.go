@@ -142,7 +142,7 @@ func TestTextViewerAndModulesScreenLostTheirExtraKeys(t *testing.T) {
 	assert.Nil(t, m.tv)
 
 	m.env.DataDir = t.TempDir()
-	runPalette(m, "modules")
+	press(m, "v")
 	require.NotNil(t, m.ov)
 	press(m, "down", "K")
 	assert.Equal(t, "home", m.mods.Normalize().Order[0], "K no longer moves a module")
@@ -295,7 +295,7 @@ func TestCtrlASelectsAllAndShiftArrowsExtendTheSelection(t *testing.T) {
 func TestShiftArrowsStillReorderInsideTheModulesScreen(t *testing.T) {
 	m, _ := newTestModel(t)
 	m.env.DataDir = t.TempDir()
-	runPalette(m, "modules")
+	press(m, "v")
 	require.NotNil(t, m.ov)
 	press(m, "down", "shift+up")
 	assert.Equal(t, "people", m.mods.Normalize().Order[0], "shift+up moved People above Home")

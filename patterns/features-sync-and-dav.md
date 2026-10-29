@@ -15,6 +15,8 @@ Moved from FEATURES.md on 2026-10-29. Every row keeps its ID and text. Update a 
 
 Integrations are already listed one by one (E05 calendar, E06 email, E07 address book, E08 messages, C09/C10 imports), but nothing yet defines the shared parts. Build these first so each integration is a small adapter.
 
+**Where the TUI views are (2026-10-29):** the Sync view is hidden by default on a new setup. Reach it from Settings ("Open Sync", "Inbox"), from the bar or from the Hidden group of the Views screen on `v` ([[views-screen]], [[settings-view]]). Its key is no longer 0 unless you show it.
+
 ## Rows
 
 | ID | Feature (evidence) | From | State | Now | Open questions | Action plan | Better by | P |

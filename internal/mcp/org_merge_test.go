@@ -62,12 +62,13 @@ func TestModulesTools(t *testing.T) {
 	}
 	var rows []map[string]any
 	callJSON(t, s, "crm_modules_list", map[string]any{}, &rows)
-	require.Len(t, rows, 11)
+	require.Len(t, rows, 12)
 	assert.Equal(t, "home", rows[0]["id"])
 	assert.Equal(t, "deals", rows[5]["id"])
 	assert.Equal(t, "tags", rows[6]["id"], "Tags comes after Deals")
 	for _, r := range rows {
-		assert.Equal(t, true, r["on"], "every module is on by default")
+		hidden := r["id"] == "archived" || r["id"] == "sync"
+		assert.Equal(t, !hidden, r["on"], "Archived and Sync start hidden, the rest is on: %v", r["id"])
 	}
 
 	callJSON(t, s, "crm_modules_set", map[string]any{"module": "deals", "on": false}, &rows)
@@ -92,6 +93,10 @@ func TestModulesTools(t *testing.T) {
 
 	callJSON(t, s, "crm_modules_reset", map[string]any{}, &rows)
 	assert.Equal(t, true, rows[0]["on"])
-	assert.Equal(t, true, rows[9]["on"])
+	assert.Equal(t, "settings", rows[11]["id"])
+	assert.Equal(t, true, rows[11]["on"])
+	assert.Equal(t, false, rows[10]["on"])
 	assert.Equal(t, "home", rows[0]["id"])
+	_, isErr = call(t, s, "crm_modules_set", map[string]any{"module": "settings", "on": false})
+	assert.True(t, isErr, "Settings stays on")
 }

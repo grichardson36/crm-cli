@@ -13,6 +13,8 @@ Moved from FEATURES.md on 2026-10-29. Every row keeps its ID and text. Update a 
 
 **See also:** [[index]]
 
+**Settings (2026-10-29):** "Deal stages" and "Deal roles" are rows of the Deals section of the Settings module, scope `synced`, and open the same manage screens as the palette ([[settings-view]]).
+
 ## Rows
 
 | ID | Feature (evidence) | From | State | Now | Open questions | Action plan | Better by | P |

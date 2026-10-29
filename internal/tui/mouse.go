@@ -63,7 +63,7 @@ func (m *Model) handleMouse(msg mouseEvent) (tea.Model, tea.Cmd) {
 			for _, seg := range m.tabLayout() {
 				if msg.X >= seg.x0 && msg.X < seg.x1 {
 					if seg.more {
-						return m, m.openViewSwitcher()
+						return m, m.openViews()
 					}
 					m.switchView(seg.view)
 					break

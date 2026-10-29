@@ -260,6 +260,8 @@ func (m *Model) saveTyped(ref repo.Ref, spec model.FieldSpec, v string) error {
 		return &v
 	}
 	switch ref.Kind {
+	case "setting":
+		return m.saveSetting(spec.Key, v)
 	case "person":
 		switch spec.Key {
 		case "tier":

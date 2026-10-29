@@ -28,6 +28,6 @@ Each inbox row has a reason:
 - `name_conflict`: creating the person clashed with an existing one.
 - `no_person`: an interaction whose person is unknown.
 
-`crm doctor` warns about a non-empty inbox. The terminal UI Sync view (key 8) has the same actions: `a` accept, `p` attach, `i` ignore.
+`crm doctor` warns about a non-empty inbox. The terminal UI Sync view (hidden by default: Settings, "Open Sync", or `v`) has the same actions: `a` accept, `p` attach, `i` ignore.
 
 See also: sync, import, tui-keys.

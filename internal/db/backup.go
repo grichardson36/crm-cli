@@ -183,3 +183,55 @@ func acquireLock(lock string) (func(), error) {
 		time.Sleep(50 * time.Millisecond)
 	}
 }
+
+// Backup is one automatic pre-migration copy of a database.
+type Backup struct {
+	Path    string // full path of the copy
+	Name    string // file name
+	Version int    // the schema version the database had when the copy was taken
+	Stamp   string // YYYYMMDD-HHMMSS
+	Size    int64  // bytes
+}
+
+// ListBackups lists the pre-migration backups of the database at dbPath, newest first. It reads
+// <data dir>/backups and never fails: a missing folder is an empty list.
+func ListBackups(dbPath string) []Backup {
+	dir := filepath.Join(filepath.Dir(dbPath), "backups")
+	re := regexp.MustCompile("^" + regexp.QuoteMeta(baseName(dbPath)) + `-pre-v(\d+)-(\d{8}-\d{6})(?:-(\d+))?\.db$`)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+	type item struct {
+		b Backup
+		n int
+	}
+	var items []item
+	for _, e := range entries {
+		m := re.FindStringSubmatch(e.Name())
+		if e.IsDir() || m == nil {
+			continue
+		}
+		v, _ := strconv.Atoi(m[1])
+		n := 1
+		if m[3] != "" {
+			n, _ = strconv.Atoi(m[3])
+		}
+		var size int64
+		if info, err := e.Info(); err == nil {
+			size = info.Size()
+		}
+		items = append(items, item{Backup{Path: filepath.Join(dir, e.Name()), Name: e.Name(), Version: v, Stamp: m[2], Size: size}, n})
+	}
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].b.Stamp != items[j].b.Stamp {
+			return items[i].b.Stamp > items[j].b.Stamp
+		}
+		return items[i].n > items[j].n
+	})
+	out := make([]Backup, len(items))
+	for i, it := range items {
+		out[i] = it.b
+	}
+	return out
+}

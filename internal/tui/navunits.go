@@ -39,6 +39,7 @@ type viewNav struct {
 var viewNavs = map[viewKind]viewNav{
 	viewBirthdays: {unit: unitGroup, home: func(m *Model) { m.snapBirthdays() }},
 	viewMerge:     {unit: unitGroup},
+	viewSettings:  {unit: unitGroup},
 	viewPeople:    {unit: unitLetter},
 	viewOrgs:      {unit: unitLetter},
 }

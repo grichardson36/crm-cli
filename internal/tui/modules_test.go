@@ -37,11 +37,20 @@ func TestModuleOffHidesTabsKeysBracketsAndPalette(t *testing.T) {
 	press(m, "]")
 	assert.Equal(t, viewMerge, m.view)
 
-	// The view list and the palette do not offer it.
+	// The Views screen lists it under Hidden, the palette does not offer it.
 	press(m, "v")
-	for _, it := range m.ov.items {
-		assert.NotEqual(t, "Birthdays", it.label)
+	ids := viewsScreen(m)
+	div, bday := -1, -1
+	for i, id := range ids {
+		if id == "|" {
+			div = i
+		}
+		if id == "birthdays" {
+			bday = i
+		}
 	}
+	assert.Greater(t, bday, div, "it sits under the Hidden divider")
+	assert.GreaterOrEqual(t, div, 0)
 	press(m, "esc")
 	assert.NotContains(t, paletteTitles(m), "Birthdays view")
 	assert.Contains(t, paletteTitles(m), "Merge view")
@@ -71,45 +80,40 @@ func TestOffOrganizationsStillOpensRecordPagesFromLinks(t *testing.T) {
 	assert.Equal(t, viewHome, m.view, "] from a view that is off goes to the first one")
 }
 
-func TestModulesScreenTogglesMovesResetsAndSaves(t *testing.T) {
+func TestViewsScreenSavesAndResetResetsIt(t *testing.T) {
 	m, _ := newTestModel(t)
+	useDefaultViews(m)
 	m.env.DataDir = t.TempDir()
 
-	runPalette(m, "modules")
+	press(m, "v")
 	require.NotNil(t, m.ov)
-	assert.Contains(t, m.ov.title, "Modules")
-	require.Len(t, m.ov.items, 11)
-	assert.Contains(t, m.ov.items[0].label, "Home")
+	assert.Contains(t, m.ov.title, "Views")
+	assert.Equal(t, "Home", m.ov.items[0].label)
 	assert.Equal(t, "1", m.ov.items[0].hint)
-	assert.Contains(t, m.ov.items[5].label, "Deals")
-	assert.Contains(t, m.ov.items[5].label, "on")
-	assert.Equal(t, "0", m.ov.items[9].hint, "the tenth module takes 0")
 
-	// Space turns Home off (People keeps the start screen), K moves the cursor row up.
-	press(m, " ")
+	// x hides Home (People keeps the start screen), shift+up moves a view up.
+	press(m, "x")
 	assert.Equal(t, 0, m.mods.Position("home"))
-	assert.Equal(t, "1", m.ov.items[1].hint, "People is now key 1")
-	press(m, "down", "down", "shift+up")
-	assert.Equal(t, "follow-up", m.mods.Normalize().Order[1], "the cursor row moved up")
+	cursorTo(t, m, "tasks")
+	press(m, "shift+up")
+	assert.Equal(t, "tasks", m.mods.Normalize().Order[2], "the cursor row moved up")
 	data, err := os.ReadFile(modules.ConfigFile(m.env.DataDir))
 	require.NoError(t, err)
 	assert.Contains(t, string(data), "[modules]")
 
-	// Turning off the last start screen is refused with a message.
-	press(m, "down", " ") // People is under the cursor now
+	// Hiding the last start screen is refused with a message.
+	cursorTo(t, m, "people")
+	press(m, "x")
 	assert.NotZero(t, m.mods.Position("people"), "People stays on")
 	assert.True(t, m.statusIsErr)
 
-	press(m, "r") // r is no longer a key of the screen
+	press(m, "r") // r is not a key of the screen
 	assert.False(t, m.mods.IsDefault())
 	press(m, "esc")
 	runID(m, "modules-reset") // the palette entry puts the default arrangement back
 	assert.True(t, m.mods.IsDefault())
-	_, err = os.Stat(modules.ConfigFile(m.env.DataDir))
-	require.NoError(t, err)
 	data, _ = os.ReadFile(modules.ConfigFile(m.env.DataDir))
 	assert.NotContains(t, string(data), "[modules]")
-	press(m, "esc")
 	assert.Equal(t, modeNormal, m.mode)
 }
 
@@ -146,7 +150,10 @@ func TestKeysHelpAndDefaultsMentionModules(t *testing.T) {
 	for _, a := range infos {
 		ids = append(ids, a.ID)
 	}
-	assert.Contains(t, ids, "modules")
+	assert.NotContains(t, ids, "modules", "the separate Modules screen is gone")
+	assert.Contains(t, ids, "modules-reset")
+	assert.Contains(t, ids, "view-settings")
+	assert.Contains(t, ids, "setting-open")
 	assert.Contains(t, ids, "view-organizations")
 	assert.Contains(t, ids, "view-deals")
 }
