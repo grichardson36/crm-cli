@@ -173,13 +173,19 @@ func Sync(ctx context.Context, a *replicasql.Adapter, peer replicasql.Device, op
 			rep.Duplicates += res.Duplicates
 			rep.Unknown += res.Unknown
 			rep.Rejected = append(rep.Rejected, res.Rejected...)
-			if !resp.More || len(res.Rejected) > 0 {
-				break
-			}
 			if opt.Full {
 				cursor = resp.Cursor
 			} else if cursor, err = a.Vector(ctx); err != nil {
 				return rep, err
+			}
+			if !resp.More || len(res.Rejected) > 0 {
+				// Tell the relay where this device is now. The relay uses it to decide when a delete may be purged.
+				if len(res.Rejected) == 0 {
+					if cur, err := a.Vector(ctx); err == nil {
+						_, _ = c.Pull(ctx, PullRequest{Cursor: cur, Limit: 1, Head: head()})
+					}
+				}
+				break
 			}
 		}
 		note(true, false, nil)

@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/jdanielnd/crm-cli/internal/replica/replicatest"
+	"strings"
 	"testing"
 	"time"
 
@@ -273,4 +275,32 @@ func TestCaptureOverheadOn5000Contacts(t *testing.T) {
 	t.Logf("single field edit with capture: %v each (average of 500)", tEdit.Round(time.Microsecond))
 	t.Logf("pull of %d changes in pages of 5000: %v", pulled, tPull.Round(time.Millisecond))
 	assert.Less(t, tOn, 120*time.Second)
+}
+
+func TestSQLiteConformance(t *testing.T) {
+	replicatest.Run(t, replicatest.Config{
+		New: func(t *testing.T) replica.Adapter { return enable(t, newDB(t)) },
+		State: func(t *testing.T, a replica.Adapter) string {
+			d := a.(*replicasql.Adapter).DB()
+			rows, err := d.Query(`SELECT uuid, first_name, COALESCE(title, ''), COALESCE(notes, ''), COALESCE(last_contacted_at, ''), updated_at FROM people ORDER BY uuid`)
+			require.NoError(t, err)
+			defer rows.Close()
+			var out []string
+			for rows.Next() {
+				var a, b, c, e, f, g string
+				require.NoError(t, rows.Scan(&a, &b, &c, &e, &f, &g))
+				out = append(out, strings.Join([]string{a, b, c, e, f, g}, "|"))
+			}
+			reviews, err := a.(*replicasql.Adapter).Reviews(context.Background(), false)
+			require.NoError(t, err)
+			var rv []string
+			for _, r := range reviews {
+				rv = append(rv, r.Key)
+			}
+			return strings.Join(out, "\n") + "\nreviews:" + strings.Join(rv, ",")
+		},
+		Collection: "people",
+		Required:   map[string]string{"first_name": `"Ann"`},
+		LWW:        "title", Notes: "notes", Max: "last_contacted_at",
+	})
 }
