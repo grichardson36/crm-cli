@@ -58,6 +58,8 @@ type formRow struct {
 	ref  repo.Ref
 	// cells are the attribute cells of a linked row or a note row (cells.go).
 	cells []rowCell
+	// feed is the subject and linked objects of an activity feed entry (feed.go).
+	feed *feedData
 }
 
 type editState struct {
@@ -353,6 +355,9 @@ func (m *Model) refreshDetail(force bool) {
 		return
 	}
 	changed := key != m.detailKey
+	if changed {
+		m.feed = feedState{}
+	}
 	m.detailKey = key
 	m.formPerson = r.personID
 	switch {
@@ -376,6 +381,7 @@ func (m *Model) refreshDetail(force bool) {
 		m.fcol = 0
 		m.detail.GotoTop()
 	}
+	m.pruneFeed()
 	m.fcur = clampInt(m.fcur, 0, len(m.form)-1)
 	if m.fcur >= 0 && m.fcur < len(m.form) {
 		m.fcol = clampInt(m.fcol, 0, len(m.form[m.fcur].cells))
@@ -410,11 +416,14 @@ func (m *Model) syncDetail() {
 		push("", -1)
 	}
 	for i, r := range m.form {
+		if isFeedRow(r) && r.head == "" && i > 0 && isFeedRow(m.form[i-1]) && m.feedFirstOfDay(i) {
+			push("", -1) // a blank line between days of the feed
+		}
 		if r.head != "" {
 			if len(lines) > 0 && lines[len(lines)-1] != "" {
 				push("", -1)
 			}
-			if len(r.cells) > 0 && !r.empty {
+			if len(r.cells) > 0 && !r.empty && !isFeedRow(r) {
 				push(m.cellHeader(i, r, w), -1)
 			} else {
 				push(m.st.Head.Render(ansi.Truncate(r.head, max(1, w), "…")), -1)
@@ -429,7 +438,14 @@ func (m *Model) syncDetail() {
 	m.detail.SetContent(strings.Join(lines, "\n"))
 	if m.focus == focusDetail && m.fcur < len(m.rowStart) {
 		top, bottom := m.rowStart[m.fcur], m.rowEnd[m.fcur]
-		if top < m.detail.YOffset() {
+		if h, y := m.detail.Height(), m.detail.YOffset(); bottom-top+1 > h {
+			// an entry taller than the pane: the viewport stays inside it
+			if y < top {
+				m.detail.SetYOffset(top)
+			} else if y+h-1 > bottom {
+				m.detail.SetYOffset(bottom - h + 1)
+			}
+		} else if top < m.detail.YOffset() {
 			m.detail.SetYOffset(top)
 		} else if bottom >= m.detail.YOffset()+m.detail.Height() {
 			m.detail.SetYOffset(bottom - m.detail.Height() + 1)
@@ -456,6 +472,9 @@ func (m *Model) renderRow(i int, r formRow, w int) []string {
 	}
 	if m.mode == modeEdit && m.edit != nil && m.edit.row == i && m.edit.ta != nil {
 		return m.typeaheadLines(label, w)
+	}
+	if isFeedRow(r) {
+		return m.renderFeedEntry(i, r, w)
 	}
 	if m.mode == modeEdit && m.edit != nil && m.edit.row == i {
 		line := m.st.Dim.Render(label) + strings.TrimRight(m.rowInput.View(), " ")
@@ -577,6 +596,9 @@ func (m *Model) startEdit() tea.Cmd {
 	if m.fcol > 0 && len(r.cells) > 0 && !r.empty {
 		return m.beginCell()
 	}
+	if isFeedRow(r) && m.feedToggle(r) {
+		return nil // an entry that hides text expands (collapses) in place, otherwise enter edits
+	}
 	if r.kind == rkTyped {
 		return m.beginTyped()
 	}
@@ -619,6 +641,9 @@ func (m *Model) beginEdit(idx int, add bool) tea.Cmd {
 	m.rowInput.SetValue(v)
 	m.rowInput.CursorEnd()
 	m.rowInput.SetWidth(max(5, m.detail.Width()-labelWidth-1))
+	if isFeedRow(r) {
+		m.rowInput.SetWidth(max(5, m.feedTextWidth()-1))
+	}
 	m.focus = focusDetail
 	m.mode = modeEdit
 	m.setStatus("", false)
@@ -718,6 +743,13 @@ func (m *Model) handleEditKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "enter":
 		m.commitEdit()
+		return m, nil
+	case "alt+enter":
+		if m.edit != nil && m.edit.kind == rkNote {
+			m.rowInput.SetValue(m.rowInput.Value() + "⏎")
+			m.rowInput.CursorEnd()
+			m.syncDetail()
+		}
 		return m, nil
 	case "tab", "shift+tab":
 		if m.edit != nil && m.edit.kind == rkHandle {

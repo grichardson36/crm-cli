@@ -141,6 +141,11 @@ func (m *Model) markedRefs() []repo.Ref {
 // bulkRefs are the objects a verb acts on: the selected ones, else the highlighted one. Selected rows
 // only count in the list pane.
 func (m *Model) bulkRefs() []repo.Ref {
+	if m.focus == focusDetail {
+		if refs := m.feedMarkedRefs(); len(refs) > 0 {
+			return refs // the selected entries of a feed
+		}
+	}
 	if m.focus == focusList {
 		if refs := m.markedRefs(); len(refs) > 0 {
 			return refs
@@ -181,6 +186,10 @@ func whenSelectable(m *Model) bool {
 
 // toggleMark is space: select or unselect the highlighted row and move down.
 func (m *Model) toggleMark() {
+	if m.focus == focusDetail {
+		m.toggleFeedMark()
+		return
+	}
 	ref, ok := m.cursorRef()
 	if !ok {
 		return
@@ -252,7 +261,7 @@ func selectionActions() []action {
 		setFieldAction(),
 		{id: "mark", title: "Select row", group: "Bulk", hint: "space", keys: []string{" "},
 			desc: "select or unselect the row, then every verb (d, x, f, l, u, r, m, the palette) acts on all selected rows. With nothing selected a verb acts on the highlighted row",
-			foot: 25, footIn: inList, footLabel: "select", when: whenSelectable, run: func(m *Model) tea.Cmd { m.toggleMark(); return nil }},
+			foot: 25, footIn: inBoth, footLabel: "select", when: func(m *Model) bool { return whenSelectable(m) || whenFeedEntry(m) }, run: func(m *Model) tea.Cmd { m.toggleMark(); return nil }},
 		{id: "select-all", title: "Select all visible", group: "Bulk", hint: "ctrl+a", keys: []string{"ctrl+a"},
 			desc: "select every visible row, again to clear. The view's sort and filter (ctrl+o) decide what is visible",
 			when: whenList, run: func(m *Model) tea.Cmd { m.selectAll(); return nil }},
