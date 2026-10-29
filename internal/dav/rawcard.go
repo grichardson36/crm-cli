@@ -346,7 +346,7 @@ func patchRaw(raw string, base, view *Contact, updatedAt string, serverRendered 
 		changed = true
 	}
 	if moved(fieldBirthday) {
-		rc.setProp(vcard.FieldBirthday, view.Birthday)
+		rc.patchBirthday(view.Birthday)
 		changed = true
 	}
 	if rc.patchItems(vcard.FieldEmail, base.Emails, view.Emails, emailKey) {
@@ -365,6 +365,36 @@ func patchRaw(raw string, base, view *Contact, updatedAt string, serverRendered 
 		rc.setProp(vcard.FieldRevision, parseTime(updatedAt).UTC().Format("20060102T150405Z"))
 	}
 	return rc.String(), true, nil
+}
+
+// patchBirthday edits BDAY. Apple marks a birthday without a year as year 1604 plus the
+// X-APPLE-OMIT-YEAR parameter: a year-less date keeps that form on such a line, and a date with a
+// year drops the parameter.
+func (rc *rawCard) patchBirthday(birthday string) {
+	idx := rc.index(vcard.FieldBirthday)
+	if birthday == "" || len(idx) == 0 {
+		rc.setProp(vcard.FieldBirthday, birthday)
+		return
+	}
+	p := rc.Props[idx[0]]
+	omit := strings.Contains(strings.ToUpper(p.Params), "X-APPLE-OMIT-YEAR")
+	params, value := p.Params, birthday
+	switch {
+	case strings.HasPrefix(birthday, "--") && omit:
+		value = "1604-" + birthday[2:]
+	case !strings.HasPrefix(birthday, "--") && omit:
+		var kept []string
+		for _, part := range strings.Split(p.Params, ";") {
+			if part != "" && !strings.HasPrefix(strings.ToUpper(part), "X-APPLE-OMIT-YEAR") {
+				kept = append(kept, part)
+			}
+		}
+		params = ""
+		if len(kept) > 0 {
+			params = ";" + strings.Join(kept, ";")
+		}
+	}
+	rc.Props[idx[0]] = rc.line(p.Group, p.Name, params, value)
 }
 
 // patchName edits N and FN. The additional names, prefix and suffix of the card stay.

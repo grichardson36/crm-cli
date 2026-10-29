@@ -428,7 +428,11 @@ func (h *handler) restoreRaw(ctx context.Context, body []byte) []byte {
 		if err := xml.EscapeText(&esc, []byte(*st.RawVCard)); err != nil {
 			return resp
 		}
-		return reportData.ReplaceAll(resp, append(append([]byte("${1}"), esc.Bytes()...), []byte("${3}")...))
+		// A function, not a template: the card text holds "$" (Apple labels are _$!<Mobile>!$_).
+		return reportData.ReplaceAllFunc(resp, func(d []byte) []byte {
+			sub := reportData.FindSubmatch(d)
+			return append(append(append([]byte{}, sub[1]...), esc.Bytes()...), sub[3]...)
+		})
 	})
 }
 
