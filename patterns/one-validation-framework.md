@@ -35,6 +35,8 @@ Defined once in `internal/validate/codes.go` (`validate.Codes`). Only `E_` codes
 | E_FIELD_UNKNOWN | error | the object has no such field |
 | E_EMAIL_INVALID | error | not shaped like an email address |
 | E_URL_INVALID | error | not shaped like a web address |
+| E_SEARCH_TEMPLATE_INVALID | error | a web search address is not http or https with {query} once (Settings, Web search, Custom) |
+| E_COLOR_INVALID | error | not a hex color such as #3b82f6 or #38f (Settings, Colors) |
 | E_PHONE_INVALID | error | not shaped like a phone number (3 to 20 digits, phone characters only) |
 | E_DOMAIN_INVALID | error | not a domain such as example.com |
 | E_DATE_INVALID | error | not a date the date parser understands |

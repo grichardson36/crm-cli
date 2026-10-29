@@ -12,6 +12,8 @@ const (
 	CodeFieldUnknown     = "E_FIELD_UNKNOWN"
 	CodeEmailInvalid     = "E_EMAIL_INVALID"
 	CodeURLInvalid       = "E_URL_INVALID"
+	CodeSearchTemplate   = "E_SEARCH_TEMPLATE_INVALID"
+	CodeColorInvalid     = "E_COLOR_INVALID"
 	CodePhoneInvalid     = "E_PHONE_INVALID"
 	CodeDomainInvalid    = "E_DOMAIN_INVALID"
 	CodeDateInvalid      = "E_DATE_INVALID"
@@ -71,6 +73,8 @@ var Codes = []CodeInfo{
 	{CodeFieldUnknown, KindError, "the object has no such field"},
 	{CodeEmailInvalid, KindError, "the text is not shaped like an email address"},
 	{CodeURLInvalid, KindError, "the text is not shaped like a web address"},
+	{CodeSearchTemplate, KindError, "a web search address is not an http or https address with {query} where the search text goes"},
+	{CodeColorInvalid, KindError, "a color is not a hex value such as #3b82f6 or #38f"},
 	{CodePhoneInvalid, KindError, "the text is not shaped like a phone number"},
 	{CodeDomainInvalid, KindError, "the text is not a domain such as example.com"},
 	{CodeDateInvalid, KindError, "the text is not a date the date parser understands"},

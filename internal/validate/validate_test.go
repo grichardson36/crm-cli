@@ -136,6 +136,8 @@ func TestEveryErrorCodeIsReachable(t *testing.T) {
 	}
 	note(validate.PathMove("tag", "a", "a/b").Err())
 	note(validate.OnePrimaryMembership(7, 2))
+	note(validate.SearchTemplate("not a template").Err())
+	note(validate.HexColor("red").Err())
 	roleSpec := spec(t, "deal_person", "role").WithVocabulary([]string{"champion"})
 	note(validate.Field(roleSpec, "zzz", validate.Options{}).Err())
 	_, vErr := validate.VocabName("deal_role", "  ")
@@ -185,7 +187,7 @@ func TestCodeVocabulary(t *testing.T) {
 		assert.True(t, strings.HasPrefix(c.Code, prefix), c.Code)
 		assert.Equal(t, c.Kind, validate.KindOf(c.Code))
 	}
-	assert.Len(t, validate.Codes, 41)
+	assert.Len(t, validate.Codes, 43)
 }
 
 func TestSanitize(t *testing.T) {
@@ -397,4 +399,49 @@ func TestStageRules(t *testing.T) {
 		_, err = validate.StageOutcome("closed")
 		assert.Error(t, err)
 	})
+}
+
+func TestSearchTemplate(t *testing.T) {
+	tests := []struct {
+		name, in, want string
+		ok             bool
+	}{
+		{"empty is not set", "  ", "", true},
+		{"https", "https://duckduckgo.com/?q={query}", "https://duckduckgo.com/?q={query}", true},
+		{"http with port and path", "http://search.example.org:8080/find/{query}/x", "http://search.example.org:8080/find/{query}/x", true},
+		{"no placeholder", "https://example.com/search?q=", "", false},
+		{"two placeholders", "https://example.com/?q={query}&r={query}", "", false},
+		{"no scheme", "example.com/?q={query}", "", false},
+		{"ftp", "ftp://example.com/{query}", "", false},
+		{"javascript", "javascript:alert({query})", "", false},
+		{"no dot in host", "https://localhost/?q={query}", "", false},
+		{"spaces", "https://example.com/?q={query} x", "", false},
+		{"too long", "https://example.com/?q={query}" + strings.Repeat("a", 500), "", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res := validate.SearchTemplate(tt.in)
+			assert.Equal(t, tt.ok, res.OK(), res.Err())
+			if tt.ok {
+				assert.Equal(t, tt.want, res.Value)
+			}
+		})
+	}
+}
+
+func TestHexColor(t *testing.T) {
+	tests := []struct {
+		in, want string
+		ok       bool
+	}{
+		{"#3B82F6", "#3b82f6", true}, {" #38f ", "#38f", true}, {"3b82f6", "", false}, {"#12345", "", false},
+		{"red", "", false}, {"#gggggg", "", false}, {"", "", false},
+	}
+	for _, tt := range tests {
+		res := validate.HexColor(tt.in)
+		assert.Equal(t, tt.ok, res.OK(), tt.in)
+		if tt.ok {
+			assert.Equal(t, tt.want, res.Value)
+		}
+	}
 }
