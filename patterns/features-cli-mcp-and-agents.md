@@ -9,6 +9,8 @@ Moved from FEATURES.md on 2026-10-29. Every row keeps its ID and text. Update a 
 
 **Follows patterns:** [[cli-json-is-the-baseline]], [[agents-never-get-prompts]], [[three-doors-one-core]], [[tests-for-every-door]], [[extension-ladder]], [[name-things-once]]
 
+**Saved views** (owner request 2026-10-29, [[saved-views]], branch feat/saved-views): `crm views list|show|run|save|edit|rename|delete|restore|move|export|import|fields`, MCP `crm_view_list|show|run|save|edit|rename|delete|restore|move|export|import|fields`, help topic `views`. Validation codes E_VIEW_* and E_QUERY_* ([[saved-view-query]]).
+
 **See also:** [[index]]
 
 Goal: any agent, or a person, learns the whole program from the program, the way `man` and `--help` work. No dependency on one vendor's skill format. Pi has no native MCP, so the plain CLI with JSON output must be enough on its own.
