@@ -41,7 +41,7 @@ func registerDavTools(s *server.MCPServer, db *sql.DB) {
 
 	s.AddTool(
 		gomcp.NewTool("crm_dav_conflicts",
-			gomcp.WithDescription("List fields where the phone and the CRM both changed and which side won (newest change wins), newest first. Link rows (field _link) record a phone contact attached to an existing person. Undo one with crm_dav_conflict_undo."),
+			gomcp.WithDescription("List fields where the phone and the CRM both changed and which side won (the CRM value is kept, the phone value is stored), newest first. Link rows (field _link) record a phone contact attached to an existing person. Undo one with crm_dav_conflict_undo."),
 			gomcp.WithBoolean("include_undone", gomcp.Description("Also list conflicts already undone")),
 			gomcp.WithNumber("limit", gomcp.Description("Max results (default 50)")),
 		),
@@ -55,8 +55,22 @@ func registerDavTools(s *server.MCPServer, db *sql.DB) {
 	)
 
 	s.AddTool(
+		gomcp.NewTool("crm_dav_issues",
+			gomcp.WithDescription("List phone vCards the CardDAV server could not read. Such a card is skipped, never read as an emptied contact, and flagged here with the failing text. Open issues only unless include_resolved is set."),
+			gomcp.WithBoolean("include_resolved", gomcp.Description("Also list issues already resolved")),
+		),
+		func(ctx context.Context, req gomcp.CallToolRequest) (*gomcp.CallToolResult, error) {
+			list, err := davRepo.Issues(ctx, req.GetBool("include_resolved", false))
+			if err != nil {
+				return mcpError(err)
+			}
+			return jsonResult(list)
+		},
+	)
+
+	s.AddTool(
 		gomcp.NewTool("crm_dav_conflict_undo",
-			gomcp.WithDescription("Restore the value that lost a CardDAV conflict. Fails if the field changed again since, or if the conflict is a link. The change reaches the phone on its next sync."),
+			gomcp.WithDescription("Apply the stored phone value of a CardDAV conflict (the CRM value was kept). Fails if the field changed again since, or if the conflict is a link. The change reaches the phone on its next sync."),
 			gomcp.WithNumber("id", gomcp.Required(), gomcp.Description("Conflict ID from crm_dav_conflicts")),
 		),
 		func(ctx context.Context, req gomcp.CallToolRequest) (*gomcp.CallToolResult, error) {

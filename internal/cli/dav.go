@@ -26,9 +26,9 @@ func registerDavCommands(rootCmd *cobra.Command) {
 		Use:   "dav",
 		Short: "Two-way contact sync with phones over CardDAV",
 		Long: "Serve the active people of this database as a CardDAV address book that a phone (DAVx5 on Android, iOS, macOS) syncs with, " +
-			"in both directions. Edits to the same field on both sides resolve to the newest change and are logged.",
+			"in both directions. Edits are merged per field. When both sides changed the same field the CRM value is kept and the phone value is stored as a conflict.",
 	}
-	davCmd.AddCommand(davServeCmd(), davInfoCmd(), davConflictsCmd(), davStatusCmd())
+	davCmd.AddCommand(davServeCmd(), davInfoCmd(), davConflictsCmd(), davStatusCmd(), davIssuesCmd())
 	rootCmd.AddCommand(davCmd)
 }
 
@@ -249,6 +249,7 @@ func davStatusCmd() *cobra.Command {
 				fmt.Fprintf(w, "last contact served:   %s\n", at(st.LastGetAt))
 				fmt.Fprintf(w, "last device edit:      %s\n", at(st.LastPutAt))
 				fmt.Fprintf(w, "conflicts:             %d (%d open)\n", st.Conflicts, st.OpenConflicts)
+				fmt.Fprintf(w, "sync issues open:      %d\n", st.OpenIssues)
 				return nil
 			})
 		},
@@ -366,12 +367,59 @@ func davConflictsCmd() *cobra.Command {
 	group := &cobra.Command{
 		Use:   "conflicts",
 		Short: "Review and undo sync conflicts",
-		Long: "Review fields where the phone and the CRM both changed. The newest change won and the loser is stored here, so " +
-			"`undo` can put it back. `crm dav conflicts` alone lists them.",
+		Long: "Review fields where the phone and the CRM both changed. The CRM value was kept and the phone value is stored here, so " +
+			"`undo` can apply it. `crm dav conflicts` alone lists them.",
 		Args: cobra.NoArgs,
 		RunE: list.RunE,
 	}
 	group.Flags().AddFlagSet(list.Flags())
 	group.AddCommand(list, show, undo)
 	return group
+}
+
+// --- issues ------------------------------------------------------------------------------
+
+func davIssuesCmd() *cobra.Command {
+	var all bool
+	cmd := &cobra.Command{
+		Use:   "issues",
+		Short: "List phone vCards that could not be read and were skipped",
+		Long: "A vCard from the phone that cannot be parsed is skipped, never read as an emptied contact, and flagged here with the text " +
+			"that failed (use -f json to see it). Fix the contact on the phone and sync again. --resolve marks one as dealt with.",
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return withDavDB(func(db *sql.DB) error {
+				list, err := repo.NewDavRepo(db).Issues(cmd.Context(), all)
+				if err != nil {
+					return err
+				}
+				if resolveFormat() == format.FormatJSON {
+					return json.NewEncoder(os.Stdout).Encode(list)
+				}
+				rows := make([]map[string]any, len(list))
+				for i, in := range list {
+					rows[i] = map[string]any{"id": in.ID, "dav_id": in.DavID, "kind": in.Kind, "message": in.Message, "created_at": in.CreatedAt}
+				}
+				return format.Output(os.Stdout, resolveFormat(), rows, []format.ColumnDef{
+					{Header: "ID", Field: "id"}, {Header: "Contact", Field: "dav_id"}, {Header: "Kind", Field: "kind"},
+					{Header: "Message", Field: "message"}, {Header: "At", Field: "created_at"}}, flagQuiet)
+			})
+		},
+	}
+	cmd.Flags().BoolVar(&all, "all", false, "include resolved issues")
+	cmd.AddCommand(&cobra.Command{
+		Use:   "resolve <id>",
+		Short: "Mark a sync issue as dealt with",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			id, err := strconv.ParseInt(args[0], 10, 64)
+			if err != nil {
+				return model.NewExitError(model.ErrUsage, "invalid issue id %q", args[0])
+			}
+			return withDavDB(func(db *sql.DB) error {
+				return repo.NewDavRepo(db).ResolveIssue(cmd.Context(), id)
+			})
+		},
+	})
+	return cmd
 }

@@ -231,8 +231,10 @@ var commandMeta = map[string]cmdMeta{
 		`crm dav serve --password-file ~/.crm/dav-password --user grant --base-url https://contacts.example.com --read-only`}},
 	"dav info": {fields: "base_url,user,address_book,address_book_url,address_book_path,discovery_url,listen,password,steps,notes", examples: []string{
 		`crm dav info -f json`, `crm dav info --base-url https://contacts.example.com --user grant`}},
-	"dav status": {fields: "contacts_exposed,device_created,synced_to_device,last_request_at,last_get_at,last_put_at,conflicts,open_conflicts", examples: []string{
+	"dav status": {fields: "contacts_exposed,device_created,synced_to_device,last_request_at,last_get_at,last_put_at,conflicts,open_conflicts,open_issues", examples: []string{
 		`crm dav status -f json`}},
+	"dav issues":         {fields: "id,uuid,dav_id,person_id,kind,message,raw_vcard,created_at,resolved_at", examples: []string{`crm dav issues -f json`}},
+	"dav issues resolve": {mutates: true, noDryRun: true, examples: []string{`crm dav issues resolve 1`}},
 	"dav conflicts": {fields: davConflictFields, examples: []string{`crm dav conflicts -f json`}},
 	"dav conflicts list": {fields: davConflictFields, examples: []string{
 		`crm dav conflicts list -f json`, `crm dav conflicts list --all -f json`}},
