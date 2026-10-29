@@ -75,6 +75,7 @@ Note types (frontmatter `type`): `pattern` (one decided rule), `feature-area` (f
 - [[tree-view-module]] (One reusable tree renders any collection with a hierarchy path field)
 - [[views-screen]] (One Views screen lists, opens, shows, hides and orders every view)
 - [[settings-view]] (Settings is one module over one registry, with a scope on each row)
+- [[custom-themes]] (Custom themes adapt Obsidian's theme model to TOML: variants, roles, snippets, validation, reload, sharing. Forced light or dark, the anthropocene palette)
 - [[one-bar]] (One bar finds objects and runs verbs)
 - [[bar-results-act-like-views]] (Tab into the results and the view hotkeys act on the highlighted object)
 - [[confirm-names-in-one-batch]] (Confirm every unresolved name in one panel)
