@@ -14,7 +14,7 @@ status: decided by owner 2026-10-29, built in feat/settings-views
 
 | Part | Meaning |
 |---|---|
-| section | Appearance, Keys, Views, Deals, Types and vocabularies, Names, Behavior, Data, Sync, Archive |
+| section | Appearance, Colors, Views, Deals, Types and vocabularies, Names, Behavior, Data, Sync, Archive, Keys (last, it is long) |
 | field | a spec from the field-type vocabulary ([[field-types-drive-editors]]) when the value can be edited in place |
 | action, run | the existing registry action or the small function that opens the screen behind it (theme choose, deal stages, doctor) |
 | value | the current value shown at the row and in the bar |
@@ -29,6 +29,10 @@ status: decided by owner 2026-10-29, built in feat/settings-views
 - `session`: not stored, it lasts until the program closes (short syntax, read-only).
 
 The detail pane says the same in a sentence. A new setting declares its scope once, where it is declared.
+
+**Keys section.** One row per action under two levels of divider headings made by the grouped list component: the layer (Framework verbs, Navigation, View control, App-specific) then the area (People, Orgs, Deals, Tasks, Notes, Tags, Merge, Views and Settings, App). One function (`keyGroup`) decides the group of an action. A row shows the action, the current key at the right and, when the key was changed, "default X". `enter` on a row waits for the new key. The rebind and reset pickers use the same groups.
+
+**Colors section.** One row per object kind, see [[kind-colors-are-chosen]]. **Web search.** Three Behavior rows, see [[web-search-engines]]. Key hints of every screen: [[key-hints-in-one-place]].
 
 **Archived and Sync.** Settings has the rows "Open Archived", "Open Sync" and "Inbox". The two views are hidden by default and reachable from here ([[views-screen]]).
 
