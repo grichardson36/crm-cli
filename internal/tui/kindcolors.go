@@ -131,7 +131,7 @@ func (m *Model) applyKindColors() {
 	}
 	for _, ck := range colorKinds() {
 		if c := resolveKindColor(m.st.Theme, m.kindColors, ck.kind); c != "" {
-			kinds[ck.kind] = lipgloss.NewStyle().Foreground(lipgloss.Color(c))
+			kinds[ck.kind] = theme.ForegroundStyle(c)
 		}
 	}
 	m.st.Kind = kinds
