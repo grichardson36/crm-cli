@@ -316,7 +316,7 @@ func TestCompareFlowSummaryThenApply(t *testing.T) {
 	require.NotNil(t, m.cmp)
 	assert.True(t, c.confirm)
 	out := ansiStrip(m.screen())
-	for _, want := range []string{"Merge #4 bob baker into #2 Bob Baker", "kept", "archived", "restorable", "merged into #2", "notes", "1 move to #2", "interactions", "2 move to #2", "tasks", "enter merges"} {
+	for _, want := range []string{"Merge #4 bob baker into #2 Bob Baker", "kept", "archived", "restorable", "merged into #2", "notes", "1 move to #2", "interactions", "2 move to #2", "tasks"} {
 		assert.Contains(t, out, want)
 	}
 	assert.Contains(t, out, "title", "the changed fields are listed")

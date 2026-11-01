@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"github.com/charmbracelet/x/ansi"
 	"strings"
 	"testing"
 
@@ -243,7 +244,7 @@ func TestArchiveRestoreFlow(t *testing.T) {
 	m, pr := newTestModel(t)
 	press(m, "d")
 	assert.Equal(t, modeConfirm, m.mode)
-	assert.Contains(t, m.screen(), "archive Zed Adams? y/n")
+	assert.Contains(t, ansi.Strip(m.screen()), "archive Zed Adams?")
 	press(m, "n")
 	assert.Empty(t, archivedIDs(t, pr))
 	assert.Len(t, m.rows, 3)

@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"github.com/charmbracelet/x/ansi"
 	"os"
 	"path/filepath"
 	"strings"
@@ -68,7 +69,7 @@ func TestHelpTopicsFilterOpenScrollAndBack(t *testing.T) {
 	require.NotNil(t, m.tv)
 	assert.Nil(t, m.ov)
 	assert.Contains(t, m.screen(), "Help: keep-in-touch")
-	assert.Contains(t, m.screen(), "ctrl+k for every action")
+	assert.Contains(t, ansi.Strip(m.screen()), "ctrl+k every action")
 
 	// Scrolling: j moves down, G goes to the end, g to the top.
 	require.Greater(t, m.tv.vp.TotalLineCount(), m.tv.vp.Height(), "topic is longer than the screen")
@@ -122,7 +123,7 @@ func TestHelpSearchWithoutMatchesSetsStatus(t *testing.T) {
 func TestKeysHelpShowsPaletteHint(t *testing.T) {
 	m := toolsModel(t)
 	press(m, "?")
-	assert.Contains(t, m.screen(), "ctrl+k for every action")
+	assert.Contains(t, ansi.Strip(m.screen()), "ctrl+k every action")
 }
 
 func TestDoctorOverlayShowsChecksAndFixes(t *testing.T) {
@@ -134,7 +135,7 @@ func TestDoctorOverlayShowsChecksAndFixes(t *testing.T) {
 	assert.Contains(t, v, "binary")
 	assert.Contains(t, v, "database")
 	assert.Contains(t, m.tv.vp.View()+strings.Join(strings.Split(v, "\n"), "\n"), "ok")
-	assert.Contains(t, v, "ctrl+k for every action")
+	assert.Contains(t, ansi.Strip(v), "ctrl+k every action")
 	press(m, "esc")
 	assert.Nil(t, m.tv)
 }

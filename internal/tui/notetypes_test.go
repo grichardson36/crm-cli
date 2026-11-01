@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"github.com/charmbracelet/x/ansi"
 	"testing"
 
 	"github.com/jdanielnd/crm-cli/internal/model"
@@ -21,7 +22,7 @@ func TestNotePromptDefaultsToNoteAndRemembersType(t *testing.T) {
 	press(m, "a", "n")
 	require.Equal(t, modePrompt, m.mode)
 	assert.Equal(t, "note: ", m.input.Prompt)
-	assert.Contains(t, m.screen(), "tab type")
+	assert.Contains(t, ansi.Strip(m.screen()), "tab type")
 	typeLinked(m, "plain note")
 	press(m, "enter")
 	assert.Equal(t, "note added", m.status)

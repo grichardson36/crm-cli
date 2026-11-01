@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"github.com/charmbracelet/x/ansi"
 	"strings"
 	"testing"
 
@@ -195,8 +196,9 @@ func TestNoteActionsInPalette(t *testing.T) {
 
 	// The footer offers the next cell on a note row.
 	press(m, "tab")
-	focusNote(t, m)
-	assert.Contains(t, m.hintsLine(), "cell")
+	m.width = 160 // verbs come first now, so the cell hint needs the room
+	assert.Contains(t, ansi.Strip(m.hintsLine()), "cell")
+	m.width = 100
 
 	assert.LessOrEqual(t, lipgloss.Width(strings.Split(m.screen(), "\n")[len(strings.Split(m.screen(), "\n"))-1]), 100)
 }
