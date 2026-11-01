@@ -83,7 +83,9 @@ var commandMeta = map[string]cmdMeta{
 	"relation-kind list": {fields: relationKindFields, examples: []string{`crm relation-kind list -f json`, `crm relation-kind list --type org`}},
 	"relation-kind add": {mutates: true, noDryRun: true, fields: relationKindFields, examples: []string{
 		`crm relation-kind add neighbor`, `crm relation-kind add godparent --inverse godchild`, `crm relation-kind add partner --type org`}},
-	"relation-kind rm": {mutates: true, noDryRun: true, examples: []string{`crm relation-kind rm neighbor`}},
+	"relation-kind rm": {mutates: true, noDryRun: true, examples: []string{`crm relation-kind rm neighbor`, `crm relation-kind rm neighbor --move-to friend`, `crm relation-kind rm neighbor --unlink`}},
+	"relation-kind rename": {mutates: true, noDryRun: true, fields: relationKindFields, examples: []string{`crm relation-kind rename godparent sponsor`}},
+	"relation-kind set": {mutates: true, noDryRun: true, fields: relationKindFields, examples: []string{`crm relation-kind set godparent --inverse godchild`, `crm relation-kind set godparent --inverse ""`}},
 	"roles":            {fields: "role", examples: []string{`crm roles -f json`, `crm roles --relation deal_person`}},
 
 	// keep in touch
