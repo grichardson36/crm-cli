@@ -22,6 +22,8 @@ No new key. The separate Modules screen and its palette entry are gone ([[one-ab
 
 **Saved views** ([[saved-views]]) are listed after the built-in views: the shown ones in tab order, then under Hidden, then a Deleted views divider. `enter` opens, `x` shows or hides (the tab and number key follow), `shift+up` and `shift+down` move inside the group, `e` edits, `d` asks y or n and deletes, `r` restores. On a built-in view `e`, `d` and `r` say that a built-in view is not edited or deleted. The three example views start under Hidden, marked (example).
 
+**Same keys as every list.** The keys of this screen (`enter`, `shift+up` / `shift+down`, `d`, `esc`) are the model of the list editor that edits deal stages, deal roles, note types and relation kinds ([[list-editor-standard]]).
+
 **Never hidden.** The Views screen is not a module, it is the `v` key, so no arrangement can remove it. Settings is a module with `Always` set: it cannot be turned off from the screen, the CLI, MCP or a hand-edited `config.toml` (the file is read, the entry is reported and ignored). The user can therefore never lock themselves out of the way back ([[settings-view]]).
 
 **Reorder stays inside the group.** A shown view never jumps across the divider, so `shift+down` on the last shown view does nothing. Showing a view puts it back at its place in the order.

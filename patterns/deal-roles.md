@@ -29,6 +29,8 @@ A person can be the CTO of the customer (membership) and the economic buyer of a
 
 **Stages use the same table.** Deal stages are a second kind of the vocabulary, with an outcome flag for the closing meaning. See [[deal-stages]]. Note types, which have their own table, can move onto it the same way, a separate decision.
 
+**Editing in the TUI.** The palette action Edit deal roles opens the list editor ([[list-editor-standard]]). Removing a role that links use asks where they go: another role or blank. The old keep-the-text choice stays in the CLI (`--keep`).
+
 **Because.** Owner request 2026-10-29. Real data names roles ([[research-hubspot-export]] H4: champion, economic buyer, signer, billing contact, Buying Role empty everywhere), but a list the user cannot extend is ignored, and free text cannot be reported on. A list that is seeded and fully editable keeps both.
 
 **Larger patterns.** [[field-types-drive-editors]], [[pick-or-create]], [[one-abstraction-many-contexts]], [[deal-stages]]

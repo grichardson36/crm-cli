@@ -29,7 +29,7 @@ status: decided (owner decision 2026-10-29), built in feat/deal-stages (not merg
 - Making a stage won or lost stamps the deals already in it that have no close date. Making it open leaves their dates alone.
 - Removing a stage with a replacement keeps the close date when both stages have the same outcome, stamps it when an open deal moves into a closed stage or won becomes lost, and clears it when a deal moves into an open stage.
 
-**Doors.** `crm deal stages list|add|rename|remove|reorder|outcome`, MCP `crm_deal_stage_*`, help topic `deal-stages`, palette action Manage deal stages (no key). The stage flags of `crm deal add|edit|list` name the list command and complete from it.
+**Doors.** `crm deal stages list|add|rename|remove|reorder|outcome`, MCP `crm_deal_stage_*`, help topic `deal-stages`, palette action Edit deal stages (the list editor, [[list-editor-standard]], no key). The stage flags of `crm deal add|edit|list` name the list command and complete from it.
 
 **Because.** Owner decision 2026-10-29. One vocabulary mechanism serves roles and stages, and an outcome flag, not a name, carries the closing meaning, so renaming never changes what a deal is.
 

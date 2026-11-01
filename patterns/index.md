@@ -75,6 +75,7 @@ Note types (frontmatter `type`): `pattern` (one decided rule), `feature-area` (f
 - [[home-is-an-action-queue]] (Home is a short queue of relationship actions)
 - [[tree-view-module]] (One reusable tree renders any collection with a hierarchy path field)
 - [[views-screen]] (One Views screen lists, opens, shows, hides and orders every view)
+- [[list-editor-standard]] (One list editor modifies every user-managed list: stages, roles, note types, relation kinds)
 - [[settings-view]] (Settings is one module over one registry, with a scope on each row)
 - [[one-bar]] (One bar finds objects and runs verbs)
 - [[bar-results-act-like-views]] (Tab into the results and the view hotkeys act on the highlighted object)

@@ -32,7 +32,9 @@ The detail pane says the same in a sentence. A new setting declares its scope on
 
 **Archived and Sync.** Settings has the rows "Open Archived", "Open Sync" and "Inbox". The two views are hidden by default and reachable from here ([[views-screen]]).
 
-**What has no storage yet.** The registry lists only what exists. Relation kinds have no management screen, the name alias table has a CLI (`crm alias`) and no TUI screen (its row shows a message), short syntax and read-only are not saved between runs. They are listed in [[open-discrepancies]] as gaps, not invented here.
+**Lists.** The rows Deal stages, Deal roles and Note types open the list editor ([[list-editor-standard]]) through the palette actions of the same id. A Relation kinds row is added by calling `openListEditor("relation-kinds")` (or the action `relation-kinds`). The entry function is `openListEditor(id)`, ids `deal-stages`, `deal-roles`, `note-types`, `relation-kinds`.
+
+**What has no storage yet.** The registry lists only what exists. The name alias table has a CLI (`crm alias`) and no TUI screen (its row shows a message), short syntax and read-only are not saved between runs. They are listed in [[open-discrepancies]] as gaps, not invented here.
 
 Built (M32): `internal/tui/settings.go` (`settingList`, `settingRows`, `buildSettingForm`, `openSetting`), `modules.SetValue` for plain text device settings, `db.ListBackups` for the Backups row, `viewSettings` in `internal/tui/model.go`. Tests in `settings_view_test.go`.
 
