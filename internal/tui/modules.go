@@ -200,8 +200,8 @@ func (m *Model) showViews(focusID string) tea.Cmd {
 	o := m.newOverlay("Views", m.viewItems(), false)
 	o.noFilter = true
 	o.digits = true
-	o.help = "enter go  x show/hide  shift+up/down move  e edit  d delete  r restore  esc close"
-	o.note = "Number keys go to a shown view. Settings and this screen (v) are always available."
+	o.hints = []hintItem{fk("enter", "go"), fk("esc", "close"), fk("d", "delete"), fk("r", "restore"), fk("e", "edit"), fk("x", "show or hide"), fk("shift+up/down", "move"), fk("1-9", "go to a view")}
+	o.note = "Settings and this screen are always available."
 	focus := func(id string) {
 		for i, idx := range o.shown {
 			if id != "" && o.items[idx].value == id {

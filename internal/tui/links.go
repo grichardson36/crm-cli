@@ -79,11 +79,11 @@ func whenAnyObject(m *Model) bool { _, ok := m.cursorObject(); return ok }
 func linkActions() []action {
 	out := []action{
 		{id: "link", title: "Link", group: "Link", hint: "l", keys: []string{"l"},
-			desc:  "link the selected person, organization, deal or task to another object (or a tag). Pick or create in one step, from either side. ctrl+z undoes",
+			desc:  "link the selected person, organization, deal or task to another object (or a tag). Pick or create in one step, from either side. Undoable",
 			write: true, foot: footLink, footIn: inBoth, footLabel: "link", when: whenAnyObject,
 			run: func(m *Model) tea.Cmd { return m.startLinkVerb(false) }},
 		{id: "unlink", title: "Unlink", group: "Link", hint: "u", keys: []string{"u"},
-			desc:  "remove a link of the selected object (or a tag). ctrl+z undoes",
+			desc:  "remove a link of the selected object (or a tag). Undoable",
 			write: true, when: whenAnyObject,
 			run: func(m *Model) tea.Cmd {
 				if m.focus == focusDetail && whenLinkedRow(m) { // u on a linked row removes that chip
@@ -216,7 +216,7 @@ func (m *Model) candidateItems(src repo.Ref, other string) []overlayItem {
 			continue
 		}
 		if linked[it.ref] {
-			it.desc = strings.TrimSpace("linked, enter edits " + it.desc)
+			it.desc = strings.TrimSpace("linked " + it.desc)
 		}
 		out = append(out, it)
 	}
@@ -371,7 +371,7 @@ func (m *Model) askUnlinkRow(r formRow) {
 	li := *r.li
 	m.mode = modeConfirm
 	m.confirm = &confirmState{
-		prompt: fmt.Sprintf("unlink %s %q? y/n", r.other, truncateLabel(r.value)),
+		prompt: fmt.Sprintf("unlink %s %q?", r.other, truncateLabel(r.value)),
 		yes: func() {
 			m.doUnlink(src, r.other, overlayItem{ref: li.ID, link: li.LinkID, label: li.Name})
 		},

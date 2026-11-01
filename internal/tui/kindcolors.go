@@ -331,7 +331,7 @@ func (m *Model) colorSettings() []setting {
 				return m.showToast("Colors: no custom colors to reset", false)
 			}
 			m.mode = modeConfirm
-			m.confirm = &confirmState{prompt: "reset every kind color to the theme? y/n", yes: func() {
+			m.confirm = &confirmState{prompt: "reset every kind color to the theme?", yes: func() {
 				if err := saveKindColors(m.env.DataDir, nil); err != nil {
 					m.pendingCmd = m.showToast("Colors: "+err.Error(), true)
 					return

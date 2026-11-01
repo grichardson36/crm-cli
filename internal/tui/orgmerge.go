@@ -26,12 +26,12 @@ func whenOrgMarks(m *Model) bool { return whenOrgsList(m) && len(m.markedOrgIDs(
 func orgMergeActions() []action {
 	return []action{
 		{id: "org-merge", title: "Merge marked organizations", group: "Organizations",
-			desc:  "merge the marked organizations into one you pick: people, parent links, deals, notes and tags move, the others are archived and ctrl+z undoes it. Same as crm org merge",
+			desc:  "merge the marked organizations into one you pick: people, parent links, deals, notes and tags move, the others are archived. Undoable. Same as crm org merge",
 			write: true,
 			when:  whenOrgsList, run: func(m *Model) tea.Cmd { m.askOrgMerge(); return nil }},
 		// Palette only, no key (the owner is redesigning keys).
 		{id: "org-not-duplicate", title: "Not a duplicate (organization)", group: "Organizations",
-			desc:  "tell the program the selected organization and the one with a close name are different organizations: the pair stops showing as a merge candidate. Stored as data, ctrl+z undoes it. Same as crm org dupes dismiss",
+			desc:  "tell the program the selected organization and the one with a close name are different organizations: the pair stops showing as a merge candidate. Stored as data, undoable. Same as crm org dupes dismiss",
 			write: true, when: func(m *Model) bool { return whenOrgsList(m) && len(m.similarOrgs()[m.selOrg()]) > 0 },
 			run: func(m *Model) tea.Cmd { m.askNotDuplicate(); return nil }},
 		{id: "org-undismiss", title: "Show dismissed organization pairs", group: "Organizations",
@@ -153,7 +153,7 @@ func (m *Model) confirmOrgMerge(keep int64, drops []int64) {
 	}
 	m.mode = modeConfirm
 	m.confirm = &confirmState{
-		prompt: fmt.Sprintf("merge %s into %s (%s)? y/n", strings.Join(res.DropNames, ", "), res.KeepName, moved),
+		prompt: fmt.Sprintf("merge %s into %s (%s)?", strings.Join(res.DropNames, ", "), res.KeepName, moved),
 		yes:    func() { m.runOrgMerge(keep, drops) },
 	}
 }

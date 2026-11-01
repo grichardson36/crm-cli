@@ -99,7 +99,7 @@ A foreign key to a table that is not registered excludes that column and lists i
 
 ## What is covered
 
-25 tables: people, organizations, interactions (notes and activity), deals, tasks, tags, taggings, person_emails, person_phones, person_handles, custom_fields, relation_kind, membership, person_relation, org_relation, deal_person, deal_org, activity_target, merge_alias, note_types, vocabulary (deal roles and stages), name_aliases, company_ignore, dupe_dismissals, org_dupe_dismissals.
+25 tables: people, organizations, interactions (notes and activity), deals, tasks, tags, taggings, person_emails, person_phones, person_handles, custom_fields, relation_kind, Person–Organization link, person_relation, org_relation, deal_person, deal_org, activity_target, merge_alias, note_types, vocabulary (deal roles and stages), name_aliases, company_ignore, dupe_dismissals, org_dupe_dismissals.
 
 Not covered, with the reason (the code list is `NotCovered()`): external_ids, sync_runs, sync_cursors, sync_inbox, sync_conflicts, dav_state, field_versions (all tied to this device or to a source account), tombstones (replaced by delete changes), merge_log (its undo data holds device-local row ids), meta. `merge_alias.old_id` is local: rows made by sync get `-1`, the old uuid and the survivor do sync. FTS tables and the keep-in-touch view are derived.
 

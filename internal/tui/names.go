@@ -209,12 +209,11 @@ func (m *Model) namesView() string {
 	st := m.st
 	cut := lipgloss.NewStyle().MaxWidth(m.width)
 	var lines []string
-	lines = append(lines, cut.Render(st.Head.Render("Link people in this line?")+st.Dim.Render("   enter save  esc back")))
-	lines = append(lines, cut.Render(st.Dim.Render("1-9 pick a person  c create a new contact  x keep as text  A same answer for the same name  up/down move")))
+	lines = append(lines, cut.Render(st.Head.Render("Link people in this line?")))
 	for i, ref := range np.refs {
 		var opts []string
 		for ci, c := range ref.Candidates {
-			label := fmt.Sprintf("[%d] %s", ci+1, c.Name)
+			label := fmt.Sprintf("%d %s", ci+1, c.Name)
 			if np.choice[i] == ci {
 				label = st.Name.Render("*" + label)
 			}
@@ -223,13 +222,13 @@ func (m *Model) namesView() string {
 		if len(ref.Candidates) == 0 {
 			opts = append(opts, st.Dim.Render("no match"))
 		}
-		create := "[c] create"
+		create := "create"
 		if np.choice[i] == choiceCreate {
-			create = st.Name.Render("*[c] create \"" + strings.ReplaceAll(ref.Text, "_", " ") + "\"")
+			create = st.Name.Render("*create \"" + strings.ReplaceAll(ref.Text, "_", " ") + "\"")
 		}
-		keep := "[x] keep as text"
+		keep := "keep as text"
 		if np.choice[i] == choiceText {
-			keep = st.Name.Render("*[x] keep as text")
+			keep = st.Name.Render("*keep as text")
 		}
 		opts = append(opts, create, keep)
 		marker := "  "
@@ -242,8 +241,9 @@ func (m *Model) namesView() string {
 	if np.err != "" {
 		lines = append(lines, cut.Render(st.Err.Render(np.err)))
 	}
-	if len(lines) > m.height-1 {
-		lines = lines[:max(1, m.height-1)]
+	if len(lines) > m.height-2 {
+		lines = lines[:max(1, m.height-2)]
 	}
+	lines = append(lines, cut.Render(m.renderHintItems(m.namesHints())))
 	return strings.Join(lines, "\n")
 }

@@ -99,7 +99,7 @@ func (m *Model) askTagMergeWith(source, target, lead string) {
 	}
 	m.mode = modeConfirm
 	m.confirm = &confirmState{
-		prompt: strings.TrimSpace(lead + fmt.Sprintf("merge #%s into #%s (%s)? y/n", source, target, detail)),
+		prompt: strings.TrimSpace(lead + fmt.Sprintf("merge #%s into #%s (%s)?", source, target, detail)),
 		yes:    func() { m.runTagMerge(source, target) },
 	}
 }

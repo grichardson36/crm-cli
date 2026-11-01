@@ -18,7 +18,7 @@ func orgAutoActions() []action {
 			desc:  "create or reuse an organization for every person's company text, after one confirm that shows the counts. One undo step, safe to repeat. Same as crm org backfill --apply",
 			write: true, run: func(m *Model) tea.Cmd { m.askBackfill(); return nil }},
 		{id: "org-ignore", title: "Ignored company texts", group: "Organizations",
-			desc:  "the strings that never create an organization (N/A, none, retired ...): enter turns one off or on, type a new text to ignore it. Same as crm org ignore",
+			desc:  "the strings that never create an organization (N/A, none, retired ...): turn one off or on, or type a new text to ignore it. Same as crm org ignore",
 			write: true, run: func(m *Model) tea.Cmd { m.openIgnoreList(); return nil }},
 	}
 }
@@ -36,7 +36,7 @@ func (m *Model) askBackfill() {
 	}
 	m.mode = modeConfirm
 	m.confirm = &confirmState{
-		prompt: fmt.Sprintf("create %d organizations, reuse %d, link %d people (%d ignored)? y/n", rep.OrgsToCreate, rep.OrgsReused, rep.PeopleToLink, rep.IgnoredPeople),
+		prompt: fmt.Sprintf("create %d organizations, reuse %d, link %d people (%d ignored)?", rep.OrgsToCreate, rep.OrgsReused, rep.PeopleToLink, rep.IgnoredPeople),
 		yes:    m.runBackfill,
 	}
 }

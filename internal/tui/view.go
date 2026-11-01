@@ -277,14 +277,14 @@ func (m *Model) listView(w, h int) string {
 		case m.view == viewBirthdays:
 			return m.st.Dim.Render("No birthdays in the next 90 days.")
 		case m.view == viewTasks:
-			return m.st.Dim.Render("No open tasks. a then enter adds one.")
+			return m.st.Dim.Render("No open tasks.")
 		case m.view == viewMerge:
-			return m.st.Dim.Render("No duplicates at " + m.minLevel.String() + " confidence or above. ctrl+o sets the minimum level.")
+			return m.st.Dim.Render("No duplicates at " + m.minLevel.String() + " confidence or above.")
 		case m.view == viewArchived:
 			if m.archKind != "" {
-				return m.st.Dim.Render("No archived " + cliNoun(m.archKind) + "s. ctrl+o changes the type.")
+				return m.st.Dim.Render("No archived " + cliNoun(m.archKind) + "s.")
 			}
-			return m.st.Dim.Render("Nothing archived. d deletes the selected object, # archives the selected person.")
+			return m.st.Dim.Render("Nothing archived.")
 		case m.view == viewSync:
 			return m.st.Dim.Render("No sync sources connected yet.")
 		case m.view == viewOrgs:
@@ -408,7 +408,12 @@ func (m *Model) footerSegs() []footSeg {
 		}
 		acts = append(acts, a)
 	}
-	sort.SliceStable(acts, func(i, j int) bool { return acts[i].foot < acts[j].foot })
+	sort.SliceStable(acts, func(i, j int) bool {
+		if ci, cj := hintClassOf(acts[i]), hintClassOf(acts[j]); ci != cj {
+			return ci < cj
+		}
+		return acts[i].foot < acts[j].foot
+	})
 
 	x := 0
 	if m.readOnly {
@@ -448,7 +453,7 @@ func (m *Model) footerView() string {
 	case modeConfirm:
 		status = m.st.Err.Render(m.confirm.prompt)
 	case modeCapture:
-		status = m.st.Name.Render("press the new key for " + m.captureTitle() + "  (esc cancels)")
+		status = m.st.Name.Render("press the new key for " + m.captureTitle())
 	default:
 		switch {
 		case m.busy != "":
@@ -458,9 +463,9 @@ func (m *Model) footerView() string {
 		case m.status != "":
 			status = m.st.Ok.Render(m.status)
 		case m.mode == modeEdit:
-			status = m.st.Dim.Render("editing: enter saves, esc cancels")
+			status = m.st.Dim.Render("editing")
 		case m.query != "":
-			status = m.st.Dim.Render("filter: " + m.query + "  (esc clears)")
+			status = m.st.Dim.Render("filter: " + m.query)
 		}
 	}
 	if n := len(m.markedIDs()); n > 0 && (m.mode == modeNormal) {
@@ -479,38 +484,10 @@ func (m *Model) footerView() string {
 	return statusLine + "\n" + m.hintsLine()
 }
 
+// hintsLine is the last line of the main screen and of the modes on it. See hints.go.
 func (m *Model) hintsLine() string {
-	switch m.mode {
-	case modeEdit:
-		h := "enter save  esc cancel"
-		switch {
-		case m.edit != nil && m.edit.typed != nil && m.edit.typed.vocab != nil:
-			h = "type to filter  up/down pick  tab complete  enter save  esc cancel"
-		case m.edit != nil && m.edit.typed != nil && m.edit.typed.spec.Type == model.FieldChoice:
-			h = "up/down pick  enter or tab save  esc cancel"
-		case m.edit != nil && m.edit.typed != nil && m.edit.typed.spec.Type == model.FieldLongText:
-			h = "enter or tab save  alt+enter new line  esc cancel"
-		case m.edit != nil && m.edit.typed != nil:
-			h = "enter or tab save  esc cancel"
-		case m.edit != nil && m.edit.ta != nil:
-			h = "enter pick  tab complete  up/down move  esc cancel"
-		}
-		if m.edit != nil && m.edit.kind == rkHandle {
-			h += "  tab change kind"
-		}
-		return m.st.Dim.Render(ansi.Truncate(h, m.width, "…"))
-	case modeConfirm:
-		return m.st.Dim.Render("y yes  n no")
-	case modeCapture:
-		return m.st.Dim.Render("any key binds, esc cancel")
-	case modePrompt:
-		if s := m.pipeRefresh(); s != nil && s.ac.Open() {
-			return m.st.Dim.Render(ansi.Truncate("enter confirm  tab accept  up/down choose  esc close the list", m.width, "…"))
-		}
-		if m.promptKind == "note" || m.promptKind == "note-object" || m.promptKind == "note-free" {
-			return m.st.Dim.Render("enter save  tab type  esc cancel")
-		}
-		return m.st.Dim.Render("enter confirm  esc cancel")
+	if line, ok := m.modalHintsLine(); ok {
+		return line
 	}
 	var parts []string
 	if m.readOnly {
@@ -523,8 +500,8 @@ func (m *Model) hintsLine() string {
 }
 
 func (m *Model) helpView() string {
-	title := m.st.Head.Render("Keys") + m.st.Dim.Render("   generated from the same action list as the palette (ctrl+k)")
-	foot := m.st.Dim.Render("up/down scroll  any other key closes  ctrl+k for every action")
+	title := m.st.Head.Render("Keys")
+	foot := m.renderHintItems(m.helpHints())
 	cut := lipgloss.NewStyle().MaxWidth(m.width)
 	return cut.Render(title) + "\n" + m.helpVP.View() + "\n" + cut.Render(foot)
 }

@@ -12,7 +12,7 @@ import (
 	"github.com/jdanielnd/crm-cli/internal/tree"
 )
 
-// The Tags module (patterns/features-tags-module). Tags are a view of their own: a list with the name,
+// The Tags module (patterns/features/features-tags-module). Tags are a view of their own: a list with the name,
 // the number of objects that carry it and a dim breakdown by kind. The verbs are the universal ones
 // (patterns/universal-verbs) and every one works on the selected tags (patterns/bulk-actions-always):
 //
@@ -439,7 +439,7 @@ func (m *Model) showTagQuery(q string) {
 func tagViewActions() []action {
 	inRow := func(m *Model) bool { return m.barTag != "" }
 	return []action{
-		{id: "tag-open", title: "Open tag page", group: "Tags", desc: "open the tag page: the objects that carry the tag, grouped by kind. enter on an object opens it. This is enter (activate) in the Tags view",
+		{id: "tag-open", title: "Open tag page", group: "Tags", desc: "open the tag page: the objects that carry the tag, grouped by kind. Same as the activate verb in the Tags view",
 			when: func(m *Model) bool {
 				return m.view == viewTags && m.focus == focusList && m.barKind == "" && len(m.rows) > 0
 			},
@@ -466,29 +466,29 @@ func tagViewActions() []action {
 				return nil
 			}},
 		{id: "tag-rename", title: "Rename tag", group: "Tags", keyIf: inRow, tagVerb: true, write: true, footLabel: "rename",
-			desc: "give a tag a new name. A name that exists offers a merge instead. In the Tags view tab moves into the detail pane and enter or e edits the name in place, on a tag row of the bar e does this. Same as crm tag rename",
+			desc: "give a tag a new name. A name that exists offers a merge instead. Edits the name in place. Same as crm tag rename",
 			run:  func(m *Model) tea.Cmd { m.askTagRename(m.cursorTagName()); return nil }},
 		{id: "tag-merge", title: "Merge tag into another", group: "Tags", keys: []string{"m"}, keyIf: inRow, tagVerb: true, write: true, footLabel: "merge",
-			desc: "move every record of this tag to another tag and remove this one (y/n). In the Tags view m merges the selected tags into the highlighted one. Same as crm tag merge",
+			desc: "move every record of this tag to another tag and remove this one (asks first). In the Tags view it merges the selected tags into the highlighted one. Same as crm tag merge",
 			run:  func(m *Model) tea.Cmd { return m.mergeTagVerb() }},
 		{id: "tag-merge-marked", title: "Merge selected tags into the highlighted one", group: "Tags", write: true,
 			desc: "merge the space-selected tags into the highlighted tag, with nothing selected pick the tag to merge into (m in the Tags view). The count is typed back for several tags. One undo step",
 			when: whenTagList, run: func(m *Model) tea.Cmd { return m.mergeTagVerb() }},
 		{id: "tags-delete", title: "Delete tag", group: "Tags", hint: "d", keys: []string{"d"}, tagVerb: true, write: true,
-			desc: "delete the tag from every record (y/n), or the selected tags (the count typed back). An unused tag name is removed. ctrl+z puts it back. Same as crm tag delete",
+			desc: "delete the tag from every record (asks first), or the selected tags (the count typed back). An unused tag name is removed. Undoable. Same as crm tag delete",
 			foot: 46, footIn: inList, footLabel: "delete", footIf: func(m *Model) bool { return m.view == viewTags && !m.onTagPage() },
 			when: func(m *Model) bool { return m.barTag != "" || whenTagList(m) },
 			run:  func(m *Model) tea.Cmd { return m.deleteTagsVerb() }},
 		{id: "tag-link", title: "Give tag to an object", group: "Tags", hint: "l", keys: []string{"l"}, tagVerb: true, write: true,
-			desc: "pick an object of any kind to give the tag (or every selected tag). On a tag page this links another object to the page's tag. ctrl+z undoes it",
+			desc: "pick an object of any kind to give the tag (or every selected tag). On a tag page this links another object to the page's tag. Undoable",
 			foot: 60, footIn: inList, footLabel: "link", footIf: func(m *Model) bool { return m.view == viewTags },
 			when: whenTagVerb, run: func(m *Model) tea.Cmd { return m.tagLinkVerb() }},
 		{id: "tag-unlink", title: "Take tag off an object", group: "Tags", hint: "u", keys: []string{"u"}, tagVerb: true, write: true,
-			desc: "on a tag page take the tag off the highlighted or selected objects, elsewhere pick an object that has it. ctrl+z undoes it",
+			desc: "on a tag page take the tag off the highlighted or selected objects, elsewhere pick an object that has it. Undoable",
 			foot: 61, footIn: inList, footLabel: "unlink", footIf: func(m *Model) bool { return m.view == viewTags },
 			when: whenTagVerb, run: func(m *Model) tea.Cmd { return m.tagUnlinkVerb() }},
 		{id: "tag-merge-duplicates", title: "Tags: merge case duplicates", group: "Tags", write: true,
-			desc: "merge every group of tags that differ only by case or separators into its most used spelling, for the groups in the list (ctrl+o filter: possible case duplicates). The count is typed back. One undo step. Same as crm tag duplicates --apply",
+			desc: "merge every group of tags that differ only by case or separators into its most used spelling, for the groups in the list (filter: possible case duplicates). The count is typed back. One undo step. Same as crm tag duplicates --apply",
 			when: func(m *Model) bool { return m.view == viewTags && !m.onTagPage() && m.barKind == "" },
 			run:  func(m *Model) tea.Cmd { return m.mergeDuplicatesVerb() }},
 		{id: "tag-delete-unused", title: "Tags: delete unused tags", group: "Tags", write: true,
@@ -609,9 +609,9 @@ func (m *Model) askDeleteTag(name string) {
 		m.setStatus(err.Error(), true)
 		return
 	}
-	prompt := fmt.Sprintf("delete tag #%s from %d records? y/n", name, s.Count+s.Archived)
+	prompt := fmt.Sprintf("delete tag #%s from %d records?", name, s.Count+s.Archived)
 	if s.Unused() {
-		prompt = fmt.Sprintf("remove the unused tag #%s? y/n", name)
+		prompt = fmt.Sprintf("remove the unused tag #%s?", name)
 	}
 	m.mode = modeConfirm
 	m.confirm = &confirmState{prompt: prompt, yes: func() { m.deleteTags([]string{name}) }}

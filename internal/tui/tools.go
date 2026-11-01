@@ -74,7 +74,7 @@ func (m *Model) handleTextKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 func (m *Model) textViewRender() string {
 	cut := lipgloss.NewStyle().MaxWidth(m.width)
 	title := m.st.Head.Render(m.tv.title)
-	foot := m.st.Dim.Render("up/down scroll  home/end top/bottom  esc back  ctrl+k for every action")
+	foot := m.renderHintItems(m.textHints())
 	return cut.Render(title) + "\n" + m.tv.vp.View() + "\n" + cut.Render(foot)
 }
 

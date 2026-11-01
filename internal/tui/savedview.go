@@ -704,7 +704,7 @@ func savedViewDef() *objDef {
 func savedViewActions() []action {
 	return []action{
 		{id: "sview-add", title: "Save current view as...", group: "Views", write: true,
-			desc: "save the list on screen as a view: its kind, search, filter, sort and group (ctrl+o options too). It shows in the Views screen and the tabs (same as crm views save)",
+			desc: "save the list on screen as a view: its kind, search, filter, sort and group. It shows in the Views screen and the tabs (same as crm views save)",
 			run:  func(m *Model) tea.Cmd { return m.startSaveView() }},
 	}
 }

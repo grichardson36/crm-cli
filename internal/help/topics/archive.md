@@ -17,7 +17,7 @@ You can pass several IDs. `crm person archive` is a deprecated alias of `delete`
 
 ## Purge
 
-Purge permanently deletes people who are already archived, with their contact details, memberships and links, tags, custom fields, and any interactions or tasks that involve only them. A tombstone is recorded so sync can propagate the delete. It cannot be undone, so it needs `--yes`.
+Purge permanently deletes people who are already archived, with their contact details, Person–Organization links and links, tags, custom fields, and any interactions or tasks that involve only them. A tombstone is recorded so sync can propagate the delete. It cannot be undone, so it needs `--yes`.
 
 ```sh crm-example
 crm person purge 4 --dry-run

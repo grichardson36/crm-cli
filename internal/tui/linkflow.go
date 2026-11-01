@@ -211,7 +211,7 @@ func (m *Model) askLinkAttrs(d *linkDraft) tea.Cmd {
 	m.startInput("link-attrs", linkAttrsPrompt(d.rel), strings.TrimRight(strings.Join(vals, " | "), " |"))
 	if d.rel.HasAttr(model.AttrRole) {
 		if roles, err := m.roleSuggestions(d.rel.Name, 6); err == nil && len(roles) > 0 {
-			m.setStatus(roleHint(d.rel)+strings.Join(roles, ", ")+" (tab completes)", false)
+			m.setStatus(roleHint(d.rel)+strings.Join(roles, ", "), false)
 		}
 	}
 	return m.input.Focus()

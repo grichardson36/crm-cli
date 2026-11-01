@@ -44,7 +44,7 @@ Defined once in `internal/validate/codes.go` (`validate.Codes`). Only `E_` codes
 | E_CHOICE_INVALID | error | not one of the field's options |
 | E_NUMBER_INVALID | error | not a number |
 | E_NUMBER_TOO_LOW | error | below the field's minimum |
-| E_PRIMARY_MEMBERSHIP_MULTIPLE | error | more than one primary membership for a person |
+| E_PRIMARY_MEMBERSHIP_MULTIPLE | error | more than one primary Person–Organization link for a person |
 | E_ORG_PARENT_CYCLE | error | an organization would be its own ancestor |
 | W_ENCODING_DAMAGED | warning | text holds U+FFFD |
 | S_PHONE_IN_TEXT_FIELD | suggestion | phone-like text in a text field |

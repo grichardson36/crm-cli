@@ -817,19 +817,6 @@ func (m *Model) sveView() string {
 	for i, r := range e.rows() {
 		lines = append(lines, m.sveRowLine(i, r, w)...)
 	}
-	help := "up/down row  left/right cell  enter edit  a add condition  d remove  ctrl+s save  esc close"
-	if e.ed != nil {
-		switch e.ed.mode {
-		case "text":
-			help = "enter saves the cell  esc cancels"
-		case "choice":
-			help = "up/down pick  enter saves  esc cancels"
-		case "multi":
-			help = "up/down move  space adds or removes  enter saves  esc cancels"
-		default:
-			help = "type to search  up/down  enter picks  tab completes  enter on empty saves  esc saves"
-		}
-	}
 	for len(lines) < m.height-2 {
 		lines = append(lines, "")
 	}
@@ -840,7 +827,7 @@ func (m *Model) sveView() string {
 	if e.isErr {
 		status = m.st.Err.Render(ansi.Truncate(e.msg, w, "…"))
 	}
-	return strings.Join(lines, "\n") + "\n" + status + "\n" + m.st.Dim.Render(ansi.Truncate(help, w, "…"))
+	return strings.Join(lines, "\n") + "\n" + status + "\n" + m.renderHintItems(m.sveHints())
 }
 
 const sveLabelW = 14

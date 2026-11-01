@@ -302,7 +302,7 @@ func (h *handler) response(href string, requested []xml.Name, known map[xml.Name
 // maxCardBytes bounds a PUT body.
 const maxCardBytes = 8 << 20
 
-// capturePut reads the PUT body so the exact text the phone sent is stored (patterns/research-sync-standard
+// capturePut reads the PUT body so the exact text the phone sent is stored (patterns/research/research-sync-standard
 // section 2). A card that cannot be read is skipped and flagged as a sync issue, it is never read as
 // an emptied contact. It returns false when it has answered the request.
 func (h *handler) capturePut(w http.ResponseWriter, r *http.Request) bool {

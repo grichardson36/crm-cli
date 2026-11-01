@@ -8,9 +8,9 @@ Coverage gaps: Dex has no public page for "Related" semantics beyond the API. Mo
 
 ## 1. Person to organization
 
-| Product | Several orgs at once | Past vs current | Role/title per membership | Primary flag | Start/end dates |
+| Product | Several orgs at once | Past vs current | Role/title per Person–Organization link | Primary flag | Start/end dates |
 |---|---|---|---|---|---|
-| Dex | Unclear. Company is a contact field, filters `has_company`, `has_linkedin_companies` [doc]. Work history is imported from LinkedIn [doc]. No company object found | Work history imported, not a modelled past-role record [doc] | Contact-level `job_title` filter [doc]. Per-membership not documented | Not documented | Not documented |
+| Dex | Unclear. Company is a contact field, filters `has_company`, `has_linkedin_companies` [doc]. Work history is imported from LinkedIn [doc]. No company object found | Work history imported, not a modelled past-role record [doc] | Contact-level `job_title` filter [doc]. Per-Person–Organization link not documented | Not documented | Not documented |
 | HubSpot | Yes, many companies per contact [doc] | Not a built-in concept. Use custom labels such as "Former employee" [general] | Labels on the association (up to 10 per object pair) [doc]. Job title is a contact property [general] | Yes. Exactly one primary company per record, own type IDs (contact to primary company = 1) [doc] | None on the association [general] |
 | Attio | Person has a `company` record reference. Company `team` is its inverse and accepts multiple values [doc]. Whether a person may hold several companies is not stated on the page | No "past companies" attribute in standard objects [doc] | `job_title` is a text attribute on the person, not on the link [doc] | Not documented | Not documented. Docs do not say a link can carry data [doc] |
 | Folk | Yes, many companies per person [doc] | Not documented | Job title shown in company People section. Whether per-link is not stated [doc] | Yes, one "favorite" company [doc] | Not documented |
@@ -78,7 +78,7 @@ Typed kinds with inverses, as products define them:
 |---|---|---|---|---|---|---|---|
 | Person in many orgs | unclear | yes | unclear | yes | unconfirmed | yes | yes |
 | Primary org flag | no | yes | no | yes (favorite) | unconfirmed | no | yes (IsDirect) |
-| Role per membership | no | label | no (title on person) | unclear | unconfirmed | DIY | yes (Roles) |
+| Role per Person–Organization link | no | label | no (title on person) | unclear | unconfirmed | DIY | yes (Roles) |
 | Start/end dates | no | no | no | no | unconfirmed | DIY | yes |
 | Past vs current | LinkedIn import | via label | no | no | unconfirmed | DIY | IsActive |
 | Org to org | not found | yes, parent/child + labels | custom attribute | not found | not found | self-relation | ParentId + Partner |
@@ -90,7 +90,7 @@ Typed kinds with inverses, as products define them:
 ## Convention most products agree on
 
 1. Person to organization is many-to-many.
-2. One membership can be marked primary (HubSpot primary, Folk favorite, Salesforce IsDirect).
+2. One Person–Organization link can be marked primary (HubSpot primary, Folk favorite, Salesforce IsDirect).
 3. Links are visible and editable from both sides.
 4. Tasks, notes, and meetings attach to several records of several object types.
 5. Directional person-to-person or org-to-org kinds are stored as a pair with an inverse. Symmetric kinds use one name for both directions.
@@ -122,7 +122,7 @@ Cons: no foreign keys on polymorphic columns, so orphans need triggers or app ch
 
 ### S3. Hybrid
 
-Specific tables where the link has a rich shape (`membership` for person to org with title, dates, primary, a Salesforce AccountContactRelation analog; `deal_contact` with role) and one generic `relation(kind_id, a_id, b_id)` table with an inverse/symmetric kind table for person-to-person and org-to-org. Activities use one `activity_target(activity_id, target_type, target_id, role)` table.
+Specific tables where the link has a rich shape (`Person–Organization link` for person to org with title, dates, primary, a Salesforce AccountContactRelation analog; `deal_contact` with role) and one generic `relation(kind_id, a_id, b_id)` table with an inverse/symmetric kind table for person-to-person and org-to-org. Activities use one `activity_target(activity_id, target_type, target_id, role)` table.
 
 Pros: foreign keys where data is richest, flexibility where it is not, matches the pattern Salesforce uses (junction objects for rich links) and HubSpot (typed edges).
 Cons: three mechanisms to learn and document. Two places to look when asking "who is related to X".

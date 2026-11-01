@@ -43,7 +43,7 @@ type addSuggestion struct {
 func globalAddActions() []action {
 	return []action{
 		{id: "add-any", title: "Add", group: "Verbs", hint: "a", keys: []string{"a"}, write: true,
-			desc: "add an object: a picker of kinds with this view's own kind preselected (a then enter adds it), or type a letter to jump: t task, n note, o organization, p person, d deal. A highlighted object is the first suggestion of the matching link segment of the pipe line, tab accepts it",
+			desc: "add an object: a picker of kinds with this view's own kind preselected or type a letter to jump to a kind. A highlighted object is the first suggestion of the matching link segment of the pipe line",
 			foot: footAdd, footIn: inList, footLabel: "add",
 			keyIf: func(m *Model) bool { return m.focus != focusDetail }, // in the detail pane a adds a row (the form's own add)
 			run:   func(m *Model) tea.Cmd { return m.openGlobalAdd(nil) }},

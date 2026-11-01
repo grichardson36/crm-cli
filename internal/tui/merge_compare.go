@@ -923,8 +923,6 @@ func (c *compareState) confirmLines(h int) []string {
 			add(label(f.Field) + c.st.Dim.Render(fmt.Sprintf("%v", orDash(f.Old))) + " -> " + c.st.Name.Render(fmt.Sprintf("%v", orDash(f.New))))
 		}
 	}
-	add("")
-	add(c.st.Dim.Render("enter merges, esc goes back to the fields"))
 	for len(out) < h {
 		out = append(out, "")
 	}
@@ -949,7 +947,7 @@ func (m *Model) compareView() string {
 		title += ": " + strings.Join(c.reasons, "; ")
 	}
 	if len(c.members) > 2 {
-		title += fmt.Sprintf("  (group of %d, showing #%d and #%d, p changes the pair)", len(c.members), c.pair(0).id, c.pair(1).id)
+		title += fmt.Sprintf("  (group of %d, showing #%d and #%d)", len(c.members), c.pair(0).id, c.pair(1).id)
 	}
 	cut := lipgloss.NewStyle().MaxWidth(m.width)
 	var lines []string

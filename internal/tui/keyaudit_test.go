@@ -16,7 +16,7 @@ import (
 // results on each kind of row) it asks the registry which action each key would run, exactly as
 // handleKey does (most specific scope first, see keymap.go), and lists every action that answers to
 // a key, so a key with two answers shows up. Run it to regenerate the tables in
-// patterns/audit-keybindings-2026-10.md:
+// patterns/research/audit-keybindings-2026-10.md:
 //
 //	KEYS_AUDIT_OUT=audit.md go test ./internal/tui -run TestKeyAudit
 //

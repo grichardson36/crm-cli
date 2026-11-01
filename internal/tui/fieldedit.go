@@ -356,7 +356,7 @@ func (m *Model) clearTyped(r formRow) {
 	}
 	m.mode = modeConfirm
 	m.confirm = &confirmState{
-		prompt: fmt.Sprintf("clear %s? y/n", spec.Label),
+		prompt: fmt.Sprintf("clear %s?", spec.Label),
 		yes: func() {
 			m.beginGroup()
 			err := m.saveTyped(r.ref, spec, "")

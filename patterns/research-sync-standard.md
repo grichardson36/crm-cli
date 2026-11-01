@@ -25,7 +25,7 @@ Read 2026-10-21 from first-party specs and docs. Feeds [[sync-maps-structure-to-
 
 ### 1. Per-field rule (Recommended)
 
-**Status 2026-10-30:** built in feat/phone-dav for phones (matched by E.164, [[phone-numbers-are-e164]]), emails, name, org, title (waterfall: headline title, else the role on the primary membership; blanking TITLE clears the headline and never deletes a membership), notes, birthday (incl. partial), location and handles. Photo and addresses beyond the first stay raw. Decided by the owner (Q14 to Q16).
+**Status 2026-10-30:** built in feat/phone-dav for phones (matched by E.164, [[phone-numbers-are-e164]]), emails, name, org, title (waterfall: headline title, else the role on the primary Person–Organization link; blanking TITLE clears the headline and never deletes a Person–Organization link), notes, birthday (incl. partial), location and handles. Photo and addresses beyond the first stay raw. Decided by the owner (Q14 to Q16).
 
 | Our field | vCard | Rule |
 |---|---|---|
@@ -34,7 +34,7 @@ Read 2026-10-21 from first-party specs and docs. Feeds [[sync-maps-structure-to-
 | emails | EMAIL (+TYPE) | List. Match by lowercase address. Same item rules as phones. |
 | addresses | ADR (+TYPE) | Structured to 7 components both ways. Compare per component. Never rebuild from a single formatted string. Keep LABEL and group labels raw. |
 | org | ORG | Existing rule: match record, else text plus `org-review`. Write primary org name as first ORG component. Preserve unit components (2nd+) raw on the phone. |
-| title / role | TITLE (ROLE) | Our membership role maps to TITLE. Write ROLE only if it was present inbound. Inbound TITLE edits update the primary membership role. Do not mix them (S8). |
+| title / role | TITLE (ROLE) | Our Person–Organization link role maps to TITLE. Write ROLE only if it was present inbound. Inbound TITLE edits update the primary Person–Organization link role. Do not mix them (S8). |
 | birthday | BDAY | Structured date incl. partial (no year). Inbound free-text BDAY is kept as text, not parsed. Compare normalized dates, not strings. |
 | notes | NOTE | Flat text, one field. Conflict means keep both (see section 4). Do not trim or reflow. |
 | photo | PHOTO | Inbound: store only if changed (hash compare). Outbound: write only when we changed it. Otherwise leave the remote PHOTO bytes alone. Size-limit large photos. |
@@ -55,7 +55,7 @@ Read 2026-10-21 from first-party specs and docs. Feeds [[sync-maps-structure-to-
 
 **Status 2026-10-30:** built. A TEL or EMAIL missing from an incoming card is a delete only when the stored previous card held it. A card that fails to parse (or has no BEGIN/END) is answered 400, skipped and flagged as a `dav_issues` row (`crm dav issues`), never read as emptied.
 
-1. Inbound field became empty: clear only that scalar field (name part, title, birthday, note) after a field-version check. For linked structure, follow the existing rule: emptying ORG never removes a membership. Same for TITLE never deleting the membership, only blanking its role.
+1. Inbound field became empty: clear only that scalar field (name part, title, birthday, note) after a field-version check. For linked structure, follow the existing rule: emptying ORG never removes a Person–Organization link. Same for TITLE never deleting the Person–Organization link, only blanking its role.
 2. Inbound list item removed (a TEL line gone): remove that item only when the previous raw contained it (explicit delete). Absence in a vCard we never saw is not a delete.
 3. Outbound clear: write the property removed or the component empty, never a placeholder. For ADR keep all seven separators (S8).
 4. A blank in a vCard whose parse failed is a parse error, not a clear. Skip and flag.

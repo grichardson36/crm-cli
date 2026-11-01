@@ -51,7 +51,7 @@ diff before.vcf after.vcf
 
 ## Then the other direction
 
-Edit the job title on the iPhone to something else and sync. Run `crm person show ID`: the headline title is the new text and the contact still has its organization memberships. Blank the title on the iPhone: the headline clears and the next card carries the role of the primary membership again.
+Edit the job title on the iPhone to something else and sync. Run `crm person show ID`: the headline title is the new text and the contact still has its organization Person–Organization links. Blank the title on the iPhone: the headline clears and the next card carries the role of the primary Person–Organization link again.
 
 ## Record the result
 

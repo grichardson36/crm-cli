@@ -223,7 +223,7 @@ var Fields = map[string][]FieldSpec{
 	},
 	"deal": {
 		{Key: "title", Label: "title", Type: FieldText, Required: true},
-		{Key: "stage", Label: "stage", Type: FieldChoice, Vocabulary: DealStageKind, Hint: "type to filter, enter picks, a new name offers Create stage"},
+		{Key: "stage", Label: "stage", Type: FieldChoice, Vocabulary: DealStageKind, Hint: "type to filter, a new name offers Create stage"},
 		{Key: "value", Label: "value", Type: FieldNumber, Min: &zero},
 		{Key: "notes", Label: "notes", Type: FieldLongText},
 		{Key: "organization", Label: "organizations", Type: FieldRelation, Kind: "organization"},
@@ -255,7 +255,7 @@ var Fields = map[string][]FieldSpec{
 	// The role of a person on a deal is a sales role from the deal role vocabulary, not the free text
 	// of a membership role. The options are loaded from the vocabulary (patterns/deal-roles).
 	DealPersonKind: {
-		{Key: "role", Label: "deal role", Type: FieldChoice, Vocabulary: DealRoleKind, Hint: "type to filter, enter picks, a new name offers Create role"},
+		{Key: "role", Label: "deal role", Type: FieldChoice, Vocabulary: DealRoleKind, Hint: "type to filter, a new name offers Create role"},
 	},
 }
 

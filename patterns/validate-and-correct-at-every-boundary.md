@@ -11,7 +11,7 @@ Every program built on the framework validates data from day one, at every bound
 - Input validation, field and form validation, type checking and constraint enforcement, driven by the field types in the schema ([[objects-first]], [[one-verb-set]]).
 - Sanitization of text, such as control characters and damaged encodings.
 - Schema validation of view files, keymaps and sync records.
-- Business rule validation, such as one primary membership per person and no cycles in org parents.
+- Business rule validation, such as one primary Person–Organization link per person and no cycles in org parents.
 
 ## Errors that help
 

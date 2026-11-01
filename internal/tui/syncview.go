@@ -141,9 +141,6 @@ func (m *Model) syncItemDetail(r row) string {
 			}
 		}
 		b.WriteString(kv("cursor", cursor))
-		if s.Registered {
-			b.WriteString("\n" + m.st.Dim.Render(line("s syncs now, d previews without writing")))
-		}
 	case it.entry != nil:
 		e := it.entry
 		b.WriteString(m.st.Name.Render(line(cleanCell(e.Summary))) + "\n\n")
@@ -156,7 +153,6 @@ func (m *Model) syncItemDetail(r row) string {
 			b.WriteString(kv("candidate", fmt.Sprintf("#%d %s", id, m.nameOf(id))))
 		}
 		b.WriteString(inboxPayloadLines(e.Payload, kv))
-		b.WriteString("\n" + m.st.Dim.Render(line("a creates a person, p attaches to one, i ignores")))
 	}
 	return strings.TrimRight(b.String(), "\n")
 }

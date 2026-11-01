@@ -140,7 +140,7 @@ func whenCellPrev(m *Model) bool { return whenCellRow(m) && m.fcol > 0 }
 
 func cellActions() []action {
 	return []action{
-		{id: "cell-next", title: "Next cell", group: "Edit pane", hint: "right", keys: []string{"right", "tab"}, desc: "move to the next attribute cell of a linked row or note (role, dates, primary, kind, type). From the last cell tab goes back to the list",
+		{id: "cell-next", title: "Next cell", group: "Edit pane", hint: "right", keys: []string{"right", "tab"}, desc: "move to the next attribute cell of a linked row or note (role, dates, primary, kind, type). From the last cell it goes back to the list",
 			foot: 16, footIn: inDetail, footLabel: "cell", when: whenCellNext, run: func(m *Model) tea.Cmd { m.fcol++; m.syncDetail(); return nil }},
 		{id: "cell-prev", title: "Previous cell", group: "Edit pane", hint: "left", keys: []string{"left", "shift+tab"}, desc: "move to the previous cell of a linked row or note. From the first cell left goes back to the list",
 			when: whenCellPrev, run: func(m *Model) tea.Cmd { m.fcol--; m.syncDetail(); return nil }},

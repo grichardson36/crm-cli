@@ -244,7 +244,7 @@ var commandMeta = map[string]cmdMeta{
 	"dav conflicts show": {fields: davConflictFields, examples: []string{`crm dav conflicts show 1 -f json`}},
 	"dav conflicts undo": {mutates: true, fields: davConflictFields, examples: []string{`crm dav conflicts undo 1`}},
 
-	// device-to-device sync (patterns/sync-contract.md)
+	// device-to-device sync (patterns/references/sync-contract.md)
 	"peers init": {mutates: true, noDryRun: true, fields: "device,already_enabled,tables,baseline_changes", examples: []string{`crm peers init --name laptop`, `crm peers init -f json`}},
 	"peers status": {fields: "enabled,status,devices", examples: []string{`crm peers status -f json`}},
 	"peers serve": {mutates: true, noDryRun: true, examples: []string{`crm peers serve --addr 100.64.0.1:7478`, `crm peers serve --addr 192.168.1.20:7478 --read-only`}},

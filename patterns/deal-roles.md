@@ -10,12 +10,12 @@ status: decided (owner request 2026-10-29), built in feat/deal-roles (not merged
 
 **Therefore.** The deal roles are a vocabulary the user owns: add, rename, reorder, remove, with the eight roles above seeded. The role of a person on a deal (`deal_person.role`) is a choice field backed by that vocabulary ([[field-types-drive-editors]]). It is edited in the cell of the people table on the deal page with the choice editor and [[pick-or-create]]: typing a name that is not listed adds the row `Create role X`. The CLI and MCP refuse an unlisted role with `E_VOCAB_UNKNOWN` and a fix, unless `--create` (`create`) is given ([[one-validation-framework]]). Set field on selected works for it like every choice field ([[bulk-actions-always]]).
 
-**Deal role versus membership role.** These are two different facts.
+**Deal role versus Person–Organization link role.** These are two different facts.
 
 - The **deal role** says what the person does in the buying decision of this deal. It comes from the list.
-- The **membership role** says what the person does at a company (CTO, Advisor). It stays free text with suggestions ([[roles-are-free-text]]). Task and note links keep free text roles too.
+- The **Person–Organization link role** says what the person does at a company (CTO, Advisor). It stays free text with suggestions ([[roles-are-free-text]]). Task and note links keep free text roles too.
 
-A person can be the CTO of the customer (membership) and the economic buyer of a deal (deal role).
+A person can be the CTO of the customer (Person–Organization link) and the economic buyer of a deal (deal role).
 
 **Storage.** One table, `vocabulary` (migration 013): `kind`, `name` unique per kind ignoring case, `position`, `archived`. The kind is `deal_role`. The registry `model.Vocabularies` names the columns that hold a kind's values, so rename can rewrite them and removal can count them. Nothing in the repository, the validation or the editors is specific to deal roles: a field names its vocabulary (`FieldSpec.Vocabulary`) and gets the editor, the check and the CLI shape.
 

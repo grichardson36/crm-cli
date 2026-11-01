@@ -88,7 +88,7 @@ func (m *Model) savedViewsKey(o *overlay, key, cur string, focus func(string)) b
 		m.closeOverlay()
 		m.mode = modeConfirm
 		m.confirm = &confirmState{
-			prompt: fmt.Sprintf("delete view %q? y/n", truncateLabel(live.Name)),
+			prompt: fmt.Sprintf("delete view %q?", truncateLabel(live.Name)),
 			yes: func() {
 				if err := m.hDeleteSaved(live.ID); err != nil {
 					m.setStatus(err.Error(), true)

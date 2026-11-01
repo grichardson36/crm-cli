@@ -1,6 +1,6 @@
 // Package replica is the device-to-device sync core: hybrid logical clock, field-change records,
 // version vectors, per-field conflict policies and the apply engine. It is pure Go and talks to a
-// database only through the Store and Projector interfaces. See patterns/sync-contract.md.
+// database only through the Store and Projector interfaces. See patterns/references/sync-contract.md.
 package replica
 
 import (

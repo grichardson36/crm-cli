@@ -113,9 +113,9 @@ func (m *Model) openNoteTypes() tea.Cmd {
 	}
 	items := []overlayItem{{id: "+add", label: "+ Add a type", desc: "name, or: name | contact to count it as contact", value: ""}}
 	for _, t := range list {
-		desc := "enter archives it"
+		desc := ""
 		if t.CountsAsContact {
-			desc = "counts as contact, " + desc
+			desc = "counts as contact"
 		}
 		items = append(items, overlayItem{id: t.Name, label: t.Name, value: t.Name, desc: desc})
 	}
@@ -133,7 +133,7 @@ func (m *Model) openNoteTypes() tea.Cmd {
 		name := it.value
 		m.mode = modeConfirm
 		m.confirm = &confirmState{
-			prompt: fmt.Sprintf("archive note type %s? old notes keep it. y/n", name),
+			prompt: fmt.Sprintf("archive note type %s? old notes keep it.", name),
 			yes: func() {
 				if err := m.ntr.Archive(m.ctx, name); err != nil {
 					m.setStatus(err.Error(), true)

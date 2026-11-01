@@ -89,7 +89,7 @@ func (m *Model) runMerge() tea.Cmd {
 func verbActions() []action {
 	return []action{
 		{id: "activate", title: "Activate", group: "Verbs", hint: "enter", keys: []string{"enter", "e"}, verbAll: true,
-			desc:  "open the highlighted thing further, or edit the field under the cursor (rename is just this). enter and e are the same action",
+			desc:  "open the highlighted thing further, or edit the field under the cursor (rename is just this)",
 			write: false, foot: 10, footIn: inBoth, footLabel: "open",
 			writeFor: func(m *Model) bool {
 				a := m.firstApplying(activateTargets)

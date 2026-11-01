@@ -266,7 +266,6 @@ func (m *Model) emptyDetail() string {
 				}
 			}
 		}
-		b.WriteString("\n" + m.st.Dim.Render("enter compares and merges, d dismisses"))
 	case viewArchived:
 		if r.akind != "" && r.akind != "person" {
 			it := m.archItems[fmt.Sprintf("%s:%d", r.akind, archivedRowID(r))]
@@ -275,7 +274,6 @@ func (m *Model) emptyDetail() string {
 			if it.Detail != "" {
 				b.WriteString(m.st.Dim.Render(fit("detail", labelWidth)) + line(cleanCell(it.Detail)) + "\n")
 			}
-			b.WriteString("\n" + m.st.Dim.Render("r restores, ctrl+o filters by type"))
 			return b.String()
 		}
 		p := m.arch[r.personID]
@@ -295,7 +293,6 @@ func (m *Model) emptyDetail() string {
 		for _, ph := range p.Phones {
 			b.WriteString(m.st.Dim.Render(fit("phone", labelWidth)) + line(phoneShown(ph)) + "\n")
 		}
-		b.WriteString("\n" + m.st.Dim.Render("r restores, d purges forever, ctrl+o filters by type"))
 	default:
 		return m.st.Dim.Render("Nothing selected.")
 	}

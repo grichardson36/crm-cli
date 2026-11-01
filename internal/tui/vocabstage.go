@@ -81,7 +81,7 @@ func (m *Model) openDealStages() tea.Cmd {
 			use = fmt.Sprintf("%d deal(s)", e.InUse)
 		}
 		items = append(items, overlayItem{id: "stage:" + e.Name, label: fmt.Sprintf("%d  %s  [%s]", i+1, e.Name, e.Outcome), value: e.Name,
-			desc: use + " · enter: rename, outcome, move or remove"})
+			desc: use})
 	}
 	o := m.newOverlay("Deal stages", items, false)
 	o.onPick = func(m *Model, it overlayItem) {
@@ -242,7 +242,7 @@ func (m *Model) removeDealStage(name string) {
 	}
 	if used == 0 {
 		m.mode = modeConfirm
-		m.confirm = &confirmState{prompt: fmt.Sprintf("remove deal stage %s? y/n", name), yes: func() { finish("") }}
+		m.confirm = &confirmState{prompt: fmt.Sprintf("remove deal stage %s?", name), yes: func() { finish("") }}
 		return
 	}
 	m.openPicker(fmt.Sprintf("%d deal(s) are in %s: move them to", used, name), others, func(m *Model, it overlayItem) { finish(it.value) })

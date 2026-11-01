@@ -447,11 +447,9 @@ func (m *Model) buildSettingForm(id string) []formRow {
 			vr.head = "Value"
 			rows = append(rows, vr)
 		}
-		hint := "enter opens it"
 		if s.run == nil && s.action == "" {
-			hint = "nothing to open"
+			rows = append(rows, infoRow("", "nothing to open"))
 		}
-		rows = append(rows, infoRow("", hint))
 	}
 	return rows
 }
@@ -500,7 +498,7 @@ func (m *Model) saveSetting(id, v string) error {
 
 func settingActions() []action {
 	return []action{
-		{id: "setting-open", title: "Open setting", group: "Verbs", desc: "in Settings: edit the setting under the cursor in place, or open the screen it belongs to (same as enter)",
+		{id: "setting-open", title: "Open setting", group: "Verbs", desc: "in Settings: edit the setting under the cursor in place, or open the screen it belongs to ",
 			when: func(m *Model) bool { return m.view == viewSettings && m.focus == focusList && (m.curSetting() != nil || m.curKeyAction() != nil) },
 			run:  func(m *Model) tea.Cmd { return m.openSetting() }},
 	}

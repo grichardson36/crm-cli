@@ -6,7 +6,7 @@ status: approved by owner 2026-10-16 (E1-E4 accepted), built in branch relations
 
 Date 2026-10-16. Decisions Q15 to Q27 are applied. Evidence: `research-relationship-models.md`, [[research-hubspot-export]], audit of a copy of personal.db (4,446 people, 0 orgs, 0 deals, 2,266 people with company text). No migration code is written until the owner approves this note.
 
-Patterns this serves: [[objects-first]], [[link-from-either-side]], [[one-verb-set]], [[soft-delete-restorable]], [[sync-safe-data]], [[person-belongs-to-many-organizations]], [[organizations-have-many-parents]], [[relation-kinds-have-inverses]], [[activities-attach-to-any-object]], [[hidden-not-removed-links]], [[merge-repoints-links]], [[roles-are-free-text]], [[current-membership-is-open-ended]].
+Patterns this serves: [[objects-first]], [[link-from-either-side]], [[one-verb-set]], [[soft-delete-restorable]], [[sync-safe-data]], [[person-belongs-to-many-organizations]], [[organizations-have-many-parents]], [[relation-kinds-have-inverses]], [[activities-attach-to-any-object]], [[hidden-not-removed-links]], [[merge-repoints-links]], [[roles-are-free-text]], [[current-Person–Organization link-is-open-ended]].
 
 ## Diagram
 
@@ -40,11 +40,11 @@ erDiagram
 
 ## Tables
 
-### membership (person to organization, many to many)
+### Person–Organization link (person to organization, many to many)
 `person_id` FK, `org_id` FK, `role` text (free text with suggestions), `started_on`, `ended_on` (null means current), `is_primary`, `notes`.
 - At most one primary per person among live rows: partial unique index on `person_id` where `is_primary = 1 and deleted_at is null`.
 - The same person and org may appear twice at different dates (rehired). Overlap is allowed.
-- A person with no membership is valid. `people.title` stays as the headline job title. `people.company` stays as text until the conversion pass retires it.
+- A person with no Person–Organization link is valid. `people.title` stays as the headline job title. `people.company` stays as text until the conversion pass retires it.
 
 ### relation_kind (shared vocabulary)
 `object_type` (`person` or `organization`), `name`, `inverse_name`, `symmetric`, `builtin`.
@@ -85,7 +85,7 @@ The real database is at schema 6. After the calendar code is archived and its mi
 
 | From | To | Real rows today |
 |---|---|---|
-| people.org_id | membership (primary) | 0 |
+| people.org_id | Person–Organization link (primary) | 0 |
 | deals.person_id, deals.org_id | deal_person, deal_org | 0 |
 | tasks.person_id, task_people | activity_target | 1 |
 | interaction_people | activity_target | 465 |
@@ -94,7 +94,7 @@ The real database is at schema 6. After the calendar code is archived and its mi
 | people.company, people.title | unchanged | 2,266 |
 
 ## Registry impact
-`model.Relations` becomes a richer spec: storage table, attributes (role, dates, primary), cardinality, labels and inverse labels. CLI, MCP and TUI keep reading it, so `Link` and `Unlink` stay one verb. Attributes appear in the link form: role, dates and primary for memberships, kind for person and org links, role for deal links.
+`model.Relations` becomes a richer spec: storage table, attributes (role, dates, primary), cardinality, labels and inverse labels. CLI, MCP and TUI keep reading it, so `Link` and `Unlink` stay one verb. Attributes appear in the link form: role, dates and primary for Person–Organization links, kind for person and org links, role for deal links.
 
 ## Company-text conversion (Q21)
 Changed by the owner 2026-10-27: company text creates or reuses an organization automatically at every door, with a backfill for existing people ([[convert-text-to-records-in-review-passes]]). `people.company` stays the source text. Junk strings are held in table `company_ignore` (migration 010, schema head 10: uuid, key, text, mode add or remove, timestamps). The review screen, the `org-review` tag and the `orgconvert.*` meta keys are gone.
@@ -104,5 +104,5 @@ Changed by the owner 2026-10-27: company text creates or reuses an organization 
 ## Assumptions to confirm
 - E1. Two relation tables (person, organization) instead of one generic table, to keep foreign keys.
 - E2. One `activity_target` table for tasks and interactions, with orphan protection by triggers and `crm doctor`.
-- E3. Overlapping memberships and repeated membership at one org are allowed.
-- E4. A person's primary membership drives the vCard ORG field in DAV sync. Decided: outbound ORG is the primary organization name. Inbound, an ORG that differs from it is matched to an existing organization by name (normalized name, also through merge_alias) and the primary membership is repointed in place, keeping role and dates, or created when the person has none. No match creates the organization and repoints or creates the primary membership (owner 2026-10-27, replaces Q21's review queue), and people.company gets the phone's text. A junk text (ignore list) creates nothing. Emptying ORG on the phone never removes a membership. When both sides changed ORG since the last sync the existing last-write-wins conflict path decides.
+- E3. Overlapping Person–Organization links and repeated Person–Organization link at one org are allowed.
+- E4. A person's primary Person–Organization link drives the vCard ORG field in DAV sync. Decided: outbound ORG is the primary organization name. Inbound, an ORG that differs from it is matched to an existing organization by name (normalized name, also through merge_alias) and the primary Person–Organization link is repointed in place, keeping role and dates, or created when the person has none. No match creates the organization and repoints or creates the primary Person–Organization link (owner 2026-10-27, replaces Q21's review queue), and people.company gets the phone's text. A junk text (ignore list) creates nothing. Emptying ORG on the phone never removes a Person–Organization link. When both sides changed ORG since the last sync the existing last-write-wins conflict path decides.

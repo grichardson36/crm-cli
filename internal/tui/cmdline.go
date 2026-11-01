@@ -421,7 +421,7 @@ func (m *Model) cmdView() string {
 	p := c.plan
 	cut := lipgloss.NewStyle().MaxWidth(m.width)
 	var lines []string
-	lines = append(lines, cut.Render(m.st.Head.Render("Command bar")+m.st.Dim.Render("   enter run  tab complete  esc close")))
+	lines = append(lines, cut.Render(m.st.Head.Render("Command bar")))
 	lines = append(lines, cut.Render(m.cmdInputLine(o)))
 
 	preview := p.Preview
@@ -447,7 +447,7 @@ func (m *Model) cmdView() string {
 				lines = append(lines, cut.Render("  "+ch.Describe()))
 			}
 		}
-		lines = append(lines, cut.Render(m.st.Dim.Render("enter apply  esc back  (ctrl+z undoes it afterwards)")))
+		lines = append(lines, cut.Render(m.overlayFooter()))
 		return strings.Join(lines, "\n")
 	}
 	if c.msg != "" {
@@ -478,6 +478,7 @@ func (m *Model) cmdView() string {
 		rest = rest[:room]
 	}
 	lines = append(lines, rest...)
+	lines = append(lines, cut.Render(m.overlayFooter()))
 	return strings.Join(lines, "\n")
 }
 

@@ -56,7 +56,7 @@ Note types (frontmatter `type`): `pattern` (one decided rule), `feature-area` (f
 - [[roles-are-free-text]] (Roles are free text with suggestions)
 - [[deal-roles]] (Deal roles are a list the user manages, apart from the role at a company)
 - [[deal-stages]] (Deal stages are a list the user manages, each with an outcome)
-- [[current-membership-is-open-ended]] (A current membership is open ended)
+- [[current-Person–Organization link-is-open-ended]] (A current Person–Organization link is open ended)
 - [[pick-or-create]] (Pick or create in one step)
 - [[field-types-drive-editors]] (The field type decides the editor, the check and the hint)
 - [[soft-delete-restorable]] (Delete is soft and restorable everywhere)

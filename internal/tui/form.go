@@ -1093,7 +1093,7 @@ func (m *Model) askDelete() {
 	}
 	m.mode = modeConfirm
 	m.confirm = &confirmState{
-		prompt: fmt.Sprintf("delete %s? y/n", what),
+		prompt: fmt.Sprintf("delete %s?", what),
 		yes: func() {
 			if err := do(); err != nil {
 				m.setStatus(err.Error(), true)

@@ -172,7 +172,7 @@ func (m *Model) removeDealRole(name string) {
 	}
 	if used == 0 {
 		m.mode = modeConfirm
-		m.confirm = &confirmState{prompt: fmt.Sprintf("remove deal role %s? y/n", name), yes: func() { finish("", false) }}
+		m.confirm = &confirmState{prompt: fmt.Sprintf("remove deal role %s?", name), yes: func() { finish("", false) }}
 		return
 	}
 	items := append([]overlayItem{{id: "keep", label: "Keep the text", desc: fmt.Sprintf("%d link(s) keep %q as plain text", used, name)}}, others...)

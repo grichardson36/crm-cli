@@ -178,7 +178,7 @@ func buildActions() []action {
 			inCompare: true, when: whenCmpEdit, run: func(m *Model) tea.Cmd { m.cmp.nextPair(); m.cmpPreview(); return nil }},
 		{id: "cmp-view", title: "Switch pane", group: "Compare", desc: "compare: narrow terminals show fewer panes, this switches between candidates and the result (palette, no key)",
 			inCompare: true, when: whenCmpEdit, run: func(m *Model) tea.Cmd { m.cmp.nextPage(); return nil }},
-		{id: "cmp-confirm", title: "Merge (with summary)", group: "Compare", hint: "enter", keys: []string{"enter"}, desc: "compare: enter shows what will be archived and moved, enter again merges",
+		{id: "cmp-confirm", title: "Merge (with summary)", group: "Compare", hint: "enter", keys: []string{"enter"}, desc: "compare: shows what will be archived and moved, then merges",
 			write: true, foot: 11, footIn: inBoth, inCompare: true, when: whenCompare, run: func(m *Model) tea.Cmd {
 				if m.cmp.confirm {
 					m.applyMerge()
@@ -229,7 +229,7 @@ func buildActions() []action {
 				m.startPrompt("tag", "tag (-name removes): ", "")
 				return m.input.Focus()
 			}},
-		{id: "tag-delete", title: "Delete tag", group: "Contact", desc: "delete a tag from every record that has it (asks y/n, ctrl+z undoes; same as crm tag delete)",
+		{id: "tag-delete", title: "Delete tag", group: "Contact", desc: "delete a tag from every record that has it (asks first, undoable; same as crm tag delete)",
 			write: true, run: func(m *Model) tea.Cmd { m.openTagDelete(); return nil }},
 		{id: "cadence", title: "Set keep-in-touch", group: "Contact", desc: "pick a keep-in-touch cadence for the person or all selected (palette, no key)",
 			write: true, when: whenPerson, run: func(m *Model) tea.Cmd { m.pickCadence(m.targets()); return nil }},
@@ -237,7 +237,7 @@ func buildActions() []action {
 			write: true, run: func(m *Model) tea.Cmd { m.completeTask(); return nil }},
 
 		// Home.
-		{id: "home-open", title: "Open", group: "Home", desc: "open the person (People view, detail pane) or the view the row stands for. enter or e",
+		{id: "home-open", title: "Open", group: "Home", desc: "open the person (People view, detail pane) or the view the row stands for",
 			when: whenHomeRow, run: func(m *Model) tea.Cmd { return m.openHomeRow() }},
 
 		// Sync view: sources and inbox.
@@ -245,7 +245,7 @@ func buildActions() []action {
 			write: true, when: whenSource, run: func(m *Model) tea.Cmd { return m.startSync(m.selectedSource(), false) }},
 		{id: "sync-dry", title: "Dry-run sync", group: "Sync", desc: "show what the selected source would change, writes nothing (palette; also: Dry-run sync: <source>)",
 			when: whenSource, run: func(m *Model) tea.Cmd { return m.startSync(m.selectedSource(), true) }},
-		{id: "inbox-accept", title: "Accept inbox record", group: "Sync", desc: "create a person from the selected inbox record. enter or e on the record does this",
+		{id: "inbox-accept", title: "Accept inbox record", group: "Sync", desc: "create a person from the selected inbox record",
 			write: true, when: whenInboxRow, run: func(m *Model) tea.Cmd { m.acceptInbox(); return nil }},
 		{id: "inbox-attach", title: "Attach inbox record", group: "Sync", desc: "attach the selected inbox record to a person you search for (palette)",
 			write: true, when: whenInboxRow, run: func(m *Model) tea.Cmd { m.attachInbox(); return nil }},
@@ -257,7 +257,7 @@ func buildActions() []action {
 		// Merge view and manual merge.
 		{id: "find-dupes", title: "Find duplicates", group: "Merge", desc: "show groups of probable duplicate people (Merge view)", module: "merge",
 			run: func(m *Model) tea.Cmd { m.switchView(viewMerge); return nil }},
-		{id: "compare", title: "Compare group", group: "Merge", desc: "open the side by side compare for the selected group. enter, e or m",
+		{id: "compare", title: "Compare group", group: "Merge", desc: "open the side by side compare for the selected group",
 			when: whenMergeRows, run: func(m *Model) tea.Cmd { m.openGroupCompare(); return nil }},
 		{id: "dismiss", title: "Dismiss group", group: "Merge", hint: "d", keys: []string{"d"}, desc: "mark the group as not duplicates (d is the Delete verb). Undo dismiss in the palette brings it back",
 			write: true, foot: 22, footIn: inList, footLabel: "dismiss", when: whenDismiss, run: func(m *Model) tea.Cmd { m.dismissGroup(); return nil }},
@@ -271,15 +271,15 @@ func buildActions() []action {
 			write: true, foot: 21, footIn: inList, when: whenArchivedRows, run: func(m *Model) tea.Cmd { return m.askPurge() }},
 		{id: "purge-selected", title: "Purge selected forever", group: "Archive", desc: "permanently delete the selected archived objects (any type) after typing the count back, for example purge 37 (palette, no key). Same tombstones as a single purge",
 			write: true, when: whenBulkPurgeSelected, run: func(m *Model) tea.Cmd { return m.askPurgeMany(false) }},
-		{id: "purge-all", title: "Purge all remaining forever", group: "Archive", desc: "permanently delete every archived object in the list (all types, or the type set with ctrl+o) after typing the count back, for example purge 37 (palette, no key)",
+		{id: "purge-all", title: "Purge all remaining forever", group: "Archive", desc: "permanently delete every archived object in the list (all types, or the type set in the options) after typing the count back, for example purge 37 (palette, no key)",
 			write: true, when: whenBulkPurgeAll, run: func(m *Model) tea.Cmd { return m.askPurgeMany(true) }},
 
 		// Detail pane (form).
-		{id: "edit", title: "Edit row", group: "Edit pane", desc: "edit the selected row inline (enter saves, esc cancels). enter or e in the detail pane does this",
+		{id: "edit", title: "Edit row", group: "Edit pane", desc: "edit the selected row inline in the detail pane",
 			write: true, when: whenDetail, run: func(m *Model) tea.Cmd { return m.startEdit() }},
 		{id: "add", title: "Add row", group: "Edit pane", hint: "a", keys: []string{"a"}, desc: "add a row of the kind under the cursor (email, phone, link, tag, task, note). In the detail pane a adds a row, in a list it opens the add picker",
 			write: true, foot: 11, footIn: inDetail, when: whenAdd, run: func(m *Model) tea.Cmd { return m.addRow(m.form[m.fcur].kind) }},
-		{id: "delete", title: "Delete row", group: "Edit pane", hint: "d", keys: []string{"d"}, desc: "delete the selected row (asks y/n). Fields are cleared",
+		{id: "delete", title: "Delete row", group: "Edit pane", hint: "d", keys: []string{"d"}, desc: "delete the selected row (asks first). Fields are cleared",
 			write: true, foot: 12, footIn: inDetail, when: whenDetail, run: func(m *Model) tea.Cmd { m.askDelete(); return nil }},
 		addKind("add-email", "Add email", "an email", rkEmail),
 		addKind("add-phone", "Add phone", "a phone number", rkPhone),
@@ -287,7 +287,7 @@ func buildActions() []action {
 		{id: "focus-detail", title: "Focus detail pane", group: "Edit pane", hint: "tab", keys: []string{"tab", "shift+tab", "right"}, desc: "move into the detail form (also right)",
 			foot: 20, footIn: inList, when: func(m *Model) bool { return whenList(m) && len(m.rows) > 0 && len(m.form) > 0 },
 			run: func(m *Model) tea.Cmd { m.focus = focusDetail; m.fcol = 0; m.syncDetail(); return nil }},
-		{id: "back", title: "Back to list", group: "Edit pane", hint: "esc", keys: []string{"esc", "tab", "shift+tab", "left"}, desc: "return to the list (also left, tab)",
+		{id: "back", title: "Back to list", group: "Edit pane", hint: "esc", keys: []string{"esc", "tab", "shift+tab", "left"}, desc: "return to the list",
 			foot: 15, footIn: inDetail, when: func(m *Model) bool { return m.focus == focusDetail },
 			run: func(m *Model) tea.Cmd { m.focus = focusList; m.fcol = 0; m.syncDetail(); return nil }},
 
@@ -301,9 +301,9 @@ func buildActions() []action {
 			run: func(m *Model) tea.Cmd { m.step(m.bodyHeight() / 2); return nil }},
 		{id: "half-up", inCompare: true, title: "Half page up", group: "Move", hint: "ctrl+u", keys: []string{"ctrl+u"}, desc: "half a page up",
 			run: func(m *Model) tea.Cmd { m.step(-m.bodyHeight() / 2); return nil }},
-		{id: "page-down", inCompare: true, title: "Page down", group: "Move", hint: "pgdown", keys: []string{"pgdown"}, desc: "a full page down (ctrl+d moves half a page)",
+		{id: "page-down", inCompare: true, title: "Page down", group: "Move", hint: "pgdown", keys: []string{"pgdown"}, desc: "a full page down",
 			run: func(m *Model) tea.Cmd { m.step(max(1, m.bodyHeight()-1)); return nil }},
-		{id: "page-up", inCompare: true, title: "Page up", group: "Move", hint: "pgup", keys: []string{"pgup"}, desc: "a full page up (ctrl+u moves half a page)",
+		{id: "page-up", inCompare: true, title: "Page up", group: "Move", hint: "pgup", keys: []string{"pgup"}, desc: "a full page up",
 			run: func(m *Model) tea.Cmd { m.step(-max(1, m.bodyHeight()-1)); return nil }},
 		{id: "jump-down", inCompare: true, title: "Jump down", group: "Move", hint: "ctrl+down", keys: []string{"ctrl+down"}, desc: "jump by the unit the view declares: a day in Birthdays, the next first letter in People and Organizations, a page elsewhere",
 			run: func(m *Model) tea.Cmd { m.jump(1); return nil }},
@@ -313,22 +313,22 @@ func buildActions() []action {
 			run: func(m *Model) tea.Cmd { m.step(-1 << 20); return nil }},
 		{id: "bottom", inCompare: true, title: "Go to bottom", group: "Move", hint: "end", keys: []string{"end"}, desc: "last row",
 			run: func(m *Model) tea.Cmd { m.step(1 << 20); return nil }},
-		{id: "home-top", inCompare: true, title: "Go to home or top", group: "Move", hint: "ctrl+shift+up", keys: []string{"ctrl+shift+up"}, desc: "the view's home destination (today in Birthdays), else the first row like home. Terminals that do not report ctrl+shift+up still have home",
+		{id: "home-top", inCompare: true, title: "Go to home or top", group: "Move", hint: "ctrl+shift+up", keys: []string{"ctrl+shift+up"}, desc: "the view's home destination (today in Birthdays), else the first row",
 			run: func(m *Model) tea.Cmd { m.goHome(-1); return nil }},
-		{id: "home-bottom", inCompare: true, title: "Go to home or bottom", group: "Move", hint: "ctrl+shift+down", keys: []string{"ctrl+shift+down"}, desc: "the view's home destination (today in Birthdays), else the last row like end. Terminals that do not report ctrl+shift+down still have end",
+		{id: "home-bottom", inCompare: true, title: "Go to home or bottom", group: "Move", hint: "ctrl+shift+down", keys: []string{"ctrl+shift+down"}, desc: "the view's home destination (today in Birthdays), else the last row",
 			run: func(m *Model) tea.Cmd { m.goHome(1); return nil }},
-		{id: "scroll-down", title: "Scroll detail down", group: "Move", desc: "scroll the detail pane down (palette; tab moves into the detail pane)",
+		{id: "scroll-down", title: "Scroll detail down", group: "Move", desc: "scroll the detail pane down (palette)",
 			run: func(m *Model) tea.Cmd { m.detail.ScrollDown(3); return nil }},
-		{id: "scroll-up", title: "Scroll detail up", group: "Move", desc: "scroll the detail pane up (palette; tab moves into the detail pane)",
+		{id: "scroll-up", title: "Scroll detail up", group: "Move", desc: "scroll the detail pane up (palette)",
 			run: func(m *Model) tea.Cmd { m.detail.ScrollUp(3); return nil }},
 
 		// Views and search.
 		viewAction(viewHome), viewAction(viewPeople), viewAction(viewDue), viewAction(viewTasks), viewAction(viewOrgs), viewAction(viewBirthdays), viewAction(viewMerge), viewAction(viewArchived), viewAction(viewSync), viewAction(viewDeals), viewAction(viewSettings), viewAction(viewTags),
-		{id: "goto-view", title: "Go to view", group: "Views", hint: "v", keys: []string{"v"}, desc: "the Views screen: every view, shown ones first, hidden ones under a divider. enter goes to the view, x shows or hides it, shift+up and shift+down reorder, esc closes. Per device",
+		{id: "goto-view", title: "Go to view", group: "Views", hint: "v", keys: []string{"v"}, desc: "the Views screen: every view, shown ones first, hidden ones under a divider. Go to a view, show or hide it and reorder them. Per device",
 			foot: 85, footIn: inList, run: func(m *Model) tea.Cmd { return m.openViews() }},
-		{id: "next-view", title: "Next view", group: "Views", hint: "]", keys: []string{"]", "ctrl+right"}, desc: "next view (also ctrl+right)",
+		{id: "next-view", title: "Next view", group: "Views", hint: "]", keys: []string{"]", "ctrl+right"}, desc: "next view",
 			run: func(m *Model) tea.Cmd { m.stepView(1); return nil }},
-		{id: "prev-view", title: "Previous view", group: "Views", hint: "[", keys: []string{"[", "ctrl+left"}, desc: "previous view (also ctrl+left)",
+		{id: "prev-view", title: "Previous view", group: "Views", hint: "[", keys: []string{"[", "ctrl+left"}, desc: "previous view",
 			run: func(m *Model) tea.Cmd { m.stepView(-1); return nil }},
 		{id: "clear-search", title: "Clear search", group: "Views", hint: "esc", keys: []string{"esc"}, desc: "clear the People filter set from the bar (a tag, an organization or Show all)",
 			when: func(m *Model) bool { return m.focus == focusList && m.query != "" },
@@ -384,7 +384,7 @@ func buildActions() []action {
 			run: func(m *Model) tea.Cmd { m.openThemeChooser(); return nil }},
 		{id: "theme-reload", title: "Theme: reload", group: "App", desc: "re-read ~/.crm/themes/*.toml and apply the current theme again",
 			run: func(m *Model) tea.Cmd { m.reloadTheme(); return nil }},
-		{id: "quit", inCompare: true, title: "Quit", group: "App", hint: "q", keys: []string{"q", "ctrl+c"}, desc: "quit. ctrl+c quits from a list and cancels a prompt or picker, and copies the focused field instead while the detail pane has a field focused",
+		{id: "quit", inCompare: true, title: "Quit", group: "App", hint: "q", keys: []string{"q", "ctrl+c"}, desc: "quit. The second key quits from a list, cancels a prompt or picker, and copies the focused field while the detail pane has one focused",
 			run: func(m *Model) tea.Cmd { return tea.Quit }},
 	}
 	// The generated verbs come after the contact actions. Each key is limited to the views where it

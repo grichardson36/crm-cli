@@ -38,7 +38,7 @@ Choices the contract left open:
 - **Trust** (rule 6): a bearer token per device, a one-time enroll token for a new device, `serve` refuses a public or wildcard bind without `--allow-public`.
 - **Rows made on two devices with one natural key** (built-in vocabulary, relation kinds, note types, tag names that exist when sync is turned on) get a uuid derived from the key, so they are one record. Tag names and other unique names created independently after sync is on can collide. The later record is kept as a blocked record, never dropped.
 
-Covered: 25 tables (people, organizations, interactions, deals, tasks, tags, taggings, person_emails, person_phones, person_handles, custom_fields, relation_kind, membership, person_relation, org_relation, deal_person, deal_org, activity_target, merge_alias, note_types, vocabulary, name_aliases, company_ignore, dupe_dismissals, org_dupe_dismissals). Not covered: external_ids, sync_runs, sync_cursors, sync_inbox, sync_conflicts, dav_state, field_versions, tombstones, merge_log, meta. Not built: a terminal UI screen, a second adapter (rule 15).
+Covered: 25 tables (people, organizations, interactions, deals, tasks, tags, taggings, person_emails, person_phones, person_handles, custom_fields, relation_kind, Person–Organization link, person_relation, org_relation, deal_person, deal_org, activity_target, merge_alias, note_types, vocabulary, name_aliases, company_ignore, dupe_dismissals, org_dupe_dismissals). Not covered: external_ids, sync_runs, sync_cursors, sync_inbox, sync_conflicts, dav_state, field_versions, tombstones, merge_log, meta. Not built: a terminal UI screen, a second adapter (rule 15).
 
 ## Not in v1
 

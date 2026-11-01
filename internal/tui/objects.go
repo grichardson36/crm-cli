@@ -420,14 +420,14 @@ func (o *objDef) addAction() action {
 		a.title, a.desc = "Add person", "create a contact: opens a blank form, saved when you enter a name. From the palette, or a then p"
 	}
 	if o.kind == "task" {
-		a.desc = "add a task: title | due | people | organizations | deals | tags. From the palette, or a then t (same as crm task add). A highlighted object is the first suggestion of the matching link segment (people, organizations, deals, tags), tab accepts it"
+		a.desc = "add a task: title | due | people | organizations | deals | tags. Same as crm task add. A highlighted object is the first suggestion of the matching link segment (people, organizations, deals, tags)"
 	}
 	if o.kind == tagKind {
-		a.desc = "add a tag: name | on, an existing name picks that tag and the objects in on get it. A highlighted object is the first suggestion of on, tab accepts. From the palette, or a then " + addShortcut(o.kind)
+		a.desc = "add a tag: name | on, an existing name picks that tag and the objects in on get it. A highlighted object is the first suggestion of on"
 	}
 	if o.kind == model.NoteKind {
 		a.when = func(m *Model) bool { return whenPerson(m) || whenObjectPage(m) }
-		a.desc = "add a note of the last used type to the person, organization or deal on screen (tab in the prompt changes the type; same as crm note add). From the palette, or a then n"
+		a.desc = "add a note of the last used type to the person, organization or deal on screen (the prompt can change the type; same as crm note add)"
 	}
 	return a
 }
@@ -442,11 +442,11 @@ func (o *objDef) editAction() action {
 		run:    func(m *Model) tea.Cmd { return o.edit(m, o.selected(m)) },
 	}
 	if o.kind == model.NoteKind {
-		a.desc = "edit the note under the cursor inline (enter or e on the note row; same as crm note edit)"
+		a.desc = "edit the note under the cursor inline (same as crm note edit)"
 	}
 	if o.kind == "person" {
 		a.write = false
-		a.desc = "move into the detail form of the selected person to edit it (enter or e)"
+		a.desc = "move into the detail form of the selected person to edit it"
 	}
 	return a
 }
@@ -454,7 +454,7 @@ func (o *objDef) editAction() action {
 func (o *objDef) deleteAction() action {
 	a := action{
 		id: o.actionID(vDelete), title: "Delete " + o.label, group: o.group, hint: "d", keys: o.keysFor(vDelete),
-		desc:  "delete the selected " + o.label + " (asks y/n, the same soft delete as crm " + cliNoun(o.kind) + " delete). ctrl+z undoes it",
+		desc:  "delete the selected " + o.label + " (asks first, the same soft delete as crm " + cliNoun(o.kind) + " delete). Undoable",
 		write: true, keyFor: o.keyFor(vDelete), foot: footDelete, footIn: inList, footLabel: "delete",
 		when: func(m *Model) bool { return o.selected(m) != 0 },
 		run:  func(m *Model) tea.Cmd { return m.verbDelete(o) },
@@ -464,14 +464,14 @@ func (o *objDef) deleteAction() action {
 	}
 	if o.kind == model.SavedViewKind {
 		a.hint, a.foot, a.keys = "", 0, nil // d deletes the object in the list, the Views screen has its own d
-		a.desc = "delete the saved view on screen (asks y/n, the same soft delete as crm views delete). ctrl+z undoes it, the Views screen (v) restores with r"
+		a.desc = "delete the saved view on screen (asks first, the same soft delete as crm views delete). Undoable, and the Views screen restores it"
 	}
 	if o.kind == model.NoteKind {
 		a.hint, a.foot = "d", 0
-		a.desc = "delete the note under the cursor (asks y/n, the same soft delete as crm note delete). d on the note row, ctrl+z undoes it"
+		a.desc = "delete the note under the cursor (asks first, the same soft delete as crm note delete). Undoable"
 	}
 	if o.kind == "person" {
-		a.desc = "delete (archive) the person or all selected (asks y/n for one, the count typed back for several, restore from the Archived view)"
+		a.desc = "delete (archive) the person or all selected (asks first for one, the count typed back for several, restore from the Archived view)"
 		a.footLabel = "archive"
 		a.foot = 35
 		a.footIf = whenMarks
@@ -482,7 +482,7 @@ func (o *objDef) deleteAction() action {
 func (o *objDef) restoreAction() action {
 	a := action{
 		id: o.actionID(vRestore), title: "Restore " + o.label, group: o.group, keys: o.keysFor(vRestore),
-		desc:  "bring back the " + o.label + " deleted last in this session (palette; ctrl+z does the same for the newest change; same as crm " + cliNoun(o.kind) + " restore)",
+		desc:  "bring back the " + o.label + " deleted last in this session (palette; same as crm " + cliNoun(o.kind) + " restore)",
 		write: true, keyFor: o.keyFor(vRestore),
 		when: func(m *Model) bool { return len(m.deleted[o.kind]) > 0 },
 		run:  func(m *Model) tea.Cmd { m.verbRestore(o); return m.takePending() },
@@ -494,7 +494,7 @@ func (o *objDef) restoreAction() action {
 		a.foot, a.footIn, a.footLabel = 20, inList, "restore"
 	}
 	if o.kind == model.NoteKind {
-		a.desc = "bring back the note deleted last in this session (ctrl+z does the same for the newest change; same as crm note restore)"
+		a.desc = "bring back the note deleted last in this session (same as crm note restore)"
 	}
 	return a
 }
@@ -537,7 +537,7 @@ func (m *Model) verbDelete(o *objDef) tea.Cmd {
 	name := truncateLabel(o.nameOf(m, id))
 	m.mode = modeConfirm
 	m.confirm = &confirmState{
-		prompt: fmt.Sprintf("delete %s %q? y/n", o.label, name),
+		prompt: fmt.Sprintf("delete %s %q?", o.label, name),
 		yes: func() {
 			if err := o.archive(m, id); err != nil {
 				m.setStatus(err.Error(), true)

@@ -18,7 +18,7 @@ Part of the [[index]]. Process rules are in [[how-to-use]] and [[surface-gaps-be
 | [[folk]]              | partial  | [[home-is-an-action-queue]], [[objects-first]], [[sync-safe-data]]                                                                 |
 | [[attio]]             | partial  | [[link-from-either-side]], [[objects-first]], [[show-parsed-chips]]                                                                |
 | [[pipedrive]]         | partial  | [[home-is-an-action-queue]], [[one-record-page]], [[pick-stage-from-numbered-list]], [[same-key-same-verb]] +1                     |
-| [[salesforce]]        | partial  | [[advanced-objects-off-main-path]], [[extension-ladder]], [[one-record-page]], [[current-membership-is-open-ended]], [[person-belongs-to-many-organizations]] |
+| [[salesforce]]        | partial  | [[advanced-objects-off-main-path]], [[extension-ladder]], [[one-record-page]], [[current-Person–Organization link-is-open-ended]], [[person-belongs-to-many-organizations]] |
 | [[jdanielnd-crm-cli]] | mined    | [[three-doors-one-core]]                                                                                                           |
 | [[dzhng-crm-cli]]     | partial  | [[cli-json-is-the-baseline]], [[extension-ladder]]                                                                                 |
 

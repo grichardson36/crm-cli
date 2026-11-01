@@ -267,7 +267,7 @@ func (m *Model) handleCaptureKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		warn = " warning: " + why + "."
 	}
 	m.confirm = &confirmState{
-		prompt: fmt.Sprintf("bind %s to %s (now %s)?%s y/n", title, keys.Display(norm), old, warn),
+		prompt: fmt.Sprintf("bind %s to %s (now %s)?%s", title, keys.Display(norm), old, warn),
 		yes: func() {
 			o := keys.Overrides{}
 			for k, v := range m.keyOverrides {

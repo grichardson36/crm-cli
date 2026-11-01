@@ -52,8 +52,9 @@ type overlay struct {
 	// turns the filter line off.
 	onKey    func(m *Model, key string) bool
 	noFilter bool
-	// help replaces the key hints in the title line, note replaces the filter line of a noFilter list.
-	help, note string
+	// hints replaces the default footer hints of the list (hints.go), note replaces the filter line of a noFilter list.
+	note       string
+	hints      []hintItem
 	onPick     func(m *Model, it overlayItem)
 	// onCursor runs when the cursor lands on a different item (live preview). onCancel runs when
 	// the overlay is closed without a pick. Both are optional.
@@ -398,14 +399,7 @@ func (m *Model) overlayView() string {
 		return m.cmdView()
 	}
 	var b strings.Builder
-	help := "   enter run  esc close  up/down choose"
-	if o.help != "" {
-		help = "   " + o.help
-	}
-	if o.palette {
-		help = "   enter run  esc close  tab verbs   > actions  @ people  # tags  = settings  ? help"
-	}
-	b.WriteString(lipgloss.NewStyle().MaxWidth(m.width).Render(m.st.Head.Render(o.title)+m.st.Dim.Render(help)) + "\n")
+	b.WriteString(lipgloss.NewStyle().MaxWidth(m.width).Render(m.st.Head.Render(o.title)) + "\n")
 	if o.noFilter && o.note != "" {
 		b.WriteString(m.st.Dim.Render(ansi.Truncate(o.note, m.width, "…")) + "\n")
 	} else {
@@ -413,7 +407,7 @@ func (m *Model) overlayView() string {
 	}
 	page := m.overlayPage()
 	if len(o.shown) == 0 {
-		b.WriteString(m.st.Dim.Render("No matches."))
+		b.WriteString(m.st.Dim.Render("No matches.") + "\n" + m.overlayFooter())
 		return b.String()
 	}
 	end := min(len(o.shown), o.offset+page)
@@ -425,7 +419,7 @@ func (m *Model) overlayView() string {
 				b.WriteString("\n" + m.st.Head.Render(ansi.Truncate(m.barVerbLine(it), m.width, "…")))
 			}
 		}
-		return b.String()
+		return b.String() + "\n" + m.overlayFooter()
 	}
 	for i := o.offset; i < end; i++ {
 		it := o.items[o.shown[i]]
@@ -456,7 +450,12 @@ func (m *Model) overlayView() string {
 			b.WriteString("\n")
 		}
 	}
-	return b.String()
+	return b.String() + "\n" + m.overlayFooter()
+}
+
+// overlayFooter is the last line of a picker, the palette or the bar: its key hints.
+func (m *Model) overlayFooter() string {
+	return m.renderHintItems(m.overlayHints())
 }
 
 // --- help ---
@@ -500,7 +499,7 @@ func (m *Model) helpText() string {
 	chain := m.scopeChain()
 	var b strings.Builder
 	b.WriteString(m.st.Head.Render(fmt.Sprintf("Keys in %s (normal mode)", viewNames[m.view])) + "\n")
-	b.WriteString(m.st.Dim.Render("Keys that act on a highlighted row need one. Everything else is in the palette, ctrl+k.") + "\n\n")
+	b.WriteString(m.st.Dim.Render("Keys that act on a highlighted row need one. Everything else is in the palette.") + "\n\n")
 	for _, layer := range []string{layerFramework, layerApp} {
 		title := "Framework: the same in every view"
 		if layer == layerApp {

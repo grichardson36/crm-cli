@@ -10,4 +10,4 @@ Why: a LinkedIn profile saying someone works at a company is more reliable than 
 
 Draft order, to be confirmed by the owner: typed by the owner, enrichment provider, phone sync, bulk import. Owner-typed values stay highest because they are deliberate.
 
-Applies to: org membership from company text, title and role, and every enrichment field. Related: [[enrichment-is-suggested-then-accepted]], [[conflicts-keep-server-store-local]], [[sync-maps-structure-to-flat-fields]], [[sync-safe-data]].
+Applies to: org Person–Organization link from company text, title and role, and every enrichment field. Related: [[enrichment-is-suggested-then-accepted]], [[conflicts-keep-server-store-local]], [[sync-maps-structure-to-flat-fields]], [[sync-safe-data]].

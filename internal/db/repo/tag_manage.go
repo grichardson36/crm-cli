@@ -11,7 +11,7 @@ import (
 	"github.com/jdanielnd/crm-cli/internal/tree"
 )
 
-// Tag management for the Tags module (patterns/features-tags-module): counts per object kind, the
+// Tag management for the Tags module (patterns/features/features-tags-module): counts per object kind, the
 // objects that carry a tag, tags that differ only by case or separators, and tags no object carries.
 // The TUI, the CLI (crm tag unused, crm tag duplicates) and MCP all call these functions.
 

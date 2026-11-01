@@ -254,7 +254,7 @@ func selectionActions() []action {
 			desc: "select or unselect the row, then every verb (d, x, f, l, u, r, m, the palette) acts on all selected rows. With nothing selected a verb acts on the highlighted row",
 			foot: 25, footIn: inList, footLabel: "select", when: whenSelectable, run: func(m *Model) tea.Cmd { m.toggleMark(); return nil }},
 		{id: "select-all", title: "Select all visible", group: "Bulk", hint: "ctrl+a", keys: []string{"ctrl+a"},
-			desc: "select every visible row, again to clear. The view's sort and filter (ctrl+o) decide what is visible",
+			desc: "select every visible row, again to clear. The view's sort and filter decide what is visible",
 			when: whenList, run: func(m *Model) tea.Cmd { m.selectAll(); return nil }},
 		{id: "extend-down", title: "Extend selection down", group: "Bulk", hint: "shift+down", keys: []string{"shift+down"},
 			desc: "select the highlighted row and the one below, again to extend by one more row (shift+up takes rows back out)",

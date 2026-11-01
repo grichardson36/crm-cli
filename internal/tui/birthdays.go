@@ -91,7 +91,7 @@ func (m *Model) snapBirthdays() {
 func todayActions() []action {
 	return []action{
 		{id: "go-today", title: "Go to today", group: "Views",
-			desc: "jump to today in this view: today's day in Birthdays (past birthdays are above, ctrl+shift+up and ctrl+shift+down do the same), the first task dated today or later in Tasks, the top in Home, People and Follow-up",
+			desc: "jump to today in this view: today's day in Birthdays (past birthdays are above), the first task dated today or later in Tasks, the top in Home, People and Follow-up",
 			when: hasTodayAnchor,
 			run:  func(m *Model) tea.Cmd { m.goToday(); return nil }},
 	}

@@ -27,7 +27,7 @@ func (m *Model) askArchive() tea.Cmd {
 	what := m.nameOf(ids[0])
 	m.mode = modeConfirm
 	m.confirm = &confirmState{
-		prompt: fmt.Sprintf("archive %s? y/n", what),
+		prompt: fmt.Sprintf("archive %s?", what),
 		yes: func() {
 			m.bulk(ids, "archived "+what+" (restore from the Archived view)", "archived", func(id int64) error {
 				return m.hArchivePerson(m.ctx, id)

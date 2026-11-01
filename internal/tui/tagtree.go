@@ -142,7 +142,7 @@ func tagTreeActions() []action {
 			desc: "move the selected tags up one level, a/b/c becomes a/c, children follow. One undo step. Same as crm tag unnest",
 			when: whenTagList, run: func(m *Model) tea.Cmd { return m.unnestVerb() }},
 		action{id: "tag-layout", title: "Tags: tree or flat layout", group: "Tags",
-			desc: "switch the Tags list between a flat list and a tree where work/clients is under work. Remembered on this device (also in ctrl+o)",
+			desc: "switch the Tags list between a flat list and a tree where work/clients is under work. Remembered on this device (also in the view options)",
 			when: func(m *Model) bool { return m.view == viewTags && !m.onTagPage() && m.barKind == "" },
 			run: func(m *Model) tea.Cmd {
 				next := layoutTree
@@ -267,7 +267,7 @@ func (m *Model) runTreeChange(what string, run func(merge bool) (*repo.TagTreeRe
 		}
 		m.mode = modeConfirm
 		m.confirm = &confirmState{
-			prompt: fmt.Sprintf("tag #%s exists. %s and merge into it (%d renamed, %d merged, %d records move)? y/n", exists.Existing, what, preview.Renamed, preview.Merged, preview.Records),
+			prompt: fmt.Sprintf("tag #%s exists. %s and merge into it (%d renamed, %d merged, %d records move)?", exists.Existing, what, preview.Renamed, preview.Merged, preview.Records),
 			yes: func() {
 				res, err := run(true)
 				m.finishTreeChange(what, res, err)
