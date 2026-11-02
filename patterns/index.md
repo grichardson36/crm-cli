@@ -28,6 +28,7 @@ Start with [[core]]. Use this index only to find the relevant supporting pattern
 ## Current references
 
 - [[link-map]]
+- [[handoff-2026-11-02]]
 - [[command-bar]]
 - [[input-grammar]]
 - [[keyboard-and-feedback]]
