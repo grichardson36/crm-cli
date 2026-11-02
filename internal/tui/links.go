@@ -369,6 +369,15 @@ func (m *Model) askUnlinkRow(r formRow) {
 	}
 	src := m.pageRef()
 	li := *r.li
+	if li.Relation == tagKind && m.view == viewTags { // a row of the Tags pane: take the open tag off this object
+		tag, obj := m.cursorTagName(), repo.Ref{Kind: li.Kind, ID: li.ID}
+		m.mode = modeConfirm
+		m.confirm = &confirmState{
+			prompt: fmt.Sprintf("take #%s off %s %q?", tag, li.Kind, truncateLabel(r.value)),
+			yes:    func() { m.doUnlink(obj, tagKind, overlayItem{value: tag, label: tag}) },
+		}
+		return
+	}
 	m.mode = modeConfirm
 	m.confirm = &confirmState{
 		prompt: fmt.Sprintf("unlink %s %q?", r.other, truncateLabel(r.value)),

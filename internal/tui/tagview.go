@@ -41,6 +41,9 @@ func whenTagVerb(m *Model) bool {
 	if m.barTag != "" {
 		return true
 	}
+	if m.view == viewTags && m.focus == focusDetail && !m.onTagPage() && whenLinkedRow(m) {
+		return true // u on an object of the Tags pane
+	}
 	if m.view != viewTags || m.focus != focusList {
 		return false
 	}
@@ -372,6 +375,7 @@ func (m *Model) buildTagForm(r row) []formRow {
 	if s.Archived > 0 {
 		rows = append(rows, infoRow("archived", strconv.Itoa(s.Archived)))
 	}
+	rows = append(rows, m.taggedObjectRows(s.Name)...)
 	if g, dup := m.tagDups[s.Name]; dup {
 		var others []string
 		for _, t := range g.Tags {
@@ -381,6 +385,35 @@ func (m *Model) buildTagForm(r row) []formRow {
 		}
 		rows = append(rows, infoRow("similar", strings.Join(others, " ")+"  (m merges them)"))
 		rows[len(rows)-1].head = "Now"
+	}
+	return rows
+}
+
+// tagObjectsLimit is how many tagged objects the right pane lists. The tag page (enter on the tag)
+// lists them all.
+const tagObjectsLimit = 50
+
+// taggedObjectRows are the objects that carry the tag, as linked rows: enter opens one, d or u takes
+// the tag off it, in the kind color of the object.
+func (m *Model) taggedObjectRows(tag string) []formRow {
+	objs, err := m.tagr.TaggedObjects(m.ctx, tag)
+	if err != nil || len(objs) == 0 {
+		return nil
+	}
+	var rows []formRow
+	for i, o := range objs {
+		if i == tagObjectsLimit {
+			more := infoRow("", fmt.Sprintf("and %d more, enter on the tag opens its page", len(objs)-tagObjectsLimit))
+			more.dim = true
+			rows = append(rows, more)
+			break
+		}
+		li := model.LinkedObject{Relation: tagKind, Kind: o.Kind, ID: o.ID, Name: o.Name, Current: true}
+		r := formRow{kind: rkLinked, label: tagKindWords[o.Kind][0], value: o.Name, id: o.ID, suffix: "  " + cleanCell(o.Detail), li: &li, other: o.Kind}
+		if i == 0 {
+			r.head = "Objects"
+		}
+		rows = append(rows, r)
 	}
 	return rows
 }
@@ -747,6 +780,10 @@ func prefixAll(p string, in []string) []string {
 // tagUnlinkVerb is u. On a tag page it takes the page's tag off the highlighted or selected objects. On a
 // list or a bar row it lists the objects that carry the tag(s) and takes the tags off the one picked.
 func (m *Model) tagUnlinkVerb() tea.Cmd {
+	if m.focus == focusDetail && whenLinkedRow(m) {
+		m.askUnlinkRow(m.form[m.fcur])
+		return nil
+	}
 	if m.onTagPage() {
 		refs := m.bulkRefs()
 		switch len(refs) {
