@@ -10,10 +10,10 @@ research: partial
 **Research state.** partly researched. See [[inspirations]].
 
 **What we take.**
-- Plain-word dates with highlight, click to make plain text. [[dates-are-plain-words]] [[show-parsed-chips]]
-- The word every for recurrence. [[every-means-recurrence]]
-- Documented false match: monthly in Create monthly report becomes a date. [[date-safety-rules]]
-- # for projects and tags. [[hash-means-tag]]
+- Plain-word dates with highlight, click to make plain text. [[core]] [[core]]
+- The word every for recurrence. [[core]]
+- Documented false match: monthly in Create monthly report becomes a date. [[core]]
+- # for projects and tags. [[core]]
 
 **What we leave.** p1 to p3 priority and braces for deadline.
 

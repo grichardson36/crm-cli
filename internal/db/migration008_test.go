@@ -67,11 +67,11 @@ func TestMigration008_MovesDataAndDropsOldColumns(t *testing.T) {
 
 	assert.Equal(t, db.LatestVersion(), scalar(t, d, `PRAGMA user_version`))
 
-	// Memberships: people.org_id became a primary membership.
-	assert.Equal(t, 2, scalar(t, d, `SELECT COUNT(*) FROM membership`))
-	assert.Equal(t, 2, scalar(t, d, `SELECT COUNT(*) FROM membership WHERE is_primary = 1 AND deleted_at IS NULL AND started_on IS NULL AND ended_on IS NULL`))
-	assert.Equal(t, 1, scalar(t, d, `SELECT org_id FROM membership WHERE person_id = 1`))
-	assert.Equal(t, 2, scalar(t, d, `SELECT org_id FROM membership WHERE person_id = 3`))
+	// Person–Organization links: people.org_id became a primary link.
+	assert.Equal(t, 2, scalar(t, d, `SELECT COUNT(*) FROM person_organization_link`))
+	assert.Equal(t, 2, scalar(t, d, `SELECT COUNT(*) FROM person_organization_link WHERE is_primary = 1 AND deleted_at IS NULL AND started_on IS NULL AND ended_on IS NULL`))
+	assert.Equal(t, 1, scalar(t, d, `SELECT org_id FROM person_organization_link WHERE person_id = 1`))
+	assert.Equal(t, 2, scalar(t, d, `SELECT org_id FROM person_organization_link WHERE person_id = 3`))
 
 	// Deals.
 	assert.Equal(t, 1, scalar(t, d, `SELECT COUNT(*) FROM deal_person`))
@@ -139,18 +139,18 @@ func TestMigration008_Constraints(t *testing.T) {
 	require.NoError(t, err)
 	defer d.Close()
 
-	// One live primary membership per person.
-	_, err = d.Exec(`INSERT INTO membership (uuid, person_id, org_id, is_primary) VALUES ('m9', 1, 2, 1)`)
+	// One live primary Person–Organization link per person.
+	_, err = d.Exec(`INSERT INTO person_organization_link (uuid, person_id, org_id, is_primary) VALUES ('m9', 1, 2, 1)`)
 	require.Error(t, err, "person 1 already has a primary")
-	_, err = d.Exec(`INSERT INTO membership (uuid, person_id, org_id, is_primary) VALUES ('m9', 1, 2, 0)`)
+	_, err = d.Exec(`INSERT INTO person_organization_link (uuid, person_id, org_id, is_primary) VALUES ('m9', 1, 2, 0)`)
 	require.NoError(t, err)
-	_, err = d.Exec(`INSERT INTO membership (uuid, person_id, org_id, is_primary) VALUES ('m10', 1, 2, 0)`)
-	require.NoError(t, err, "repeated and overlapping memberships are allowed")
-	_, err = d.Exec(`UPDATE membership SET deleted_at = datetime('now') WHERE person_id = 1 AND is_primary = 1`)
+	_, err = d.Exec(`INSERT INTO person_organization_link (uuid, person_id, org_id, is_primary) VALUES ('m10', 1, 2, 0)`)
+	require.NoError(t, err, "repeated and overlapping Person–Organization links are allowed")
+	_, err = d.Exec(`UPDATE person_organization_link SET deleted_at = datetime('now') WHERE person_id = 1 AND is_primary = 1`)
 	require.NoError(t, err)
-	_, err = d.Exec(`INSERT INTO membership (uuid, person_id, org_id, is_primary) VALUES ('m11', 1, 1, 1)`)
+	_, err = d.Exec(`INSERT INTO person_organization_link (uuid, person_id, org_id, is_primary) VALUES ('m11', 1, 1, 1)`)
 	require.NoError(t, err, "a soft-deleted primary frees the slot")
-	_, err = d.Exec(`INSERT INTO membership (uuid, person_id, org_id, started_on, ended_on) VALUES ('m12', 2, 1, '2021-01-01', '2020-01-01')`)
+	_, err = d.Exec(`INSERT INTO person_organization_link (uuid, person_id, org_id, started_on, ended_on) VALUES ('m12', 2, 1, '2021-01-01', '2020-01-01')`)
 	require.Error(t, err, "dates must be in order")
 
 	// One live primary organization per deal.
@@ -201,7 +201,7 @@ func TestMigration008_ActivityTargetHasNoOrphans(t *testing.T) {
 	_, err = d.Exec(`DELETE FROM people WHERE id = 1`)
 	require.NoError(t, err)
 	assert.Equal(t, 0, scalar(t, d, `SELECT COUNT(*) FROM activity_target WHERE target_kind = 'person' AND target_id = 1`))
-	assert.Equal(t, 0, scalar(t, d, `SELECT COUNT(*) FROM membership WHERE person_id = 1`), "memberships cascade")
+	assert.Equal(t, 0, scalar(t, d, `SELECT COUNT(*) FROM person_organization_link WHERE person_id = 1`), "Person–Organization links cascade")
 	assert.Equal(t, 0, scalar(t, d, `SELECT COUNT(*) FROM person_relation WHERE a_id = 1 OR b_id = 1`), "person links cascade")
 }
 
@@ -211,7 +211,7 @@ func TestMigration008_FreshDatabase(t *testing.T) {
 	defer d.Close()
 	assert.Equal(t, db.LatestVersion(), scalar(t, d, `PRAGMA user_version`))
 	assert.Equal(t, 10, scalar(t, d, `SELECT COUNT(*) FROM relation_kind`))
-	assert.Equal(t, 0, scalar(t, d, `SELECT COUNT(*) FROM membership`))
+	assert.Equal(t, 0, scalar(t, d, `SELECT COUNT(*) FROM person_organization_link`))
 	var ok string
 	require.NoError(t, d.QueryRow(`PRAGMA integrity_check`).Scan(&ok))
 	assert.Equal(t, "ok", ok)

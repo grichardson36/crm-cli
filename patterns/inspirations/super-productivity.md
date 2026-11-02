@@ -10,8 +10,8 @@ research: partial
 **Research state.** partly researched. See [[inspirations]].
 
 **What we take.**
-- Bare 25m as a duration form. [[duration-forms]]
-- The exception that prefixes dates with @, which we dropped to free @ for people. [[at-sign-means-person]]
+- Bare 25m as a duration form. [[core]]
+- The exception that prefixes dates with @, which we dropped to free @ for people. [[core]]
 
 **What we leave.** @ for dates.
 

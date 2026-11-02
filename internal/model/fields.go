@@ -253,7 +253,7 @@ var Fields = map[string][]FieldSpec{
 		{Key: "tabs", Label: "in the tabs", Type: FieldChoice, Choices: []FieldChoiceOption{{Value: "no", Label: "no"}, {Value: "yes", Label: "yes"}}},
 	},
 	// The role of a person on a deal is a sales role from the deal role vocabulary, not the free text
-	// of a membership role. The options are loaded from the vocabulary (patterns/deal-roles).
+	// of a Person–Organization link role. The options are loaded from the vocabulary (patterns/deal-roles).
 	DealPersonKind: {
 		{Key: "role", Label: "deal role", Type: FieldChoice, Vocabulary: DealRoleKind, Hint: "type to filter, a new name offers Create role"},
 	},

@@ -58,7 +58,7 @@ func DefaultRegistry() []Table {
 		{Name: "person_handles", AddUUID: true},
 		{Name: "custom_fields", AddUUID: true, Poly: []Poly{{Column: "entity_id", KindColumn: "entity_type", Targets: map[string]string{"person": "people", "organization": "organizations", "deal": "deals", "interaction": "interactions", "task": "tasks"}}}},
 		{Name: "relation_kind", Natural: []string{"object_type", "name"}},
-		{Name: "membership"},
+		{Name: "person_organization_link"},
 		{Name: "person_relation"},
 		{Name: "org_relation"},
 		{Name: "deal_person"},

@@ -223,7 +223,7 @@ func (e *Engine) Reproject(ctx context.Context, st Store, pr Projector, refs ...
 }
 
 // flush projects the dirty records and every pending record, and repeats while that makes progress,
-// because a record can wait for another one (a membership waits for its person).
+// because a record can wait for another one (a Person–Organization link waits for its person).
 func (e *Engine) flush(ctx context.Context, st Store, pr Projector, dirty map[RecordRef]bool) error {
 	pending, err := st.Pending(ctx)
 	if err != nil {

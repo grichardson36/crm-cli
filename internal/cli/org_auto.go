@@ -10,7 +10,7 @@ import (
 )
 
 // autoOrgForCompany applies the company-text rule to a person: the text creates or reuses an
-// organization and the person's primary membership points to it. Junk strings (crm org ignore) and
+// organization and the person's primary Person–Organization link points to it. Junk strings (crm org ignore) and
 // an empty text do nothing. What it did goes to stderr.
 func autoOrgForCompany(ctx context.Context, db *sql.DB, personID int64, company string) error {
 	ch, err := repo.NewOrgAutoRepo(db).ApplyCompany(ctx, personID, company, repo.ModePrimary)

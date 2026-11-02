@@ -10,8 +10,8 @@ research: partial
 **Research state.** partly researched. See [[inspirations]].
 
 **What we take.**
-- Activity timeline on every record. [[one-record-page]]
-- A warning case: component freedom and navigation-item count make clutter. [[advanced-objects-off-main-path]] [[extension-ladder]]
+- Activity timeline on every record. [[core]]
+- A warning case: component freedom and navigation-item count make clutter. [[core]] [[core]]
 
 **What we leave.** Component-assembled pages and custom developer components.
 

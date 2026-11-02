@@ -393,10 +393,10 @@ func (r *DavRepo) ResolveIssue(ctx context.Context, id int64) error {
 	return nil
 }
 
-// PrimaryRole is the role on the person's primary organization membership, "" when there is none.
+// PrimaryRole is the role on the person's primary Person–Organization link, "" when there is none.
 func PrimaryRole(ctx context.Context, q DBTX, personID int64) (string, error) {
 	var role sql.NullString
-	err := q.QueryRowContext(ctx, `SELECT m.role FROM membership m JOIN organizations o ON o.id = m.org_id
+	err := q.QueryRowContext(ctx, `SELECT m.role FROM person_organization_link m JOIN organizations o ON o.id = m.org_id
 		WHERE m.person_id = ? AND m.is_primary = 1 AND m.deleted_at IS NULL AND o.archived = 0`, personID).Scan(&role)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil

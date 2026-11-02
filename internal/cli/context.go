@@ -60,14 +60,14 @@ func registerContextCommand(rootCmd *cobra.Command) {
 			// Organizations: the primary one as before, all of them with role and dates
 			var org *model.Organization
 			lr := repo.NewLinkRepo(db)
-			memberships, err := lr.Linked(ctx, repo.Ref{Kind: "person", ID: person.ID}, "organization")
+			organizationLinks, err := lr.Linked(ctx, repo.Ref{Kind: "person", ID: person.ID}, "organization")
 			if err != nil {
 				return err
 			}
-			if len(memberships) > 0 {
-				result["organizations"] = memberships
+			if len(organizationLinks) > 0 {
+				result["organizations"] = organizationLinks
 			}
-			for _, ms := range memberships {
+			for _, ms := range organizationLinks {
 				if ms.Primary {
 					or := repo.NewOrgRepo(db)
 					org, err = or.FindByID(ctx, ms.ID)
@@ -176,7 +176,7 @@ func registerContextCommand(rootCmd *cobra.Command) {
 			if person.Location != nil {
 				fmt.Fprintf(w, "  Location: %s\n", *person.Location)
 			}
-			for _, ms := range memberships {
+			for _, ms := range organizationLinks {
 				fmt.Fprintf(w, "  Organization: %s\n", linkLine(ms))
 			}
 			if person.Summary != nil {

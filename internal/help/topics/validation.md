@@ -17,7 +17,7 @@ One validation framework checks every value from the CLI, MCP, the terminal UI, 
 | E_DATE_ORDER | an end date is before its start date |
 | E_CHOICE_INVALID | not one of the field's options |
 | E_NUMBER_INVALID, E_NUMBER_TOO_LOW | not a number, or below the field's minimum |
-| E_PRIMARY_MEMBERSHIP_MULTIPLE | more than one primary Person–Organization link |
+| E_PRIMARY_PERSON_ORGANIZATION_LINK_MULTIPLE | more than one primary Person–Organization link |
 | E_ORG_PARENT_CYCLE | an organization would be its own ancestor |
 | E_VOCAB_UNKNOWN | a value is not on a list you manage (a deal role or deal stage not on the list): add it first or pass `--create` |
 | E_VOCAB_IN_USE | a listed value is still used: name a replacement (`--replace-with`) or `--keep` it as plain text (a deal stage always needs a replacement) |

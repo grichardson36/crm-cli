@@ -82,7 +82,7 @@ func linkExamples(kind, other string, remove bool) []string {
 	}
 	out := []string{fmt.Sprintf("crm %s link %s 1 1", noun, on)}
 	switch rel.Name {
-	case "membership":
+	case "person_organization_link":
 		out = append(out, fmt.Sprintf("crm %s link %s 1 1 --role CTO --from 2019-03 --primary", noun, on),
 			fmt.Sprintf("crm %s link %s 1 1 --role Advisor --from 2023 --new", noun, on))
 	case "person_relation", "org_relation":
@@ -141,7 +141,7 @@ func parseObjectID(what, s string) (int64, error) {
 }
 
 // relationCmd is `crm <kind> link|unlink <other> <id> <other id>`. The flags come from the relation
-// registry: a membership takes --role --from --to --primary --notes, a person or organization
+// registry: a Person–Organization link takes --role --from --to --primary --notes, a person or organization
 // relation takes --kind, a deal link takes --role. See `crm help relations`.
 func relationCmd(kind, other string, remove bool) *cobra.Command {
 	rel, _ := model.RelationBetween(kind, other)
