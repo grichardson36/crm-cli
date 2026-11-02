@@ -108,13 +108,13 @@ func TestTheSegmentBeingTypedShowsASoftIndicatorNeverAnError(t *testing.T) {
 func TestSmartCorrectionShowsAsAHint(t *testing.T) {
 	m, _ := newTestModel(t)
 	press(m, "a", "p")
-	require.True(t, m.creating)
+	require.Equal(t, modePrompt, m.mode)
 	typeText(m, "ann@example.com")
 	s := m.pipeRefresh()
-	rep := m.pipeReportFor(s, m.rowInput.Value(), m.rowInput.Position())
+	rep := m.pipeReportFor(s, m.input.Value(), m.input.Position())
 	assert.Contains(t, rep.suggest, "S_EMAIL_IN_TEXT_FIELD")
 	assert.Contains(t, plainView(m), "looks like an email address")
-	assert.Equal(t, "ann@example.com", m.rowInput.Value(), "the text is not changed")
+	assert.Equal(t, "ann@example.com", m.input.Value(), "the text is not changed")
 }
 
 // Enter keeps the final full validation: a closed segment with an error stops the save and keeps the line.

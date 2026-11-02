@@ -1052,9 +1052,9 @@ func (m *Model) bulk(ids []int64, single, plural string, fn func(id int64) error
 }
 
 func (m *Model) runPrompt(kind, value string) {
-	if kind == personAddKind {
+	if kind == personAddKind && m.creating {
 		// A picker for a name of the new person's line ended: back to the name row, which saves again.
-		if m.creating && m.edit != nil {
+		if m.edit != nil {
 			m.mode = modeEdit
 			_ = m.rowInput.Focus()
 			m.commitEdit()
@@ -1092,6 +1092,9 @@ func (m *Model) runPrompt(kind, value string) {
 		return
 	}
 	switch kind {
+	case personAddKind:
+		m.savePersonLine(value)
+		return
 	case "link-attrs":
 		m.runLinkAttrs(value)
 		return

@@ -98,7 +98,7 @@ func TestAddAndDeleteKeysAreTheSameInEveryObjectView(t *testing.T) {
 	press(m, "2")
 	before := len(m.people)
 	press(m, "a", "enter")
-	require.Equal(t, focusDetail, m.focus, "a then enter opens the blank contact form")
+	require.Equal(t, modePrompt, m.mode, "a then enter opens the person line in the footer")
 	typeText(m, "Dana Fox")
 	press(m, "enter")
 	assert.Len(t, m.people, before+1)

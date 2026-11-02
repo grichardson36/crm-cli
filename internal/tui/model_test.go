@@ -714,11 +714,11 @@ func TestCopyAndOpen(t *testing.T) {
 	assert.Equal(t, "\x1b]52;c;aGk=\x07", sb.String())
 }
 
-func TestCreateContact(t *testing.T) {
+func TestCreateContactWithTheForm(t *testing.T) {
 	m, pr := newTestModel(t)
 
 	// Esc abandons it, nothing is inserted.
-	press(m, "a", "enter")
+	runPalette(m, "person: add with the form")
 	assert.Equal(t, modeEdit, m.mode)
 	assert.Equal(t, focusDetail, m.focus)
 	assert.Contains(t, m.screen(), "New contact")
@@ -730,7 +730,8 @@ func TestCreateContact(t *testing.T) {
 	assert.Len(t, all, 3)
 
 	// An empty name is rejected and the box stays open.
-	press(m, "a", "enter", "enter")
+	runPalette(m, "person: add with the form")
+	press(m, "enter")
 	assert.Equal(t, modeEdit, m.mode)
 	assert.True(t, m.statusIsErr)
 
@@ -768,13 +769,38 @@ func TestCreateContactFromOtherViewAndPalette(t *testing.T) {
 	press(m, "3", "ctrl+k")
 	typeText(m, "new contact")
 	press(m, "enter")
-	require.Equal(t, modeEdit, m.mode)
+	require.Equal(t, modePrompt, m.mode, "the person line opens in the footer")
 	typeText(m, "Eve")
 	press(m, "enter")
 	assert.Equal(t, viewPeople, m.view)
 	all, err := pr.FindAll(context.Background(), model.PersonFilters{})
 	require.NoError(t, err)
 	assert.Len(t, all, 4)
+}
+
+// The add of a person is the footer line like every other kind: a name, then the links. The cursor
+// lands on the new person in the list.
+func TestAddPersonIsAFooterLineThatLandsOnThePerson(t *testing.T) {
+	m, pr := newTestModel(t)
+	press(m, "a", "enter")
+	require.Equal(t, modePrompt, m.mode)
+	assert.Equal(t, personAddKind, m.promptKind)
+	press(m, "esc")
+	assert.Equal(t, modeNormal, m.mode)
+	all, _ := pr.FindAll(context.Background(), model.PersonFilters{})
+	assert.Len(t, all, 3, "esc adds nobody")
+
+	press(m, "a", "enter")
+	typeText(m, "Dana Mary Dunn")
+	press(m, "enter")
+	assert.Equal(t, modeNormal, m.mode)
+	all, _ = pr.FindAll(context.Background(), model.PersonFilters{})
+	require.Len(t, all, 4)
+	assert.Equal(t, "Dana Mary Dunn", m.rows[m.cursor].title, "the cursor lands on the new person in the list")
+	assert.Equal(t, focusList, m.focus)
+	press(m, "ctrl+z")
+	all, _ = pr.FindAll(context.Background(), model.PersonFilters{})
+	assert.Len(t, all, 3, "ctrl+z undoes the add")
 }
 
 func TestMarksAndBulkActions(t *testing.T) {

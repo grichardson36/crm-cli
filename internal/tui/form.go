@@ -1001,11 +1001,11 @@ func (m *Model) submitPersonLine(line string) error {
 	return m.createPerson(personAddLine().coreLine(line))
 }
 
-// createPerson inserts the person on the first successful save of a name.
-func (m *Model) createPerson(name string) error {
+// createPersonRecord inserts a person from a typed name.
+func (m *Model) createPersonRecord(name string) (*model.Person, error) {
 	parts := strings.Fields(name)
 	if len(parts) == 0 {
-		return fmt.Errorf("a name is required: %w", model.ErrValidation)
+		return nil, fmt.Errorf("a name is required: %w", model.ErrValidation)
 	}
 	in := model.CreatePersonInput{FirstName: strings.Join(parts[:len(parts)-1], " ")}
 	if len(parts) == 1 {
@@ -1014,7 +1014,35 @@ func (m *Model) createPerson(name string) error {
 		last := parts[len(parts)-1]
 		in.LastName = &last
 	}
-	p, err := m.hCreatePerson(m.ctx, in)
+	return m.hCreatePerson(m.ctx, in)
+}
+
+// startPersonLine is the add of a person: the footer line like every other kind, the name first and
+// the links after it. The form version is the palette action "Person: add with the form".
+func (m *Model) startPersonLine() tea.Cmd {
+	m.startInput(personAddKind, personDef().prompt(), "")
+	return m.input.Focus()
+}
+
+// savePersonLine saves the footer line of a new person and leaves the cursor on them.
+func (m *Model) savePersonLine(name string) {
+	p, err := m.createPersonRecord(name)
+	if err != nil {
+		m.startInput(personAddKind, personDef().prompt(), name)
+		m.pendingCmd = tea.Batch(m.input.Focus(), m.showToast(err.Error(), true))
+		m.setStatus(err.Error(), true)
+		return
+	}
+	m.view, m.query = viewPeople, ""
+	m.afterWrite()
+	m.landOn("person", p.ID)
+	m.setStatus("person added (ctrl+z undoes)", false)
+	m.pendingCmd = m.showToast("person added · ctrl+z undoes", false)
+}
+
+// createPerson inserts the person on the first successful save of a name.
+func (m *Model) createPerson(name string) error {
+	p, err := m.createPersonRecord(name)
 	if err != nil {
 		return err
 	}

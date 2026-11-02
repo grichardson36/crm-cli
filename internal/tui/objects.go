@@ -312,7 +312,7 @@ func personDef() *objDef {
 			return m.curPerson()
 		},
 		nameOf:    func(m *Model, id int64) string { return m.personLabel(id) },
-		add:       func(m *Model) tea.Cmd { return m.startCreate() },
+		add:       func(m *Model) tea.Cmd { return m.startPersonLine() },
 		edit:      func(m *Model, id int64) tea.Cmd { m.focus = focusDetail; m.syncDetail(); return nil },
 		archive:   func(m *Model, id int64) error { return m.hArchivePerson(m.ctx, id) },
 		restore:   func(m *Model, id int64) error { return m.hRestorePerson(m.ctx, id) },

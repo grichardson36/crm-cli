@@ -25,6 +25,7 @@ Start with [[core]]. Use this index only to find the relevant supporting pattern
 - [[edge-adapters]]
 - [[accepted-enrichment]]
 - [[navigation-standard]]
+- [[add-standard]]
 
 ## Current references
 

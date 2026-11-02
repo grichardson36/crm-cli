@@ -349,6 +349,8 @@ func buildActions() []action {
 			write: true, run: func(m *Model) tea.Cmd { return m.undoLast() }},
 		{id: "redo", title: "Redo", group: "App", hint: "ctrl+y", keys: []string{"ctrl+y"}, desc: "redo the change that was just undone",
 			write: true, run: func(m *Model) tea.Cmd { return m.redoLast() }},
+		{id: "person-add-form", title: "Person: add with the form", group: "App", desc: "add a person in the detail form, with a name row and the contact detail rows, instead of the footer line that a uses",
+			write: true, run: func(m *Model) tea.Cmd { return m.startCreate() }},
 		{id: "undo-history", title: "Undo history", group: "App", hint: "ctrl+shift+z", keys: []string{"ctrl+shift+z"}, desc: "a list of this session's changes, newest first. Pick one to undo it and everything after it",
 			write: true, run: func(m *Model) tea.Cmd { return m.openHistory(false) }},
 		{id: "redo-history", title: "Redo history", group: "App", desc: "a list of the changes that were undone, next first. Pick one to redo it and everything before it",

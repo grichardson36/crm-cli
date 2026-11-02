@@ -151,8 +151,8 @@ func TestGlobalAddTaskDealPersonAndNote(t *testing.T) {
 	require.Len(t, deals, 1)
 	assert.Equal(t, viewBirthdays, m.view)
 
-	press(m, "a", "p") // person: the form opens, a name saves it
-	require.Equal(t, modeEdit, m.mode, "the person form takes the screen")
+	press(m, "a", "p") // person: the footer line opens, a name saves it
+	require.Equal(t, modePrompt, m.mode, "the person line takes the footer")
 	typeText(m, "Zoe Quinn")
 	press(m, "enter")
 	assert.Equal(t, viewPeople, m.view, "the view's own kind is added in place and the new person shows in People")

@@ -294,8 +294,10 @@ func (m *Model) applyLink(src repo.Ref, l pendingLink) error {
 // create and the links are one undo step. A failed link leaves the object created and says so.
 func (m *Model) afterCreate(kind string, id int64) {
 	if len(m.pipeLinks) == 0 || (m.pipeObj != "" && m.pipeObj != kind) {
+		m.landOn(kind, id)
 		return
 	}
+	defer m.landOn(kind, id)
 	links := m.pipeLinks
 	m.pipeLinks, m.pipeObj = nil, ""
 	// Fold the entry the create just recorded into the same step as the links.
@@ -322,6 +324,41 @@ func (m *Model) afterCreate(kind string, id int64) {
 	m.pipeRes = map[string]pendingLink{}
 	if firstErr != nil {
 		m.setStatus(firstErr.Error(), true)
+	}
+}
+
+// landOn leaves the list cursor on a new object when the open view lists that kind (owner decision
+// 2026-11-02: every add lands on the new object in its list). Another view, or a list the filter
+// hides it from, keeps the cursor where it was.
+func (m *Model) landOn(kind string, id int64) {
+	o := objectByKind(kind)
+	if o == nil || o.view != m.view || m.cmp != nil || m.creating {
+		return
+	}
+	if err := m.reload(); err != nil {
+		return
+	}
+	for i, r := range m.rows {
+		if r.skip {
+			continue
+		}
+		var hit bool
+		switch kind {
+		case "person":
+			hit = r.personID == id
+		case "organization":
+			hit = r.orgID == id
+		case "deal":
+			hit = r.dealID == id
+		case "task":
+			hit = r.taskID == id
+		}
+		if hit {
+			m.cursor = i
+			m.clamp()
+			m.refreshDetail(true)
+			return
+		}
 	}
 }
 
