@@ -232,11 +232,14 @@ func TestAppearanceModeKeysChangeAndSaveTheMode(t *testing.T) {
 	assert.Equal(t, theme.ModeDark, m.appearance)
 	assert.Equal(t, "dark", m.st.Theme.Variant)
 	press(m, "right")
-	assert.Equal(t, theme.ModeAuto, m.appearance, "the selector wraps")
+	assert.Equal(t, theme.ModeDark, m.appearance, "right of the last mode stays")
+	press(m, "left", "left")
+	assert.Equal(t, theme.ModeAuto, m.appearance)
 	assert.Equal(t, theme.FillAuto, m.fillMode)
+	assert.Equal(t, focusDetail, m.focus)
 	press(m, "left")
-	assert.Equal(t, theme.ModeDark, m.appearance)
-	assert.Equal(t, focusDetail, m.focus, "left changes the mode, it does not leave the pane on this row")
+	assert.Equal(t, focusList, m.focus, "left of the first mode is the edge of the pane: back to the list")
+	assert.Equal(t, theme.ModeAuto, m.appearance)
 }
 
 // A light theme previewed on a dark terminal paints the screen. Choosing a dark theme afterwards sets

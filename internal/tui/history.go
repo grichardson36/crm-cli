@@ -211,6 +211,70 @@ func (m *Model) redoLast() tea.Cmd {
 	return m.showToast("Redone: "+e.label+" · ctrl+z undo", false)
 }
 
+// openHistory shows the undo list (newest first) or the redo list (next first) as a picker. Choosing
+// an entry undoes or redoes it and every entry between it and the top of the list, like the arrow
+// beside the undo button of an office program.
+func (m *Model) openHistory(redo bool) tea.Cmd {
+	stack, title, empty := m.hist, "Undo history", "Nothing to undo"
+	if redo {
+		stack, title, empty = m.redoStack, "Redo history", "Nothing to redo"
+	}
+	if len(stack) == 0 {
+		return m.showToast(empty, true)
+	}
+	var items []overlayItem
+	for i := len(stack) - 1; i >= 0; i-- {
+		n := len(stack) - i
+		it := overlayItem{id: fmt.Sprintf("hist:%d", n), label: stack[i].label, ref: int64(n)}
+		if n > 1 {
+			verb := "undoes"
+			if redo {
+				verb = "redoes"
+			}
+			it.desc = fmt.Sprintf("%s this and the %d newer", verb, n-1)
+			if redo {
+				it.desc = fmt.Sprintf("%s this and the %d before it", verb, n-1)
+			}
+		}
+		items = append(items, it)
+	}
+	m.openPicker(title, items, func(m *Model, it overlayItem) {
+		m.pendingCmd = m.stepHistory(redo, int(it.ref))
+	})
+	m.ov.noFilter = true
+	return nil
+}
+
+// stepHistory undoes or redoes n entries, one at a time, and stops at the first one that fails.
+// It says what happened once, in the toast of the last step.
+func (m *Model) stepHistory(redo bool, n int) tea.Cmd {
+	var cmd tea.Cmd
+	done := 0
+	for i := 0; i < n; i++ {
+		before := len(m.hist)
+		if redo {
+			cmd = m.redoLast()
+			if len(m.hist) == before {
+				break
+			}
+		} else {
+			cmd = m.undoLast()
+			if len(m.hist) == before {
+				break
+			}
+		}
+		done++
+	}
+	if done > 1 {
+		word := "Undone"
+		if redo {
+			word = "Redone"
+		}
+		return m.showToast(fmt.Sprintf("%s %d changes", word, done), false)
+	}
+	return cmd
+}
+
 // personLabel is the name of a person for messages.
 func (m *Model) personLabel(id int64) string {
 	for _, p := range m.people {

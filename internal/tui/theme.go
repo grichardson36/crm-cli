@@ -258,8 +258,16 @@ func (m *Model) stepMode(delta int) tea.Cmd {
 			i = j
 		}
 	}
-	n := len(theme.Modes)
-	if err := m.setAppearance(theme.Modes[(i+delta+n)%n]); err != nil {
+	if i+delta < 0 { // left of the first mode is the edge of the pane: back to the Settings list
+		m.focus, m.fcol = focusList, 0
+		m.endPreview()
+		m.syncDetail()
+		return nil
+	}
+	if i+delta >= len(theme.Modes) { // right of the last mode stays
+		return nil
+	}
+	if err := m.setAppearance(theme.Modes[i+delta]); err != nil {
 		m.setStatus(err.Error(), true)
 	}
 	return nil
