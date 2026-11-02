@@ -1,6 +1,6 @@
 -- up
 
--- Device-to-device sync (patterns/sync-contract.md). Every statement can run twice. Nothing here is used until `crm peers init`
+-- Device-to-device sync (patterns/references/sync-contract.md). Every statement can run twice. Nothing here is used until `crm peers init`
 -- turns sync on. The version a database gets is the position of the file, so never renumber.
 
 -- One row. phys and cnt are the hybrid logical clock. device is this database's sync identity and

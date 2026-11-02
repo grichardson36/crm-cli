@@ -72,7 +72,7 @@ func TestPurgeEveryType(t *testing.T) {
 	assert.Equal(t, 1, res.Purged)
 	for _, q := range []string{
 		`SELECT COUNT(*) FROM organizations`,
-		`SELECT COUNT(*) FROM membership`,
+		`SELECT COUNT(*) FROM person_organization_link`,
 		`SELECT COUNT(*) FROM deal_org`,
 		`SELECT COUNT(*) FROM taggings WHERE entity_type = 'organization'`,
 		`SELECT COUNT(*) FROM activity_target WHERE target_kind = 'organization'`,
@@ -80,7 +80,7 @@ func TestPurgeEveryType(t *testing.T) {
 		require.NoError(t, d.QueryRow(q).Scan(&n))
 		assert.Zero(t, n, q)
 	}
-	for _, table := range []string{"organizations", "membership", "deal_org", "taggings", "activity_target"} {
+	for _, table := range []string{"organizations", "person_organization_link", "deal_org", "taggings", "activity_target"} {
 		require.NoError(t, d.QueryRow(`SELECT COUNT(*) FROM tombstones WHERE table_name = ?`, table).Scan(&n))
 		assert.Positive(t, n, "tombstone for "+table)
 	}

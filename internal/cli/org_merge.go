@@ -36,10 +36,17 @@ func orgMergeRows(res *repo.OrgMergeResult) []map[string]any {
 	}
 	for _, name := range sortedKeys(res.Moved) {
 		if n := res.Moved[name]; n > 0 {
-			rows = append(rows, map[string]any{"change": "moved", "name": name, "detail": n})
+			rows = append(rows, map[string]any{"change": "moved", "name": orgMergeMovedName(name), "detail": n})
 		}
 	}
 	return rows
+}
+
+func orgMergeMovedName(name string) string {
+	if name == "person_organization_links" {
+		return "Person–Organization links"
+	}
+	return name
 }
 
 func orgMergeCmd() *cobra.Command {
@@ -50,7 +57,7 @@ func orgMergeCmd() *cobra.Command {
 		Long: `Merge the duplicate organizations into the survivor. Without --apply this only shows what would change.
 
 The survivor keeps its own fields and an empty one takes the first value from the duplicates (domain, industry, notes, summary).
-Memberships all move to the survivor, only a row identical to one the survivor already has (same person, role, start and end) is dropped.
+Person–Organization links all move to the survivor, only a row identical to one the survivor already has (same person, role, start and end) is dropped.
 Parent links move, a link that becomes a self link or a duplicate is dropped, and a merge that would make an organization its own parent is refused.
 Deal links, task and interaction links and tags move too. Each duplicate is archived and its id and uuid keep resolving to the survivor (merge alias).
 Company text keeps working: the duplicate's name now matches the survivor as an alias, so a person typed with the old name joins the survivor. Find merge candidates with 'crm org dupes'.`,

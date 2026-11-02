@@ -1,15 +1,37 @@
 {
   "collapse-filter": true,
-  "search": "",
+  "search": "-file:index -file:pattern-audit -[\"type\":inspiration] -[\"type\":research]]",
   "showTags": false,
   "showAttachments": false,
   "hideUnresolved": false,
   "showOrphans": true,
   "collapse-color-groups": true,
-  "colorGroups": [],
+  "colorGroups": [
+    {
+      "query": "[\"type\":inspiration]",
+      "color": {
+        "a": 1,
+        "rgb": 11752160
+      }
+    },
+    {
+      "query": "[\"type\":pattern]",
+      "color": {
+        "a": 1,
+        "rgb": 5431432
+      }
+    },
+    {
+      "query": "[\"type\":guide]",
+      "color": {
+        "a": 1,
+        "rgb": 16449066
+      }
+    }
+  ],
   "collapse-display": true,
   "showArrow": false,
-  "textFadeMultiplier": 0,
+  "textFadeMultiplier": -1.2,
   "nodeSizeMultiplier": 1,
   "lineSizeMultiplier": 1,
   "collapse-forces": true,
@@ -17,6 +39,6 @@
   "repelStrength": 10,
   "linkStrength": 1,
   "linkDistance": 250,
-  "scale": 0.7132754626224417,
+  "scale": 0.7132754626224364,
   "close": true
 }

@@ -1255,7 +1255,7 @@ func statsHandler(db *sql.DB) server.ToolHandlerFunc {
 }
 
 // personWithOrg applies the company-text rule (company text creates or reuses an organization and
-// becomes the primary membership) and returns the person, with an "organization" entry when the text
+// becomes the primary Person–Organization link) and returns the person, with an "organization" entry when the text
 // was handled. Ignored and empty text do nothing.
 func personWithOrg(ctx context.Context, pr *repo.PersonRepo, person *model.Person, apply bool, company string) (*gomcp.CallToolResult, error) {
 	if !apply || company == "" {

@@ -1,6 +1,6 @@
 # Purge any archived type
 
-Purge is a verb of every object type that can be archived: people, organizations, deals, tasks and notes. It permanently deletes the object and its dependent rows (links, tags, memberships) and records a tombstone for each deleted synced row, so sync can propagate it. It cannot be undone, and it only takes archived objects.
+Purge is a verb of every object type that can be archived: people, organizations, deals, tasks and notes. It permanently deletes the object and its dependent rows (links, tags, Person–Organization links) and records a tombstone for each deleted synced row, so sync can propagate it. It cannot be undone, and it only takes archived objects.
 
 ## Command line
 

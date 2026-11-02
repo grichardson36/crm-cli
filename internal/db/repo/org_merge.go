@@ -11,7 +11,7 @@ import (
 )
 
 // Organization merge (open discrepancy X18). The survivor keeps its own fields and empty ones are
-// filled from the duplicates. Everything attached to a duplicate moves to the survivor: memberships
+// filled from the duplicates. Everything attached to a duplicate moves to the survivor: Person–Organization links
 // (every row stays except an exact duplicate of a survivor row), parent links (self links dropped,
 // duplicates dropped, a cycle rejects the merge), deal links, task and interaction links and tags.
 // Each duplicate is archived and a merge_alias row records that its id and uuid now resolve to the
@@ -36,11 +36,11 @@ type OrgFieldChange struct {
 
 // OrgMergeResult is what a merge did, or with DryRun what it would do.
 type OrgMergeResult struct {
-	KeepID    int64            `json:"keep_id"`
-	KeepName  string           `json:"keep_name"`
-	DropIDs   []int64          `json:"drop_ids"`
-	DropNames []string         `json:"drop_names"`
-	DryRun    bool             `json:"dry_run"`
+	KeepID    int64    `json:"keep_id"`
+	KeepName  string   `json:"keep_name"`
+	DropIDs   []int64  `json:"drop_ids"`
+	DropNames []string `json:"drop_names"`
+	DryRun    bool     `json:"dry_run"`
 	// LogID is the merge log entry of an applied merge: `crm merge undo LogID` reverses it in any later session.
 	LogID  int64            `json:"log_id,omitempty"`
 	Fields []OrgFieldChange `json:"fields"`
@@ -142,7 +142,7 @@ func (r *OrgRepo) mergeOrgs(ctx context.Context, keepID int64, dropIDs []int64, 
 		return nil, err
 	}
 	res := &OrgMergeResult{KeepID: keepID, KeepName: keep.Name, DropIDs: dropIDs, DryRun: dryRun, Fields: []OrgFieldChange{},
-		Moved: map[string]int{"memberships": 0, "relations": 0, "deals": 0, "tasks": 0, "interactions": 0, "tags": 0, "aliases": 0, "duplicates_dropped": 0}}
+		Moved: map[string]int{"person_organization_links": 0, "relations": 0, "deals": 0, "tasks": 0, "interactions": 0, "tags": 0, "aliases": 0, "duplicates_dropped": 0}}
 	drops := make([]*model.Organization, 0, len(dropIDs))
 	for _, d := range dropIDs {
 		o, err := r.FindByID(ctx, d)
@@ -169,7 +169,7 @@ func (r *OrgRepo) mergeOrgs(ctx context.Context, keepID int64, dropIDs []int64, 
 		return nil, err
 	}
 	for _, d := range drops {
-		for _, step := range []func(int64) error{m.memberships, m.relations, m.dealLinks, m.activities, m.tags, m.alias} {
+		for _, step := range []func(int64) error{m.personOrganizationLinks, m.relations, m.dealLinks, m.activities, m.tags, m.alias} {
 			if err := step(d.ID); err != nil {
 				return nil, err
 			}
@@ -209,7 +209,7 @@ func touchOrgMembers(ctx context.Context, q DBTX, ids []int64) error {
 		args[i] = id
 	}
 	_, err := q.ExecContext(ctx, `UPDATE people SET updated_at = datetime('now') WHERE id IN
-		(SELECT person_id FROM membership WHERE org_id IN (`+placeholders(len(ids))+`))`, args...)
+		(SELECT person_id FROM person_organization_link WHERE org_id IN (`+placeholders(len(ids))+`))`, args...)
 	if err != nil {
 		return fmt.Errorf("touch members: %w", err)
 	}
@@ -258,22 +258,22 @@ func (m *orgMerger) fields(keep *model.Organization, drops []*model.Organization
 	return nil
 }
 
-type orgMembership struct {
-	id, person int64
+type orgPersonOrganizationLink struct {
+	id, person     int64
 	role, from, to sql.NullString
 	primary        bool
 }
 
-func (m *orgMerger) orgMemberships(org int64) ([]orgMembership, error) {
-	rows, err := m.tx.QueryContext(m.ctx, `SELECT id, person_id, role, started_on, ended_on, is_primary FROM membership
+func (m *orgMerger) orgPersonOrganizationLinks(org int64) ([]orgPersonOrganizationLink, error) {
+	rows, err := m.tx.QueryContext(m.ctx, `SELECT id, person_id, role, started_on, ended_on, is_primary FROM person_organization_link
 		WHERE org_id = ? AND deleted_at IS NULL ORDER BY id`, org)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var out []orgMembership
+	var out []orgPersonOrganizationLink
 	for rows.Next() {
-		var r orgMembership
+		var r orgPersonOrganizationLink
 		var p int
 		if err := rows.Scan(&r.id, &r.person, &r.role, &r.from, &r.to, &p); err != nil {
 			return nil, err
@@ -284,20 +284,20 @@ func (m *orgMerger) orgMemberships(org int64) ([]orgMembership, error) {
 	return out, rows.Err()
 }
 
-// memberships moves every membership of the duplicate. Only a row identical to one the survivor
+// personOrganizationLinks moves every Person–Organization link of the duplicate. Only a row identical to one the survivor
 // already has (same person, role, start and end) is dropped, and its primary flag moves to that row.
-func (m *orgMerger) memberships(d int64) error {
-	rows, err := m.orgMemberships(d)
+func (m *orgMerger) personOrganizationLinks(d int64) error {
+	rows, err := m.orgPersonOrganizationLinks(d)
 	if err != nil {
-		return fmt.Errorf("list memberships: %w", err)
+		return fmt.Errorf("list Person–Organization links: %w", err)
 	}
 	same := func(a, b sql.NullString) bool { return a.Valid == b.Valid && a.String == b.String }
 	for _, r := range rows {
-		at, err := m.orgMemberships(m.keep)
+		at, err := m.orgPersonOrganizationLinks(m.keep)
 		if err != nil {
 			return err
 		}
-		var twin *orgMembership
+		var twin *orgPersonOrganizationLink
 		for i := range at {
 			if at[i].person == r.person && same(at[i].role, r.role) && same(at[i].from, r.from) && same(at[i].to, r.to) {
 				twin = &at[i]
@@ -305,22 +305,22 @@ func (m *orgMerger) memberships(d int64) error {
 			}
 		}
 		if twin == nil {
-			if err := m.edit("membership", r.id, []string{"org_id"}, m.keep); err != nil {
-				return fmt.Errorf("move membership: %w", err)
+			if err := m.edit("person_organization_link", r.id, []string{"org_id"}, m.keep); err != nil {
+				return fmt.Errorf("move Person–Organization link: %w", err)
 			}
-			m.res.Moved["memberships"]++
+			m.res.Moved["person_organization_links"]++
 			continue
 		}
-		if err := m.drop("membership", r.id); err != nil {
+		if err := m.drop("person_organization_link", r.id); err != nil {
 			return err
 		}
 		if r.primary && !twin.primary {
 			var n int
-			if err := m.tx.QueryRowContext(m.ctx, `SELECT COUNT(*) FROM membership WHERE person_id = ? AND is_primary = 1 AND deleted_at IS NULL`, r.person).Scan(&n); err != nil {
+			if err := m.tx.QueryRowContext(m.ctx, `SELECT COUNT(*) FROM person_organization_link WHERE person_id = ? AND is_primary = 1 AND deleted_at IS NULL`, r.person).Scan(&n); err != nil {
 				return err
 			}
 			if n == 0 {
-				if err := m.edit("membership", twin.id, []string{"is_primary"}, 1); err != nil {
+				if err := m.edit("person_organization_link", twin.id, []string{"is_primary"}, 1); err != nil {
 					return err
 				}
 			}

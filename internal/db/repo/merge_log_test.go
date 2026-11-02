@@ -20,7 +20,7 @@ import (
 func liveState(t *testing.T, d *sql.DB) string {
 	t.Helper()
 	var b strings.Builder
-	for _, tbl := range []string{"people", "person_emails", "person_phones", "person_handles", "custom_fields", "taggings", "membership",
+	for _, tbl := range []string{"people", "person_emails", "person_phones", "person_handles", "custom_fields", "taggings", "person_organization_link",
 		"person_relation", "deal_person", "activity_target", "merge_alias", "dupe_dismissals", "organizations", "org_relation", "deal_org"} {
 		cols, err := d.Query("SELECT name FROM pragma_table_info('" + tbl + "') WHERE name NOT IN ('updated_at', 'uuid', 'created_at', 'deleted_at')")
 		require.NoError(t, err)
@@ -192,7 +192,7 @@ func TestMergeLog_OrganizationMergeUndoRedo(t *testing.T) {
 
 	_, err = logs.Undo(ctx, res.LogID)
 	require.NoError(t, err)
-	assert.Equal(t, before, liveState(t, f.d), "domain filled in, memberships, parent link, tag and alias all go back")
+	assert.Equal(t, before, liveState(t, f.d), "domain filled in, Person–Organization link, parent link, tag and alias all go back")
 	_, err = logs.Redo(ctx, res.LogID)
 	require.NoError(t, err)
 	assert.Equal(t, after, liveState(t, f.d))

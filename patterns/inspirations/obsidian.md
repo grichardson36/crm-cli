@@ -10,11 +10,11 @@ research: mined
 **Research state.** mined. See [[inspirations]].
 
 **What we take.**
-- Quick switcher: fuzzy, empty box shows recents, Enter on no match creates the note. [[empty-bar-shows-recents]] [[create-on-miss]] [[one-bar]]
-- Command palette: recent commands first, pinned commands, fuzzy ranking. [[one-bar]]
-- Wikilinks and autocomplete link to notes that do not exist yet. [[pick-or-create]] [[link-from-either-side]]
-- Small core plus local plugins. [[extension-ladder]]
-- The vault shape itself: this pattern language is atomic notes with wikilinks. [[objects-first]]
+- Quick switcher: fuzzy, empty box shows recents, Enter on no match creates the note. [[core]] [[core]] [[core]]
+- Command palette: recent commands first, pinned commands, fuzzy ranking. [[core]]
+- Wikilinks and autocomplete link to notes that do not exist yet. [[core]] [[link-registry]]
+- Small core plus local plugins. [[core]]
+- The vault shape itself: this pattern language is atomic notes with wikilinks. [[object-registry]]
 
 **What we leave.** Two separate boxes for actions and notes. We merged them (M01).
 

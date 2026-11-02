@@ -55,7 +55,7 @@ func registerOrgAutoTools(s *server.MCPServer, db *sql.DB) {
 
 	s.AddTool(
 		gomcp.NewTool("crm_org_backfill",
-			gomcp.WithDescription("Create or reuse organizations for existing people's company text. Dry run by default: returns counts (people with company text, distinct groups, orgs to create, orgs reused, ignored, people to link) and the groups, groups of 3 or more people first. Set apply to true to write it as one batch: each missing organization is created, each person gets a membership (primary when they have none, title as role), people.company is not changed. Matching is the normalized name (case, punctuation, Inc/LLC endings) or a merge alias, close names never merge. Junk strings on the ignore list (crm_org_ignore_list) create nothing. Idempotent"),
+			gomcp.WithDescription("Create or reuse organizations for existing people's company text. Dry run by default: returns counts (people with company text, distinct groups, orgs to create, orgs reused, ignored, people to link) and the groups, groups of 3 or more people first. Set apply to true to write it as one batch: each missing organization is created, each person gets a Person–Organization link (primary when they have none, title as role), people.company is not changed. Matching is the normalized name (case, punctuation, Inc/LLC endings) or a merge alias, close names never merge. Junk strings on the ignore list (crm_org_ignore_list) create nothing. Idempotent"),
 			gomcp.WithBoolean("apply", gomcp.Description("Write the changes (default false: dry run)")),
 			gomcp.WithNumber("limit", gomcp.Description("Max groups listed (default 50, 0 for all)")),
 		),
@@ -98,7 +98,7 @@ func registerOrgAutoTools(s *server.MCPServer, db *sql.DB) {
 	)
 	s.AddTool(
 		gomcp.NewTool("crm_org_ignore_add",
-			gomcp.WithDescription("Ignore a company string so it never creates an organization (matched by normalized text, case and punctuation do not matter). Turns a removed built-in back on. Existing organizations and memberships are not touched"),
+			gomcp.WithDescription("Ignore a company string so it never creates an organization (matched by normalized text, case and punctuation do not matter). Turns a removed built-in back on. Existing organizations and Person–Organization links are not touched"),
 			gomcp.WithString("text", gomcp.Required(), gomcp.Description("The company text to ignore")),
 		),
 		func(ctx context.Context, req gomcp.CallToolRequest) (*gomcp.CallToolResult, error) {

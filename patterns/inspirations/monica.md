@@ -10,9 +10,9 @@ research: partial
 **Research state.** partly researched. See [[inspirations]].
 
 **What we take.**
-- Cheap high-warmth fields Dex lacks: how we met, gift ideas, promises and debts. [[person-workspace-is-the-center]]
-- Relationship kinds between people. [[link-from-either-side]]
-- Per-contact choice of visible sections. [[one-record-page]]
+- Cheap high-warmth fields Dex lacks: how we met, gift ideas, promises and debts. [[core]]
+- Relationship kinds between people. [[link-registry]]
+- Per-contact choice of visible sections. [[core]]
 
 **What we leave.** Journal and life-event breadth beyond the relationship loop.
 

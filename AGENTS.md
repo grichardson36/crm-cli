@@ -54,7 +54,7 @@ If `crm` is not installed, read `INSTALL.md`.
 
 The `patterns/` folder is an Obsidian vault and the source of truth for design decisions and features. Open `patterns/index.md` first.
 
-1. Read the patterns that apply before any design or feature change. Feature rows (IDs such as M27) are in the `patterns/features-*.md` notes.
-2. If code breaks a pattern, or no pattern covers the question, surface it to the owner with a recommendation. Do not decide alone. The live list is `patterns/open-discrepancies.md`.
-3. Log each new rule as one atomic note in `patterns/`, linked from `patterns/index.md`. Update the feature rows you change in the same session.
+1. Read `patterns/core.md`, identify the change's domains and apply its gates in order. Then read the relevant supporting patterns and feature rows (IDs such as M27) in `patterns/features/`.
+2. If a gate does not answer the question or code breaks a gate, record it in `patterns/records/open-discrepancies.md` and surface it to the owner with a recommendation. Do not decide alone.
+3. Record each decision in the artifact selected by `patterns/core.md`: add a supporting pattern or core gate only when its criteria are met; otherwise use the relevant feature row, reference, research note or discrepancy. Update changed feature rows in the same session.
 4. Never test on the real databases.

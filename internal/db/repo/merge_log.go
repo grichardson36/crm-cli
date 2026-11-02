@@ -71,7 +71,7 @@ func NewMergeLogRepo(db *sql.DB) *MergeLogRepo { return &MergeLogRepo{db: db} }
 // so table names are checked against this list and column names against the table itself.
 var mergeTables = map[string]bool{
 	"people": true, "person_emails": true, "person_phones": true, "person_handles": true, "custom_fields": true,
-	"taggings": true, "membership": true, "person_relation": true, "deal_person": true, "activity_target": true,
+	"taggings": true, "person_organization_link": true, "person_relation": true, "deal_person": true, "activity_target": true,
 	"merge_alias": true, "dupe_dismissals": true, "organizations": true, "org_relation": true, "deal_org": true,
 	"org_dupe_dismissals": true,
 }
@@ -108,7 +108,7 @@ func personSnapSpecs(ids []int64) []snapSpec {
 		{"person_handles", "person_id IN (" + ph + ")", a},
 		{"custom_fields", "entity_type = 'person' AND entity_id IN (" + ph + ")", a},
 		{"taggings", "entity_type = 'person' AND entity_id IN (" + ph + ")", a},
-		{"membership", "person_id IN (" + ph + ")", a},
+		{"person_organization_link", "person_id IN (" + ph + ")", a},
 		{"person_relation", "a_id IN (" + ph + ") OR b_id IN (" + ph + ")", dup(2)},
 		{"deal_person", "person_id IN (" + ph + ")", a},
 		{"activity_target", "target_kind = 'person' AND target_id IN (" + ph + ")", a},
@@ -128,7 +128,7 @@ func orgSnapSpecs(ids []int64) []snapSpec {
 	}
 	return []snapSpec{
 		{"organizations", "id IN (" + ph + ")", a},
-		{"membership", "org_id IN (" + ph + ")", a},
+		{"person_organization_link", "org_id IN (" + ph + ")", a},
 		{"org_relation", "a_id IN (" + ph + ") OR b_id IN (" + ph + ")", dup(2)},
 		{"deal_org", "org_id IN (" + ph + ")", a},
 		{"activity_target", "target_kind = 'organization' AND target_id IN (" + ph + ")", a},
@@ -604,7 +604,7 @@ func (p *replayer) touch(edits []RowEdit, kind string) error {
 			add("organizations", e.RowID)
 		}
 		switch e.Table {
-		case "membership", "activity_target", "deal_person", "deal_org":
+		case "person_organization_link", "activity_target", "deal_person", "deal_org":
 			p.touchRows(add, e.Table, e)
 		}
 	}
@@ -621,9 +621,9 @@ func (p *replayer) touch(edits []RowEdit, kind string) error {
 // touchRows reads the link row as it is now and marks the objects at its ends.
 func (p *replayer) touchRows(add func(string, int64), table string, e RowEdit) {
 	switch table {
-	case "membership":
+	case "person_organization_link":
 		var pid, oid int64
-		if p.tx.QueryRowContext(p.ctx, "SELECT person_id, org_id FROM membership WHERE rowid = ?", e.RowID).Scan(&pid, &oid) == nil {
+		if p.tx.QueryRowContext(p.ctx, "SELECT person_id, org_id FROM person_organization_link WHERE rowid = ?", e.RowID).Scan(&pid, &oid) == nil {
 			add("people", pid)
 			add("organizations", oid)
 		}

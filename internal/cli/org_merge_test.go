@@ -44,7 +44,7 @@ func TestOrgMergePreviewsThenApplies(t *testing.T) {
 	var res map[string]any
 	require.NoError(t, json.Unmarshal([]byte(stdout), &res))
 	assert.Equal(t, true, res["dry_run"])
-	assert.EqualValues(t, 1, res["moved"].(map[string]any)["memberships"])
+	assert.EqualValues(t, 1, res["moved"].(map[string]any)["person_organization_links"])
 
 	stdout, _, _ = crm(t, dbPath, "org", "list", "-f", "json")
 	var orgs []map[string]any

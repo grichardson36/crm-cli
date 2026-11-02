@@ -9,7 +9,7 @@ import (
 )
 
 // links moves every link of the dropped people to the survivor (Q27). Exact duplicates are dropped
-// (soft deleted), memberships at the same organization fold into the richest one with the earliest
+// (soft deleted), Person–Organization links at the same organization fold into the richest one with the earliest
 // start, and an alias records each old id and uuid so old references keep resolving.
 func (m *merger) links() error {
 	for _, d := range m.dropIDs {
@@ -22,7 +22,7 @@ func (m *merger) links() error {
 		if err := m.movePersonRelations(d); err != nil {
 			return err
 		}
-		if err := m.moveMemberships(d); err != nil {
+		if err := m.movePersonOrganizationLinks(d); err != nil {
 			return err
 		}
 		if err := m.writeAlias(d); err != nil {
@@ -200,22 +200,22 @@ func (m *merger) movePersonRelations(d int64) error {
 	return nil
 }
 
-type membershipRow struct {
-	id, org                int64
-	role, from, to, notes  sql.NullString
-	primary                bool
+type personOrganizationLinkRow struct {
+	id, org               int64
+	role, from, to, notes sql.NullString
+	primary               bool
 }
 
-func (m *merger) memberships(person int64) ([]membershipRow, error) {
-	rows, err := m.tx.QueryContext(m.ctx, `SELECT id, org_id, role, started_on, ended_on, notes, is_primary FROM membership
+func (m *merger) personOrganizationLinks(person int64) ([]personOrganizationLinkRow, error) {
+	rows, err := m.tx.QueryContext(m.ctx, `SELECT id, org_id, role, started_on, ended_on, notes, is_primary FROM person_organization_link
 		WHERE person_id = ? AND deleted_at IS NULL ORDER BY id`, person)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var out []membershipRow
+	var out []personOrganizationLinkRow
 	for rows.Next() {
-		var r membershipRow
+		var r personOrganizationLinkRow
 		var p int
 		if err := rows.Scan(&r.id, &r.org, &r.role, &r.from, &r.to, &r.notes, &p); err != nil {
 			return nil, err
@@ -226,23 +226,23 @@ func (m *merger) memberships(person int64) ([]membershipRow, error) {
 	return out, rows.Err()
 }
 
-// moveMemberships moves a dropped person's memberships to the survivor. Two memberships at one
+// movePersonOrganizationLinks moves a dropped person's links to the survivor. Two links at one
 // organization can be different roles (CTO and Advisor), so both stay. Only a row identical to one
 // the survivor has (same organization, role, start and end) is dropped. A primary flag the dropped
 // row held moves to the identical survivor row when the survivor has no primary.
-func (m *merger) moveMemberships(d int64) error {
-	dropped, err := m.memberships(d)
+func (m *merger) movePersonOrganizationLinks(d int64) error {
+	dropped, err := m.personOrganizationLinks(d)
 	if err != nil {
-		return fmt.Errorf("list memberships: %w", err)
+		return fmt.Errorf("list Person–Organization links: %w", err)
 	}
 	same := func(a, b sql.NullString) bool { return a.Valid == b.Valid && a.String == b.String }
 	for _, r := range dropped {
-		keep, err := m.memberships(m.keepID)
+		keep, err := m.personOrganizationLinks(m.keepID)
 		if err != nil {
 			return err
 		}
 		hasPrimary := false
-		var twin *membershipRow
+		var twin *personOrganizationLinkRow
 		for i := range keep {
 			k := keep[i]
 			hasPrimary = hasPrimary || k.primary
@@ -251,11 +251,11 @@ func (m *merger) moveMemberships(d int64) error {
 			}
 		}
 		if twin != nil {
-			if err := m.softDelete("membership", r.id); err != nil {
+			if err := m.softDelete("person_organization_link", r.id); err != nil {
 				return err
 			}
 			if r.primary && !hasPrimary {
-				if _, err := m.exec("UPDATE membership SET is_primary = 1, updated_at = datetime('now') WHERE id = ?", twin.id); err != nil {
+				if _, err := m.exec("UPDATE person_organization_link SET is_primary = 1, updated_at = datetime('now') WHERE id = ?", twin.id); err != nil {
 					return err
 				}
 			}
@@ -263,10 +263,10 @@ func (m *merger) moveMemberships(d int64) error {
 			continue
 		}
 		primary := r.primary && !hasPrimary
-		if _, err := m.exec("UPDATE membership SET person_id = ?, is_primary = ?, updated_at = datetime('now') WHERE id = ?", m.keepID, primary, r.id); err != nil {
-			return fmt.Errorf("move membership: %w", err)
+		if _, err := m.exec("UPDATE person_organization_link SET person_id = ?, is_primary = ?, updated_at = datetime('now') WHERE id = ?", m.keepID, primary, r.id); err != nil {
+			return fmt.Errorf("move Person–Organization link: %w", err)
 		}
-		m.res.Moved["memberships"]++
+		m.res.Moved["person_organization_links"]++
 	}
 	return nil
 }

@@ -234,7 +234,7 @@ func (m *Model) entityLabel(entity string, id int64) string {
 // --- recorded writes ---
 
 // hUpdatePerson updates a person and records it for undo. When it sets company text, the text also
-// creates or reuses an organization and the person's primary membership points to it. The update and
+// creates or reuses an organization and the person's primary Person–Organization link points to it. The update and
 // the organization change undo as one step.
 func (m *Model) hUpdatePerson(ctx context.Context, id int64, in model.UpdatePersonInput) (*model.Person, error) {
 	if in.Company == nil || strings.TrimSpace(*in.Company) == "" {

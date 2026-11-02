@@ -87,7 +87,7 @@ func TestLinkFormAsksRoleDatesAndPrimaryAndEditChangesThemInPlace(t *testing.T) 
 	press(m, "left", "left", "left", "left", "left")
 	assert.Equal(t, 0, m.fcol)
 
-	// The ended membership is dim on the page.
+	// The ended Person–Organization link is dim on the page.
 	goTo(t, m, "organization")
 	assert.True(t, m.form[m.fcur].dim)
 
@@ -116,7 +116,7 @@ func TestLinkingAPickedOrganizationAgainEditsOrAddsAnotherStay(t *testing.T) {
 	press(m, "enter")
 	submit(m, "Engineer | 2015 | 2018")
 
-	// One link exists and a membership may repeat: the form asks which.
+	// One link exists and a Person–Organization link may repeat: the form asks which.
 	runPalette(m, "link organization")
 	typeText(m, "acme")
 	press(m, "enter")
@@ -425,7 +425,7 @@ func TestArchivedViewListsEveryKindFiltersByTypeAndRestores(t *testing.T) {
 	assert.ErrorIs(t, err, model.ErrNotFound)
 	require.Len(t, m.rows, 1, "the undone restore puts the deal back in the Archived list")
 
-	// Back to all types: restore the organization and its membership comes back with it.
+	// Back to all types: restore the organization and its Person–Organization link comes back with it.
 	press(m, "ctrl+o", "left", "left", "left", "esc") // deals, organizations, people, all types
 	m.cursorOn(func(r row) bool { return r.akind == "organization" })
 	press(m, "r")

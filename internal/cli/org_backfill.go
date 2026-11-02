@@ -24,9 +24,9 @@ func orgBackfillCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "backfill",
 		Short: "Create or reuse organizations for existing people's company text (dry run unless --apply)",
-		Long: "Reads every person's company text and says what would happen: how many people have company text, how many distinct groups (case, punctuation and Inc/LLC endings ignored), how many organizations would be created, how many already exist and are reused, how many strings are ignored (see 'crm org ignore list'), and how many people get a membership. Groups of 3 or more people are listed first.\n" +
+		Long: "Reads every person's company text and says what would happen: how many people have company text, how many distinct groups (case, punctuation and Inc/LLC endings ignored), how many organizations would be created, how many already exist and are reused, how many strings are ignored (see 'crm org ignore list'), and how many people get a Person–Organization link. Groups of 3 or more people are listed first.\n" +
 			"Matching is the normalized name or a merge alias. Close but different names never merge: find them with 'crm org dupes'.\n" +
-			"Without --apply nothing is written. With --apply it creates the missing organizations and gives each person a membership (primary when they have none, existing memberships stay, the title becomes the role) as one batch. people.company is not changed. Running it again does nothing.",
+			"Without --apply nothing is written. With --apply it creates the missing organizations and gives each person a Person–Organization link (primary when they have none, existing links stay, the title becomes the role) as one batch. people.company is not changed. Running it again does nothing.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runBackfill(cmd, apply, limit)
@@ -97,7 +97,7 @@ func orgIgnoreCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "ignore",
 		Short: "Manage company strings that never create an organization (N/A, none, retired ...)",
-		Long:  "The ignore list holds company strings that are junk, so they never create an organization. It has built-in defaults and your additions. Turning off a built-in is a removal. Existing organizations and memberships are not touched.",
+		Long:  "The ignore list holds company strings that are junk, so they never create an organization. It has built-in defaults and your additions. Turning off a built-in is a removal. Existing organizations and Person–Organization links are not touched.",
 	}
 	cmd.AddCommand(&cobra.Command{
 		Use:   "list",

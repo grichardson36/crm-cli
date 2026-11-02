@@ -131,7 +131,7 @@ func PurgeArchived(ctx context.Context, db *sql.DB, opts PurgeArchivedOptions) (
 // PurgeObject permanently deletes one archived object and its dependent rows in one transaction. A
 // tombstone is recorded for every deleted synced row. An object that is not archived is refused.
 //
-// Dependents by kind. Organizations: memberships, organization links, deal links, task and note
+// Dependents by kind. Organizations: Person–Organization links, organization links, deal links, task and note
 // links, taggings and custom fields. Deals: person and organization links, task and note links,
 // taggings and custom fields. Tasks and notes: their links and taggings. People: see PersonRepo.Purge.
 func PurgeObject(ctx context.Context, db *sql.DB, kind string, id int64) error {
@@ -186,7 +186,7 @@ func PurgeObject(ctx context.Context, db *sql.DB, kind string, id int64) error {
 	var links []step
 	switch kind {
 	case "organization":
-		links = []step{{"membership", "org_id = ?", false}, {"org_relation", "a_id = ? OR b_id = ?", true}, {"deal_org", "org_id = ?", false},
+		links = []step{{"person_organization_link", "org_id = ?", false}, {"org_relation", "a_id = ? OR b_id = ?", true}, {"deal_org", "org_id = ?", false},
 			{"activity_target", "target_kind = 'organization' AND target_id = ?", false}}
 	case "deal":
 		links = []step{{"deal_person", "deal_id = ?", false}, {"deal_org", "deal_id = ?", false},

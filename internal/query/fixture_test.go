@@ -56,7 +56,7 @@ func fixture(t *testing.T) *sql.DB {
 	o("Initech", "software")
 	o("Globex", "manufacturing")
 	o("Umbrella", nil)
-	exec(t, d, `INSERT INTO membership (uuid, person_id, org_id) VALUES ('m1', 1, 1), ('m2', 4, 1), ('m3', 2, 2)`)
+	exec(t, d, `INSERT INTO person_organization_link (uuid, person_id, org_id) VALUES ('m1', 1, 1), ('m2', 4, 1), ('m3', 2, 2)`)
 
 	dl := func(title string, value any, stage string) {
 		exec(t, d, `INSERT INTO deals (uuid, title, value, stage) VALUES (?, ?, ?, ?)`, "uuid-"+title, title, value, stage)

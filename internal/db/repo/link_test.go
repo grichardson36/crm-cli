@@ -105,7 +105,7 @@ func TestLinkRefusesBadInput(t *testing.T) {
 	_, err = f.links.Link(ctx, repo.Ref{Kind: "widget", ID: 1}, repo.Ref{Kind: "organization", ID: f.org})
 	assert.ErrorIs(t, err, model.ErrValidation)
 	_, err = f.links.Link(ctx, repo.Ref{Kind: "person", ID: f.person}, repo.Ref{Kind: "organization", ID: f.org}, model.LinkAttrs{Kind: sp("friend")})
-	assert.ErrorIs(t, err, model.ErrValidation, "a membership has no kind")
+	assert.ErrorIs(t, err, model.ErrValidation, "a Person–Organization link has no kind")
 	_, err = f.links.Link(ctx, repo.Ref{Kind: "task", ID: f.task}, repo.Ref{Kind: "person", ID: f.person}, model.LinkAttrs{Primary: bp(true)})
 	assert.ErrorIs(t, err, model.ErrValidation, "a task link has no primary flag")
 }
@@ -151,7 +151,7 @@ func TestMembershipAttributesPrimaryAndRepeats(t *testing.T) {
 	list, err := f.links.Linked(ctx, person, "organization")
 	require.NoError(t, err)
 	require.Len(t, list, 1)
-	assert.True(t, list[0].Primary, "the first current membership becomes primary")
+	assert.True(t, list[0].Primary, "the first current Person–Organization link becomes primary")
 	assert.True(t, list[0].Current)
 	assert.Equal(t, "2019-03", *list[0].StartedOn)
 
@@ -180,10 +180,10 @@ func TestMembershipAttributesPrimaryAndRepeats(t *testing.T) {
 	require.NotNil(t, res.Before)
 	assert.Nil(t, res.Before.EndedOn)
 	list, _ = f.links.Linked(ctx, person, "organization")
-	assert.Equal(t, []int64{f.org2, f.org}, ids(list), "past memberships come after current ones")
+	assert.Equal(t, []int64{f.org2, f.org}, ids(list), "past Person–Organization links come after current ones")
 	assert.False(t, list[1].Current)
 
-	// Coming back is a second membership at the same organization (E3).
+	// Coming back is a second Person–Organization link at the same organization (E3).
 	res, err = f.links.LinkNew(ctx, person, o1, model.LinkAttrs{Role: sp("Director"), StartedOn: sp("2023")})
 	require.NoError(t, err)
 	assert.True(t, res.Created)
@@ -196,7 +196,7 @@ func TestMembershipAttributesPrimaryAndRepeats(t *testing.T) {
 	assert.Len(t, removed, 2)
 	list, _ = f.links.Linked(ctx, person, "organization")
 	assert.Equal(t, []int64{f.org2}, ids(list))
-	require.NoError(t, f.links.RestoreLink(ctx, "membership", removed[0].ID))
+	require.NoError(t, f.links.RestoreLink(ctx, "person_organization_link", removed[0].ID))
 	list, _ = f.links.Linked(ctx, person, "organization")
 	assert.Len(t, list, 2)
 
@@ -356,7 +356,7 @@ func TestRolesSuggestions(t *testing.T) {
 	require.NoError(t, err)
 	_, err = f.links.Link(ctx, repo.Ref{Kind: "person", ID: f.other}, repo.Ref{Kind: "organization", ID: f.org2}, model.LinkAttrs{Role: sp("Advisor")})
 	require.NoError(t, err)
-	roles, err := f.links.Roles(ctx, "membership", 10)
+	roles, err := f.links.Roles(ctx, "person_organization_link", 10)
 	require.NoError(t, err)
 	require.Len(t, roles, 2)
 	assert.Equal(t, "Founder", roles[0], "most used first, case folded")
@@ -407,12 +407,12 @@ func TestMergeCombinesLinks(t *testing.T) {
 	tp := repo.Ref{Kind: "person", ID: third.ID}
 	o1, o2 := repo.Ref{Kind: "organization", ID: f.org}, repo.Ref{Kind: "organization", ID: f.org2}
 
-	// Same organization on both with different roles: both stay (CTO and Engineer are two memberships).
+	// Same organization on both with different roles: both stay (CTO and Engineer are two links).
 	_, err = f.links.Link(ctx, keep, o1, model.LinkAttrs{StartedOn: sp("2020-05"), Role: sp("CTO")})
 	require.NoError(t, err)
 	_, err = f.links.Link(ctx, drop, o1, model.LinkAttrs{StartedOn: sp("2018"), Role: sp("Engineer"), Notes: sp("hired by Pat")})
 	require.NoError(t, err)
-	// An identical membership on both (same organization, role, start, end) is dropped once.
+	// An identical Person–Organization link on both (same organization, role, start, end) is dropped once.
 	_, err = f.links.Link(ctx, keep, o2, model.LinkAttrs{Role: sp("Advisor")})
 	require.NoError(t, err)
 	_, err = f.links.Link(ctx, drop, o2, model.LinkAttrs{Role: sp("Advisor")})
@@ -436,11 +436,11 @@ func TestMergeCombinesLinks(t *testing.T) {
 
 	res, err := f.people.Merge(ctx, f.person, []int64{f.other}, nil)
 	require.NoError(t, err)
-	assert.Equal(t, 1, res.Moved["memberships"], "only the Engineer stay moved, the identical Advisor row was dropped")
+	assert.Equal(t, 1, res.Moved["person_organization_links"], "only the Engineer link moved, the identical Advisor row was dropped")
 	assert.Equal(t, 1, res.Moved["interactions"])
 	assert.Equal(t, 1, res.Moved["deals"])
 	assert.Equal(t, 1, res.Moved["aliases"])
-	assert.GreaterOrEqual(t, res.Moved["duplicates_dropped"], 4, "identical membership, friend pair, self link, task link")
+	assert.GreaterOrEqual(t, res.Moved["duplicates_dropped"], 4, "identical Person–Organization link, friend pair, self link, task link")
 
 	orgs, err := f.links.Linked(ctx, keep, "organization")
 	require.NoError(t, err)

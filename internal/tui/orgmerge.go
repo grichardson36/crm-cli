@@ -139,9 +139,9 @@ func (m *Model) confirmOrgMerge(keep int64, drops []int64) {
 		return
 	}
 	var parts []string
-	for _, k := range []string{"memberships", "relations", "deals", "tasks", "interactions", "tags"} {
+	for _, k := range []string{"person_organization_links", "relations", "deals", "tasks", "interactions", "tags"} {
 		if n := res.Moved[k]; n > 0 {
-			parts = append(parts, fmt.Sprintf("%d %s", n, k))
+			parts = append(parts, fmt.Sprintf("%d %s", n, mergeCountLabel(k)))
 		}
 	}
 	if n := res.Moved["duplicates_dropped"]; n > 0 {

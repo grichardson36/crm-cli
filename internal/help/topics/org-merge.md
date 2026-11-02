@@ -20,7 +20,7 @@ crm org merge 1 2 3 --apply
 `org merge SURVIVOR DUPLICATE...` previews, `--apply` writes. MCP: `crm_org_merge` with `dry_run`.
 
 - The survivor keeps its own fields. An empty domain, industry, notes or summary takes the first value from the duplicates.
-- Memberships all move. Only a row identical to one the survivor has (same person, role, start and end) is dropped, and its primary flag moves to the row that stays.
+- Person–Organization links all move. Only a row identical to one the survivor has (same person, role, start and end) is dropped, and its primary flag moves to the row that stays.
 - Parent links move. A link that becomes a self link or a duplicate is dropped. A merge that would make an organization its own parent is refused.
 - Deal links, tasks, notes and tags move.
 - Duplicates are archived and their ids keep resolving to the survivor. Company text with the old name matches the survivor.

@@ -10,7 +10,7 @@ research: mined
 **Research state.** mined. See [[inspirations]].
 
 **What we take.**
-- Repo layer plus thin CLI and MCP is the shape behind three doors, one core. [[three-doors-one-core]]
+- Repo layer plus thin CLI and MCP is the shape behind three doors, one core. [[core]]
 
 **What we leave.** No TUI upstream. MIT requires keeping the copyright notice.
 

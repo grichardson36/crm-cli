@@ -10,7 +10,7 @@ research: partial
 **Research state.** partly researched. See [[inspirations]].
 
 **What we take.**
-- Buffers, notice, step and caps as booking-link settings (Tier 0 static export). [[local-first]]
+- Buffers, notice, step and caps as booking-link settings (Tier 0 static export). [[core]]
 
 **What we leave.** Round robin, routing forms, SMS reminders, generated video links, live booking until Tier 0 is used.
 
