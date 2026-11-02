@@ -415,7 +415,7 @@ func TestDealLinkRole_ValidatedThroughVocabulary(t *testing.T) {
 			}
 		})
 	}
-	t.Run("membership roles stay free text", func(t *testing.T) {
+	t.Run("Person–Organization link roles stay free text", func(t *testing.T) {
 		f := setupLinks(t)
 		_, err := f.links.Link(ctx, repo.Ref{Kind: "person", ID: f.person}, repo.Ref{Kind: "organization", ID: f.org}, model.LinkAttrs{Role: sp("Chief Whatever Officer")})
 		assert.NoError(t, err)

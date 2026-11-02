@@ -254,13 +254,13 @@ func OrgParentCycle(child, parent int64, childIsAncestor bool) error {
 		Fix:      "remove the existing parent link first"})
 }
 
-// OnePrimaryMembership is the rule that a person has at most one primary membership.
-func OnePrimaryMembership(person int64, primaries int) error {
+// OnePrimaryPersonOrganizationLink is the rule that a person has at most one primary Person–Organization link.
+func OnePrimaryPersonOrganizationLink(person int64, primaries int) error {
 	if primaries <= 1 {
 		return nil
 	}
-	return Fail(Issue{Code: CodePrimaryMultiple, Field: "primary",
+	return Fail(Issue{Code: CodePrimaryPersonOrganizationLinkMultiple, Field: "primary",
 		Expected: "one primary organization per person",
 		Received: fmt.Sprintf("person %d has %d", person, primaries),
-		Fix:      "mark one membership primary and clear the others"})
+		Fix:      "mark one Person–Organization link primary and clear the others"})
 }

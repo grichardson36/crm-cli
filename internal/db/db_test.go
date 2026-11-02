@@ -18,7 +18,7 @@ func TestOpen_InMemory(t *testing.T) {
 	defer d.Close()
 
 	// Verify tables exist
-	tables := []string{"people", "organizations", "interactions", "deals", "tasks", "tags", "taggings", "custom_fields", "membership", "person_relation", "relation_kind"}
+	tables := []string{"people", "organizations", "interactions", "deals", "tasks", "tags", "taggings", "custom_fields", "person_organization_link", "person_relation", "relation_kind"}
 	for _, table := range tables {
 		var name string
 		err := d.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name=?", table).Scan(&name)

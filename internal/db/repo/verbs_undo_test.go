@@ -21,7 +21,7 @@ func TestUnlinkThenLinkRevivesTheOldRowInEveryLinkTable(t *testing.T) {
 		attrs    model.LinkAttrs
 		change   model.LinkAttrs // given when linking again: only this attribute changes
 	}{
-		{"membership", "membership",
+		{"person_organization_link", "person_organization_link",
 			func(f linkFixture) repo.Ref { return repo.Ref{Kind: "person", ID: f.person} },
 			func(f linkFixture) repo.Ref { return repo.Ref{Kind: "organization", ID: f.org} },
 			model.LinkAttrs{Role: sp("CTO"), StartedOn: sp("2019-03-01"), EndedOn: sp("2021-06-30"), Notes: sp("left on good terms")},
@@ -127,24 +127,24 @@ func TestRevivedPrimaryMembershipDoesNotStealThePrimaryFlag(t *testing.T) {
 	o1, o2 := repo.Ref{Kind: "organization", ID: f.org}, repo.Ref{Kind: "organization", ID: f.org2}
 	r1, err := f.links.Link(ctx, p, o1, model.LinkAttrs{Role: sp("CTO")})
 	require.NoError(t, err)
-	rec, _ := f.links.Get(ctx, "membership", r1.LinkID)
-	require.True(t, rec.Primary, "the first membership is primary")
+	rec, _ := f.links.Get(ctx, "person_organization_link", r1.LinkID)
+	require.True(t, rec.Primary, "the first Person–Organization link is primary")
 	_, err = f.links.Unlink(ctx, p, o1)
 	require.NoError(t, err)
 	r2, err := f.links.Link(ctx, p, o2)
 	require.NoError(t, err)
 	_, err = f.links.Link(ctx, p, o1)
 	require.NoError(t, err)
-	old, _ := f.links.Get(ctx, "membership", r1.LinkID)
+	old, _ := f.links.Get(ctx, "person_organization_link", r1.LinkID)
 	assert.False(t, old.Primary, "another link took the flag in the meantime")
 	assert.Equal(t, "CTO", *old.Role)
-	cur, _ := f.links.Get(ctx, "membership", r2.LinkID)
+	cur, _ := f.links.Get(ctx, "person_organization_link", r2.LinkID)
 	assert.True(t, cur.Primary)
 
-	// A person who left and came back on purpose can still get a second membership row.
+	// A person who left and came back on purpose can still get a second Person–Organization link.
 	_, err = f.links.LinkNew(ctx, p, o1, model.LinkAttrs{Role: sp("Advisor")})
 	require.NoError(t, err)
-	assert.Equal(t, 2, count(t, f.links.DB(), "SELECT COUNT(*) FROM membership WHERE org_id = ? AND deleted_at IS NULL", f.org))
+	assert.Equal(t, 2, count(t, f.links.DB(), "SELECT COUNT(*) FROM person_organization_link WHERE org_id = ? AND deleted_at IS NULL", f.org))
 }
 
 func TestTagsAreNamesOnObjects(t *testing.T) {

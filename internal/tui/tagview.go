@@ -12,7 +12,7 @@ import (
 	"github.com/jdanielnd/crm-cli/internal/tree"
 )
 
-// The Tags module (patterns/features-tags-module). Tags are a view of their own: a list with the name,
+// The Tags module (patterns/features/features-tags-module). Tags are a view of their own: a list with the name,
 // the number of objects that carry it and a dim breakdown by kind. The verbs are the universal ones
 // (patterns/universal-verbs) and every one works on the selected tags (patterns/bulk-actions-always):
 //

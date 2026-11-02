@@ -41,7 +41,7 @@ func (r *PersonRepo) Restore(ctx context.Context, id int64) error {
 // Purge permanently deletes an already archived person and their dependent rows in
 // one transaction. A tombstone is recorded for every deleted synced row.
 //
-// Dependents: contact methods, memberships, person links, task and interaction links, taggings and
+// Dependents: contact methods, Person–Organization links, person links, task and interaction links, taggings and
 // custom fields are deleted. Interactions and tasks linked only to this person are
 // deleted too. Deals and tasks shared with others keep existing and lose the person link.
 func (r *PersonRepo) Purge(ctx context.Context, id int64) error {
@@ -109,7 +109,7 @@ func (r *PersonRepo) Purge(ctx context.Context, id int64) error {
 		return err
 	}
 	// Links of the person are deleted with it (foreign keys and triggers). Record them first.
-	if err := tombstone("membership", "person_id = ?", id); err != nil {
+	if err := tombstone("person_organization_link", "person_id = ?", id); err != nil {
 		return err
 	}
 	if err := tombstone("person_relation", "a_id = ? OR b_id = ?", id, id); err != nil {
@@ -140,7 +140,7 @@ func (r *PersonRepo) Purge(ctx context.Context, id int64) error {
 	if err := exec("DELETE FROM field_versions WHERE entity = 'person' AND local_id = ?", id); err != nil {
 		return err
 	}
-	// Cascades: person_emails, person_phones, person_handles, membership, person_relation,
+	// Cascades: person_emails, person_phones, person_handles, person_organization_link, person_relation,
 	// deal_person; a trigger removes the activity_target rows and merge aliases.
 	if err := tombstone("people", "id = ?", id); err != nil {
 		return err

@@ -92,8 +92,8 @@ type store struct {
 
 func storeOf(rel model.Relation) store {
 	switch rel.Name {
-	case "membership":
-		return store{table: "membership", aCol: "person_id", bCol: "org_id", cols: map[string]string{
+	case "person_organization_link":
+		return store{table: "person_organization_link", aCol: "person_id", bCol: "org_id", cols: map[string]string{
 			model.AttrRole: "role", model.AttrFrom: "started_on", model.AttrTo: "ended_on", model.AttrPrimary: "is_primary", model.AttrNotes: "notes"}}
 	case "person_relation":
 		return store{table: "person_relation", aCol: "a_id", bCol: "b_id", cols: map[string]string{model.AttrKind: "kind_id", model.AttrNotes: "notes"}}
@@ -243,7 +243,7 @@ func nilIfEmptyPtr(p *string) any {
 }
 
 // LinkNew is Link that always adds another link, even when the pair is already linked. Only
-// memberships can repeat (a person who left and came back, or holds two roles).
+// Person–Organization links can repeat (a person who left and came back, or holds two roles).
 func (r *LinkRepo) LinkNew(ctx context.Context, a, b Ref, attrs ...model.LinkAttrs) (LinkResult, error) {
 	return r.link(ctx, a, b, firstAttrs(attrs), true)
 }
@@ -834,7 +834,7 @@ func (r *LinkRepo) checkOrgCycle(ctx context.Context, parentKindID, aID, bID int
 }
 
 // Linked lists the links of a to objects of otherKind, live links to live objects only, with the
-// link attributes. Current memberships come before past ones, the primary first.
+// link attributes. Current Person–Organization links come before past ones, the primary first.
 func (r *LinkRepo) Linked(ctx context.Context, a Ref, otherKind string) ([]model.LinkedObject, error) {
 	if err := r.check(ctx, a); err != nil {
 		return nil, err
@@ -1002,7 +1002,7 @@ func (r *LinkRepo) Roles(ctx context.Context, relation string, limit int) ([]str
 // writes it as the vCard ORG.
 func PrimaryOrgName(ctx context.Context, q DBTX, personID int64) (string, error) {
 	var name string
-	err := q.QueryRowContext(ctx, `SELECT o.name FROM membership m JOIN organizations o ON o.id = m.org_id
+	err := q.QueryRowContext(ctx, `SELECT o.name FROM person_organization_link m JOIN organizations o ON o.id = m.org_id
 		WHERE m.person_id = ? AND m.is_primary = 1 AND m.deleted_at IS NULL AND o.archived = 0`, personID).Scan(&name)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil

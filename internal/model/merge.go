@@ -11,15 +11,15 @@ type MergeFieldChange struct {
 
 // MergeResult reports what a merge did, or would do when DryRun is true.
 type MergeResult struct {
-	KeepID  int64              `json:"keep_id"`
-	DropIDs []int64            `json:"drop_ids"`
-	DryRun  bool               `json:"dry_run"`
+	KeepID  int64   `json:"keep_id"`
+	DropIDs []int64 `json:"drop_ids"`
+	DryRun  bool    `json:"dry_run"`
 	// LogID is the merge log entry of a merge that was applied: `crm merge undo LogID` reverses it in any later session.
 	LogID  int64              `json:"log_id,omitempty"`
 	Fields []MergeFieldChange `json:"fields"`
 	// Added counts attribute rows copied to the survivor: emails, phones, handles, tags, custom_fields.
 	Added map[string]int `json:"added"`
-	// Moved counts records re-pointed to the survivor: interactions, tasks, deals (deal links), relationships (person links), memberships, duplicates_dropped, aliases.
+	// Moved counts records re-pointed to the survivor: interactions, tasks, deal links, person links, Person–Organization links, duplicates_dropped, aliases.
 	Moved map[string]int `json:"moved"`
 	// Removed counts survivor rows deleted because MergeOptions.Exclude named them. Absent when none.
 	Removed map[string]int `json:"removed,omitempty"`

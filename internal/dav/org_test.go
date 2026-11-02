@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// orgFixture builds a person with a primary membership at Acme Corp.
+// orgFixture builds a person with a primary Person–Organization link at Acme Corp.
 func orgFixture(t *testing.T) (*env, *model.Person, *repo.OrgRepo, *repo.LinkRepo, *model.Organization) {
 	t.Helper()
 	e := newEnv(t, false)
@@ -33,14 +33,14 @@ func orgFixture(t *testing.T) (*env, *model.Person, *repo.OrgRepo, *repo.LinkRep
 func primaryOf(t *testing.T, e *env, personID int64) (orgID int64, role string) {
 	t.Helper()
 	var r *string
-	require.NoError(t, e.db.QueryRow(`SELECT org_id, role FROM membership WHERE person_id = ? AND is_primary = 1 AND deleted_at IS NULL`, personID).Scan(&orgID, &r))
+	require.NoError(t, e.db.QueryRow(`SELECT org_id, role FROM person_organization_link WHERE person_id = ? AND is_primary = 1 AND deleted_at IS NULL`, personID).Scan(&orgID, &r))
 	if r != nil {
 		role = *r
 	}
 	return
 }
 
-// E4: the primary membership fills the vCard ORG, TITLE stays the person's title.
+// E4: the primary Person–Organization link fills the vCard ORG, TITLE stays the person's title.
 func TestPrimaryOrganizationFillsOrg(t *testing.T) {
 	e, p, orgs, _, acme := orgFixture(t)
 	ctx := context.Background()
@@ -79,10 +79,10 @@ func TestPhoneOrgEditMatchingAnOrganizationMovesThePrimaryMembership(t *testing.
 	require.NoError(t, err)
 	assert.Empty(t, res.ETag, "the phone typed GLOBEX, the CRM says Globex, so it fetches the card again")
 	org, role := primaryOf(t, e, p.ID)
-	assert.Equal(t, globex.ID, org, "the membership was repointed in place")
+	assert.Equal(t, globex.ID, org, "the Person–Organization link was repointed in place")
 	assert.Equal(t, "CTO", role, "role and dates are kept")
 	var n int
-	require.NoError(t, e.db.QueryRow(`SELECT COUNT(*) FROM membership WHERE person_id = ? AND deleted_at IS NULL`, p.ID).Scan(&n))
+	require.NoError(t, e.db.QueryRow(`SELECT COUNT(*) FROM person_organization_link WHERE person_id = ? AND deleted_at IS NULL`, p.ID).Scan(&n))
 	assert.Equal(t, 1, n)
 	assert.Equal(t, "GLOBEX", *e.reload(p.ID).Company, "people.company is the source text the phone sent")
 
@@ -107,7 +107,7 @@ func TestPhoneOrgEditMatchingNothingCreatesTheOrganizationAndRepointsThePrimary(
 	created, err := orgs.FindByID(context.Background(), org)
 	require.NoError(t, err)
 	assert.Equal(t, "Brand New Startup", created.Name, "the phone text created the organization")
-	assert.Equal(t, "CTO", role, "the primary membership was repointed in place, role kept")
+	assert.Equal(t, "CTO", role, "the primary Person–Organization link was repointed in place, role kept")
 	list, err := orgs.FindAll(context.Background(), 0)
 	require.NoError(t, err)
 	assert.Len(t, list, 2)
@@ -119,7 +119,7 @@ func TestPhoneOrgEditMatchingNothingCreatesTheOrganizationAndRepointsThePrimary(
 	assert.Equal(t, "Brand New Startup", card.PreferredValue(vcard.FieldOrganization), "the next GET shows the text the phone sent (X19)")
 }
 
-// Owner decision 2026-10-27 (5): emptying ORG on the phone never removes a membership.
+// Owner decision 2026-10-27 (5): emptying ORG on the phone never removes a Person–Organization link.
 func TestEmptyingOrgOnThePhoneNeverRemovesAMembership(t *testing.T) {
 	e, p, _, _, acme := orgFixture(t)
 	card, etag := e.pull(e.reload(p.ID))
@@ -130,7 +130,7 @@ func TestEmptyingOrgOnThePhoneNeverRemovesAMembership(t *testing.T) {
 	assert.Equal(t, acme.ID, org)
 	assert.Equal(t, "CTO", role)
 	var n int
-	require.NoError(t, e.db.QueryRow(`SELECT COUNT(*) FROM membership WHERE person_id = ? AND deleted_at IS NULL`, p.ID).Scan(&n))
+	require.NoError(t, e.db.QueryRow(`SELECT COUNT(*) FROM person_organization_link WHERE person_id = ? AND deleted_at IS NULL`, p.ID).Scan(&n))
 	assert.Equal(t, 1, n)
 }
 
@@ -143,7 +143,7 @@ func TestPhoneOrgJunkTextCreatesNothing(t *testing.T) {
 			_, err := e.push(e.davID(p), card, etagHeader(etag))
 			require.NoError(t, err)
 			org, _ := primaryOf(t, e, p.ID)
-			assert.Equal(t, acme.ID, org, "membership untouched")
+			assert.Equal(t, acme.ID, org, "Person–Organization link untouched")
 			list, err := orgs.FindAll(context.Background(), 0)
 			require.NoError(t, err)
 			assert.Len(t, list, 1, "no organization for junk")
@@ -161,14 +161,14 @@ func TestPhoneOrgEditForAPersonWithoutAPrimaryMembership(t *testing.T) {
 	require.NoError(t, err)
 
 	card, etag := e.pull(e.reload(p.ID))
-	assert.Equal(t, "Old Text Co", card.PreferredValue(vcard.FieldOrganization), "no membership: the company text is the ORG")
+	assert.Equal(t, "Old Text Co", card.PreferredValue(vcard.FieldOrganization), "no Person–Organization link: the company text is the ORG")
 	card.SetValue(vcard.FieldOrganization, "Globex")
 	_, err = e.push(e.davID(p), card, etagHeader(etag))
 	require.NoError(t, err)
 	org, _ := primaryOf(t, e, p.ID)
-	assert.Equal(t, globex.ID, org, "a primary membership was created")
+	assert.Equal(t, globex.ID, org, "a primary Person–Organization link was created")
 
-	// No match and no membership: the organization and the membership are created.
+	// No match and no Person–Organization link: the organization and the Person–Organization link are created.
 	q, err := e.people.Create(ctx, model.CreatePersonInput{FirstName: "Quinn"})
 	require.NoError(t, err)
 	card, etag = e.pull(e.reload(q.ID))

@@ -122,7 +122,7 @@ func (r *PersonRepo) merge(ctx context.Context, keepID int64, dropIDs []int64, c
 			KeepID: keepID, DropIDs: dropIDs, DryRun: dryRun,
 			Fields: []model.MergeFieldChange{},
 			Added:  map[string]int{"emails": 0, "phones": 0, "handles": 0, "tags": 0, "custom_fields": 0},
-			Moved:  map[string]int{"interactions": 0, "tasks": 0, "deals": 0, "relationships": 0, "memberships": 0, "duplicates_dropped": 0, "aliases": 0},
+			Moved:  map[string]int{"interactions": 0, "tasks": 0, "deals": 0, "relationships": 0, "person_organization_links": 0, "duplicates_dropped": 0, "aliases": 0},
 		},
 	}
 	var specs []snapSpec

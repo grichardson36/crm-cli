@@ -390,7 +390,7 @@ Requires Go 1.26+. No CGO — builds anywhere Go runs.
 
 ## Design decisions and features
 
-The `patterns/` folder is the project's knowledge base: a vault of small linked notes (open it in [Obsidian](https://obsidian.md) or read the files). It is the source of truth for design decisions, the feature list and open questions. Start at [`patterns/index.md`](patterns/index.md). Every feature has a row with a stable ID (for example M27) in a `patterns/features-*.md` note.
+The `patterns/` folder is the project's knowledge base: a vault of small linked notes (open it in [Obsidian](https://obsidian.md) or read the files). It is the source of truth for design decisions, the feature list and open questions. Start at [`patterns/index.md`](patterns/index.md). Every feature has a row with a stable ID (for example M27) in a `patterns/features/features-*.md` note.
 
 ## License
 

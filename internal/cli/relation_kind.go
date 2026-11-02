@@ -166,6 +166,6 @@ func rolesCmd() *cobra.Command {
 			return format.Output(os.Stdout, resolveFormat(), rows, []format.ColumnDef{{Header: "Role", Field: "role"}}, flagQuiet)
 		},
 	}
-	cmd.Flags().StringVar(&relation, "relation", "membership", "membership, deal_person or deal_org")
+	cmd.Flags().StringVar(&relation, "relation", "person_organization_link", "link storage key: person_organization_link, deal_person, or deal_org")
 	return cmd
 }

@@ -80,7 +80,7 @@ func (r *PersonRepo) Create(ctx context.Context, input model.CreatePersonInput) 
 	return r.FindByID(ctx, rowID)
 }
 
-// setPrimaryOrg makes the organization the person's primary one, adding the membership if the
+// setPrimaryOrg makes the organization the person's primary one, adding the Person–Organization link if the
 // person has none there. A nil or zero id changes nothing.
 func (r *PersonRepo) setPrimaryOrg(ctx context.Context, personID int64, orgID *int64) error {
 	if orgID == nil || *orgID == 0 {
@@ -159,7 +159,7 @@ func (r *PersonRepo) FindAll(ctx context.Context, filters model.PersonFilters) (
 		if filters.Tag != nil {
 			col = "p.id"
 		}
-		query += " AND " + col + " IN (SELECT person_id FROM membership WHERE org_id = ? AND deleted_at IS NULL)"
+		query += " AND " + col + " IN (SELECT person_id FROM person_organization_link WHERE org_id = ? AND deleted_at IS NULL)"
 		args = append(args, *filters.OrgID)
 	}
 

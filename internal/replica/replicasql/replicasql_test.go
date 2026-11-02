@@ -152,13 +152,13 @@ func TestLinksResolveThroughUUIDs(t *testing.T) {
 	mustExec(t, b.DB(), `INSERT INTO organizations (uuid, name) VALUES ('other-org', 'Pad Org')`)
 	mustExec(t, a.DB(), `INSERT INTO people (uuid, first_name) VALUES ('p1', 'Ann')`)
 	mustExec(t, a.DB(), `INSERT INTO organizations (uuid, name) VALUES ('o1', 'Acme')`)
-	mustExec(t, a.DB(), `INSERT INTO membership (uuid, person_id, org_id, role) SELECT 'm1', p.id, o.id, 'CEO' FROM people p, organizations o WHERE p.uuid='p1' AND o.uuid='o1'`)
+	mustExec(t, a.DB(), `INSERT INTO person_organization_link (uuid, person_id, org_id, role) SELECT 'm1', p.id, o.id, 'CEO' FROM people p, organizations o WHERE p.uuid='p1' AND o.uuid='o1'`)
 	mustExec(t, a.DB(), `INSERT INTO tags (name, uuid) VALUES ('vip', 't1')`)
 	mustExec(t, a.DB(), `INSERT INTO taggings (tag_id, entity_type, entity_id) SELECT t.id, 'person', p.id FROM tags t, people p WHERE t.uuid='t1' AND p.uuid='p1'`)
 	mustExec(t, a.DB(), `INSERT INTO tasks (uuid, title) VALUES ('k1', 'Call')`)
 	mustExec(t, a.DB(), `INSERT INTO activity_target (uuid, source_kind, source_id, target_kind, target_id) SELECT 'a1', 'task', k.id, 'person', p.id FROM tasks k, people p WHERE k.uuid='k1' AND p.uuid='p1'`)
 	syncOnce(t, a, b)
-	assert.Equal(t, "CEO", str(t, b.DB(), `SELECT m.role FROM membership m JOIN people p ON p.id=m.person_id JOIN organizations o ON o.id=m.org_id WHERE p.uuid='p1' AND o.uuid='o1'`))
+	assert.Equal(t, "CEO", str(t, b.DB(), `SELECT m.role FROM person_organization_link m JOIN people p ON p.id=m.person_id JOIN organizations o ON o.id=m.org_id WHERE p.uuid='p1' AND o.uuid='o1'`))
 	assert.Equal(t, 1, count(t, b.DB(), `SELECT COUNT(*) FROM taggings g JOIN tags t ON t.id=g.tag_id JOIN people p ON p.id=g.entity_id WHERE g.entity_type='person' AND p.uuid='p1' AND t.uuid='t1'`))
 	assert.Equal(t, 1, count(t, b.DB(), `SELECT COUNT(*) FROM activity_target x JOIN tasks k ON k.id=x.source_id JOIN people p ON p.id=x.target_id WHERE k.uuid='k1' AND p.uuid='p1'`))
 	assert.Zero(t, count(t, b.DB(), `SELECT COUNT(*) FROM replica_pending`))
@@ -170,11 +170,11 @@ func TestChildArrivingBeforeParentWaits(t *testing.T) {
 	b := enable(t, newDB(t))
 	mustExec(t, a.DB(), `INSERT INTO people (uuid, first_name) VALUES ('p1', 'Ann')`)
 	mustExec(t, a.DB(), `INSERT INTO organizations (uuid, name) VALUES ('o1', 'Acme')`)
-	mustExec(t, a.DB(), `INSERT INTO membership (uuid, person_id, org_id) SELECT 'm1', p.id, o.id FROM people p, organizations o`)
+	mustExec(t, a.DB(), `INSERT INTO person_organization_link (uuid, person_id, org_id) SELECT 'm1', p.id, o.id FROM people p, organizations o`)
 	snap, _ := a.Snapshot(ctx)
 	var first, rest []replica.Change
 	for _, c := range snap.Changes {
-		if c.Collection == "membership" {
+		if c.Collection == "person_organization_link" {
 			first = append(first, c)
 		} else {
 			rest = append(rest, c)
@@ -183,11 +183,11 @@ func TestChildArrivingBeforeParentWaits(t *testing.T) {
 	_, err := b.ApplyBatch(ctx, first)
 	require.NoError(t, err)
 	assert.Equal(t, 1, count(t, b.DB(), `SELECT COUNT(*) FROM replica_pending`))
-	assert.Zero(t, count(t, b.DB(), `SELECT COUNT(*) FROM membership`))
+	assert.Zero(t, count(t, b.DB(), `SELECT COUNT(*) FROM person_organization_link`))
 	_, err = b.ApplyBatch(ctx, rest)
 	require.NoError(t, err)
 	assert.Zero(t, count(t, b.DB(), `SELECT COUNT(*) FROM replica_pending`))
-	assert.Equal(t, 1, count(t, b.DB(), `SELECT COUNT(*) FROM membership`))
+	assert.Equal(t, 1, count(t, b.DB(), `SELECT COUNT(*) FROM person_organization_link`))
 }
 
 func TestRegistryCoversEveryTableOrExplainsWhy(t *testing.T) {

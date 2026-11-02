@@ -210,7 +210,7 @@ Di,Four,Globex,a4
 	assert.Equal(t, 2, rep.OrgsCreated, "acme and globex, N/A is junk")
 	assert.Equal(t, 3, rep.OrgsLinked)
 	assert.Equal(t, 2, count(`SELECT COUNT(*) FROM organizations WHERE archived = 0`))
-	assert.Equal(t, 3, count(`SELECT COUNT(*) FROM membership WHERE is_primary = 1`))
+	assert.Equal(t, 3, count(`SELECT COUNT(*) FROM person_organization_link WHERE is_primary = 1`))
 
 	// Importing again skips the known contacts and creates nothing.
 	rep, err = importer.ImportDex(context.Background(), d, path, "", importer.DexOptions{})

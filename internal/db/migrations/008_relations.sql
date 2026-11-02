@@ -1,7 +1,7 @@
 -- foreign_keys: off
 -- up
 
--- Relations that match the real world (patterns/schema-er.md, approved 2026-10-16).
+-- Relations that match the real world (patterns/references/schema-er.md, approved 2026-10-16).
 --
 -- New: membership, relation_kind, person_relation, org_relation, deal_person, deal_org,
 -- activity_target, merge_alias. Every one has id, uuid, created_at, updated_at and deleted_at.

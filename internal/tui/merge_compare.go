@@ -632,9 +632,9 @@ func summarize(res *model.MergeResult) string {
 		}
 	}
 	var moved []string
-	for _, name := range []string{"interactions", "tasks", "deals", "relationships", "memberships"} {
+	for _, name := range []string{"interactions", "tasks", "deals", "relationships", "person_organization_links"} {
 		if n := res.Moved[name]; n > 0 {
-			moved = append(moved, fmt.Sprintf("%d %s", n, strings.ReplaceAll(name, "_", " ")))
+			moved = append(moved, fmt.Sprintf("%d %s", n, mergeCountLabel(name)))
 		}
 	}
 	if n := res.Moved["duplicates_dropped"]; n > 0 {
@@ -647,6 +647,13 @@ func summarize(res *model.MergeResult) string {
 		return "no list changes"
 	}
 	return strings.Join(parts, ", ")
+}
+
+func mergeCountLabel(name string) string {
+	if name == "person_organization_links" {
+		return "Person–Organization links"
+	}
+	return strings.ReplaceAll(name, "_", " ")
 }
 
 func (m *Model) applyMerge() {
@@ -910,9 +917,9 @@ func (c *compareState) confirmLines(h int) []string {
 		add(c.st.Err.Render(c.previewErr))
 	} else if c.preview != nil {
 		res := c.preview
-		for _, name := range []string{"memberships", "deals", "relationships"} {
+		for _, name := range []string{"person_organization_links", "deals", "relationships"} {
 			if n := res.Moved[name]; n > 0 {
-				add(label(name) + fmt.Sprintf("%d move to #%d", n, keep.id))
+				add(label(mergeCountLabel(name)) + fmt.Sprintf("%d move to #%d", n, keep.id))
 			}
 		}
 		if n := res.Moved["duplicates_dropped"]; n > 0 {

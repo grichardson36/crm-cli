@@ -241,11 +241,11 @@ func (r *OrgRepo) Search(ctx context.Context, query string, limit int) ([]*model
 	return orgs, nil
 }
 
-// FindPeople returns the people with a live membership in an organization, current or past.
+// FindPeople returns the people with a live Person–Organization link in an organization, current or past.
 func (r *OrgRepo) FindPeople(ctx context.Context, orgID int64) ([]*model.Person, error) {
 	rows, err := r.db.QueryContext(ctx,
 		fmt.Sprintf(`SELECT %s FROM people WHERE archived = 0
-			AND id IN (SELECT person_id FROM membership WHERE org_id = ? AND deleted_at IS NULL) ORDER BY first_name`, personColumns), orgID)
+			AND id IN (SELECT person_id FROM person_organization_link WHERE org_id = ? AND deleted_at IS NULL) ORDER BY first_name`, personColumns), orgID)
 	if err != nil {
 		return nil, fmt.Errorf("find people for org %d: %w", orgID, err)
 	}
@@ -299,7 +299,7 @@ func (r *OrgRepo) Overwrite(ctx context.Context, id int64, o *model.Organization
 // the organization name as the vCard ORG, so a rename must reach their contacts.
 func (r *OrgRepo) touchMembers(ctx context.Context, orgID int64) error {
 	_, err := r.db.ExecContext(ctx, `UPDATE people SET updated_at = datetime('now') WHERE id IN
-		(SELECT person_id FROM membership WHERE org_id = ? AND is_primary = 1 AND deleted_at IS NULL)`, orgID)
+		(SELECT person_id FROM person_organization_link WHERE org_id = ? AND is_primary = 1 AND deleted_at IS NULL)`, orgID)
 	if err != nil {
 		return fmt.Errorf("touch members of organization %d: %w", orgID, err)
 	}

@@ -169,13 +169,13 @@ func registerObjectTools(s *server.MCPServer, db *sql.DB) {
 			}
 			if !remove {
 				opts = append(opts,
-					gomcp.WithString("role", gomcp.Description("Role. A membership or task role is free text (CTO). A role on a deal link must be on the deal role list (crm_deal_role_list), for example champion. Empty clears it")),
+					gomcp.WithString("role", gomcp.Description("Role. A Person–Organization link or task role is free text (CTO). A role on a deal link must be on the deal role list (crm_deal_role_list), for example champion. Empty clears it")),
 					gomcp.WithBoolean("create", gomcp.Description("Deal links only: add the role to the deal role list when it is not there yet. Without it an unknown role is refused with E_VOCAB_UNKNOWN")),
 					gomcp.WithString("from", gomcp.Description("Start date: YYYY, YYYY-MM, YYYY-MM-DD or today. Empty clears it")),
 					gomcp.WithString("to", gomcp.Description("End date, same forms. Empty means current")),
 					gomcp.WithBoolean("primary", gomcp.Description("Make this the primary organization of the person or deal")),
 					gomcp.WithString("notes", gomcp.Description("Notes on the link")),
-					gomcp.WithBoolean("new", gomcp.Description("Add another link even when the pair is already linked (memberships only)")),
+					gomcp.WithBoolean("new", gomcp.Description("Add another link even when the pair is already linked (Person–Organization links only)")),
 				)
 			} else {
 				opts = append(opts, gomcp.WithNumber("link_id", gomcp.Description("Remove only this link when the pair is linked more than once")))

@@ -58,7 +58,7 @@ func (m *Model) linkSuffix(li model.LinkedObject) string {
 	return "  " + strings.Join(parts, " · ")
 }
 
-// linkRows builds the rows of one link section of src's page. Past memberships come after current
+// linkRows builds the rows of one link section of src's page. Past Person–Organization links come after current
 // ones and are drawn dim, with their dates.
 func (m *Model) linkRows(src repo.Ref, other, head, label string) []formRow {
 	items, err := m.links.Linked(m.ctx, src, other)
