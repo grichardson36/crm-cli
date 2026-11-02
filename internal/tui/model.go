@@ -248,6 +248,7 @@ type Model struct {
 	st        theme.Styles
 	themeName string               // name of the active theme
 	darkBG    bool                 // terminal has a dark background (resolves the auto theme)
+	fillMode  theme.Fill           // paint the whole screen with the theme background (per device setting)
 	profile   colorprofile.Profile // what colors the terminal can show (NO_COLOR gives Ascii)
 	// Command bar: caches for the quick package, the person the palette opened on, the changes of
 	// command lines run this session (newest last) for Undo, and the short syntax switch.

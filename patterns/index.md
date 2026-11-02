@@ -32,6 +32,7 @@ Start with [[core]]. Use this index only to find the relevant supporting pattern
 - [[input-grammar]]
 - [[keyboard-and-feedback]]
 - [[list-editor-standard]]
+- [[custom-themes]] (custom themes, forced light or dark, the anthropocene palette)
 - [[sync-contract]]
 - [[references/app/domain-model|app domain model]]
 - [[references/app/architecture|app architecture]]

@@ -27,7 +27,7 @@ func TestThemeListShowsBuiltinsAndMarksActive(t *testing.T) {
 		assert.Equal(t, "builtin", r.Kind)
 		assert.Equal(t, r.Name == "auto", r.Active, "auto is the default")
 	}
-	assert.Equal(t, []string{"auto", "dark", "light", "high-contrast", "catppuccin", "nord", "gruvbox", "solarized"}, names)
+	assert.Equal(t, []string{"auto", "dark", "light", "high-contrast", "catppuccin", "nord", "gruvbox", "solarized", "anthropocene", "anthropocene-dark", "anthropocene-light"}, names)
 }
 
 func TestThemeSetShowPathAndPersistence(t *testing.T) {

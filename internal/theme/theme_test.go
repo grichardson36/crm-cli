@@ -16,7 +16,7 @@ import (
 )
 
 func TestBuiltinsAreValidAndNamed(t *testing.T) {
-	want := []string{"auto", "dark", "light", "high-contrast", "catppuccin", "nord", "gruvbox", "solarized"}
+	want := []string{"auto", "dark", "light", "high-contrast", "catppuccin", "nord", "gruvbox", "solarized", "anthropocene", "anthropocene-dark", "anthropocene-light"}
 	assert.Equal(t, want, BuiltinNames())
 	for _, name := range want {
 		for _, dark := range []bool{true, false} {
@@ -263,8 +263,8 @@ func TestKindColorsAreReadableAndDistinctInEveryBuiltin(t *testing.T) {
 	for _, name := range BuiltinNames() {
 		th, _ := Builtin(name, name != "light")
 		bg := 0.0
-		if name == "light" {
-			bg = 1.0
+		if th.Bg != "" {
+			bg = luminance(t, th.Bg)
 		}
 		seen := map[string]string{}
 		for kind, role := range KindRoles {

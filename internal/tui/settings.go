@@ -10,6 +10,7 @@ import (
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/jdanielnd/crm-cli/internal/modules"
+	"github.com/jdanielnd/crm-cli/internal/theme"
 )
 
 // The settings registry (patterns/settings-view). Every setting is declared once, here: its id, the
@@ -107,6 +108,9 @@ func (m *Model) searchTemplate() string {
 var syntaxField = model.FieldSpec{Key: "syntax", Label: "Short syntax", Type: model.FieldChoice,
 	Choices: []model.FieldChoiceOption{{Value: "on", Label: "on"}, {Value: "off", Label: "off"}}}
 
+var fillField = model.FieldSpec{Key: "fill-background", Label: "Fill the whole screen with the theme background", Type: model.FieldChoice,
+	Choices: []model.FieldChoiceOption{{Value: "auto", Label: "auto"}, {Value: "on", Label: "on"}, {Value: "off", Label: "off"}}}
+
 var searchURLField = model.FieldSpec{Key: "search-url", Label: "Web search", Type: model.FieldText, Max: 500,
 	Hint: "an address with {query} where the text goes, for example https://duckduckgo.com/?q={query}. d resets it"}
 
@@ -125,6 +129,23 @@ func (m *Model) settingList() []setting {
 		// Appearance
 		{id: "theme", section: secAppearance, name: "Theme", words: "colors colours dark light appearance look", desc: "choose a color theme, previewed live", scope: scopeDevice,
 			value: func(m *Model) string { return m.themeName }, action: "theme-choose"},
+		{id: "fill-background", section: secAppearance, name: "Fill the whole screen with the theme background", words: "background paint light dark terminal force colors", scope: scopeDevice,
+			desc: "paint every cell with the theme background so a light theme stays light on a dark terminal. auto: on for light themes, for dark themes only on a light terminal. Needs a theme with a bg color and a color terminal",
+			value: func(m *Model) string { return string(m.fillMode) }, field: &fillField,
+			set: func(m *Model, v string) error {
+				f, err := theme.ParseFill(v)
+				if err != nil {
+					return fmt.Errorf("%v: %w", err, model.ErrValidation)
+				}
+				if m.env.DataDir == "" {
+					return fmt.Errorf("no data directory in this session, so the setting cannot be saved: %w", model.ErrValidation)
+				}
+				if err := theme.SaveFill(m.env.DataDir, f); err != nil {
+					return err
+				}
+				m.fillMode = f
+				return nil
+			}},
 		{id: "theme-reload", section: secAppearance, name: "Theme files", words: "theme reload refresh themes", desc: "re-read ~/.crm/themes and apply the theme again", scope: scopeDevice,
 			action: "theme-reload"},
 

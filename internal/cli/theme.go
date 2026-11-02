@@ -26,7 +26,7 @@ func registerThemeCommands(rootCmd *cobra.Command) {
 	cmd := &cobra.Command{
 		Use:   "theme",
 		Short: "List, choose and create color themes for the terminal UI",
-		Long: "Color themes for 'crm tui'. Built-in: auto, dark, light, high-contrast, catppuccin, nord, gruvbox, solarized.\n" +
+		Long: "Color themes for 'crm tui'. Built-in: auto, dark, light, high-contrast, catppuccin, nord, gruvbox, solarized, anthropocene (follows the terminal), anthropocene-dark, anthropocene-light.\n" +
 			"Custom themes are TOML files in ~/.crm/themes. The choice is remembered per device in ~/.crm/config.toml.\n" +
 			"Inside the TUI use the palette actions 'Theme: choose' (live preview) and 'Theme: reload'. See 'crm help theme'.",
 	}
