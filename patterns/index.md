@@ -24,6 +24,7 @@ Start with [[core]]. Use this index only to find the relevant supporting pattern
 - [[reversible-records]]
 - [[edge-adapters]]
 - [[accepted-enrichment]]
+- [[navigation-standard]]
 
 ## Current references
 

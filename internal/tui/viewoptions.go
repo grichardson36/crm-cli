@@ -141,8 +141,9 @@ func (o viewOption) current(m *Model) string { return o.choiceLabel(o.get(m)) }
 func (m *Model) openViewOptions() tea.Cmd {
 	opts := m.optionsForView()
 	view := m.view
-	ov := m.newOverlay("View options, "+viewNames[view]+": left / right changes, esc closes", m.viewOptionItems(opts), false)
+	ov := m.newOverlay("View options, "+viewNames[view], m.viewOptionItems(opts), false)
 	ov.noFilter = true
+	ov.hints = []hintItem{fk("left/right", "change"), fk("esc", "close"), fk("up/down", "choose")}
 	ov.onKey = func(m *Model, key string) bool {
 		var back bool
 		switch key {
