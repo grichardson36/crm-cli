@@ -10,8 +10,8 @@ research: partial
 **Research state.** partly researched. See [[inspirations]].
 
 **What we take.**
-- Smart parsing must be dismissible. [[date-safety-rules]] [[show-parsed-chips]]
-- ! for importance. [[bang-means-priority]]
+- Smart parsing must be dismissible. [[core]] [[core]]
+- ! for importance. [[core]]
 
 **Gaps to research.** Verify sigils against the official help center.
 

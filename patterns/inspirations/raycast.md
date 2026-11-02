@@ -10,6 +10,6 @@ research: partial
 **Research state.** partly researched. See [[inspirations]].
 
 **What we take.**
-- Command then arguments is the shape of n Sam called ... #deal. [[bar-modes-by-first-word]]
+- Command then arguments is the shape of n Sam called ... #deal. [[core]]
 
 **Sources.** Search summaries only (UNVERIFIED).

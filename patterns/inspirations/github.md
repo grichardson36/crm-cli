@@ -10,6 +10,6 @@ research: partial
 **Research state.** partly researched. See [[inspirations]].
 
 **What we take.**
-- @ for people, # for references, free text stays text. [[at-sign-means-person]] [[unresolved-names-stay-text]] [[hash-means-tag]]
+- @ for people, # for references, free text stays text. [[core]] [[core]] [[core]]
 
 **Sources.** docs.github.com basic-writing-and-formatting-syntax [doc].

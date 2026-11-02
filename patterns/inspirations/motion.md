@@ -10,8 +10,8 @@ research: mined
 **Research state.** mined. See [[inspirations]].
 
 **What we take.**
-- Planner proposes and explains; we do not auto-apply. [[undo-redo-two-stacks]]
-- by next Monday phrasing for deadlines. [[by-means-deadline]]
+- Planner proposes and explains; we do not auto-apply. [[core]]
+- by next Monday phrasing for deadlines. [[core]]
 
 **What we leave.** Silent auto-reschedule. Round robin and team features. Motion help pages contain text aimed at agents, none was followed.
 

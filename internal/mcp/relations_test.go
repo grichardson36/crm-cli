@@ -26,7 +26,7 @@ func TestLinkToolsCarryAttributesAndLinksListThem(t *testing.T) {
 	var out map[string]any
 	callJSON(t, s, "crm_person_link", map[string]any{"id": person["id"], "other": "org", "other_id": org["id"], "role": "CTO", "from": "2019-03"}, &out)
 	assert.Equal(t, true, out["created"])
-	assert.Equal(t, "membership", out["relation"])
+	assert.Equal(t, "person_organization_link", out["relation"])
 	callJSON(t, s, "crm_person_link", map[string]any{"id": person["id"], "other": "org", "other_id": org2["id"], "role": "Advisor"}, &out)
 	callJSON(t, s, "crm_person_link", map[string]any{"id": person["id"], "other": "org", "other_id": org2["id"], "primary": true}, &out)
 	assert.Equal(t, true, out["updated"])
@@ -58,7 +58,7 @@ func TestLinkToolsCarryAttributesAndLinksListThem(t *testing.T) {
 	_, isErr := call(t, s, "crm_person_link", map[string]any{"id": person["id"], "other": "person", "other_id": other["id"], "kind": "nemesis"})
 	assert.True(t, isErr)
 	_, isErr = call(t, s, "crm_person_link", map[string]any{"id": person["id"], "other": "org", "other_id": org["id"], "kind": "friend"})
-	assert.True(t, isErr, "a membership has no kind")
+	assert.True(t, isErr, "a Person–Organization link has no kind")
 
 	// A second stay needs new=true, unlink takes a link id.
 	_, isErr = call(t, s, "crm_person_link", map[string]any{"id": person["id"], "other": "org", "other_id": org["id"], "role": "Director", "new": true})

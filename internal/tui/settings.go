@@ -164,6 +164,18 @@ func (m *Model) settingList() []setting {
 				}
 				return countText(len(list), "type")
 			}, action: "note-types"},
+		{id: "relation-kinds", section: secTypes, name: "Relation kinds", words: "friend parent manager inverse mutual link kinds vocabulary", desc: "add, rename, order and remove the kinds of person and organization links (friend, parent, manager, ...)", scope: scopeSynced,
+			value: func(m *Model) string {
+				kr := repo.NewKindRepo(m.db)
+				n := 0
+				for _, t := range []string{"person", "organization"} {
+					if list, err := kr.List(m.ctx, t); err == nil {
+						n += len(list)
+					}
+				}
+				return countText(n, "kind")
+			},
+			run: func(m *Model) tea.Cmd { return m.openListEditor("relation-kinds") }},
 
 		// Names
 		{id: "aliases", section: secNames, name: "Name aliases", words: "nicknames zach zachary alias table", desc: "the table that lets Zach find Zachary. Manage it with: crm alias list, add, remove", scope: scopeSynced,

@@ -70,7 +70,7 @@ type LinkedObject struct {
 	EndedOn   *string `json:"to,omitempty"`
 	Primary   bool    `json:"primary,omitempty"`
 	Notes     *string `json:"notes,omitempty"`
-	// Current is false for a membership that has ended.
+	// Current is false for a Person–Organization link that has ended.
 	Current bool `json:"current"`
 	// Incoming is true when the link is stored with the other object as "a" (it points at the viewer).
 	Incoming bool `json:"-"`

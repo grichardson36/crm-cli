@@ -29,14 +29,14 @@ func vocabRows(list []*model.VocabEntry) []map[string]any {
 
 // dealRolesCmd is `crm deal roles list|add|rename|remove|reorder|backfill`: the deal role vocabulary
 // (patterns/deal-roles), kept in the vocabulary table. A person's role on a deal is a sales role
-// (champion, decision maker, ...), different from the free-text role at a company (a membership).
+// (champion, decision maker, ...), different from the free-text role on a Person–Organization link.
 func dealRolesCmd() *cobra.Command {
 	const kind = model.DealRoleKind
 	cmd := &cobra.Command{
 		Use:   "roles",
 		Short: "Manage the deal roles: champion, decision maker, economic buyer ...",
 		Long: "The roles a person can have on a deal come from a list you manage. Add, rename, reorder and remove them here. " +
-			"The role at a company (a membership) is different and stays free text.\n" +
+			"The role on a Person–Organization link is different and stays free text.\n" +
 			"A rename rewrites the deal links that use the role. Removing a role that links still use needs --replace-with ROLE (they move) or --keep (they keep the text as plain text). " +
 			"Linking a person to a deal with a role that is not on the list is refused with E_VOCAB_UNKNOWN unless you pass --create. " +
 			"'backfill' adds the free-text roles already on your deal links to the list. See `crm help deal-roles`.",

@@ -43,7 +43,7 @@ var AttrSpecs = map[string]AttrSpec{
 // Relation is one stored kind of link between two kinds of object, kept in one table. Every link
 // is made, viewed and removed from both ends (patterns/link-from-either-side).
 //
-// A and B are object kinds. For membership A is the person and B the organization. For a relation
+// A and B are object kinds. For a Person–Organization link A is the person and B the organization. For a relation
 // between two objects of the same kind (person_relation, org_relation) the order matters: the row
 // (a, b, kind) reads "a is <kind> b". Activity relations have a task or interaction as A.
 type Relation struct {
@@ -56,7 +56,7 @@ type Relation struct {
 	Kinded bool
 	// PrimaryPerA says at most one live link per A can be primary (one primary organization per person).
 	PrimaryPerA bool
-	// Unique says a pair is linked at most once at a time. Memberships can repeat (E3).
+	// Unique says a pair is linked at most once at a time. Person–Organization links can repeat (E3).
 	Unique bool
 	// LabelA is what an A calls its B objects (a person's "Organizations"). LabelB is what a B calls its A objects.
 	LabelA, LabelB string
@@ -64,7 +64,7 @@ type Relation struct {
 
 // Relations is the one list of links. The CLI, MCP, TUI, doctor and schema all read it.
 var Relations = []Relation{
-	{Name: "membership", A: "person", B: "organization", Attrs: []string{AttrRole, AttrFrom, AttrTo, AttrPrimary, AttrNotes},
+	{Name: "person_organization_link", A: "person", B: "organization", Attrs: []string{AttrRole, AttrFrom, AttrTo, AttrPrimary, AttrNotes},
 		PrimaryPerA: true, LabelA: "Organizations", LabelB: "Members"},
 	{Name: "person_relation", A: "person", B: "person", Attrs: []string{AttrKind, AttrNotes}, Kinded: true, Unique: true,
 		LabelA: "Related people", LabelB: "Related people"},

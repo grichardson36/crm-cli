@@ -1,6 +1,6 @@
 # Deal roles
 
-A person's role on a deal is a sales role: champion, decision maker, economic buyer, influencer, blocker, end user, signer, billing contact. The role at a company (a membership: CTO, Advisor) is a different thing and stays free text. Deal roles are a list you manage. A new database starts with the eight above.
+A person's role on a deal is a sales role: champion, decision maker, economic buyer, influencer, blocker, end user, signer, billing contact. The role at a company (a Person–Organization link: CTO, Advisor) is a different thing and stays free text. Deal roles are a list you manage. A new database starts with the eight above.
 
 ```sh crm-example
 crm deal roles list

@@ -135,7 +135,7 @@ func TestEveryErrorCodeIsReachable(t *testing.T) {
 		note(validate.TagName(bad).Err())
 	}
 	note(validate.PathMove("tag", "a", "a/b").Err())
-	note(validate.OnePrimaryMembership(7, 2))
+	note(validate.OnePrimaryPersonOrganizationLink(7, 2))
 	roleSpec := spec(t, "deal_person", "role").WithVocabulary([]string{"champion"})
 	note(validate.Field(roleSpec, "zzz", validate.Options{}).Err())
 	_, vErr := validate.VocabName("deal_role", "  ")
@@ -336,9 +336,9 @@ func TestInputAdapters(t *testing.T) {
 }
 
 func TestBusinessRules(t *testing.T) {
-	assert.NoError(t, validate.OnePrimaryMembership(1, 0))
-	assert.NoError(t, validate.OnePrimaryMembership(1, 1))
-	assert.Error(t, validate.OnePrimaryMembership(1, 2))
+	assert.NoError(t, validate.OnePrimaryPersonOrganizationLink(1, 0))
+	assert.NoError(t, validate.OnePrimaryPersonOrganizationLink(1, 1))
+	assert.Error(t, validate.OnePrimaryPersonOrganizationLink(1, 2))
 	assert.NoError(t, validate.OrgParentCycle(1, 2, false))
 	assert.Error(t, validate.OrgParentCycle(1, 2, true))
 	assert.NoError(t, validate.DateOrder("start date", "2026-01-01", "end date", "2026-01-01"))

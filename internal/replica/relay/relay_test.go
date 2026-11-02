@@ -89,11 +89,11 @@ func TestTwoDevicesThroughARealRelay(t *testing.T) {
 
 	a.exec(`INSERT INTO people (uuid, first_name, last_name, notes) VALUES ('p1', 'Ann', 'Lee', 'base')`)
 	a.exec(`INSERT INTO organizations (uuid, name) VALUES ('o1', 'Acme')`)
-	a.exec(`INSERT INTO membership (uuid, person_id, org_id, role) SELECT 'm1', p.id, o.id, 'CEO' FROM people p, organizations o`)
+	a.exec(`INSERT INTO person_organization_link (uuid, person_id, org_id, role) SELECT 'm1', p.id, o.id, 'CEO' FROM people p, organizations o`)
 	syncWith(t, a, pa)
 	syncWith(t, b, pb)
 	assert.Equal(t, "Ann", b.str(`SELECT first_name FROM people WHERE uuid='p1'`))
-	assert.Equal(t, "CEO", b.str(`SELECT role FROM membership WHERE uuid='m1'`))
+	assert.Equal(t, "CEO", b.str(`SELECT role FROM person_organization_link WHERE uuid='m1'`))
 	assert.Equal(t, "Acme", rel.str(`SELECT name FROM organizations WHERE uuid='o1'`), "the relay keeps a full copy")
 
 	// Offline edits on both devices touch different fields and merge per field.

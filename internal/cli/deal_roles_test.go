@@ -90,7 +90,7 @@ func TestDealRolesUseOnLinks(t *testing.T) {
 		require.Equal(t, 0, code, stderr)
 		assert.Contains(t, roleNames(t, db), "kingmaker")
 	})
-	t.Run("a membership role stays free text and has no --create", func(t *testing.T) {
+	t.Run("a Person–Organization link role stays free text and has no --create", func(t *testing.T) {
 		_, stderr, code := crm(t, db, "person", "link", "org", "1", "1", "--role", "Chief Whatever Officer")
 		assert.Equal(t, 0, code, stderr)
 		_, stderr, code = crm(t, db, "person", "link", "org", "1", "2", "--role", "x", "--create")

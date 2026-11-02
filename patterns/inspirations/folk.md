@@ -10,9 +10,9 @@ research: partial
 **Research state.** partly researched. See [[inspirations]].
 
 **What we take.**
-- Groups as workflow databases: per-group fields and pipeline views serve many uses from one contact store. [[objects-first]]
-- Provenance such as last enriched is cheap and useful. [[sync-safe-data]]
-- Quiet-contact nudges and an import logged in the timeline. [[home-is-an-action-queue]]
+- Groups as workflow databases: per-group fields and pipeline views serve many uses from one contact store. [[object-registry]]
+- Provenance such as last enriched is cheap and useful. [[core]]
+- Quiet-contact nudges and an import logged in the timeline. [[core]]
 
 **What we leave.** Sequences with waits and branching, Chrome capture extension.
 

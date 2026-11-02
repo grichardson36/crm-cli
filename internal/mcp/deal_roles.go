@@ -22,7 +22,7 @@ func registerDealRoleTools(s *server.MCPServer, db *sql.DB) {
 
 	s.AddTool(
 		gomcp.NewTool("crm_deal_role_list",
-			gomcp.WithDescription("List the deal roles in pick order (champion, decision maker, economic buyer ...) with the number of deal links that use each. The role of a person on a deal must be one of these (or created with create). The role at a company (a membership) is free text and not on this list"),
+			gomcp.WithDescription("List the deal roles in pick order (champion, decision maker, economic buyer ...) with the number of deal links that use each. The role of a person on a deal must be one of these (or created with create). The role on a Person–Organization link is free text and not on this list"),
 			gomcp.WithBoolean("all", gomcp.Description("Include removed roles")),
 		),
 		func(ctx context.Context, req gomcp.CallToolRequest) (*gomcp.CallToolResult, error) {

@@ -13,7 +13,7 @@ import (
 
 // Company text creates or reuses an organization (owner decision 2026-10-27). people.company stays
 // the source text. Wherever it is set, the text is matched to a live organization by NormalizeCompany
-// (exact) or through merge_alias, else a new organization is made, and the person gets a membership.
+// (exact) or through merge_alias, else a new organization is made, and the person gets a Person–Organization link.
 // Close but different names never auto-merge: they show up as organization merge candidates
 // (FindOrgCandidates). Junk strings (company_ignore) never create anything.
 // See patterns/convert-text-to-records-in-review-passes.
@@ -212,15 +212,15 @@ func (r *OrgAutoRepo) Lookup(ctx context.Context, text string) (OrgMatch, bool, 
 	return m, ok, nil
 }
 
-// Membership modes of ApplyCompany.
+// Person–Organization link modes of ApplyCompany.
 const (
 	// ModePrimary makes the organization the person's primary one. An older primary stays as a
-	// non-primary membership. Used by the entry points that edit a person (CLI, MCP, TUI, import).
+	// non-primary Person–Organization link. Used by the entry points that edit a person (CLI, MCP, TUI, import).
 	ModePrimary = "primary"
-	// ModeRepoint moves the person's primary membership to the organization in place, keeping role
+	// ModeRepoint moves the person's primary Person–Organization link to the organization in place, keeping role
 	// and dates (the DAV rule, E4). A person with no primary gets one.
 	ModeRepoint = "repoint"
-	// ModeAdd adds a membership, primary only when the person has none, and never moves an existing
+	// ModeAdd adds a Person–Organization link, primary only when the person has none, and never moves an existing
 	// one. A person already linked to the organization is left alone. Used by the backfill.
 	ModeAdd = "add"
 )
@@ -238,13 +238,13 @@ type CompanyChange struct {
 	// merged automatically.
 	Similar []OrgMatch `json:"similar,omitempty"`
 
-	// LinkCreated, LinkID, Before, After and Demoted describe the membership write.
+	// LinkCreated, LinkID, Before, After and Demoted describe the Person–Organization link write.
 	LinkCreated bool        `json:"link_created,omitempty"`
 	LinkID      int64       `json:"link_id,omitempty"`
 	Before      *LinkRecord `json:"-"`
 	After       *LinkRecord `json:"-"`
 	Demoted     []int64     `json:"-"`
-	// Repoint is set when the primary membership moved in place.
+	// Repoint is set when the primary Person–Organization link moved in place.
 	RepointID   int64 `json:"-"`
 	RepointFrom int64 `json:"-"`
 }
@@ -255,7 +255,7 @@ func (c CompanyChange) Empty() bool {
 }
 
 // ApplyCompany matches the person's company text to an organization (creating it when none matches)
-// and gives the person a membership according to mode. An empty or ignored text does nothing.
+// and gives the person a Person–Organization link according to mode. An empty or ignored text does nothing.
 // people.company is not touched: the caller keeps it as the source text.
 func (r *OrgAutoRepo) ApplyCompany(ctx context.Context, personID int64, text, mode string) (CompanyChange, error) {
 	c, err := r.newResolver(ctx)
@@ -292,17 +292,17 @@ func (r *OrgAutoRepo) apply(ctx context.Context, c *resolver, personID int64, te
 
 func (r *OrgAutoRepo) attach(ctx context.Context, ch *CompanyChange, mode string) error {
 	var memID, primaryOrg int64
-	err := r.db.QueryRowContext(ctx, `SELECT id, org_id FROM membership WHERE person_id = ? AND is_primary = 1 AND deleted_at IS NULL`, ch.PersonID).Scan(&memID, &primaryOrg)
+	err := r.db.QueryRowContext(ctx, `SELECT id, org_id FROM person_organization_link WHERE person_id = ? AND is_primary = 1 AND deleted_at IS NULL`, ch.PersonID).Scan(&memID, &primaryOrg)
 	hasPrimary := err == nil
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return fmt.Errorf("find primary membership: %w", err)
+		return fmt.Errorf("find primary Person–Organization link: %w", err)
 	}
 	if hasPrimary && primaryOrg == ch.OrgID {
 		return nil
 	}
 	if hasPrimary && mode == ModeRepoint {
-		if _, err := r.db.ExecContext(ctx, `UPDATE membership SET org_id = ?, updated_at = datetime('now') WHERE id = ?`, ch.OrgID, memID); err != nil {
-			return fmt.Errorf("move primary membership: %w", err)
+		if _, err := r.db.ExecContext(ctx, `UPDATE person_organization_link SET org_id = ?, updated_at = datetime('now') WHERE id = ?`, ch.OrgID, memID); err != nil {
+			return fmt.Errorf("move primary Person–Organization link: %w", err)
 		}
 		if _, err := r.db.ExecContext(ctx, `UPDATE people SET updated_at = datetime('now') WHERE id = ?`, ch.PersonID); err != nil {
 			return err
@@ -311,8 +311,8 @@ func (r *OrgAutoRepo) attach(ctx context.Context, ch *CompanyChange, mode string
 		return nil
 	}
 	var existing int
-	if err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM membership WHERE person_id = ? AND org_id = ? AND deleted_at IS NULL`, ch.PersonID, ch.OrgID).Scan(&existing); err != nil {
-		return fmt.Errorf("find membership: %w", err)
+	if err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM person_organization_link WHERE person_id = ? AND org_id = ? AND deleted_at IS NULL`, ch.PersonID, ch.OrgID).Scan(&existing); err != nil {
+		return fmt.Errorf("find Person–Organization link: %w", err)
 	}
 	if existing > 0 && mode == ModeAdd {
 		return nil
@@ -337,7 +337,7 @@ func (r *OrgAutoRepo) attach(ctx context.Context, ch *CompanyChange, mode string
 		return nil
 	}
 	ch.LinkCreated, ch.LinkID, ch.Before, ch.Demoted = res.Created, res.LinkID, res.Before, res.Demoted
-	after, err := r.links.Get(ctx, "membership", res.LinkID)
+	after, err := r.links.Get(ctx, "person_organization_link", res.LinkID)
 	if err != nil {
 		return err
 	}
@@ -347,23 +347,23 @@ func (r *OrgAutoRepo) attach(ctx context.Context, ch *CompanyChange, mode string
 
 func (r *OrgAutoRepo) setPrimaryFlag(ctx context.Context, ids []int64, on bool) error {
 	for _, id := range ids {
-		if _, err := r.db.ExecContext(ctx, `UPDATE membership SET is_primary = ?, updated_at = datetime('now') WHERE id = ?`, on, id); err != nil {
+		if _, err := r.db.ExecContext(ctx, `UPDATE person_organization_link SET is_primary = ?, updated_at = datetime('now') WHERE id = ?`, on, id); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// Undo reverses a change: the membership goes back, then a created organization is archived.
+// Undo reverses a change: the Person–Organization link goes back, then a created organization is archived.
 func (r *OrgAutoRepo) Undo(ctx context.Context, ch CompanyChange) error {
 	if ch.RepointID != 0 {
-		if _, err := r.db.ExecContext(ctx, `UPDATE membership SET org_id = ?, updated_at = datetime('now') WHERE id = ?`, ch.RepointFrom, ch.RepointID); err != nil {
+		if _, err := r.db.ExecContext(ctx, `UPDATE person_organization_link SET org_id = ?, updated_at = datetime('now') WHERE id = ?`, ch.RepointFrom, ch.RepointID); err != nil {
 			return err
 		}
 	}
 	switch {
 	case ch.LinkCreated:
-		rec, err := r.links.Get(ctx, "membership", ch.LinkID)
+		rec, err := r.links.Get(ctx, "person_organization_link", ch.LinkID)
 		if err == nil && !rec.Deleted {
 			if _, err := r.links.Unlink(ctx, Ref{Kind: "person", ID: rec.A}, Ref{Kind: "organization", ID: rec.B}, UnlinkOptions{LinkID: rec.ID}); err != nil {
 				return err
@@ -393,7 +393,7 @@ func (r *OrgAutoRepo) Redo(ctx context.Context, ch CompanyChange) error {
 		}
 	}
 	if ch.RepointID != 0 {
-		if _, err := r.db.ExecContext(ctx, `UPDATE membership SET org_id = ?, updated_at = datetime('now') WHERE id = ?`, ch.OrgID, ch.RepointID); err != nil {
+		if _, err := r.db.ExecContext(ctx, `UPDATE person_organization_link SET org_id = ?, updated_at = datetime('now') WHERE id = ?`, ch.OrgID, ch.RepointID); err != nil {
 			return err
 		}
 	}
@@ -402,7 +402,7 @@ func (r *OrgAutoRepo) Redo(ctx context.Context, ch CompanyChange) error {
 	}
 	switch {
 	case ch.LinkCreated:
-		if err := r.links.RestoreLink(ctx, "membership", ch.LinkID); err != nil {
+		if err := r.links.RestoreLink(ctx, "person_organization_link", ch.LinkID); err != nil {
 			return err
 		}
 	case ch.After != nil:
@@ -438,7 +438,7 @@ type BackfillGroup struct {
 	Action  string `json:"action"`
 	OrgID   int64  `json:"org_id,omitempty"`
 	OrgName string `json:"org_name,omitempty"`
-	// ToLink is how many people still need a membership, Linked how many already have one.
+	// ToLink is how many people still need a Person–Organization link, Linked how many already have one.
 	ToLink int `json:"to_link"`
 	Linked int `json:"linked"`
 
@@ -487,10 +487,10 @@ func (r *OrgAutoRepo) plan(ctx context.Context, c *resolver) (BackfillReport, er
 	var rep BackfillReport
 	// Keys of the organizations each person is a live member of.
 	member := map[int64]map[string]bool{}
-	mrows, err := r.db.QueryContext(ctx, `SELECT m.person_id, o.name FROM membership m JOIN organizations o ON o.id = m.org_id
+	mrows, err := r.db.QueryContext(ctx, `SELECT m.person_id, o.name FROM person_organization_link m JOIN organizations o ON o.id = m.org_id
 		WHERE m.deleted_at IS NULL AND o.archived = 0`)
 	if err != nil {
-		return rep, fmt.Errorf("list memberships: %w", err)
+		return rep, fmt.Errorf("list Person–Organization links: %w", err)
 	}
 	for mrows.Next() {
 		var pid int64
@@ -603,7 +603,7 @@ type BackfillChange struct {
 func (b BackfillChange) Empty() bool { return len(b.Changes) == 0 }
 
 // BackfillApply runs the backfill as one batch: it creates the missing organizations and gives each
-// person with company text a membership (primary when they have none, existing memberships stay).
+// person with company text a Person–Organization link (primary when they have none, existing links stay).
 // people.company is not changed. It is idempotent: a second run finds nothing to do. On an error the
 // partial work is undone.
 func (r *OrgAutoRepo) BackfillApply(ctx context.Context) (BackfillReport, BackfillChange, error) {

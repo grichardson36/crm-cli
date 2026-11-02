@@ -10,6 +10,6 @@ research: partial
 **Research state.** partly researched. See [[inspirations]].
 
 **What we take.**
-- TUI precedent for undo keys; we accept ctrl+z, ctrl+y and ctrl+r. [[undo-redo-two-stacks]] [[keys-are-rebindable]]
+- TUI precedent for undo keys; we accept ctrl+z, ctrl+y and ctrl+r. [[core]] [[core]]
 
 **Sources.** toolsbase.dev/en/reference/lazygit-commands [search].

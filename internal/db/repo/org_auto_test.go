@@ -111,29 +111,29 @@ func TestApplyCompanyModes(t *testing.T) {
 		f.link(t, repo.Ref{Kind: "person", ID: pid}, repo.Ref{Kind: "organization", ID: old}, model.LinkAttrs{})
 		return f, pid, old
 	}
-	t.Run("primary makes the new organization primary and keeps the old membership", func(t *testing.T) {
+	t.Run("primary makes the new organization primary and keeps the old Person–Organization link", func(t *testing.T) {
 		f, pid, old := setup(t)
 		ch, err := repo.NewOrgAutoRepo(f.d).ApplyCompany(context.Background(), pid, "New Co", repo.ModePrimary)
 		require.NoError(t, err)
 		assert.True(t, ch.OrgCreated)
 		assert.Equal(t, "New Co", f.primaryOrgName(t, pid))
-		assert.Equal(t, 2, f.count(t, `SELECT COUNT(*) FROM membership WHERE person_id = ? AND deleted_at IS NULL`, pid))
-		assert.Equal(t, 1, f.count(t, `SELECT COUNT(*) FROM membership WHERE person_id = ? AND org_id = ? AND is_primary = 0 AND deleted_at IS NULL`, pid, old))
-		assert.Equal(t, 1, f.count(t, `SELECT COUNT(*) FROM membership WHERE person_id = ? AND role = 'CTO'`, pid), "the title is the role of the new membership")
+		assert.Equal(t, 2, f.count(t, `SELECT COUNT(*) FROM person_organization_link WHERE person_id = ? AND deleted_at IS NULL`, pid))
+		assert.Equal(t, 1, f.count(t, `SELECT COUNT(*) FROM person_organization_link WHERE person_id = ? AND org_id = ? AND is_primary = 0 AND deleted_at IS NULL`, pid, old))
+		assert.Equal(t, 1, f.count(t, `SELECT COUNT(*) FROM person_organization_link WHERE person_id = ? AND role = 'CTO'`, pid), "the title is the role of the new person_organization_link")
 	})
 	t.Run("repoint moves the primary in place", func(t *testing.T) {
 		f, pid, _ := setup(t)
 		_, err := repo.NewOrgAutoRepo(f.d).ApplyCompany(context.Background(), pid, "New Co", repo.ModeRepoint)
 		require.NoError(t, err)
 		assert.Equal(t, "New Co", f.primaryOrgName(t, pid))
-		assert.Equal(t, 1, f.count(t, `SELECT COUNT(*) FROM membership WHERE person_id = ? AND deleted_at IS NULL`, pid))
+		assert.Equal(t, 1, f.count(t, `SELECT COUNT(*) FROM person_organization_link WHERE person_id = ? AND deleted_at IS NULL`, pid))
 	})
 	t.Run("add never moves the primary", func(t *testing.T) {
 		f, pid, _ := setup(t)
 		_, err := repo.NewOrgAutoRepo(f.d).ApplyCompany(context.Background(), pid, "New Co", repo.ModeAdd)
 		require.NoError(t, err)
 		assert.Equal(t, "Old Co", f.primaryOrgName(t, pid))
-		assert.Equal(t, 2, f.count(t, `SELECT COUNT(*) FROM membership WHERE person_id = ? AND deleted_at IS NULL`, pid))
+		assert.Equal(t, 2, f.count(t, `SELECT COUNT(*) FROM person_organization_link WHERE person_id = ? AND deleted_at IS NULL`, pid))
 	})
 }
 
@@ -155,7 +155,7 @@ func TestApplyCompanyUndoRedo(t *testing.T) {
 			require.NoError(t, oa.Undo(ctx, ch))
 			assert.Equal(t, 1, f.liveOrgs(t), "the created organization is archived")
 			assert.Equal(t, "Old Co", f.primaryOrgName(t, pid), "the old primary is back")
-			assert.Equal(t, 1, f.count(t, `SELECT COUNT(*) FROM membership WHERE person_id = ? AND deleted_at IS NULL`, pid))
+			assert.Equal(t, 1, f.count(t, `SELECT COUNT(*) FROM person_organization_link WHERE person_id = ? AND deleted_at IS NULL`, pid))
 
 			require.NoError(t, oa.Redo(ctx, ch))
 			assert.Equal(t, 2, f.liveOrgs(t))
@@ -244,7 +244,7 @@ func TestBackfillDryRunWritesNothing(t *testing.T) {
 	f, _ := backfillFixture(t)
 	ctx := context.Background()
 	orgsBefore := f.liveOrgs(t)
-	membersBefore := f.count(t, `SELECT COUNT(*) FROM membership`)
+	membersBefore := f.count(t, `SELECT COUNT(*) FROM person_organization_link`)
 
 	rep, err := repo.NewOrgAutoRepo(f.d).BackfillPlan(ctx)
 	require.NoError(t, err)
@@ -263,7 +263,7 @@ func TestBackfillDryRunWritesNothing(t *testing.T) {
 	assert.Len(t, rep.List[0].Variants, 2, "two spellings of acme")
 
 	assert.Equal(t, orgsBefore, f.liveOrgs(t))
-	assert.Equal(t, membersBefore, f.count(t, `SELECT COUNT(*) FROM membership`))
+	assert.Equal(t, membersBefore, f.count(t, `SELECT COUNT(*) FROM person_organization_link`))
 }
 
 func TestBackfillApplyIsOneBatchAndIdempotent(t *testing.T) {
@@ -282,7 +282,7 @@ func TestBackfillApplyIsOneBatchAndIdempotent(t *testing.T) {
 	assert.Equal(t, "Globex", f.primaryOrgName(t, ids["G1"]))
 	assert.Equal(t, "", f.primaryOrgName(t, ids["J1"]))
 	assert.Equal(t, "", f.primaryOrgName(t, ids["Empty"]))
-	assert.Equal(t, 1, f.count(t, `SELECT COUNT(*) FROM membership WHERE person_id = ? AND role = 'CEO'`, ids["A1"]), "the title is the role")
+	assert.Equal(t, 1, f.count(t, `SELECT COUNT(*) FROM person_organization_link WHERE person_id = ? AND role = 'CEO'`, ids["A1"]), "the title is the role")
 	assert.Equal(t, "acme, inc.", *mustPerson(t, f, ids["A3"]).Company, "people.company is untouched")
 
 	// Dry run now: nothing left to create or link.
@@ -293,19 +293,19 @@ func TestBackfillApplyIsOneBatchAndIdempotent(t *testing.T) {
 	assert.Equal(t, 3, rep.OrgsReused)
 
 	// A second apply changes nothing.
-	members := f.count(t, `SELECT COUNT(*) FROM membership`)
+	members := f.count(t, `SELECT COUNT(*) FROM person_organization_link`)
 	_, ch2, err := oa.BackfillApply(ctx)
 	require.NoError(t, err)
 	assert.True(t, ch2.Empty())
 	assert.Equal(t, 3, f.liveOrgs(t))
-	assert.Equal(t, members, f.count(t, `SELECT COUNT(*) FROM membership`))
+	assert.Equal(t, members, f.count(t, `SELECT COUNT(*) FROM person_organization_link`))
 }
 
 func TestBackfillUndoRedoIsOneStep(t *testing.T) {
 	f, ids := backfillFixture(t)
 	ctx := context.Background()
 	oa := repo.NewOrgAutoRepo(f.d)
-	members := f.count(t, `SELECT COUNT(*) FROM membership WHERE deleted_at IS NULL`)
+	members := f.count(t, `SELECT COUNT(*) FROM person_organization_link WHERE deleted_at IS NULL`)
 
 	_, ch, err := oa.BackfillApply(ctx)
 	require.NoError(t, err)
@@ -313,7 +313,7 @@ func TestBackfillUndoRedoIsOneStep(t *testing.T) {
 
 	require.NoError(t, oa.UndoBackfill(ctx, ch))
 	assert.Equal(t, 1, f.liveOrgs(t), "only the organization that existed before")
-	assert.Equal(t, members, f.count(t, `SELECT COUNT(*) FROM membership WHERE deleted_at IS NULL`))
+	assert.Equal(t, members, f.count(t, `SELECT COUNT(*) FROM person_organization_link WHERE deleted_at IS NULL`))
 	assert.Equal(t, "Globex", f.primaryOrgName(t, ids["G1"]))
 	assert.Equal(t, "", f.primaryOrgName(t, ids["A1"]))
 
@@ -335,8 +335,8 @@ func TestBackfillKeepsAnExistingPrimaryAndRespectsTheIgnoreList(t *testing.T) {
 
 	_, _, err := oa.BackfillApply(ctx)
 	require.NoError(t, err)
-	assert.Equal(t, "Old Co", f.primaryOrgName(t, pid), "the backfill never moves a primary membership")
-	assert.Equal(t, 2, f.count(t, `SELECT COUNT(*) FROM membership WHERE person_id = ? AND deleted_at IS NULL`, pid))
+	assert.Equal(t, "Old Co", f.primaryOrgName(t, pid), "the backfill never moves a primary Person–Organization link")
+	assert.Equal(t, 2, f.count(t, `SELECT COUNT(*) FROM person_organization_link WHERE person_id = ? AND deleted_at IS NULL`, pid))
 	assert.Equal(t, 0, f.count(t, `SELECT COUNT(*) FROM organizations WHERE name = 'Gig Work'`))
 }
 

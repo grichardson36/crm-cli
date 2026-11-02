@@ -105,7 +105,7 @@ type Change struct {
 	Old    string `json:"old,omitempty"`
 	New    string `json:"new,omitempty"`
 	// Org is set on Op "org": the organization the company text created or reused and the
-	// membership it made. Undo and redo use it.
+	// Person–Organization link it made. Undo and redo use it.
 	Org *repo.CompanyChange `json:"org,omitempty"`
 }
 

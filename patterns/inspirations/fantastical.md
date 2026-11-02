@@ -10,8 +10,8 @@ research: partial
 **Research state.** partly researched. See [[inspirations]].
 
 **What we take.**
-- at for location. [[at-place-means-location]]
-- Quoted text is a no-parse zone. [[date-safety-rules]]
-- ! repetition for priority. [[bang-means-priority]]
+- at for location. [[core]]
+- Quoted text is a no-parse zone. [[core]]
+- ! repetition for priority. [[core]]
 
 **Sources.** The Sweet Setup guide (2019). Fantastical's own page 404'd, so syntax may have changed.

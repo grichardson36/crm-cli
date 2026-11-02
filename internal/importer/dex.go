@@ -46,7 +46,7 @@ type DexReport struct {
 	RelatedLinks      int `json:"related_links"`
 	RelatedUnresolved int `json:"related_unresolved"`
 	// OrgsCreated and OrgsLinked count the organizations made from company text and the people
-	// given a membership (junk strings on the ignore list make nothing).
+	// given a Person–Organization link (junk strings on the ignore list make nothing).
 	OrgsCreated int `json:"orgs_created"`
 	OrgsLinked  int `json:"orgs_linked"`
 	// Issues and Suggestions are what the shared validation framework found in the imported rows

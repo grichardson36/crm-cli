@@ -1,10 +1,10 @@
-# Memberships, kinds and hierarchy
+# Person–Organization links, kinds and hierarchy
 
 How people and organizations relate. All of it is a link (see links), so it works from either end.
 
 ## A person in many organizations
 
-A membership has a free-text role, a start and end date (`YYYY`, `YYYY-MM` or `YYYY-MM-DD`, no end means current) and a primary flag. One live primary per person. The first current membership becomes primary. A past stay is dimmed in the terminal UI and a repeated stay at one organization is a second link (`--new`). Membership roles are free text, `crm roles` lists the ones in use. The role of a person on a deal is a different thing, a sales role from a list you manage (see deal-roles).
+A Person–Organization link has a free-text role, a start and end date (`YYYY`, `YYYY-MM` or `YYYY-MM-DD`, no end means current) and a primary flag. One live primary per person. The first current Person–Organization link becomes primary. A past stay is dimmed in the terminal UI and a repeated stay at one organization is a second link (`--new`). Person–Organization link roles are free text, `crm roles` lists the ones in use. The role of a person on a deal is a different thing, a sales role from a list you manage (see deal-roles).
 
 ```sh crm-example
 crm person link org 2 1 --role Founder --from 2018 --to 2021
@@ -12,7 +12,7 @@ crm person link org 2 1 --role Advisor --from 2023 --new
 crm roles
 ```
 
-The vCard ORG on a phone is the primary organization, TITLE stays the person's title. An ORG you edit on the phone moves the primary membership to the organization of that name (case, punctuation and Inc/LLC endings ignored, merge aliases followed). A name that matches nothing creates the organization and then does the same, a person without a primary membership gets one, and a junk text such as `N/A` creates nothing. `people.company` takes the phone's text. Emptying ORG on the phone never removes a membership. See convert.
+The vCard ORG on a phone is the primary organization, TITLE stays the person's title. An ORG you edit on the phone moves the primary Person–Organization link to the organization of that name (case, punctuation and Inc/LLC endings ignored, merge aliases followed). A name that matches nothing creates the organization and then does the same, a person without a primary Person–Organization link gets one, and a junk text such as `N/A` creates nothing. `people.company` takes the phone's text. Emptying ORG on the phone never removes a Person–Organization link. See convert.
 
 ## Kinds between people
 
@@ -31,7 +31,7 @@ crm person link person 1 2 --kind friend
 
 ## Merge and aliases
 
-`crm person merge` moves every link to the survivor. Only exact duplicate links are dropped (a membership is a duplicate when organization, role, start and end all match, so CTO and Advisor at one organization both stay), and the old id and uuid are kept as an alias so old references resolve.
+`crm person merge` moves every link to the survivor. Only exact duplicate links are dropped (a Person–Organization link is a duplicate when organization, role, start and end all match, so CTO and Advisor at one organization both stay), and the old id and uuid are kept as an alias so old references resolve.
 
 The palette entry Edit relation kinds opens the list editor for link kinds: `a` adds a mutual kind, `tab` and `enter` set the inverse name, `d` removes (links move to another kind or are unlinked). CLI: `crm relation-kind list|add|rename|set|rm`.
 

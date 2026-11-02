@@ -185,7 +185,7 @@ func TestLinkPersonToANewOrganizationAndUndo(t *testing.T) {
 	assert.Equal(t, "create", last.id, "the last row is Create typed text")
 	assert.Contains(t, last.label, "Globex")
 	press(m, "enter")
-	require.Equal(t, modePrompt, m.mode, "a membership asks for its attributes")
+	require.Equal(t, modePrompt, m.mode, "a Person–Organization link asks for its attributes")
 	assert.Equal(t, "link-attrs", m.promptKind)
 	assert.Contains(t, plain(m.footerView()), "role | from | to | primary | notes", "the attributes show as the hint")
 	press(m, "enter")

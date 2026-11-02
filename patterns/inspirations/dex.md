@@ -10,11 +10,11 @@ research: mined
 **Research state.** mined. See [[inspirations]].
 
 **What we take.**
-- Keep-in-touch cadence per person with an enum (7 days, 14 days, 1 month, 42 days, 3 months, 6 months, 1 year, never) and priority tiers (Top, High, Medium, Low, None). [[relationship-loop-first]] [[home-is-an-action-queue]]
-- Merge-and-fix duplicates with a compare screen. [[soft-delete-restorable]]
-- User-defined note types, timeline items that carry meeting type and calendar event id. [[one-record-page]] [[timeline-upcoming-first]]
-- CSV import with column mapping that creates custom fields from unknown columns. [[import-is-a-snapshot-sync-is-a-relationship]]
-- Dex already exposes API, MCP, CLI and Zapier, which validates the agent-surface direction. [[cli-json-is-the-baseline]]
+- Keep-in-touch cadence per person with an enum (7 days, 14 days, 1 month, 42 days, 3 months, 6 months, 1 year, never) and priority tiers (Top, High, Medium, Low, None). [[core]] [[core]]
+- Merge-and-fix duplicates with a compare screen. [[core]]
+- User-defined note types, timeline items that carry meeting type and calendar event id. [[core]] [[core]]
+- CSV import with column mapping that creates custom fields from unknown columns. [[core]]
+- Dex already exposes API, MCP, CLI and Zapier, which validates the agent-surface direction. [[core]]
 
 **What we leave.** AI copilot and nightly summaries, SMS and WhatsApp reminders, team workspaces, paid-only API access. Dex has no documented command palette.
 

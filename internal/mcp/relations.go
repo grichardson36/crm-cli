@@ -86,11 +86,11 @@ func registerRelationTools(s *server.MCPServer, db *sql.DB) {
 	)
 	s.AddTool(
 		gomcp.NewTool("crm_link_roles",
-			gomcp.WithDescription("List the roles already used in a relation, most used first. Membership, task and note roles are free text and these are suggestions. Deal link roles come from the deal role list (crm_deal_role_list)"),
-			gomcp.WithString("relation", gomcp.Enum("membership", "deal_person", "deal_org"), gomcp.Description("Relation (default membership)")),
+			gomcp.WithDescription("List the roles already used in a link, most used first. Person–Organization, task, and note link roles are free text and these are suggestions. Deal-link roles come from the deal role list (crm_deal_role_list)"),
+			gomcp.WithString("relation", gomcp.Enum("person_organization_link", "deal_person", "deal_org"), gomcp.Description("Link storage key. Defaults to person_organization_link")),
 		),
 		func(ctx context.Context, req gomcp.CallToolRequest) (*gomcp.CallToolResult, error) {
-			roles, err := links.Roles(ctx, req.GetString("relation", "membership"), 50)
+			roles, err := links.Roles(ctx, req.GetString("relation", "person_organization_link"), 50)
 			if err != nil {
 				return mcpError(err)
 			}

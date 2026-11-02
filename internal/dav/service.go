@@ -108,7 +108,7 @@ func (s *Service) visible(ctx context.Context, davID string) (*repo.DavTarget, e
 
 // loadPerson reads a person as the phone sees them. The vCard ORG is the person's primary
 // organization when there is one (E4), so Company is replaced by its name for rendering. The
-// stored people.company text is used when the person has no primary membership, and TITLE stays
+// stored people.company text is used when the person has no primary Person–Organization link, and TITLE stays
 // people.title.
 func (s *Service) loadPerson(ctx context.Context, id int64) (*model.Person, error) {
 	p, err := s.People.FindByID(ctx, id)
@@ -124,7 +124,7 @@ func (s *Service) loadPerson(ctx context.Context, id int64) (*model.Person, erro
 		p.Company = &org
 	}
 	// Job title waterfall (owner decision 2026-10-27): the headline title if set, else the role on
-	// the primary membership. Blanking TITLE on the phone clears the headline, so the role shows again.
+	// the primary Person–Organization link. Blanking TITLE on the phone clears the headline, so the role shows again.
 	if nonNil(p.Title) == "" {
 		role, err := repo.PrimaryRole(ctx, s.DB, id)
 		if err != nil {
@@ -498,20 +498,20 @@ func (s *Service) nameAmong(ctx context.Context, ids []int64, nf, nl string) (in
 // org-review queue). It returns true when the caller must leave people.company alone, false when the
 // caller stores the phone's text there (people.company stays the source text).
 //   - A text that names an organization (normalized name, or the name of a merged-away one): the
-//     person's primary membership moves to it in place, role and dates stay. A person with no
-//     primary membership gets one.
+//     person's primary Person–Organization link moves to it in place, role and dates stay. A person with no
+//     primary Person–Organization link gets one.
 //   - A text that matches no organization creates it and does the same.
-//   - A junk text (the ignore list: N/A, none, retired ...) creates nothing and changes no membership.
-//   - EMPTYING ORG NEVER REMOVES A MEMBERSHIP. The phone clearing the field only means "no company
-//     text there", the organization link is the CRM's own data. The primary membership stays, so the
+//   - A junk text (the ignore list: N/A, none, retired ...) creates nothing and changes no Person–Organization link.
+//   - EMPTYING ORG NEVER REMOVES A Person–Organization link. The phone clearing the field only means "no company
+//     text there", the organization link is the CRM's own data. The primary Person–Organization link stays, so the
 //     next GET shows the organization name again.
 func (s *Service) applyDeviceOrg(ctx context.Context, personID int64, value string) (bool, error) {
 	name := strings.TrimSpace(value)
 	if name == "" {
 		var n int
-		err := s.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM membership WHERE person_id = ? AND is_primary = 1 AND deleted_at IS NULL`, personID).Scan(&n)
+		err := s.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM person_organization_link WHERE person_id = ? AND is_primary = 1 AND deleted_at IS NULL`, personID).Scan(&n)
 		if err != nil {
-			return false, fmt.Errorf("find primary membership: %w", err)
+			return false, fmt.Errorf("find primary Person–Organization link: %w", err)
 		}
 		return n > 0, nil
 	}
@@ -545,10 +545,10 @@ func (s *Service) mergeInto(ctx context.Context, p *model.Person, st *model.DavS
 	crmRawValues := rawScalars(p)
 
 	// Scalars, per field. ORG is the primary organization (E4). An ORG edit on the phone is applied by
-	// applyDeviceOrg: it moves the primary membership to the organization of that name, creating the
-	// organization when none matches. Emptying ORG never removes a membership. TITLE is the headline
+	// applyDeviceOrg: it moves the primary Person–Organization link to the organization of that name, creating the
+	// organization when none matches. Emptying ORG never removes a Person–Organization link. TITLE is the headline
 	// title (see loadPerson): an edit sets it, blanking it clears it so the role shows again, and a
-	// membership is never deleted. A field both sides changed keeps the CRM value and logs the phone's.
+	// Person–Organization link is never deleted. A field both sides changed keeps the CRM value and logs the phone's.
 	decisions := mergeScalars(base.scalars(), crmView.scalars(), dev.scalars(), mode)
 	var in model.UpdatePersonInput
 	for _, d := range decisions {
