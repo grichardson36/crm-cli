@@ -67,3 +67,5 @@ Views (number jumps, `[`/`]` cycle, `v` switcher): 1 Home, 2 People, 3 Due, 4 Ta
 | `y` confirm in compare | `enter` |
 
 Still open: the digits, `[ ]` and `v` are bare view-moving keys (X28, the owner decided to keep them in B2).
+
+**List editor** (palette: Edit deal stages, Edit deal roles, Edit note types, Edit relation kinds; [[list-editor-standard]]): `a` add inline, `enter` / `e` edit the cell (rename on the name), `tab` / `shift+tab` across cells, `shift+up` / `shift+down` order, `d` remove (items in use: pick where the records go, then `y`), `space` / `ctrl+a` select, `ctrl+z` / `ctrl+y` undo and redo, `esc` closes. No new bare key.

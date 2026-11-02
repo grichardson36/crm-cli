@@ -200,8 +200,6 @@ type Model struct {
 	setField *setFieldState
 	// setFieldDeal and setFieldCreate carry a bulk deal role: the deal it is set on and a role to add to the list first.
 	setFieldDeal repo.Ref
-	// vocabName is the vocabulary value a rename prompt is for.
-	vocabName      string
 	setFieldCreate string
 	detail         viewport.Model
 	detailKey      string
@@ -255,6 +253,7 @@ type Model struct {
 	st        theme.Styles
 	themeName string               // name of the active theme
 	darkBG    bool                 // terminal has a dark background (resolves the auto theme)
+	fillMode  theme.Fill           // paint the whole screen with the theme background (per device setting)
 	profile   colorprofile.Profile // what colors the terminal can show (NO_COLOR gives Ascii)
 	// Command bar: caches for the quick package, the person the palette opened on, the changes of
 	// command lines run this session (newest last) for Undo, and the short syntax switch.
@@ -1107,23 +1106,8 @@ func (m *Model) runPrompt(kind, value string) {
 	case "kind-color-hex":
 		m.saveKindColorHex(value)
 		return
-	case "notetype-add":
-		m.addNoteType(value)
-		return
 	case "tag-new":
 		m.saveNewTag(value)
-		return
-	case "vocab-role-add":
-		m.addDealRole(value)
-		return
-	case "vocab-role-rename":
-		m.renameDealRole(value)
-		return
-	case "vocab-stage-add":
-		m.addDealStage(value)
-		return
-	case "vocab-stage-rename":
-		m.renameDealStage(value)
 		return
 	case "set-field":
 		m.runSetField(value)

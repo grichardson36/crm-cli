@@ -67,6 +67,8 @@ func hintScreens() []hintScreen {
 		{"capture", 2, func(t *testing.T, m *Model) { m.startCapture("add-any") }},
 		{"picker", 1, func(t *testing.T, m *Model) { m.openThemeChooser() }},
 		{"offer picker", 1, func(t *testing.T, m *Model) { m.env.DataDir = t.TempDir(); m.openOfferPicker(0) }},
+		{"list editor", 1, func(t *testing.T, m *Model) { m.openListEditor("deal-stages") }},
+		{"list editor add", 1, func(t *testing.T, m *Model) { m.openListEditor("deal-stages"); press(m, "a") }},
 		{"views screen", 1, func(t *testing.T, m *Model) { press(m, "v") }},
 		{"palette", 1, func(t *testing.T, m *Model) { press(m, "ctrl+k") }},
 		{"command bar", 1, func(t *testing.T, m *Model) { press(m, "ctrl+k"); typeText(m, "task buy milk ") }},

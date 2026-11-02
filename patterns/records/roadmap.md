@@ -7,6 +7,8 @@ Items here are not built. Decisions behind them live in this vault, start at [[i
 
 ## Next
 
+- Custom themes ([[custom-themes]], design proposed on branch feat/themes-more): one file with `[dark]` and `[light]` tables, `base` of a custom theme, snippets in `~/.crm/themes/snippets`, theme checks in `internal/validate` with contrast warnings (`crm theme check`), a file watcher for live reload, `crm theme export` and `import`, a picker detail pane with a rendered sample.
+- Theme generator in the style of the theme-factory skill: `crm theme generate` takes a name, a mood or a few seed colors (accent, background) and writes both variants with roles derived from the seeds, checks contrast (4.5:1 text, 3:1 kinds) and the 16-color mapping, then shows the sample in the picker before saving ([[custom-themes]]).
 - Phone number normalization to the E.164 standard. Today `PhoneKey` (`internal/dedupe/normalize.go`) only reduces a number to its last 10 digits for matching, and the stored value stays as typed. Plan: parse with a phone number library using a default region, store the original and the E.164 form, display in national format, match on E.164, and keep the original text for the vCard round trip (see [[research-sync-standard]]).
 
 ## Someday / maybe

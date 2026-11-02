@@ -24,23 +24,23 @@ func NewNoteTypeRepo(db *sql.DB) *NoteTypeRepo {
 	return &NoteTypeRepo{db: db}
 }
 
-const noteTypeColumns = "id, uuid, name, counts_as_contact, archived, created_at, updated_at"
+const noteTypeColumns = "id, uuid, name, counts_as_contact, position, archived, created_at, updated_at"
 
 func scanNoteType(row interface{ Scan(...any) error }) (*model.NoteType, error) {
 	var n model.NoteType
-	if err := row.Scan(&n.ID, &n.UUID, &n.Name, &n.CountsAsContact, &n.Archived, &n.CreatedAt, &n.UpdatedAt); err != nil {
+	if err := row.Scan(&n.ID, &n.UUID, &n.Name, &n.CountsAsContact, &n.Position, &n.Archived, &n.CreatedAt, &n.UpdatedAt); err != nil {
 		return nil, err
 	}
 	return &n, nil
 }
 
-// List returns note types ordered by name. Archived types are included only when all is true.
+// List returns note types in pick order (position, then name). Archived types are included only when all is true.
 func (r *NoteTypeRepo) List(ctx context.Context, all bool) ([]*model.NoteType, error) {
 	query := "SELECT " + noteTypeColumns + " FROM note_types"
 	if !all {
 		query += " WHERE archived = 0"
 	}
-	query += " ORDER BY name"
+	query += " ORDER BY position, name"
 	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("list note types: %w", err)
@@ -84,7 +84,7 @@ func (r *NoteTypeRepo) Add(ctx context.Context, name string, countsAsContact boo
 			return nil, fmt.Errorf("note type %q already exists: %w", existing.Name, model.ErrConflict)
 		}
 		if _, err := r.db.ExecContext(ctx,
-			"UPDATE note_types SET archived = 0, counts_as_contact = ?, updated_at = datetime('now') WHERE id = ?",
+			"UPDATE note_types SET archived = 0, counts_as_contact = ?, position = (SELECT COALESCE(MAX(position), 0) + 1 FROM note_types), updated_at = datetime('now') WHERE id = ?",
 			countsAsContact, existing.ID); err != nil {
 			return nil, fmt.Errorf("restore note type: %w", err)
 		}
@@ -93,7 +93,7 @@ func (r *NoteTypeRepo) Add(ctx context.Context, name string, countsAsContact boo
 		return nil, err
 	}
 	if _, err := r.db.ExecContext(ctx,
-		"INSERT INTO note_types (uuid, name, counts_as_contact) VALUES (?, ?, ?)",
+		"INSERT INTO note_types (uuid, name, counts_as_contact, position) VALUES (?, ?, ?, (SELECT COALESCE(MAX(position), 0) + 1 FROM note_types))",
 		uuid.New().String(), name, countsAsContact); err != nil {
 		return nil, fmt.Errorf("insert note type: %w", err)
 	}

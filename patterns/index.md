@@ -34,6 +34,8 @@ Start with [[core]]. Use this index only to find the relevant supporting pattern
 - [[key-hints-in-one-place]]
 - [[web-search-engines]]
 - [[kind-colors-are-chosen]]
+- [[list-editor-standard]]
+- [[custom-themes]] (custom themes, forced light or dark, the anthropocene palette)
 - [[sync-contract]]
 - [[references/app/domain-model|app domain model]]
 - [[references/app/architecture|app architecture]]

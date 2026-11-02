@@ -1,13 +1,10 @@
 package tui
 
 import (
-	"fmt"
-	"strings"
-
 	tea "charm.land/bubbletea/v2"
 )
 
-// Note types: the type chosen for new notes and the manage overlay.
+// Note types: the type chosen for new notes. The list is edited in the list editor (listeditor.go).
 
 // noteTypeNames lists the active note types by name.
 func (m *Model) noteTypeNames() []string {
@@ -102,60 +99,4 @@ func (m *Model) pickNoteType() {
 		m.noteType = it.value
 		m.pendingCmd = m.startNotePrompt()
 	})
-}
-
-// openNoteTypes shows the active note types. Enter on a type archives it, the first row adds one.
-func (m *Model) openNoteTypes() tea.Cmd {
-	list, err := m.ntr.List(m.ctx, false)
-	if err != nil {
-		m.setStatus(err.Error(), true)
-		return nil
-	}
-	items := []overlayItem{{id: "+add", label: "+ Add a type", desc: "name, or: name | contact to count it as contact", value: ""}}
-	for _, t := range list {
-		desc := ""
-		if t.CountsAsContact {
-			desc = "counts as contact"
-		}
-		items = append(items, overlayItem{id: t.Name, label: t.Name, value: t.Name, desc: desc})
-	}
-	o := m.newOverlay("Note types", items, false)
-	o.onPick = func(m *Model, it overlayItem) {
-		if it.id == "+add" {
-			m.startInput("notetype-add", "new note type: ", "")
-			m.pendingCmd = m.input.Focus()
-			return
-		}
-		if it.value == "note" {
-			m.setStatus("note is the default type and stays", true)
-			return
-		}
-		name := it.value
-		m.mode = modeConfirm
-		m.confirm = &confirmState{
-			prompt: fmt.Sprintf("archive note type %s? old notes keep it.", name),
-			yes: func() {
-				if err := m.ntr.Archive(m.ctx, name); err != nil {
-					m.setStatus(err.Error(), true)
-					return
-				}
-				m.setStatus("archived note type "+name, false)
-				m.pendingCmd = m.openNoteTypes()
-			},
-		}
-	}
-	return m.showOverlay(o)
-}
-
-// addNoteType runs the "new note type" prompt: "name" or "name | contact".
-func (m *Model) addNoteType(value string) {
-	name, flag, _ := strings.Cut(value, "|")
-	counts := strings.EqualFold(strings.TrimSpace(flag), "contact")
-	t, err := m.ntr.Add(m.ctx, strings.TrimSpace(name), counts)
-	if err != nil {
-		m.setStatus(err.Error(), true)
-		return
-	}
-	m.setStatus("added note type "+t.Name, false)
-	m.pendingCmd = m.openNoteTypes()
 }

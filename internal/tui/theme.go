@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/colorprofile"
 	"github.com/jdanielnd/crm-cli/internal/theme"
 )
@@ -34,6 +35,7 @@ func (m *Model) themeCatalog() theme.Catalog {
 // applyStartupTheme picks the remembered theme (CRM_THEME, then config.toml, then auto).
 // A problem never stops the program: it falls back to auto and says why in the status line.
 func (m *Model) applyStartupTheme() {
+	m.fillMode = theme.ChosenFill(m.env.DataDir)
 	m.darkBG = true // until the terminal answers (tea.BackgroundColorMsg)
 	name, _ := theme.Chosen(m.env.DataDir, os.Getenv)
 	cat := m.themeCatalog()
@@ -147,4 +149,22 @@ func (m *Model) reloadTheme() {
 		return
 	}
 	m.setStatus("theme reloaded: "+t.Name, false)
+}
+
+// fillScreen reports whether the frame is painted with the theme background: the fill setting
+// allows it for this theme and the terminal shows colors at all (NO_COLOR keeps the terminal's own).
+func (m *Model) fillScreen() bool {
+	return m.profile > colorprofile.Ascii && m.st.Theme.Fills(m.fillMode, m.darkBG)
+}
+
+// paintView gives every cell of the frame the theme background and sets the terminal's default
+// colors (OSC 10 and 11) so margins and cleared areas match. Bubble Tea restores the terminal's own
+// colors when the program exits, and sets or resets them when the view's fields change.
+func (m *Model) paintView(v *tea.View) {
+	if !m.fillScreen() || m.width <= 0 {
+		return
+	}
+	t := m.st.Theme
+	v.Content = t.Paint(v.Content, m.width, m.height)
+	v.ForegroundColor, v.BackgroundColor = t.DefaultColors()
 }

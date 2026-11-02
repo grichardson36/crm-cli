@@ -10,6 +10,7 @@ import (
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/jdanielnd/crm-cli/internal/validate"
+	"github.com/jdanielnd/crm-cli/internal/theme"
 )
 
 // The settings registry (patterns/settings-view). Every setting is declared once, here: its id, the
@@ -116,6 +117,10 @@ func engineField() model.FieldSpec {
 var customSearchField = model.FieldSpec{Key: "web-search-custom", Label: "Custom address", Type: model.FieldText, Max: validate.MaxSearchTemplate,
 	Hint: "https://example.com/search?q={query}"}
 
+var fillField = model.FieldSpec{Key: "fill-background", Label: "Fill the whole screen with the theme background", Type: model.FieldChoice,
+	Choices: []model.FieldChoiceOption{{Value: "auto", Label: "auto"}, {Value: "on", Label: "on"}, {Value: "off", Label: "off"}}}
+
+
 // settingList is the registry. The bar and the Settings view both read it.
 func (m *Model) settingList() []setting {
 	vocabCount := func(kind, noun string) func(m *Model) string {
@@ -131,6 +136,23 @@ func (m *Model) settingList() []setting {
 		// Appearance
 		{id: "theme", section: secAppearance, name: "Theme", words: "colors colours dark light appearance look", desc: "choose a color theme, previewed live", scope: scopeDevice,
 			value: func(m *Model) string { return m.themeName }, action: "theme-choose"},
+		{id: "fill-background", section: secAppearance, name: "Fill the whole screen with the theme background", words: "background paint light dark terminal force colors", scope: scopeDevice,
+			desc: "paint every cell with the theme background so a light theme stays light on a dark terminal. auto: on for light themes, for dark themes only on a light terminal. Needs a theme with a bg color and a color terminal",
+			value: func(m *Model) string { return string(m.fillMode) }, field: &fillField,
+			set: func(m *Model, v string) error {
+				f, err := theme.ParseFill(v)
+				if err != nil {
+					return fmt.Errorf("%v: %w", err, model.ErrValidation)
+				}
+				if m.env.DataDir == "" {
+					return fmt.Errorf("no data directory in this session, so the setting cannot be saved: %w", model.ErrValidation)
+				}
+				if err := theme.SaveFill(m.env.DataDir, f); err != nil {
+					return err
+				}
+				m.fillMode = f
+				return nil
+			}},
 		{id: "theme-reload", section: secAppearance, name: "Theme files", words: "theme reload refresh themes", desc: "re-read ~/.crm/themes and apply the theme again", scope: scopeDevice,
 			action: "theme-reload"},
 
@@ -170,6 +192,18 @@ func (m *Model) settingList() []setting {
 				}
 				return countText(len(list), "type")
 			}, action: "note-types"},
+		{id: "relation-kinds", section: secTypes, name: "Relation kinds", words: "friend parent manager inverse mutual link kinds vocabulary", desc: "add, rename, order and remove the kinds of person and organization links (friend, parent, manager, ...)", scope: scopeSynced,
+			value: func(m *Model) string {
+				kr := repo.NewKindRepo(m.db)
+				n := 0
+				for _, t := range []string{"person", "organization"} {
+					if list, err := kr.List(m.ctx, t); err == nil {
+						n += len(list)
+					}
+				}
+				return countText(n, "kind")
+			},
+			run: func(m *Model) tea.Cmd { return m.openListEditor("relation-kinds") }},
 
 		// Names
 		{id: "aliases", section: secNames, name: "Name aliases", words: "nicknames zach zachary alias table", desc: "the table that lets Zach find Zachary. Manage it with: crm alias list, add, remove", scope: scopeSynced,

@@ -46,7 +46,7 @@ func registerRelationCommands(rootCmd *cobra.Command) {
 		Long: "A link kind names how two people (or two organizations) are related. 'a is parent b' also reads 'b is child a'. A kind without an inverse is mutual (friend). " +
 			"Built-in kinds cannot be removed. See 'crm help relations'.",
 	}
-	kind.AddCommand(relationKindListCmd(), relationKindAddCmd(), relationKindRmCmd())
+	kind.AddCommand(relationKindListCmd(), relationKindAddCmd(), relationKindRmCmd(), relationKindRenameCmd(), relationKindSetCmd())
 	rootCmd.AddCommand(kind)
 	rootCmd.AddCommand(rolesCmd())
 }
@@ -116,10 +116,11 @@ func relationKindAddCmd() *cobra.Command {
 }
 
 func relationKindRmCmd() *cobra.Command {
-	var typ string
+	var typ, moveTo string
+	var unlink bool
 	cmd := &cobra.Command{
 		Use:   "rm <name>",
-		Short: "Remove a user-defined link kind that no link uses",
+		Short: "Remove a user-defined link kind. Links that use it need --move-to KIND or --unlink",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			objType, err := objectTypeOf(typ)
@@ -131,14 +132,82 @@ func relationKindRmCmd() *cobra.Command {
 				return err
 			}
 			defer db.Close()
-			if err := repo.NewKindRepo(db).Remove(cmd.Context(), objType, args[0]); err != nil {
+			if moveTo == "" && !unlink {
+				if err := repo.NewKindRepo(db).Remove(cmd.Context(), objType, args[0]); err != nil {
+					return err
+				}
+				fmt.Fprintf(os.Stderr, "Removed %s kind %q\n", objType, args[0])
+				return nil
+			}
+			rem, err := repo.NewKindRepo(db).RemoveMany(cmd.Context(), objType, []string{args[0]}, repo.KindRemoveAction{MoveTo: moveTo, Unlink: unlink})
+			if err != nil {
 				return err
 			}
-			fmt.Fprintf(os.Stderr, "Removed %s kind %q\n", objType, args[0])
+			fmt.Fprintf(os.Stderr, "Removed %s kind %q (%d link(s) moved, %d unlinked)\n", objType, args[0], rem.Moved, rem.Unlinked)
 			return nil
 		},
 	}
 	cmd.Flags().StringVar(&typ, "type", "person", "person or org")
+	cmd.Flags().StringVar(&moveTo, "move-to", "", "move the links that use the kind to this kind")
+	cmd.Flags().BoolVar(&unlink, "unlink", false, "delete the links that use the kind")
+	return cmd
+}
+
+func relationKindRenameCmd() *cobra.Command {
+	var typ string
+	cmd := &cobra.Command{
+		Use:   "rename <name> <new-name>",
+		Short: "Rename a user-defined link kind (built-in kinds keep their names)",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			objType, err := objectTypeOf(typ)
+			if err != nil {
+				return err
+			}
+			db, err := openDB()
+			if err != nil {
+				return err
+			}
+			defer db.Close()
+			k, err := repo.NewKindRepo(db).Update(cmd.Context(), objType, args[0], repo.KindPatch{Name: &args[1]})
+			if err != nil {
+				return err
+			}
+			return format.Output(os.Stdout, resolveFormat(), []map[string]any{kindToMap(k)}, relationKindColumns, flagQuiet)
+		},
+	}
+	cmd.Flags().StringVar(&typ, "type", "person", "person or org")
+	return cmd
+}
+
+func relationKindSetCmd() *cobra.Command {
+	var typ, inverse string
+	cmd := &cobra.Command{
+		Use:   "set <name> --inverse <name>",
+		Short: "Change the inverse name of a user-defined link kind (empty makes it mutual)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			objType, err := objectTypeOf(typ)
+			if err != nil {
+				return err
+			}
+			if !cmd.Flags().Changed("inverse") {
+				return model.NewExitError(model.ErrValidation, "give --inverse NAME (empty for a mutual kind)")
+			}
+			db, err := openDB()
+			if err != nil {
+				return err
+			}
+			defer db.Close()
+			k, err := repo.NewKindRepo(db).Update(cmd.Context(), objType, args[0], repo.KindPatch{Inverse: &inverse})
+			if err != nil {
+				return err
+			}
+			return format.Output(os.Stdout, resolveFormat(), []map[string]any{kindToMap(k)}, relationKindColumns, flagQuiet)
+		},
+	}
+	cmd.Flags().StringVar(&typ, "type", "person", "person or org")
+	cmd.Flags().StringVar(&inverse, "inverse", "", "name seen from the other end (empty for a mutual kind)")
 	return cmd
 }
 

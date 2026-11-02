@@ -89,6 +89,7 @@ type NoteType struct {
 	UUID            string `json:"uuid"`
 	Name            string `json:"name"`
 	CountsAsContact bool   `json:"counts_as_contact"`
+	Position        int    `json:"position"` // pick order (migration 019), the list editor reorders it
 	Archived        bool   `json:"archived"`
 	CreatedAt       string `json:"created_at"`
 	UpdatedAt       string `json:"updated_at"`
