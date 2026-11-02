@@ -183,12 +183,12 @@ func TestBarFindsSettingsByTypingWithTheirCurrentValue(t *testing.T) {
 	typeText(m, "theme")
 	labels := settingLabels(m)
 	require.NotEmpty(t, labels, shownKinds(m))
-	assert.Equal(t, "Theme: nord", labels[0], "the current theme is shown")
+	assert.Equal(t, "Appearance: nord, auto", labels[0], "the current theme and mode are shown")
 	assert.Contains(t, barNames(m, kindAction), "Theme: choose", "the action is still listed after the setting")
 	assert.Contains(t, plain(m.screen()), "Settings")
 	press(m, "enter")
-	require.Equal(t, modeOverlay, m.mode)
-	assert.Equal(t, "Theme", m.ov.title, "enter opens the theme chooser")
+	require.Equal(t, modeNormal, m.mode)
+	assert.Equal(t, viewSettings, m.view, "enter opens the Appearance pane")
 	press(m, "esc")
 }
 
@@ -199,7 +199,7 @@ func TestBarEqualsScopeListsEverySetting(t *testing.T) {
 	typeText(m, "=")
 	assert.Equal(t, map[string]int{kindSetting: len(m.settingList())}, kindsOf(m))
 	got := strings.Join(settingLabels(m), "\n")
-	for _, want := range []string{"Theme: ", "Keys: defaults", "Short syntax: on", "Read-only: off", "Database: ", "Doctor",
+	for _, want := range []string{"Appearance: ", "Keys: defaults", "Short syntax: on", "Read-only: off", "Database: ", "Doctor",
 		"Open Sync: 0"} {
 		assert.Contains(t, got, want)
 	}

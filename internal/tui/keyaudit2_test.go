@@ -37,7 +37,7 @@ func auditFamily(id string) string {
 		return "unlink"
 	case "down", "up", "top", "bottom", "half-down", "half-up", "page-down", "page-up", "jump-up", "jump-down", "home-top", "home-bottom":
 		return "move"
-	case "focus-detail", "back", "cell-next", "cell-prev", "cmp-field":
+	case "focus-detail", "back", "cell-next", "cell-prev", "mode-next", "mode-prev", "cmp-field":
 		return "pane_focus"
 	case "cmp-left", "cmp-right", "cmp-pick":
 		return "pick"

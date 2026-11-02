@@ -285,7 +285,7 @@ func buildActions() []action {
 			run: func(m *Model) tea.Cmd { m.focus = focusDetail; m.fcol = 0; m.syncDetail(); return nil }},
 		{id: "back", title: "Back to list", group: "Edit pane", hint: "esc", keys: []string{"esc", "tab", "shift+tab", "left"}, desc: "return to the list",
 			foot: 15, footIn: inDetail, when: func(m *Model) bool { return m.focus == focusDetail },
-			run: func(m *Model) tea.Cmd { m.focus = focusList; m.fcol = 0; m.syncDetail(); return nil }},
+			run: func(m *Model) tea.Cmd { m.focus = focusList; m.fcol = 0; m.endPreview(); m.syncDetail(); return nil }},
 
 		// Movement. Arrow keys, tab and shift+tab, pages and jumps. The unit of ctrl+up and ctrl+down and the
 		// home destination of ctrl+shift+up and ctrl+shift+down are declared per view in navunits.go.
@@ -376,8 +376,8 @@ func buildActions() []action {
 			run: func(m *Model) tea.Cmd { m.showDavConflicts(); return nil }},
 		{id: "dav-status", title: "DAV: status", group: "App", desc: "contacts exposed, last device activity and conflict counts (same as crm dav status)",
 			run: func(m *Model) tea.Cmd { m.showDavStatus(); return nil }},
-		{id: "theme-choose", title: "Theme: choose", group: "App", desc: "pick a color theme, previewed live as you move, remembered on this device (same as crm theme set)",
-			run: func(m *Model) tea.Cmd { m.openThemeChooser(); return nil }},
+		{id: "theme-choose", title: "Theme: choose", group: "App", desc: "open Settings, Appearance: the mode and the theme list, themes previewed as the cursor moves, remembered on this device (same as crm theme set)",
+			run: func(m *Model) tea.Cmd { return m.openAppearance() }},
 		{id: "theme-reload", title: "Theme: reload", group: "App", desc: "re-read ~/.crm/themes/*.toml and apply the current theme again",
 			run: func(m *Model) tea.Cmd { m.reloadTheme(); return nil }},
 		{id: "quit", inCompare: true, title: "Quit", group: "App", hint: "q", keys: []string{"q", "ctrl+c"}, desc: "quit. The second key quits from a list, cancels a prompt or picker, and copies the focused field while the detail pane has one focused",
@@ -392,7 +392,7 @@ func buildActions() []action {
 			break
 		}
 	}
-	out := append(append(append(append(append(append(cellActions(), tagViewActions()...), todayActions()...), globalAddActions()...), verbActions()...), orgAutoActions()...), acts[:at]...)
+	out := append(append(append(append(append(append(append(appearanceActions(), cellActions()...),tagViewActions()...), todayActions()...), globalAddActions()...), verbActions()...), orgAutoActions()...), acts[:at]...)
 	out = append(out, tagTreeActions()...)
 	out = append(out, objectActions()...)
 	out = append(out, selectionActions()...)
@@ -420,6 +420,7 @@ func (m *Model) step(delta int) {
 		m.fcur = clampInt(m.fcur+delta, 0, len(m.form)-1)
 		m.fcol = 0
 		m.syncDetail()
+		m.previewRow()
 		return
 	}
 	m.move(delta)

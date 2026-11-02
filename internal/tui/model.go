@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"image/color"
 	"os"
 	"strings"
 	"time"
@@ -251,9 +252,13 @@ type Model struct {
 
 	// st holds every style of the active theme. Views draw only with it. See theme.go.
 	st        theme.Styles
-	themeName string               // name of the active theme
-	darkBG    bool                 // terminal has a dark background (resolves the auto theme)
-	fillMode  theme.Fill           // paint the whole screen with the theme background (per device setting)
+	themeName   string      // name of the chosen theme (theme.go says what else holds theme state)
+	appearance  theme.Mode  // auto, light or dark (per device setting)
+	previewName string      // theme previewed in the Appearance pane, "" when none
+	darkBG      bool        // the terminal reports a dark background
+	termBG      color.Color // the terminal's own background, read before the first paint
+	oscPainted  bool        // the terminal's default colors were set by us
+	fillMode    theme.Fill  // paint the whole screen with the theme background, set by the mode
 	profile   colorprofile.Profile // what colors the terminal can show (NO_COLOR gives Ascii)
 	// Command bar: caches for the quick package, the person the palette opened on, the changes of
 	// command lines run this session (newest last) for Undo, and the short syntax switch.
@@ -367,6 +372,7 @@ func New(ctx context.Context, db *sql.DB) (*Model, error) {
 		clip:       func(s string) { osc52Copy(os.Stdout, s) },
 		open:       openURL,
 		st:         defaultStyles(),
+		appearance: theme.ModeAuto,
 	}
 	if err := m.reload(); err != nil {
 		return nil, err
@@ -834,10 +840,11 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case tea.BackgroundColorMsg:
 		m.darkBG = msg.IsDark()
-		if m.themeName == theme.AutoName {
-			if t, err := m.themeCatalog().Find(theme.AutoName); err == nil {
-				m.setTheme(t)
-			}
+		if !m.oscPainted {
+			m.termBG = msg.Color
+		}
+		if m.st.Theme.Follows() {
+			m.resolveTheme()
 		}
 		return m, nil
 	case tea.PasteMsg:

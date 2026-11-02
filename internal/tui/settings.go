@@ -10,7 +10,6 @@ import (
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/jdanielnd/crm-cli/internal/validate"
-	"github.com/jdanielnd/crm-cli/internal/theme"
 )
 
 // The settings registry (patterns/settings-view). Every setting is declared once, here: its id, the
@@ -117,9 +116,6 @@ func engineField() model.FieldSpec {
 var customSearchField = model.FieldSpec{Key: "web-search-custom", Label: "Custom address", Type: model.FieldText, Max: validate.MaxSearchTemplate,
 	Hint: "https://example.com/search?q={query}"}
 
-var fillField = model.FieldSpec{Key: "fill-background", Label: "Fill the whole screen with the theme background", Type: model.FieldChoice,
-	Choices: []model.FieldChoiceOption{{Value: "auto", Label: "auto"}, {Value: "on", Label: "on"}, {Value: "off", Label: "off"}}}
-
 
 // settingList is the registry. The bar and the Settings view both read it.
 func (m *Model) settingList() []setting {
@@ -134,25 +130,10 @@ func (m *Model) settingList() []setting {
 	}
 	return append(m.colorSettings(), []setting{
 		// Appearance
-		{id: "theme", section: secAppearance, name: "Theme", words: "colors colours dark light appearance look", desc: "choose a color theme, previewed live", scope: scopeDevice,
-			value: func(m *Model) string { return m.themeName }, action: "theme-choose"},
-		{id: "fill-background", section: secAppearance, name: "Fill the whole screen with the theme background", words: "background paint light dark terminal force colors", scope: scopeDevice,
-			desc: "paint every cell with the theme background so a light theme stays light on a dark terminal. auto: on for light themes, for dark themes only on a light terminal. Needs a theme with a bg color and a color terminal",
-			value: func(m *Model) string { return string(m.fillMode) }, field: &fillField,
-			set: func(m *Model, v string) error {
-				f, err := theme.ParseFill(v)
-				if err != nil {
-					return fmt.Errorf("%v: %w", err, model.ErrValidation)
-				}
-				if m.env.DataDir == "" {
-					return fmt.Errorf("no data directory in this session, so the setting cannot be saved: %w", model.ErrValidation)
-				}
-				if err := theme.SaveFill(m.env.DataDir, f); err != nil {
-					return err
-				}
-				m.fillMode = f
-				return nil
-			}},
+		{id: appearanceID, section: secAppearance, name: "Appearance", words: "theme mode colors colours dark light auto look background", scope: scopeDevice,
+			desc: "the mode (auto follows the terminal, light and dark paint the whole screen) and the theme. Themes are previewed as the cursor moves, enter chooses one",
+			value: func(m *Model) string { return m.themeName + ", " + string(m.appearance) },
+			run:   func(m *Model) tea.Cmd { return m.openAppearance() }},
 		{id: "theme-reload", section: secAppearance, name: "Theme files", words: "theme reload refresh themes", desc: "re-read ~/.crm/themes and apply the theme again", scope: scopeDevice,
 			action: "theme-reload"},
 
@@ -424,6 +405,17 @@ func (m *Model) settingRows() []row {
 	return g.rows
 }
 
+// openAppearance goes to the Appearance row of Settings with the cursor in its pane.
+func (m *Model) openAppearance() tea.Cmd {
+	m.gotoSetting(appearanceID)
+	if m.view == viewSettings && m.appearanceOpen() {
+		m.focus = focusDetail
+		m.fcur, m.fcol = m.firstSelectable(), 0
+		m.syncDetail()
+	}
+	return nil
+}
+
 // gotoSetting switches to the Settings view with the cursor on a setting.
 func (m *Model) gotoSetting(id string) {
 	m.switchView(viewSettings)
@@ -461,6 +453,9 @@ func (m *Model) buildSettingForm(id string) []formRow {
 		return nil
 	}
 	m.formTitle = s.name
+	if id == appearanceID {
+		return m.appearanceRows()
+	}
 	rows := []formRow{infoRow("section", s.section)}
 	rows[0].head = "Setting"
 	rows = append(rows, infoRow("about", s.desc), infoRow("stored", string(s.scope)+": "+s.scope.note()))

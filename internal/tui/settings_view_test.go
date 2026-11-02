@@ -54,7 +54,7 @@ func TestSettingsViewIsAGroupedListWithASectionDividerEach(t *testing.T) {
 	}
 	assert.Equal(t, settingSections, sections)
 	assert.False(t, m.rows[m.cursor].skip, "the cursor starts on a setting")
-	assert.Equal(t, "Theme", m.rows[m.cursor].title)
+	assert.Equal(t, "Appearance", m.rows[m.cursor].title)
 	assert.Contains(t, m.screen(), "Appearance")
 	assert.Equal(t, "Settings", viewNames[viewSettings])
 }
@@ -62,7 +62,7 @@ func TestSettingsViewIsAGroupedListWithASectionDividerEach(t *testing.T) {
 func TestSettingsRowsShowTheScopeTag(t *testing.T) {
 	m := settingsModel(t)
 	want := map[string]string{
-		"theme": "device", "keys": "device", "views": "device", "web-search": "device", "backups": "device",
+		"appearance": "device", "keys": "device", "views": "device", "web-search": "device", "backups": "device",
 		"deal-stages": "synced", "deal-roles": "synced", "note-types": "synced", "aliases": "synced", "company-ignore": "synced", "archived": "synced",
 		"syntax": "session", "read-only": "session",
 	}
@@ -97,8 +97,8 @@ func TestTheBarAndTheViewReadTheSameRegistry(t *testing.T) {
 	assert.ElementsMatch(t, registry, view, "the Settings view lists the registry")
 	assert.ElementsMatch(t, registry, bar, "the = list of the bar lists the registry")
 	// The bar shows the same value and the scope as the hint.
-	for _, it := range m.settingItems("theme") {
-		if it.id == "setting:theme" {
+	for _, it := range m.settingItems("appearance") {
+		if it.id == "setting:appearance" {
 			assert.Contains(t, it.label, m.themeName)
 			assert.Equal(t, "device", it.hint)
 		}
@@ -131,7 +131,7 @@ func TestSettingsEnterOpensTheThingBehindARow(t *testing.T) {
 		{"views", viewSettings, "Views"},
 		{"deal-stages", viewSettings, "Deal stages"},
 		{"deal-roles", viewSettings, "Deal roles"},
-		{"theme", viewSettings, "Theme"},
+		{"appearance", viewSettings, ""},
 	} {
 		t.Run(tc.id, func(t *testing.T) {
 			m := settingsModel(t)

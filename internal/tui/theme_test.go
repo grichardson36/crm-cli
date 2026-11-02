@@ -42,7 +42,7 @@ func TestEveryViewRendersWithEveryTheme(t *testing.T) {
 
 	for _, th := range cat.Themes {
 		m.setTheme(th)
-		require.Equal(t, th.Name, m.themeName)
+		m.themeName = th.Name
 		check := func(what string) {
 			t.Helper()
 			var out string
@@ -130,81 +130,135 @@ func TestThemePaletteActionsExistAndAreAllowedReadOnly(t *testing.T) {
 	}
 }
 
-func TestThemeChooseLivePreviewKeepAndRemember(t *testing.T) {
+// openAppearanceFor opens the Appearance pane with the cursor on the mode selector.
+func openAppearanceFor(t *testing.T, m *Model) {
+	t.Helper()
+	runPalette(m, "theme: choose")
+	require.Equal(t, viewSettings, m.view)
+	require.Equal(t, focusDetail, m.focus)
+	require.Equal(t, rkMode, m.form[m.fcur].kind, "the cursor starts on the mode selector")
+}
+
+// downToTheme moves the pane cursor to a theme row.
+func downToTheme(t *testing.T, m *Model, name string) {
+	t.Helper()
+	for i := 0; i < len(m.form) && !(m.form[m.fcur].kind == rkTheme && m.form[m.fcur].value == name); i++ {
+		press(m, "down")
+	}
+	require.Equal(t, name, m.form[m.fcur].value)
+}
+
+func settingValue(t *testing.T, m *Model, id string) string {
+	t.Helper()
+	for _, r := range m.rows {
+		if r.setting == id {
+			return r.sub
+		}
+	}
+	t.Fatalf("no Settings row %s", id)
+	return ""
+}
+
+func TestAppearancePreviewChooseAndRemember(t *testing.T) {
 	m := themeModel(t)
 	dark, _ := theme.Builtin("dark", true)
 	m.setTheme(dark)
+	openAppearanceFor(t, m)
 
-	runPalette(m, "theme: choose")
-	require.NotNil(t, m.ov)
-	assert.Equal(t, "Theme", m.ov.title)
-	// Built-ins, the custom theme, and the broken file greyed out with its error.
-	var ids []string
-	var broken *overlayItem
-	for i := range m.ov.items {
-		ids = append(ids, m.ov.items[i].id)
-		if strings.HasPrefix(m.ov.items[i].id, "problem:") {
-			broken = &m.ov.items[i]
+	// Built-ins, the custom theme, and the broken file with its error.
+	var names []string
+	var broken string
+	for _, r := range m.form {
+		if r.kind == rkTheme {
+			names = append(names, r.value)
+		}
+		if r.kind == rkInfo && strings.Contains(r.value, "colors.accent") {
+			broken = r.value
 		}
 	}
-	assert.Subset(t, ids, []string{"auto", "dark", "light", "high-contrast", "catppuccin", "nord", "gruvbox", "solarized", "sunset"})
-	require.NotNil(t, broken)
-	assert.Contains(t, broken.disabled, "colors.accent")
-	assert.Equal(t, "dark", m.ov.items[m.ov.shown[m.ov.cursor]].id, "cursor starts on the active theme")
+	assert.Subset(t, names, []string{"auto", "dark", "light", "high-contrast", "catppuccin", "nord", "gruvbox", "solarized", "sunset"})
+	assert.NotEmpty(t, broken)
 
-	// Moving previews without saving.
-	for m.ov.items[m.ov.shown[m.ov.cursor]].id != "nord" {
-		press(m, "down")
-	}
-	assert.Equal(t, "nord", m.themeName)
-	assert.Contains(t, m.screen(), "38;2;136;192;208", "the open list is drawn in the previewed theme")
+	// Moving previews without choosing or saving.
+	downToTheme(t, m, "nord")
+	assert.Equal(t, "nord", m.st.Theme.Name, "the screen shows the previewed theme")
+	assert.Equal(t, "dark", m.themeName, "the chosen theme did not change")
+	assert.Contains(t, m.screen(), "38;2;136;192;208")
 	_, err := os.Stat(theme.ConfigFile(m.env.DataDir))
 	assert.True(t, os.IsNotExist(err), "preview does not save")
 
-	// Enter keeps and remembers it.
+	// Enter chooses it, and the Settings row reads the same state.
 	press(m, "enter")
-	assert.Nil(t, m.ov)
 	assert.Equal(t, "nord", m.themeName)
+	assert.Equal(t, "nord", m.st.Theme.Name)
+	assert.Equal(t, "nord, auto", settingValue(t, m, appearanceID), "the Settings row follows the choice")
 	name, src := theme.Chosen(m.env.DataDir, func(string) string { return "" })
 	assert.Equal(t, "nord", name)
 	assert.Equal(t, "config", src)
 	assert.Contains(t, m.status, "nord")
 }
 
-func TestThemeChooseEscRestoresPreviousTheme(t *testing.T) {
+func TestAppearanceEscRestoresTheChosenTheme(t *testing.T) {
 	m := themeModel(t)
 	light, _ := theme.Builtin("light", true)
 	m.setTheme(light)
-	runPalette(m, "theme: choose")
-	press(m, "down", "down", "down")
-	assert.NotEqual(t, "light", m.themeName, "previewing another theme")
+	m.themeName = "light"
+	openAppearanceFor(t, m)
+	downToTheme(t, m, "gruvbox")
+	require.Equal(t, "gruvbox", m.st.Theme.Name)
 	press(m, "esc")
-	assert.Nil(t, m.ov)
+	assert.Equal(t, focusList, m.focus)
 	assert.Equal(t, "light", m.themeName)
-	assert.Equal(t, "light", m.st.Theme.Name)
+	assert.Equal(t, "light", m.st.Theme.Name, "leaving the pane ends the preview")
 	_, err := os.Stat(theme.ConfigFile(m.env.DataDir))
 	assert.True(t, os.IsNotExist(err))
 }
 
-func TestThemeChooseBrokenFileExplainsAndKeepsTheme(t *testing.T) {
+func TestAppearanceModeKeysChangeAndSaveTheMode(t *testing.T) {
 	m := themeModel(t)
-	runPalette(m, "theme: choose")
-	for !strings.HasPrefix(m.ov.items[m.ov.shown[m.ov.cursor]].id, "problem:") {
-		press(m, "down")
-	}
-	assert.Equal(t, "sunset", m.themeName, "a broken file is never previewed: the last valid theme stays")
+	m.themeName = "auto"
+	m.darkBG = true
+	openAppearanceFor(t, m)
+	require.Equal(t, theme.ModeAuto, m.appearance)
+
+	press(m, "right")
+	assert.Equal(t, theme.ModeLight, m.appearance)
+	assert.Equal(t, "light", m.st.Theme.Variant, "auto takes its light variant in light mode on a dark terminal")
+	assert.Equal(t, theme.FillOn, m.fillMode, "light and dark paint the whole screen")
+	assert.Equal(t, theme.ModeLight, theme.ChosenMode(m.env.DataDir))
+	assert.Equal(t, "auto, light", settingValue(t, m, appearanceID))
+
+	press(m, "right")
+	assert.Equal(t, theme.ModeDark, m.appearance)
+	assert.Equal(t, "dark", m.st.Theme.Variant)
+	press(m, "right")
+	assert.Equal(t, theme.ModeAuto, m.appearance, "the selector wraps")
+	assert.Equal(t, theme.FillAuto, m.fillMode)
+	press(m, "left")
+	assert.Equal(t, theme.ModeDark, m.appearance)
+	assert.Equal(t, focusDetail, m.focus, "left changes the mode, it does not leave the pane on this row")
+}
+
+// A light theme previewed on a dark terminal paints the screen. Choosing a dark theme afterwards sets
+// the terminal background explicitly instead of relying on the terminal to honor a reset.
+func TestAppearanceDarkThemeAfterLightRestoresTheTerminalBackground(t *testing.T) {
+	m := themeModel(t)
+	m.profile, m.darkBG, m.width, m.height = colorprofile.TrueColor, true, 80, 24
+	m.termBG = lipgloss.Color("#101010")
+	openAppearanceFor(t, m)
+	downToTheme(t, m, "light")
+	assert.NotNil(t, m.View().BackgroundColor, "a light theme paints on a dark terminal")
+	downToTheme(t, m, "nord")
 	press(m, "enter")
-	assert.True(t, m.statusIsErr)
-	assert.Contains(t, m.status, "colors.accent")
-	assert.Equal(t, "dark", m.themeName)
+	v := m.View()
+	require.NotNil(t, v.BackgroundColor, "the terminal background is set, not left to a reset")
+	assert.True(t, rgbaEqual(v.BackgroundColor, m.termBG) || rgbaEqual(v.BackgroundColor, mustColor("#2E3440")))
 }
 
 func TestThemeReloadPicksUpEditedFile(t *testing.T) {
 	m := themeModel(t)
-	runPalette(m, "theme: choose")
-	for m.ov.items[m.ov.shown[m.ov.cursor]].id != "sunset" {
-		press(m, "down")
-	}
+	openAppearanceFor(t, m)
+	downToTheme(t, m, "sunset")
 	press(m, "enter")
 	require.Equal(t, "sunset", m.themeName)
 	assert.Contains(t, m.screen(), "48;2;254;128;25", "gruvbox tab background through the sunset theme")

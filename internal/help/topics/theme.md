@@ -1,6 +1,6 @@
 # Themes
 
-Color themes for the terminal UI (`crm tui`). Built in: `auto` (default, picks dark or light from the terminal), `dark`, `light`, `high-contrast`, `catppuccin` (Mocha), `nord`, `gruvbox`, `solarized`, and the Anthropic-inspired `anthropocene` (follows the terminal), `anthropocene-dark` (warm near-black, terracotta accent) and `anthropocene-light` (warm off-white).
+Color themes for the terminal UI (`crm tui`). Built in: `auto` (default, picks dark or light from the terminal), `dark`, `light`, `high-contrast`, `catppuccin` (Mocha), `nord`, `gruvbox`, `solarized`, and `anthropocene` (follows the terminal), `anthropocene-dark` (warm near-black, terracotta accent) and `anthropocene-light` (warm off-white).
 
 ```sh crm-example
 crm theme list
@@ -14,7 +14,7 @@ crm theme path
 crm theme set nord
 ```
 
-Saved per device in `~/.crm/config.toml` (`theme = "nord"`). The environment variable `CRM_THEME` overrides it, for example in the web terminal. In the TUI run `Theme: choose` from the palette (`ctrl+k`): it previews each theme as you move, `enter` keeps it, `esc` restores the old one.
+Saved per device in `~/.crm/config.toml` (`theme = "nord"`). The environment variable `CRM_THEME` overrides it, for example in the web terminal. In the TUI open Settings > Appearance (or run `Theme: choose` from the palette, `ctrl+k`): the right pane has the mode (`left` and `right`) and the theme list. It previews each theme as you move, `enter` keeps it, `esc` restores the old one.
 
 ## Make your own
 

@@ -234,16 +234,16 @@ var builtins = []Theme{
 		[9]string{"#EBDBB2", "#928374", "#83A598", "#FB4934", "#B8BB26", "#FABD2F", "#D3869B", "#282828", "#FE8019"}, [2]string{"#EBDBB2", "#504945"}, [6]string{"#83A598", "#FE8019", "#B8BB26", "#D3869B", "#FABD2F", "#8EC07C"}),
 	mk("solarized", "Solarized dark", "dark", "#002B36",
 		[9]string{"#93A1A1", "#657B83", "#268BD2", "#DC322F", "#859900", "#B58900", "#D33682", "#FDF6E3", "#268BD2"}, [2]string{"#EEE8D5", "#073642"}, [6]string{"#268BD2", "#CB4B16", "#859900", "#8A8FD8", "#B58900", "#2AA198"}),
-	mk("anthropocene-dark", "Anthropic warm near-black with the terracotta accent", "dark", "#141413",
+	mk("anthropocene-dark", "warm near-black with the terracotta accent", "dark", "#141413",
 		[9]string{"#FAF9F5", "#9C9A91", "#D97757", "#E5736F", "#8DAA6B", "#E2B259", "#6A9BCC", "#141413", "#D97757"}, [2]string{"#FAF9F5", "#2E2D2A"}, [6]string{"#6A9BCC", "#D4A27F", "#8DAA6B", "#A99BCF", "#E8E6DC", "#7FB5AB"}),
-	mk("anthropocene-light", "Anthropic warm off-white with the terracotta accent", "light", "#FAF9F5",
+	mk("anthropocene-light", "warm off-white with the terracotta accent", "light", "#FAF9F5",
 		[9]string{"#141413", "#6B695F", "#B4532F", "#B3392F", "#5A7240", "#8A5A00", "#3F73A6", "#FAF9F5", "#B4532F"}, [2]string{"#141413", "#E8E6DC"}, [6]string{"#3F73A6", "#9A6234", "#5A7240", "#6F5FA3", "#4A4944", "#2F7C72"}),
 }
 
 // AutoName is the default theme: dark or light, chosen from the terminal background.
 const AutoName = "auto"
 
-// AnthropoceneName is the Anthropic theme that picks its dark or light variant from the terminal,
+// AnthropoceneName is the warm terracotta theme that picks its dark or light variant from the terminal,
 // like auto. anthropocene-dark and anthropocene-light are the fixed variants.
 const AnthropoceneName = "anthropocene"
 
@@ -255,7 +255,7 @@ var followers = map[string][2]string{
 
 var followerDesc = map[string]string{
 	AutoName:         "dark or light, chosen from the terminal background (default)",
-	AnthropoceneName: "Anthropic colors, light or dark chosen from the terminal background",
+	AnthropoceneName: "warm colors with a terracotta accent, light or dark chosen from the terminal background",
 }
 
 // Follows reports whether t picks its variant from the terminal (auto, anthropocene). Such a theme

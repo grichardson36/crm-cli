@@ -28,6 +28,8 @@ const (
 	rkNote
 	rkLinked // a link to another object: organization, related person, deal, member
 	rkTyped  // a field with a declared type (model.FieldSpec): edited in place by its type (fieldedit.go)
+	rkMode   // the mode selector of the Appearance pane: left and right change it (theme.go)
+	rkTheme  // a theme of the Appearance pane: the cursor previews it, enter chooses it (theme.go)
 )
 
 // tierNames maps priority_tier (index) to a name. Index 0 clears the tier.
@@ -370,6 +372,9 @@ func (m *Model) refreshDetail(force bool) {
 	case ok && m.view == viewTags:
 		m.form = m.buildTagForm(r)
 	case ok && m.view == viewSettings:
+		if r.setting != appearanceID {
+			m.endPreview()
+		}
 		m.form = m.buildSettingForm(r.setting)
 	case ok && m.view != viewArchived:
 		m.form = m.buildForm(r.personID, r.taskID)
@@ -475,6 +480,12 @@ func (m *Model) renderRow(i int, r formRow, w int) []string {
 	}
 	if isFeedRow(r) {
 		return m.renderFeedEntry(i, r, w)
+	}
+	if r.kind == rkMode {
+		return []string{m.renderModeRow(r, label, selected, w)}
+	}
+	if r.kind == rkTheme {
+		return []string{m.renderThemeRow(r, selected, w)}
 	}
 	if m.mode == modeEdit && m.edit != nil && m.edit.row == i {
 		line := m.st.Dim.Render(label) + strings.TrimRight(m.rowInput.View(), " ")

@@ -28,7 +28,7 @@ Sources: docs.obsidian.md (CSS variables, Foundations > Colors, Build a theme) a
 **O3. Variants.** One file declares both variants, like `.theme-dark` and `.theme-light`:
 
 ```toml
-description = "Anthropic colors"
+description = "warm colors"
 [colors]            # shared by both variants
 accent = "#D97757"
 [dark]
@@ -61,7 +61,7 @@ Problem: a frame only colors cells that have a style. Unstyled cells and the are
 Therefore:
 
 1. The theme has an optional `bg` role and a variant. All built-ins have both.
-2. The per device setting `fill_background` (`auto`, `on`, `off`, in Settings > Appearance and as `fill_background` in `config.toml`) decides. `auto` paints for a light theme, and for a dark theme only when the terminal reported a light background. `auto` and `anthropocene` follow the terminal and never paint by themselves. A theme without `bg`, or a terminal without color (NO_COLOR), never paints.
+2. The per device mode (`auto`, `light`, `dark`, the first line of the Appearance pane in Settings and `mode` in `config.toml`) decides. `auto` paints for a light theme, and for a dark theme only when the terminal reported a light background. `light` and `dark` always paint and make `auto` and `anthropocene` take that variant. A painted screen that is later unpainted gets the terminal's own background set explicitly (read before the first paint), because not every terminal honors the reset. `auto` and `anthropocene` follow the terminal and never paint by themselves. A theme without `bg`, or a terminal without color (NO_COLOR), never paints.
 3. When painting, `View()` redraws the frame into a cell buffer (ultraviolet, the library under Bubble Tea v2). Every cell with no background gets `bg` and every cell with no foreground gets `fg`. Styled cells keep their colors, so selection, tabs and reverse video still work.
 4. `View.BackgroundColor` and `View.ForegroundColor` set the terminal default colors (OSC 11 and 10), so margins and cleared areas match. Bubble Tea resets them (OSC 111 and 110) on exit and updates them when they change, so the picker preview repaints live.
 

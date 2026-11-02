@@ -146,6 +146,7 @@ func TestBackgroundColorMessageResolvesTheAutoTheme(t *testing.T) {
 	auto, err := m.themeCatalog().Find(theme.AutoName)
 	require.NoError(t, err)
 	m.setTheme(auto)
+	m.themeName = theme.AutoName
 	dark := m.st.Theme.Fg
 	m.Update(tea.BackgroundColorMsg{Color: darkColor{}})
 	assert.Equal(t, dark, m.st.Theme.Fg)

@@ -108,51 +108,20 @@ func mustColor(hex string) color.Color {
 	return bg
 }
 
-func TestFillSettingIsSavedPerDeviceAndRead(t *testing.T) {
+// The mode is read again at startup and does not drop the remembered theme.
+func TestModeIsReadAtStartup(t *testing.T) {
 	m := themeModel(t)
-	m.fillMode = theme.FillAuto
-	var row *setting
-	for _, s := range m.settingList() {
-		if s.id == "fill-background" {
-			s := s
-			row = &s
-		}
-	}
-	require.NotNil(t, row, "one row in the registry")
-	assert.Equal(t, secAppearance, row.section)
-	assert.Equal(t, scopeDevice, row.scope)
-	assert.Equal(t, "auto", row.value(m))
-
-	tests := []struct {
-		in      string
-		want    theme.Fill
-		wantErr bool
-	}{{"on", theme.FillOn, false}, {"off", theme.FillOff, false}, {"auto", theme.FillAuto, false}, {"sideways", theme.FillAuto, true}}
-	for _, tt := range tests {
-		t.Run(tt.in, func(t *testing.T) {
-			err := row.set(m, tt.in)
-			if tt.wantErr {
-				require.Error(t, err)
-				return
-			}
-			require.NoError(t, err)
-			assert.Equal(t, tt.want, m.fillMode)
-			assert.Equal(t, tt.want, theme.ChosenFill(m.env.DataDir), "stored in config.toml")
-			assert.Equal(t, string(tt.want), row.value(m))
-		})
-	}
-
-	// It is read again at startup, and it does not drop the remembered theme.
 	require.NoError(t, theme.SaveChoice(m.env.DataDir, "nord"))
-	require.NoError(t, theme.SaveFill(m.env.DataDir, theme.FillOn))
+	require.NoError(t, theme.SaveMode(m.env.DataDir, theme.ModeDark))
 	m2, _ := newTestModel(t)
 	m2.env = m.env
 	m2.applyStartupTheme()
+	assert.Equal(t, theme.ModeDark, m2.appearance)
 	assert.Equal(t, theme.FillOn, m2.fillMode)
 	assert.Equal(t, "nord", m2.themeName)
 
 	m.env = Env{}
-	require.Error(t, row.set(m, "on"), "no data directory, nothing to save to")
+	require.Error(t, m.setAppearance(theme.ModeLight), "no data directory, nothing to save to")
 }
 
 // syncBuffer is an output a program goroutine can write while the test reads it.

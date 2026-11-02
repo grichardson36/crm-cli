@@ -65,7 +65,6 @@ func hintScreens() []hintScreen {
 		{"add prompt", 2, func(t *testing.T, m *Model) { press(m, "a", "enter") }},
 		{"confirm", 2, func(t *testing.T, m *Model) { press(m, "d") }},
 		{"capture", 2, func(t *testing.T, m *Model) { m.startCapture("add-any") }},
-		{"picker", 1, func(t *testing.T, m *Model) { m.openThemeChooser() }},
 		{"offer picker", 1, func(t *testing.T, m *Model) { m.env.DataDir = t.TempDir(); m.openOfferPicker(0) }},
 		{"list editor", 1, func(t *testing.T, m *Model) { m.openListEditor("deal-stages") }},
 		{"list editor add", 1, func(t *testing.T, m *Model) { m.openListEditor("deal-stages"); press(m, "a") }},

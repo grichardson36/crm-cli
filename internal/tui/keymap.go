@@ -59,6 +59,7 @@ var scopeTable = map[string]scopeDef{
 	"form":              {parent: scopeApp},
 	"compare":           {parent: scopeApp},
 	"cells":             {parent: "form"},
+	"appearance":        {parent: "form"},
 	"type:person":       {parent: scopeApp},
 	"type:task":         {parent: scopeApp},
 	"type:organization": {parent: scopeApp},
@@ -103,6 +104,9 @@ func (m *Model) scopeChain() []string {
 	if m.focus == focusDetail {
 		if whenCellRow(m) {
 			chain = append(chain, "cells") // left, right and tab move across the cells of this row
+		}
+		if whenAppearanceRow(m) {
+			chain = append(chain, "appearance") // left and right change the mode, enter chooses a theme
 		}
 		chain = append(chain, "form")
 	}
@@ -230,6 +234,7 @@ var frameworkIDs = map[string]bool{
 	"down": true, "up": true, "half-down": true, "half-up": true, "page-down": true, "page-up": true,
 	"jump-down": true, "jump-up": true, "top": true, "bottom": true, "home-top": true, "home-bottom": true,
 	"focus-detail": true, "back": true, "cell-next": true, "cell-prev": true,
+	"mode-next": true, "mode-prev": true, "theme-pick": true,
 	"tag-tree-expand": true, "tag-tree-collapse": true,
 	// app chrome
 	"palette": true, "options": true, "help": true, "quit": true, "goto-view": true, "next-view": true, "prev-view": true, "clear-search": true,
@@ -260,6 +265,7 @@ var scopeByID = map[string]string{
 	"tag-tree-expand": "view:tags", "tag-tree-collapse": "view:tags",
 	// The detail form
 	"delete": "form", "add": "form", "copy": "form", "back": "form", "cell-next": "cells", "cell-prev": "cells",
+	"mode-next": "appearance", "mode-prev": "appearance", "theme-pick": "appearance",
 	// The compare screen
 	"cmp-left": "compare", "cmp-right": "compare", "cmp-pick": "compare", "cmp-field": "compare", "cmp-survivor": "compare",
 	"cmp-pair": "compare", "cmp-view": "compare", "cmp-confirm": "compare", "cmp-apply": "compare", "cmp-back": "compare", "cmp-dismiss": "compare",
