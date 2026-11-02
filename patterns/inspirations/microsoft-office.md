@@ -10,7 +10,7 @@ research: partial
 **Research state.** partly researched. See [[inspirations]].
 
 **What we take.**
-- Two-stack undo and the dropdown model. [[undo-redo-two-stacks]] [[undo-appears-in-the-bar]]
+- Two-stack undo and the dropdown model. [[core]] [[core]]
 
 **What we leave.** Dropdown depth varies by version (16 and 300 both reported).
 

@@ -10,6 +10,6 @@ research: partial
 **Research state.** partly researched. See [[inspirations]].
 
 **What we take.**
-- Plain-word dates, no sigil. [[dates-are-plain-words]]
+- Plain-word dates, no sigil. [[core]]
 
 **Sources.** culturedcode.com/things/support/articles/2803573 [doc].

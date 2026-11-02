@@ -10,11 +10,11 @@ research: partial
 **Research state.** partly researched. See [[inspirations]].
 
 **What we take.**
-- Record layout: identity and actions on the left, overview and timeline in the middle, upcoming work first with search, filters and pinning. [[one-record-page]] [[timeline-upcoming-first]]
-- Associations dialog for linking records from either record. [[link-from-either-side]] [[pick-or-create]]
-- Mention a user by typing @ and picking from a dropdown. [[at-sign-means-person]]
-- Limits on custom tabs (five) and fixed Activities tab keep records clean. [[advanced-objects-off-main-path]]
-- Global search groups results by record type. [[one-bar]]
+- Record layout: identity and actions on the left, overview and timeline in the middle, upcoming work first with search, filters and pinning. [[core]] [[core]]
+- Associations dialog for linking records from either record. [[link-registry]] [[core]]
+- Mention a user by typing @ and picking from a dropdown. [[core]]
+- Limits on custom tabs (five) and fixed Activities tab keep records clean. [[core]]
+- Global search groups results by record type. [[core]]
 
 **What we leave.** Ticketing, shared inbox, live chat, quotes, sequences. They serve teams, not one user.
 

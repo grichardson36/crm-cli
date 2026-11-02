@@ -10,8 +10,8 @@ research: partial
 **Research state.** partly researched. See [[inspirations]].
 
 **What we take.**
-- Pick from a list while typing, free text stays text. [[unresolved-names-stay-text]] [[pick-or-create]]
-- @remind phrasing. [[remind-word]]
-- Everything is an object with properties and relations. [[objects-first]]
+- Pick from a list while typing, free text stays text. [[core]] [[core]]
+- @remind phrasing. [[core]]
+- Everything is an object with properties and relations. [[object-registry]]
 
 **Sources.** notion.com/help/guides/reminders-and-mentions [doc]. Non-member behaviour is undocumented.
