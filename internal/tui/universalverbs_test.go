@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -255,7 +256,7 @@ func TestCtrlShiftArrowsHaveTheNamesTheRegistryUses(t *testing.T) {
 // A view declares its jump unit and home destination in one place, viewNavs. A view not listed
 // inherits a page and no home.
 func TestViewsInheritTheDefaultNavigation(t *testing.T) {
-	for _, v := range []viewKind{viewHome, viewDue, viewTasks, viewDeals, viewArchived, viewSync} {
+	for _, v := range []viewKind{viewHome, viewDue, viewArchived, viewSync} {
 		nav := navOf(v)
 		assert.Equal(t, unitPage, nav.unit, viewNames[v])
 		assert.Nil(t, nav.home, viewNames[v])
@@ -266,11 +267,16 @@ func TestViewsInheritTheDefaultNavigation(t *testing.T) {
 	assert.NotNil(t, navOf(viewBirthdays).home, "Birthdays declares today as its home")
 	assert.Equal(t, unitLetter, navOf(viewPeople).unit)
 	assert.Equal(t, unitLetter, navOf(viewOrgs).unit)
+	assert.Equal(t, unitLetter, navOf(viewDeals).unit)
+	assert.Equal(t, unitLetter, navOf(viewTasks).unit)
+	assert.Nil(t, navOf(viewDeals).home)
+	assert.Nil(t, navOf(viewTasks).home)
 
 	// A new view with a declared unit and home gets the behavior without any key code.
 	var landed bool
+	orig := viewNavs[viewDeals]
 	viewNavs[viewDeals] = viewNav{unit: unitPage, home: func(m *Model) { landed = true }}
-	defer delete(viewNavs, viewDeals)
+	defer func() { viewNavs[viewDeals] = orig }()
 	m, _ := newTestModel(t)
 	m.switchView(viewDeals)
 	press(m, "ctrl+shift+up")
@@ -293,4 +299,65 @@ func TestOrganizationsJumpAFirstLetterGroup(t *testing.T) {
 	assert.Equal(t, "Cargo", m.rows[m.cursor].title)
 	press(m, "ctrl+up")
 	assert.Equal(t, "Bravo", m.rows[m.cursor].title)
+}
+
+// CRM-017: Deals and Tasks jump by first letter like People and Organizations, in the order the
+// list already has. Given Alpha, Apex, Beta, Brio, Cargo, Cove in that order.
+func assertLetterJumps(t *testing.T, m *Model) {
+	t.Helper()
+	var titles []string
+	for _, r := range m.rows {
+		titles = append(titles, r.title)
+	}
+	require.Equal(t, []string{"Alpha", "Apex", "Beta", "Brio", "Cargo", "Cove"}, titles)
+	at := func(want, why string) {
+		t.Helper()
+		assert.Equal(t, want, m.rows[m.cursor].title, why)
+	}
+	press(m, "home")
+	press(m, "ctrl+down")
+	at("Beta", "from Alpha to the next letter")
+	press(m, "ctrl+down")
+	at("Cargo", "next letter")
+	press(m, "ctrl+down")
+	at("Cove", "on the last letter ctrl+down goes to the last row, as People does")
+	press(m, "ctrl+up")
+	at("Cargo", "inside a group ctrl+up goes to the group start")
+	press(m, "ctrl+up")
+	at("Beta", "first row of the previous letter")
+	press(m, "down")
+	press(m, "ctrl+up")
+	at("Beta", "from the middle of a group to its start")
+	press(m, "ctrl+up")
+	at("Alpha", "previous letter")
+	press(m, "ctrl+up")
+	at("Alpha", "on the first letter ctrl+up stays on its first row")
+}
+
+func TestDealsJumpAFirstLetterGroup(t *testing.T) {
+	m, _ := newTestModel(t)
+	for i, n := range []string{"Alpha", "Apex", "Beta", "Brio", "Cargo", "Cove"} {
+		d, err := m.dlr.Create(context.Background(), model.CreateDealInput{Title: n, Stage: "lead"})
+		require.NoError(t, err)
+		// deals list newest first, so Alpha is the newest
+		_, err = m.db.Exec(`UPDATE deals SET created_at = ? WHERE id = ?`, fmt.Sprintf("2026-01-0%d 00:00:00", 9-i), d.ID)
+		require.NoError(t, err)
+	}
+	m.afterWrite()
+	m.switchView(viewDeals)
+	m.settle()
+	assertLetterJumps(t, m)
+}
+
+func TestTasksJumpAFirstLetterGroup(t *testing.T) {
+	m, _ := newTestModel(t)
+	for i, n := range []string{"Alpha", "Apex", "Beta", "Brio", "Cargo", "Cove"} {
+		due := fmt.Sprintf("2026-03-0%d", i+1) // tasks list soonest due first
+		_, err := m.tr.Create(context.Background(), model.CreateTaskInput{Title: n, Priority: "medium", DueAt: &due})
+		require.NoError(t, err)
+	}
+	m.afterWrite()
+	m.switchView(viewTasks)
+	m.settle()
+	assertLetterJumps(t, m)
 }

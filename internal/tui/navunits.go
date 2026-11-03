@@ -25,7 +25,7 @@ type jumpUnit int
 const (
 	unitPage    jumpUnit = iota // a page, the default
 	unitGroup                   // the next or previous group divider: a day in Birthdays, a confidence level in Merge
-	unitLetter                  // the next or previous first-letter group (People, Organizations)
+	unitLetter                  // the next or previous first-letter group (People, Organizations, Deals, Tasks)
 	unitSibling                 // the next or previous row at the same level of a tree, else the node one level out (Tags tree layout)
 )
 
@@ -43,6 +43,8 @@ var viewNavs = map[viewKind]viewNav{
 	viewSettings:  {unit: unitGroup},
 	viewPeople:    {unit: unitLetter},
 	viewOrgs:      {unit: unitLetter},
+	viewDeals:     {unit: unitLetter},
+	viewTasks:     {unit: unitLetter},
 	viewTags:      {unit: unitSibling},
 }
 
