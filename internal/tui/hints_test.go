@@ -18,6 +18,28 @@ var keyHintText = regexp.MustCompile(`(^|[^A-Za-z+/])(enter|esc|tab|shift\+tab|c
 // footerOnly renders the screen and returns the lines above the footer, and the footer.
 func footerOnly(m *Model, footerLines int) (body []string, footer []string) {
 	lines := strings.Split(ansi.Strip(m.screen()), "\n")
+	if m.mode == modeOverlay && m.ov != nil && m.ov.draw == nil {
+		// A popup keeps its hints in the last row of its box. The screen behind it is not its own.
+		top, bottom := -1, -1
+		for i, l := range lines {
+			if top < 0 && strings.Contains(l, "┌") {
+				top = i
+			}
+			if strings.Contains(l, "└") {
+				bottom = i
+			}
+		}
+		if top >= 0 && bottom > top+2 {
+			cut := func(l string) string {
+				l = strings.TrimSpace(l)
+				return strings.TrimSpace(strings.Trim(l, "│"))
+			}
+			for _, l := range lines[top+1 : bottom-2] {
+				body = append(body, cut(l))
+			}
+			return body, []string{cut(lines[bottom-1])}
+		}
+	}
 	n := len(lines) - footerLines
 	if n < 0 {
 		n = 0

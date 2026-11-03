@@ -227,14 +227,7 @@ func (m *Model) openHistory(redo bool) tea.Cmd {
 		n := len(stack) - i
 		it := overlayItem{id: fmt.Sprintf("hist:%d", n), label: stack[i].label, ref: int64(n)}
 		if n > 1 {
-			verb := "undoes"
-			if redo {
-				verb = "redoes"
-			}
-			it.desc = fmt.Sprintf("%s this and the %d newer", verb, n-1)
-			if redo {
-				it.desc = fmt.Sprintf("%s this and the %d before it", verb, n-1)
-			}
+			it.desc = fmt.Sprintf("%d steps", n)
 		}
 		items = append(items, it)
 	}
@@ -242,6 +235,11 @@ func (m *Model) openHistory(redo bool) tea.Cmd {
 		m.pendingCmd = m.stepHistory(redo, int(it.ref))
 	})
 	m.ov.noFilter = true
+	word := "undo"
+	if redo {
+		word = "redo"
+	}
+	m.ov.hints = []hintItem{fk("enter", word), fk("esc", "close"), fk("up/down", "select")}
 	return nil
 }
 

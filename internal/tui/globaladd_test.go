@@ -211,7 +211,7 @@ func TestTypingAInTheBarInputTypesALetter(t *testing.T) {
 	press(m, "ctrl+k")
 	typeText(m, "bob a")
 	assert.Equal(t, "bob a", m.ov.filter.Value(), "a is text while the input has the focus")
-	assert.Equal(t, "Command bar", m.ov.title)
+	assert.Equal(t, "Select a command…", m.ov.title)
 }
 
 func TestAddIsBlockedInReadOnlyModeAndRebindable(t *testing.T) {

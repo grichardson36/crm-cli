@@ -25,7 +25,7 @@ func (m *Model) savedItem(v repo.SavedView) overlayItem {
 	if m.sv != nil && m.sv.v.UUID == v.UUID {
 		desc = "current view. " + desc
 	}
-	return overlayItem{id: "saved:" + v.UUID, label: label, value: savedPrefix + v.UUID, desc: desc}
+	return overlayItem{id: "saved:" + v.UUID, label: label, value: savedPrefix + v.UUID, desc: desc, isCur: m.sv != nil && m.sv.v.UUID == v.UUID}
 }
 
 // savedViewsKey handles the keys of the Views screen on a saved view. It returns true when it used the key.

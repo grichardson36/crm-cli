@@ -36,7 +36,7 @@ func TestCommandBarShowsALivePreviewAndRunsANote(t *testing.T) {
 	require.True(t, m.ov.cmd.plan.Ready())
 
 	out := plain(m.screen())
-	assert.Contains(t, out, "Command bar")
+	assert.Contains(t, out, "> n called about the deal")
 	assert.Contains(t, out, `note on Zed Adams: "called about the deal"`)
 	assert.Contains(t, out, "tag #deal (new)")
 	assert.Contains(t, out, "remind Fri 16 Oct")

@@ -7,7 +7,6 @@ import (
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/jdanielnd/crm-cli/internal/keys"
 	sg "github.com/jdanielnd/crm-cli/internal/suggest"
@@ -33,6 +32,11 @@ type overlayItem struct {
 	// divider marks a heading row of a grouped list (label at the left, desc at the right). The
 	// cursor never lands on it and enter does nothing on it (patterns/grouped-lists-with-dividers).
 	divider bool
+	// selector marks a row whose value left and right change. current is the value shown at the
+	// right of the row. isCur marks the row of what is open now (drawn in the accent style).
+	selector bool
+	current  string
+	isCur    bool
 }
 
 // overlay is a filterable list shown instead of the main screen: the command palette or a picker.
@@ -52,6 +56,11 @@ type overlay struct {
 	// turns the filter line off.
 	onKey    func(m *Model, key string) bool
 	noFilter bool
+	// noDesc hides the desc column of a popup (desc stays searchable). hintsFor builds the hint row
+	// from the highlighted row, and replaces hints.
+	noDesc   bool
+	minW     int // text width the popup keeps at least, when its hints need more room
+	hintsFor func(m *Model) []hintItem
 	// onMsg sees the whole key event before onKey (a screen with its own text input) and draw
 	// replaces the list drawing. The list editor uses both (listeditor.go), le is its state.
 	onMsg func(m *Model, msg tea.KeyPressMsg) bool
@@ -162,6 +171,7 @@ func (o *overlay) move(d, page int) {
 
 func (m *Model) newOverlay(title string, items []overlayItem, palette bool) *overlay {
 	in := newInput("> ")
+	in.Placeholder = title
 	o := &overlay{title: title, items: items, filter: in, palette: palette}
 	if palette {
 		o.base = items
@@ -205,7 +215,7 @@ func (m *Model) openPalette() tea.Cmd {
 			items[i].label += " (" + v + ")"
 		}
 	}
-	o := m.newOverlay("Command bar", items, true)
+	o := m.newOverlay("Select a command…", items, true)
 	o.search = m.barSearch
 	o.recent = m.recentItems
 	o.refilter()
@@ -253,7 +263,14 @@ func (m *Model) closeOverlay() {
 	m.ov = nil
 }
 
-func (m *Model) overlayPage() int { return max(1, m.height-overlayTop-2) }
+// overlayPage is the number of list rows a popup shows. A custom drawn screen (the list editor) has
+// the whole terminal.
+func (m *Model) overlayPage() int {
+	if m.ov != nil && m.ov.draw != nil {
+		return max(1, m.height-overlayTop-2)
+	}
+	return m.popupPage()
+}
 
 // pickOverlay runs the item at shown index i.
 func (m *Model) pickOverlay(i int) tea.Cmd {
@@ -396,10 +413,17 @@ func (m *Model) overlayMouse(msg mouseEvent) (tea.Model, tea.Cmd) {
 	case tea.MouseWheelDown:
 		o.move(3, m.overlayPage())
 	case tea.MouseLeft:
-		top := overlayTop + o.extraTop
-		i := o.offset + msg.Y - top
-		if msg.Y >= top && msg.Y < top+m.overlayPage() {
-			return m, m.pickOverlay(i)
+		if o.draw != nil {
+			top := overlayTop + o.extraTop
+			i := o.offset + msg.Y - top
+			if msg.Y >= top && msg.Y < top+m.overlayPage() {
+				return m, m.pickOverlay(i)
+			}
+			break
+		}
+		b := m.overlayBox(o)
+		if msg.X >= b.x && msg.X < b.x+b.w && msg.Y >= b.listY && msg.Y < b.listY+b.rows {
+			return m, m.pickOverlay(o.offset + msg.Y - b.listY)
 		}
 	}
 	return m, nil
@@ -407,70 +431,163 @@ func (m *Model) overlayMouse(msg mouseEvent) (tea.Model, tea.Cmd) {
 
 func (m *Model) overlayView() string {
 	o := m.ov
-	if o.cmd != nil {
-		return m.cmdView()
-	}
 	if o.draw != nil {
 		return o.draw(m)
 	}
-	var b strings.Builder
-	b.WriteString(lipgloss.NewStyle().MaxWidth(m.width).Render(m.st.Head.Render(o.title)) + "\n")
-	if o.noFilter && o.note != "" {
-		b.WriteString(m.st.Dim.Render(ansi.Truncate(o.note, m.width, "…")) + "\n")
-	} else {
-		b.WriteString(o.filter.View() + "\n")
+	return m.popupOver(m.underView(), m.overlayPopup(o))
+}
+
+// hasFilter says whether the popup shows a filter line: the palette and pick-or-create lists always
+// do, a picker when it is long or once something is typed. Typing filters in every popup but a noFilter one.
+func (o *overlay) hasFilter() bool {
+	if o.noFilter {
+		return false
 	}
-	page := m.overlayPage()
-	if len(o.shown) == 0 {
-		b.WriteString(m.st.Dim.Render("No matches.") + "\n" + m.overlayFooter())
-		return b.String()
+	if o.palette || o.create != nil {
+		return true
 	}
-	end := min(len(o.shown), o.offset+page)
-	hintW, titleW := 8, 24
+	// A short picker shows its title until the first letter is typed. Typing filters either way.
+	return len(o.items) > popupFilterMin || o.filter.Value() != ""
+}
+
+// popupWidth is the row width the popup wants: the widest row, within the popup limits.
+func (o *overlay) popupWidth() int {
 	if o.palette {
-		b.WriteString(m.barListView(o, end))
-		if o.focusResults {
-			if it, ok := o.highlighted(); ok {
-				b.WriteString("\n" + m.st.Head.Render(ansi.Truncate(m.barVerbLine(it), m.width, "…")))
-			}
-		}
-		return b.String() + "\n" + m.overlayFooter()
+		return popupPaletteW
 	}
+	w := ansi.StringWidth(o.title) + 2
+	hintW := o.hintWidth()
+	for _, it := range o.items {
+		line := hintW + ansi.StringWidth(it.label) + 2
+		switch {
+		case it.divider:
+			line = ansi.StringWidth(it.label) + ansi.StringWidth(it.desc) + 6
+		case it.selector:
+			line += ansi.StringWidth(it.current) + 2
+		case it.disabled != "":
+			line += ansi.StringWidth(it.disabled) + 2
+		case !o.noDesc && it.desc != "":
+			line += min(30, ansi.StringWidth(it.desc)) + 2
+		}
+		w = max(w, line)
+	}
+	w = max(w, o.minW)
+	return clampInt(w, popupMinW, max(popupMaxW, o.minW))
+}
+
+// hintWidth is the width of the key column at the left of a picker row, 0 when no row has a key.
+func (o *overlay) hintWidth() int {
+	w := 0
+	for _, it := range o.items {
+		w = max(w, ansi.StringWidth(it.hint))
+	}
+	if w == 0 {
+		return 0
+	}
+	return min(w, 8) + 2
+}
+
+// popupRowCount is the number of list lines the box has: the whole list up to the page, and the
+// palette always a full page, so the box does not change size while typing.
+func (o *overlay) popupRowCount(page int) int {
+	if o.palette {
+		return page
+	}
+	n := len(o.items)
+	if o.create != nil && o.baseLen > 0 {
+		n = o.baseLen + 1
+	}
+	return min(max(1, n), page)
+}
+
+// overlayBox is where the popup of o sits.
+func (m *Model) overlayBox(o *overlay) popupBox {
+	return m.popupBoxAt(m.popupTextW(o.popupWidth()), o.popupRowCount(m.popupPage()))
+}
+
+// overlayPopup is what the popup of o draws now.
+func (m *Model) overlayPopup(o *overlay) popupSpec {
+	box := m.overlayBox(o)
+	spec := popupSpec{title: o.title, box: box}
+	if o.cmd != nil {
+		return m.cmdPopup(o, spec)
+	}
+	if o.hasFilter() {
+		o.filter.SetWidth(max(1, box.textW-3))
+		spec.input = o.filter.View()
+	}
+	spec.rows = m.popupListRows(o, box.textW, box.rows)
+	if o.focusResults {
+		if it, ok := o.highlighted(); ok {
+			spec.hints = m.st.Head.Render(ansi.Truncate(m.barVerbLine(it), box.textW, "…"))
+		}
+	}
+	if spec.hints == "" {
+		spec.hints = m.renderPopupHints(m.overlayHints(), box.textW)
+	}
+	spec.empty = "No matches"
+	return spec
+}
+
+// popupListRows draws the rows from o.offset on, n at most, each textW cells wide. The Views list
+// and the Settings pane that embeds it draw their rows with this.
+func (m *Model) popupListRows(o *overlay, textW, n int) []string {
+	end := min(len(o.shown), o.offset+n)
+	if o.palette {
+		return m.barListView(o, end, textW)
+	}
+	hintW := o.hintWidth()
+	labelMax := 0
+	for _, it := range o.items {
+		if !it.divider {
+			labelMax = max(labelMax, ansi.StringWidth(it.label))
+		}
+	}
+	var out []string
 	for i := o.offset; i < end; i++ {
 		it := o.items[o.shown[i]]
 		if it.divider {
-			b.WriteString(m.st.Dim.Render(ruleLine(it.label, it.desc, m.width)))
-			if i < end-1 {
-				b.WriteString("\n")
-			}
+			out = append(out, m.st.Dim.Render(ruleLine(it.label, it.desc, textW)))
 			continue
 		}
-		desc := it.desc
-		if it.disabled != "" {
-			desc = "(" + it.disabled + ") " + desc
+		right := ""
+		switch {
+		case it.disabled != "":
+			right = it.disabled
+		case it.selector:
+			right = it.current
+		case !o.noDesc:
+			right = it.desc
 		}
-		left := fit(it.hint, hintW) + fit(it.label, titleW)
-		room := m.width - ansi.StringWidth(left)
-		line := left + fit(desc, max(0, room))
-		line = fit(line, m.width)
+		labelW := textW - hintW
+		if right != "" {
+			rightW := min(ansi.StringWidth(right), max(8, textW/2))
+			labelW = max(4, min(labelMax+2, textW-hintW-rightW-1))
+		}
+		rightW := max(0, textW-hintW-labelW)
+		keyCol, labelCol := fit(it.hint, hintW), fit(it.label, labelW)
+		rightCol := fit(right, rightW)
+		if it.selector {
+			rightCol = padLeft(ansi.Truncate(right, rightW, "…"), rightW)
+		}
 		switch {
 		case i == o.cursor:
-			b.WriteString(m.st.Sel.Render(line))
+			out = append(out, m.st.Sel.Render(keyCol+labelCol+rightCol))
 		case it.disabled != "":
-			b.WriteString(m.st.Dim.Render(line))
+			out = append(out, m.st.Dim.Render(keyCol+labelCol+rightCol))
 		default:
-			b.WriteString(m.st.Name.Render(fit(it.hint, hintW)) + fit(it.label, titleW) + m.st.Dim.Render(fit(desc, max(0, room))))
-		}
-		if i < end-1 {
-			b.WriteString("\n")
+			label := labelCol
+			if it.isCur {
+				label = m.st.Head.Render(labelCol)
+			}
+			rst := m.st.Dim
+			if it.selector {
+				rst = m.st.Name
+			}
+			out = append(out, m.st.Name.Render(keyCol)+label+rst.Render(rightCol))
 		}
 	}
-	return b.String() + "\n" + m.overlayFooter()
-}
-
-// overlayFooter is the last line of a picker, the palette or the bar: its key hints.
-func (m *Model) overlayFooter() string {
-	return m.renderHintItems(m.overlayHints())
+	return out
 }
 
 // --- help ---
@@ -570,11 +687,19 @@ func (m *Model) helpText() string {
 	return strings.TrimRight(b.String(), "\n")
 }
 
-// barListView draws the bar list: the group name at the start of each group, the label, the
-// description, and the key on the right.
-func (m *Model) barListView(o *overlay, end int) string {
-	const groupW, keyW = 8, 15
-	var b strings.Builder
+// barListView draws the bar list as lines: the group name at the start of each group, the label,
+// the description of a record and the key on the right.
+func (m *Model) barListView(o *overlay, end, width int) []string {
+	const groupW = 8
+	keyW := 0
+	for _, it := range o.items {
+		keyW = max(keyW, ansi.StringWidth(it.hint))
+	}
+	keyW = min(keyW, 15)
+	if keyW > 0 {
+		keyW++
+	}
+	var out []string
 	prev := ""
 	if o.offset > 0 {
 		prev = barGroup[o.items[o.shown[o.offset-1]].kind]
@@ -587,24 +712,25 @@ func (m *Model) barListView(o *overlay, end int) string {
 			tag = group
 		}
 		prev = group
-		desc := it.desc
-		if it.disabled != "" {
-			desc = "(" + it.disabled + ") " + desc
+		desc := ""
+		switch it.kind {
+		case kindPerson, kindOrg, kindDeal, kindTask, kindNote, kindTag, kindRecent, kindAll:
+			desc = it.desc
 		}
-		titleW := min(34, max(12, m.width/3))
-		room := max(0, m.width-groupW-titleW-keyW)
+		if it.disabled != "" {
+			desc = it.disabled
+		}
+		titleW := min(34, max(12, width/2))
+		room := max(0, width-groupW-titleW-keyW)
 		plainLine := fit(tag, groupW) + fit(it.label, titleW) + fit(desc, room) + padLeft(it.hint, keyW)
 		switch {
 		case i == o.cursor:
-			b.WriteString(m.st.Sel.Render(fit(plainLine, m.width)))
+			out = append(out, m.st.Sel.Render(fit(plainLine, width)))
 		case it.disabled != "":
-			b.WriteString(m.st.Dim.Render(fit(plainLine, m.width)))
+			out = append(out, m.st.Dim.Render(fit(plainLine, width)))
 		default:
-			b.WriteString(m.st.Head.Render(fit(tag, groupW)) + m.st.Name.Render(fit(it.label, titleW)) + m.st.Dim.Render(fit(desc, room)) + m.st.Dim.Render(padLeft(it.hint, keyW)))
-		}
-		if i < end-1 {
-			b.WriteString("\n")
+			out = append(out, m.st.Head.Render(fit(tag, groupW))+m.st.Name.Render(fit(it.label, titleW))+m.st.Dim.Render(fit(desc, room))+m.st.Dim.Render(padLeft(it.hint, keyW)))
 		}
 	}
-	return b.String()
+	return out
 }

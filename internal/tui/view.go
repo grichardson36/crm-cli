@@ -50,6 +50,14 @@ func (m *Model) baseView() string {
 	if m.mode == modeOverlay && m.ov != nil {
 		return m.overlayView()
 	}
+	return m.underView()
+}
+
+// underView is the screen without the popup on top of it.
+func (m *Model) underView() string {
+	if m.width == 0 {
+		return "loading..."
+	}
 	if m.mode == modeNames && m.names != nil {
 		return m.namesView()
 	}
