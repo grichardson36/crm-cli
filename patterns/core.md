@@ -188,6 +188,18 @@ Current app facts live outside the core gates: [[references/app/domain-model|app
 
 Items below here are not built.
 - ## Next
+	- [ ] 🧭 CRM-015: Display ctrl+o *sort* below in the hint bar where applicable. (next)
+		- Intent: the user can see in the footer that a list has view options (sort and more).
+		- Decisions: owner chose the label `options` for every view (not `sort`). Shown wherever the view has options (`optionsForView` is not empty, saved views included), replacing today's Merge/Archived-only `footIf`. Key comes from the registry action `options`, so rebinding follows ([[key-hints-in-one-place]]). One registry action, so every door that has a footer gets it. No CLI, MCP or agent door applies (TUI footer only). No data change.
+		- Scenarios:
+			- Given the People view, When the footer renders, Then it shows `ctrl+o options`.
+			- Given the Organizations or Tags view, When the footer renders, Then it shows `ctrl+o options`.
+			- Given a saved view, When the footer renders, Then it shows `ctrl+o options`.
+			- Given Merge or Archived, When the footer renders, Then it still shows `ctrl+o options`.
+			- Given a list view with no options (Deals, Tasks), When the footer renders, Then it shows no `ctrl+o` hint.
+			- Given `options` rebound to another key, When the footer renders in People, Then it shows that key.
+		- Test seam: `footerSegs()` in `internal/tui` (pattern of `TestFooterHintsFollowTheKeymap` in `hints_test.go`).
+		- Exceptions: footer is cut to the width, so the hint may drop on narrow terminals (existing behavior).
 	- [ ] Interactive color picker for the Theme pane (today a hex field with a swatch): pick a color on a grid or sliders, keep the hex field as the typed path ([[custom-themes]]).
 	- [ ] Custom themes ([[custom-themes]]): snippets in `~/.crm/themes/snippets`, theme checks in `internal/validate` with contrast warnings (`crm theme check`), a file watcher for live reload, `crm theme export` and `import`, a picker detail pane with a rendered sample.
 	- [ ] Theme generator in the style of the theme-factory skill: `crm theme generate` takes a name, a mood or a few seed colors (accent, background) and writes both variants with roles derived from the seeds, checks contrast (4.5:1 text, 3:1 kinds) and the 16-color mapping, then shows the sample in the picker before saving ([[custom-themes]]).
@@ -222,7 +234,6 @@ Items below here are not built.
 	- [ ] Like Dex, track changes to LinkedIn title/subscript and aggregate them to a list. Look and function very similar to Dex
 	- [ ] Custom fonts alongside themes
 	- [ ] "Keys" and "Framework verbs" in Settings seems extremely redundant and confusing for the user. Grill with user before settling on how best to configure these controls
-	- [ ] Display ctrl+o *sort* below in the hint bar where applicable.
 	- [ ] Sorting/Filtering/Grouping improvements
 		- [ ] Add ascending/descending to sort
 		- [ ] Be able to sort and group by other variables - maybe the user can pick from all our tracked variables
