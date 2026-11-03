@@ -241,8 +241,8 @@ func (m *Model) namesView() string {
 	if np.err != "" {
 		lines = append(lines, cut.Render(st.Err.Render(np.err)))
 	}
-	if len(lines) > m.height-2 {
-		lines = lines[:max(1, m.height-2)]
+	if rows := m.pageRows(m.namesHints()); len(lines) > rows {
+		lines = lines[:max(1, rows)]
 	}
 	lines = append(lines, cut.Render(m.renderHintItems(m.namesHints())))
 	return strings.Join(lines, "\n")

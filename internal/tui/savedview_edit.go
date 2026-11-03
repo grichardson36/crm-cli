@@ -817,11 +817,12 @@ func (m *Model) sveView() string {
 	for i, r := range e.rows() {
 		lines = append(lines, m.sveRowLine(i, r, w)...)
 	}
-	for len(lines) < m.height-2 {
+	rows := m.pageRows(m.sveHints())
+	for len(lines) < rows {
 		lines = append(lines, "")
 	}
-	if len(lines) > m.height-2 {
-		lines = lines[:m.height-2]
+	if len(lines) > rows {
+		lines = lines[:rows]
 	}
 	status := m.st.Dim.Render(e.msg)
 	if e.isErr {

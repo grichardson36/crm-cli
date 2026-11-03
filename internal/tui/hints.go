@@ -1,8 +1,6 @@
 package tui
 
 import (
-	"strings"
-
 	"github.com/charmbracelet/x/ansi"
 	"github.com/jdanielnd/crm-cli/internal/model"
 )
@@ -64,24 +62,25 @@ func (m *Model) keyText(h hintItem) string {
 }
 
 // renderHintItems draws hints in the footer format: the key in the name style, the label dim, two
-// spaces between hints. A hint whose registry action has no key is left out. The line is cut to the width.
+// spaces between hints. A hint whose registry action has no key is left out. Hints that do not fit
+// the width continue on the next row, up to footerMaxRows rows (footer.go), and the rest are cut.
 func (m *Model) renderHintItems(items []hintItem) string {
 	var parts []string
-	used := 0
+	var widths []int
 	for _, h := range items {
 		k := m.keyText(h)
 		if k == "" {
 			continue
 		}
-		w := ansi.StringWidth(k) + 1 + ansi.StringWidth(h.label)
-		if used+w > m.width {
-			break
-		}
+		widths = append(widths, ansi.StringWidth(k)+1+ansi.StringWidth(h.label))
 		parts = append(parts, m.st.Name.Render(k)+" "+m.st.Dim.Render(h.label))
-		used += w + 2
 	}
-	return strings.Join(parts, "  ")
+	places := placeHints(widths, 0, m.width, m.footerMax())
+	return joinHintRows(parts[:len(places)], places, "")
 }
+
+// hintRowsOf is the number of footer rows the hints take on this screen width.
+func (m *Model) hintRowsOf(items []hintItem) int { return hintRows(m.renderHintItems(items)) }
 
 // editHints are the hints while a field of a record page is edited in place.
 func (m *Model) editHints() []hintItem {

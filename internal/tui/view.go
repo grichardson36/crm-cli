@@ -79,6 +79,9 @@ func (m *Model) underView() string {
 	if detailW < 1 {
 		detailW = 1
 	}
+	if m.detail.Height() != bodyH {
+		m.detail.SetHeight(bodyH) // the footer wraps or unwraps as the hints change
+	}
 
 	list := lipgloss.NewStyle().Width(listW).Height(bodyH).MaxHeight(bodyH).Render(m.listView(listW, bodyH))
 	sepStyle := m.st.Dim
@@ -384,7 +387,7 @@ func (m *Model) listView(w, h int) string {
 // footSeg is one clickable key hint in the footer.
 type footSeg struct {
 	hint, label, id string
-	x0, x1          int // screen columns [x0, x1)
+	row, x0, x1     int // hint row, screen columns [x0, x1)
 }
 
 var footShort = map[string]string{
@@ -423,11 +426,12 @@ func (m *Model) footerSegs() []footSeg {
 		return acts[i].foot < acts[j].foot
 	})
 
-	x := 0
+	lead := 0
 	if m.readOnly {
-		x = len("READ-ONLY") + 2
+		lead = len("READ-ONLY") + 2
 	}
 	var segs []footSeg
+	var widths []int
 	for _, a := range acts {
 		hint, label := a.hint, footShort[a.id]
 		if a.footLabel != "" {
@@ -442,12 +446,13 @@ func (m *Model) footerSegs() []footSeg {
 		if a.id == "focus-detail" && m.readOnly {
 			label = "detail"
 		}
-		w := ansi.StringWidth(hint) + 1 + ansi.StringWidth(label)
-		if x+w > m.width {
-			break
-		}
-		segs = append(segs, footSeg{hint: hint, label: label, id: a.id, x0: x, x1: x + w})
-		x += w + 2
+		widths = append(widths, ansi.StringWidth(hint)+1+ansi.StringWidth(label))
+		segs = append(segs, footSeg{hint: hint, label: label, id: a.id})
+	}
+	places := placeHints(widths, lead, m.width, m.footerMax())
+	segs = segs[:len(places)]
+	for i, p := range places {
+		segs[i].row, segs[i].x0, segs[i].x1 = p.row, p.x0, p.x1
 	}
 	return segs
 }
@@ -497,14 +502,17 @@ func (m *Model) hintsLine() string {
 	if line, ok := m.modalHintsLine(); ok {
 		return line
 	}
-	var parts []string
+	var lead string
 	if m.readOnly {
-		parts = append(parts, m.st.Warn.Render("READ-ONLY"))
+		lead = m.st.Warn.Render("READ-ONLY")
 	}
+	var parts []string
+	var places []hintPlace
 	for _, s := range m.footerSegs() {
 		parts = append(parts, m.st.Name.Render(s.hint)+" "+m.st.Dim.Render(s.label))
+		places = append(places, hintPlace{s.row, s.x0, s.x1})
 	}
-	return strings.Join(parts, "  ")
+	return joinHintRows(parts, places, lead)
 }
 
 func (m *Model) helpView() string {

@@ -623,7 +623,7 @@ func (m *Model) popupListRows(o *overlay, textW, n int) []string {
 func (m *Model) openHelp() {
 	m.help = true
 	m.helpVP.SetWidth(m.width)
-	m.helpVP.SetHeight(max(1, m.height-2))
+	m.helpVP.SetHeight(max(1, m.pageRows(m.helpHints())))
 	m.helpVP.SetContent(m.helpText())
 	m.helpVP.GotoTop()
 }

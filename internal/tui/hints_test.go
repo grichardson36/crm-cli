@@ -98,7 +98,7 @@ func hintScreens() []hintScreen {
 		{"help topics", 1, func(t *testing.T, m *Model) { m.openHelpTopics("") }},
 		{"help topic text", 1, func(t *testing.T, m *Model) { m.showTopic("keys", nil) }},
 		{"help keys page", 1, func(t *testing.T, m *Model) { press(m, "?") }},
-		{"names panel", 1, func(t *testing.T, m *Model) {
+		{"names panel", 2, func(t *testing.T, m *Model) {
 			m.names = &namesPanel{refs: nil}
 			m.mode = modeNames
 		}},
