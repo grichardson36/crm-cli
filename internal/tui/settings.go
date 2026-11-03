@@ -130,11 +130,10 @@ func (m *Model) settingList() []setting {
 	}
 	return append(m.colorSettings(), []setting{
 		// Appearance
-		{id: appearanceID, section: secAppearance, name: "Appearance", words: "theme mode colors colours dark light auto look background", scope: scopeDevice,
-			desc: "the mode (auto follows the terminal, light and dark paint the whole screen) and the theme. Themes are previewed as the cursor moves, enter chooses one",
+		{id: appearanceID, section: secAppearance, name: "Theme", words: "appearance theme mode colors colours dark light auto look background", scope: scopeDevice,
 			value: func(m *Model) string { return m.themeName + ", " + string(m.appearance) },
 			run:   func(m *Model) tea.Cmd { return m.openAppearance() }},
-		{id: "theme-reload", section: secAppearance, name: "Theme files", words: "theme reload refresh themes", desc: "re-read ~/.crm/themes and apply the theme again", scope: scopeDevice,
+		{id: "theme-reload", section: secAppearance, name: "Theme files", words: "theme reload refresh themes", scope: scopeDevice,
 			action: "theme-reload"},
 
 		// Keys
@@ -405,17 +404,6 @@ func (m *Model) settingRows() []row {
 	return g.rows
 }
 
-// openAppearance goes to the Appearance row of Settings with the cursor in its pane.
-func (m *Model) openAppearance() tea.Cmd {
-	m.gotoSetting(appearanceID)
-	if m.view == viewSettings && m.appearanceOpen() {
-		m.focus = focusDetail
-		m.fcur, m.fcol = m.firstSelectable(), 0
-		m.syncDetail()
-	}
-	return nil
-}
-
 // gotoSetting switches to the Settings view with the cursor on a setting.
 func (m *Model) gotoSetting(id string) {
 	m.switchView(viewSettings)
@@ -458,7 +446,10 @@ func (m *Model) buildSettingForm(id string) []formRow {
 	}
 	rows := []formRow{infoRow("section", s.section)}
 	rows[0].head = "Setting"
-	rows = append(rows, infoRow("about", s.desc), infoRow("stored", string(s.scope)+": "+s.scope.note()))
+	if s.desc != "" {
+		rows = append(rows, infoRow("about", s.desc))
+	}
+	rows = append(rows, infoRow("stored", string(s.scope)+": "+s.scope.note()))
 	switch {
 	case s.field != nil && s.set != nil:
 		r := specRow(repo.Ref{Kind: "setting"}, *s.field, s.valueOf(m))

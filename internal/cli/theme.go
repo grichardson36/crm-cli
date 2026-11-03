@@ -6,31 +6,28 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
-	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/colorprofile"
 	"github.com/jdanielnd/crm-cli/internal/format"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/jdanielnd/crm-cli/internal/theme"
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 )
 
 const (
-	themeListFields = "name,kind,active,description,path,error"
-	themeShowFields = "name,kind,active,source,description,path,base,resolved,colors"
+	themeListFields = "name,kind,active,description,path,copied_from,dark,light,error"
+	themeShowFields = "name,kind,active,source,mode,description,path,copied_from,dark,light"
 )
 
 func registerThemeCommands(rootCmd *cobra.Command) {
 	cmd := &cobra.Command{
 		Use:   "theme",
 		Short: "List, choose and create color themes for the terminal UI",
-		Long: "Color themes for 'crm tui'. Built-in: auto, dark, light, high-contrast, catppuccin, nord, gruvbox, solarized, anthropocene (follows the terminal), anthropocene-dark, anthropocene-light.\n" +
-			"Custom themes are TOML files in ~/.crm/themes. The choice is remembered per device in ~/.crm/config.toml.\n" +
-			"Inside the TUI use the palette actions 'Theme: choose' (live preview) and 'Theme: reload'. See 'crm help theme'.",
+		Long: "Color themes for 'crm tui'. A theme is one name with a dark and a light palette. Built-in: anthropocene, catppuccin, default, gruvbox, high-contrast, nord, solarized.\n" +
+			"The mode (auto, light or dark) picks the palette: crm theme mode. Custom themes are TOML files in ~/.crm/themes. The choice is remembered per device in ~/.crm/config.toml.\n" +
+			"Inside the TUI use Settings > Theme. See 'crm help theme'.",
 	}
-	cmd.AddCommand(themeListCmd(), themeSetCmd(), themeShowCmd(), themePathCmd(), themeInitCmd())
+	cmd.AddCommand(themeListCmd(), themeSetCmd(), themeModeCmd(), themeShowCmd(), themePathCmd(), themeInitCmd())
 	rootCmd.AddCommand(cmd)
 }
 
@@ -40,6 +37,7 @@ type themeContext struct {
 	cat    theme.Catalog
 	active string
 	source string
+	mode   theme.Mode
 }
 
 func loadThemeContext() (*themeContext, error) {
@@ -48,8 +46,13 @@ func loadThemeContext() (*themeContext, error) {
 		return nil, err
 	}
 	name, source := theme.Chosen(dir, os.Getenv)
-	dark := hasDarkBackground()
-	return &themeContext{dir: dir, cat: theme.LoadCatalog(dir, dark), active: name, source: source}, nil
+	cat := theme.LoadCatalog(dir)
+	if t, err := cat.Find(name); err == nil {
+		name = t.Name
+	} else {
+		name, source = theme.DefaultName, "fallback"
+	}
+	return &themeContext{dir: dir, cat: cat, active: name, source: source, mode: theme.ChosenMode(dir)}, nil
 }
 
 func (c *themeContext) find(name string) (theme.Theme, error) {
@@ -67,10 +70,17 @@ func kindOf(t theme.Theme) string {
 	return "custom"
 }
 
+// themeRow is a theme as one record: its name once, with both palettes.
+func (c *themeContext) themeRow(t theme.Theme) map[string]any {
+	return map[string]any{"id": t.Name, "name": t.Name, "kind": kindOf(t), "active": t.Name == c.active,
+		"description": t.Description, "path": t.Path, "copied_from": t.CopiedFrom,
+		"dark": t.Dark.Map(), "light": t.Light.Map(), "error": ""}
+}
+
 func themeListCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
-		Short: "List built-in and custom themes, marking the active one",
+		Short: "List built-in and custom themes once each, with both palettes, marking the active one",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := loadThemeContext()
@@ -79,12 +89,11 @@ func themeListCmd() *cobra.Command {
 			}
 			var rows []map[string]any
 			for _, t := range c.cat.Themes {
-				rows = append(rows, map[string]any{"id": t.Name, "name": t.Name, "kind": kindOf(t), "active": t.Name == c.active,
-					"description": t.Description, "path": t.Path, "error": ""})
+				rows = append(rows, c.themeRow(t))
 			}
 			for _, p := range c.cat.Problems {
 				rows = append(rows, map[string]any{"id": filepath.Base(p.File), "name": strings.TrimSuffix(filepath.Base(p.File), ".toml"),
-					"kind": "invalid", "active": false, "description": "", "path": p.File, "error": p.Err})
+					"kind": "invalid", "active": false, "description": "", "path": p.File, "copied_from": "", "error": p.Err})
 			}
 			if resolveFormat() != format.FormatJSON {
 				for _, p := range c.cat.Problems {
@@ -127,10 +136,36 @@ func themeSetCmd() *cobra.Command {
 	}
 }
 
+func themeModeCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "mode <auto|light|dark>",
+		Short: "Choose the mode for this device: auto follows the terminal, light and dark paint the whole screen",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			md, err := theme.ParseMode(args[0])
+			if err != nil || strings.TrimSpace(args[0]) == "" {
+				return model.NewExitError(model.ErrValidation, "mode %q is not valid, use auto, light or dark", args[0])
+			}
+			dir, err := defaultDataDir()
+			if err != nil {
+				return err
+			}
+			if err := theme.SaveMode(dir, md); err != nil {
+				return model.NewExitError(model.ErrValidation, "%v", err)
+			}
+			if resolveFormat() == format.FormatJSON {
+				return json.NewEncoder(os.Stdout).Encode(map[string]any{"mode": string(md), "saved": true, "config": theme.ConfigFile(dir)})
+			}
+			fmt.Fprintf(os.Stdout, "mode: %s (saved in %s)\n", md, theme.ConfigFile(dir))
+			return nil
+		},
+	}
+}
+
 func themeShowCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "show [name]",
-		Short: "Show a theme's color roles (default: the active theme)",
+		Short: "Show a theme's color roles in both palettes (default: the active theme)",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := loadThemeContext()
@@ -145,21 +180,11 @@ func themeShowCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			colors := map[string]string{}
-			for _, rc := range t.Colors() {
-				if rc.Color != "" {
-					colors[rc.Role] = rc.Color
-				}
-			}
-			resolved := ""
-			if t.Name == theme.AutoName {
-				resolved = "dark"
-				if !hasDarkBackground() {
-					resolved = "light"
-				}
-			}
-			out := map[string]any{"name": t.Name, "kind": kindOf(t), "active": t.Name == c.active, "source": "",
-				"description": t.Description, "path": t.Path, "base": t.Base, "resolved": resolved, "colors": colors}
+			out := c.themeRow(t)
+			delete(out, "id")
+			delete(out, "error")
+			out["source"] = ""
+			out["mode"] = string(c.mode)
 			if t.Name == c.active {
 				out["source"] = c.source
 			}
@@ -168,28 +193,29 @@ func themeShowCmd() *cobra.Command {
 			}
 			w := colorprofile.NewWriter(os.Stdout, os.Environ()) // drops the swatch color when stdout is not a color terminal
 			fmt.Fprintf(w, "name:        %s (%s)\n", t.Name, kindOf(t))
-			fmt.Fprintf(w, "description: %s\n", t.Description)
+			if t.Description != "" {
+				fmt.Fprintf(w, "description: %s\n", t.Description)
+			}
 			if t.Name == c.active {
 				fmt.Fprintf(w, "active:      yes, chosen by %s\n", c.source)
 			}
+			fmt.Fprintf(w, "mode:        %s\n", c.mode)
 			if t.Path != "" {
 				fmt.Fprintf(w, "file:        %s\n", t.Path)
 			}
-			if t.Base != "" {
-				fmt.Fprintf(w, "base:        %s\n", t.Base)
-			}
-			if resolved != "" {
-				fmt.Fprintf(w, "resolves to: %s\n", resolved)
+			if t.CopiedFrom != "" {
+				fmt.Fprintf(w, "copied from: %s\n", t.CopiedFrom)
 			}
 			// The swatch is drawn with the theme's own color. the colorprofile writer drops it when output is
 			// not a terminal or NO_COLOR is set, leaving the plain value.
-			for _, rc := range t.Colors() {
-				if rc.Color == "" {
-					fmt.Fprintf(w, "  %-8s (not set: reverse video)\n", rc.Role)
-					continue
+			for _, p := range []struct {
+				name string
+				pal  theme.Palette
+			}{{"dark", t.Dark}, {"light", t.Light}} {
+				fmt.Fprintf(w, "\n[%s]\n", p.name)
+				for _, rc := range p.pal.Colors() {
+					fmt.Fprintf(w, "  %-12s %s %s\n", rc.Role, theme.Swatch(rc.Color), rc.Color)
 				}
-				swatch := theme.Swatch(rc.Color)
-				fmt.Fprintf(w, "  %-8s %s %s\n", rc.Role, swatch, rc.Color)
 			}
 			return nil
 		},
@@ -223,15 +249,15 @@ func themePathCmd() *cobra.Command {
 func themeInitCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "init <name>",
-		Short: "Write an example custom theme to ~/.crm/themes/<name>.toml",
+		Short: "Write a custom theme template (a dark and a light palette) to ~/.crm/themes",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			name := strings.ToLower(strings.TrimSpace(args[0]))
+			name := strings.TrimSpace(args[0])
 			if err := theme.ValidName(name); err != nil {
 				return model.NewExitError(model.ErrValidation, "%v", err)
 			}
 			for _, b := range theme.BuiltinNames() {
-				if b == name {
+				if strings.EqualFold(b, name) {
 					return model.NewExitError(model.ErrValidation, "%q is a built-in theme name, choose another (for example %s-custom)", name, name)
 				}
 			}
@@ -240,9 +266,12 @@ func themeInitCmd() *cobra.Command {
 				return err
 			}
 			td := theme.Dir(dir)
-			path := filepath.Join(td, name+".toml")
+			path := filepath.Join(td, theme.Slug(name)+".toml")
 			if _, err := os.Stat(path); err == nil {
 				return model.NewExitError(model.ErrConflict, "%s already exists, edit it or pick another name", path)
+			}
+			if theme.LoadCatalog(dir).Has(name) {
+				return model.NewExitError(model.ErrConflict, "a theme named %q already exists, pick another name", name)
 			}
 			if err := os.MkdirAll(td, 0o700); err != nil {
 				return fmt.Errorf("create %s: %w", td, err)
@@ -254,25 +283,8 @@ func themeInitCmd() *cobra.Command {
 				return json.NewEncoder(os.Stdout).Encode(map[string]any{"name": name, "path": path, "created": true})
 			}
 			fmt.Fprintf(os.Stdout, "%s\n", path)
-			fmt.Fprintf(os.Stderr, "edit it, then run: crm theme set %s\n", name)
+			fmt.Fprintf(os.Stderr, "edit it, then run: crm theme set %q\n", name)
 			return nil
 		},
-	}
-}
-
-// hasDarkBackground asks the terminal for its background color, for the auto theme in commands that
-// run outside the full-screen UI. Without a terminal on both ends there is nobody to ask, and a
-// terminal that does not answer must not hang the command, so it gives up after a moment and says dark.
-func hasDarkBackground() bool {
-	if !term.IsTerminal(int(os.Stdin.Fd())) || !term.IsTerminal(int(os.Stdout.Fd())) {
-		return true
-	}
-	ch := make(chan bool, 1)
-	go func() { ch <- lipgloss.HasDarkBackground(os.Stdin, os.Stdout) }()
-	select {
-	case dark := <-ch:
-		return dark
-	case <-time.After(time.Second):
-		return true
 	}
 }

@@ -249,7 +249,7 @@ func copyOpenActions() []action {
 	return []action{
 		{id: "copy", title: "Copy value", group: "Edit pane", hint: "ctrl+c", keys: []string{"ctrl+c"},
 			desc: "copy the value of the focused field (detail pane) to the clipboard, OSC52 so it works over SSH. It copies when a field is focused and otherwise keeps its old job: quit in a list, cancel in a prompt or picker",
-			foot: 13, footIn: inDetail, footLabel: "copy", when: whenDetail, run: func(m *Model) tea.Cmd { m.copyRow(); return nil }},
+			foot: 13, footIn: inDetail, footLabel: "copy", when: whenDetail, footIf: func(m *Model) bool { return !m.appearanceOpen() }, run: func(m *Model) tea.Cmd { m.copyRow(); return nil }},
 		{id: "copy-vcard", title: "Copy contact as vCard", group: "Contact", hint: "ctrl+shift+c", keys: []string{"ctrl+shift+c"},
 			desc: "copy the person as a vCard (the card the phone sync serves) to the clipboard. Many terminals keep its key for themselves, so this palette entry always works",
 			when: func(m *Model) bool { return m.vcardPerson() != 0 }, run: func(m *Model) tea.Cmd { m.copyVCard(); return nil }},

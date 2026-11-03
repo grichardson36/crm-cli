@@ -54,7 +54,7 @@ func TestSettingsViewIsAGroupedListWithASectionDividerEach(t *testing.T) {
 	}
 	assert.Equal(t, settingSections, sections)
 	assert.False(t, m.rows[m.cursor].skip, "the cursor starts on a setting")
-	assert.Equal(t, "Appearance", m.rows[m.cursor].title)
+	assert.Equal(t, "Theme", m.rows[m.cursor].title)
 	assert.Contains(t, m.screen(), "Appearance")
 	assert.Equal(t, "Settings", viewNames[viewSettings])
 }
@@ -110,7 +110,9 @@ func TestTheBarAndTheViewReadTheSameRegistry(t *testing.T) {
 		seen[s.id] = true
 		assert.Contains(t, settingSections, s.section, s.id)
 		assert.NotEmpty(t, s.name, s.id)
-		assert.NotEmpty(t, s.desc, s.id)
+		if s.id != appearanceID && s.id != "theme-reload" { // the Theme rows carry no explanatory text
+			assert.NotEmpty(t, s.desc, s.id)
+		}
 		assert.NotEmpty(t, s.words, s.id)
 		assert.Contains(t, []settingScope{scopeDevice, scopeSynced, scopeSession}, s.scope, s.id)
 		assert.True(t, s.field != nil || s.run != nil || s.action != "", "%s does something on enter", s.id)

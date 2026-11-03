@@ -7,7 +7,7 @@ import (
 
 // Styles are the lipgloss styles a theme produces. Every view draws with these and nothing else.
 type Styles struct {
-	Theme Theme
+	Look Look
 
 	Dim    lipgloss.Style // secondary text
 	Name   lipgloss.Style // bold accent: names, key hints
@@ -35,7 +35,7 @@ func (s Styles) KindStyle(kind string) lipgloss.Style {
 	return lipgloss.NewStyle()
 }
 
-// NewStyles builds the styles of t. p is the color profile of the terminal: Bubble Tea v2 reports
+// NewStyles builds the styles of a look. p is the color profile of the terminal: Bubble Tea v2 reports
 // it with a tea.ColorProfileMsg. Styles always carry the exact theme colors and Bubble Tea
 // downsamples them to the terminal (256 or 16 colors) when it writes the frame, so the profile only
 // decides one thing here: whether colors exist at all.
@@ -44,13 +44,13 @@ func (s Styles) KindStyle(kind string) lipgloss.Style {
 // selected row would vanish. NO_COLOR only asks for no color, so in that case the styles use text
 // attributes alone: reverse for the selection and the active tab, bold for names and headings,
 // faint for secondary text.
-func NewStyles(t Theme, p colorprofile.Profile) Styles {
+func NewStyles(t Look, p colorprofile.Profile) Styles {
 	if p <= colorprofile.Ascii {
 		return monoStyles(t)
 	}
 	ns := lipgloss.NewStyle
 	col := lipgloss.Color
-	s := Styles{Theme: t}
+	s := Styles{Look: t}
 	s.Dim = ns().Foreground(col(t.Dim))
 	s.Name = ns().Bold(true).Foreground(col(t.Accent))
 	s.Head = ns().Bold(true).Foreground(col(t.Fg))
@@ -76,10 +76,10 @@ func NewStyles(t Theme, p colorprofile.Profile) Styles {
 }
 
 // monoStyles sets no color, so only attributes are written.
-func monoStyles(t Theme) Styles {
+func monoStyles(t Look) Styles {
 	ns := lipgloss.NewStyle
 	return Styles{
-		Theme:  t,
+		Look:   t,
 		Dim:    ns().Faint(true),
 		Name:   ns().Bold(true),
 		Head:   ns().Bold(true),

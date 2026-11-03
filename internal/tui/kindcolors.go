@@ -51,7 +51,7 @@ var colorPalette = []paletteEntry{
 }
 
 // paletteColor is the color of a palette name in the theme, "" for an unknown name.
-func paletteColor(t theme.Theme, name string) string {
+func paletteColor(t theme.Look, name string) string {
 	for _, p := range colorPalette {
 		if p.name == name {
 			return t.Color(p.role)
@@ -76,7 +76,7 @@ func validKindColor(v string) (string, bool) {
 
 // resolveKindColor is the color of an object kind: the user's override (a palette name resolved in
 // the theme, or a hex color), else the theme's kind color. It is "" for a kind without a color.
-func resolveKindColor(t theme.Theme, overrides map[string]string, kind string) string {
+func resolveKindColor(t theme.Look, overrides map[string]string, kind string) string {
 	if v, ok := overrides[kind]; ok {
 		if _, valid := validKindColor(v); valid {
 			if c := paletteColor(t, strings.ToLower(v)); c != "" {
@@ -130,7 +130,7 @@ func (m *Model) applyKindColors() {
 		kinds[k] = st
 	}
 	for _, ck := range colorKinds() {
-		if c := resolveKindColor(m.st.Theme, m.kindColors, ck.kind); c != "" {
+		if c := resolveKindColor(m.st.Look, m.kindColors, ck.kind); c != "" {
 			kinds[ck.kind] = theme.ForegroundStyle(c)
 		}
 	}
@@ -152,7 +152,7 @@ func (m *Model) setKindColor(kind, v string) error {
 		return err
 	}
 	m.kindColors = next
-	m.setTheme(m.st.Theme)
+	m.setTheme(m.st.Look)
 	return nil
 }
 
@@ -191,7 +191,7 @@ func (m *Model) colorChoiceLabel(kind string) string {
 		}
 		return v + " (palette)"
 	}
-	if c := m.st.Theme.KindColor(kind); c != "" {
+	if c := m.st.Look.KindColor(kind); c != "" {
 		return "theme " + c
 	}
 	return "theme (plain)"
@@ -211,7 +211,7 @@ func (m *Model) openKindColorPicker(kind, label string) {
 	}
 	var items []overlayItem
 	for _, p := range colorPalette {
-		items = append(items, overlayItem{id: p.name, label: p.name, desc: paletteColor(m.st.Theme, p.name) + " in this theme"})
+		items = append(items, overlayItem{id: p.name, label: p.name, desc: paletteColor(m.st.Look, p.name) + " in this theme"})
 	}
 	items = append(items,
 		overlayItem{id: "#custom", label: "Custom hex...", desc: "type a color such as #3b82f6"},
@@ -228,11 +228,11 @@ func (m *Model) openKindColorPicker(kind, label string) {
 			next[kind] = it.id
 		}
 		m.kindColors = next
-		m.setTheme(m.st.Theme)
+		m.setTheme(m.st.Look)
 	}
 	restore := func(m *Model) {
 		m.kindColors = original
-		m.setTheme(m.st.Theme)
+		m.setTheme(m.st.Look)
 	}
 	m.openPicker("Color of "+label, items, func(m *Model, it overlayItem) {
 		restore(m)
@@ -295,7 +295,7 @@ func (m *Model) previewKindColorHex() {
 		next[m.colorKindEditing] = res.Value
 	}
 	m.kindColors = next
-	m.setTheme(m.st.Theme)
+	m.setTheme(m.st.Look)
 }
 
 // endKindColorPrompt puts the saved colors back after the hex prompt ends (cancel, or before the save).
@@ -303,7 +303,7 @@ func (m *Model) endKindColorPrompt() {
 	if m.colorBase != nil {
 		m.kindColors = m.colorBase
 		m.colorBase = nil
-		m.setTheme(m.st.Theme)
+		m.setTheme(m.st.Look)
 	}
 }
 
@@ -337,7 +337,7 @@ func (m *Model) colorSettings() []setting {
 					return
 				}
 				m.kindColors = nil
-				m.setTheme(m.st.Theme)
+				m.setTheme(m.st.Look)
 				m.pendingCmd = m.showToast("Colors: back to the theme", false)
 			}}
 			return nil

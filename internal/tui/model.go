@@ -254,11 +254,13 @@ type Model struct {
 	st        theme.Styles
 	themeName   string      // name of the chosen theme (theme.go says what else holds theme state)
 	appearance  theme.Mode  // auto, light or dark (per device setting)
-	previewName string      // theme previewed in the Appearance pane, "" when none
+	previewName string      // theme previewed in the Theme pane, "" when none
 	darkBG      bool        // the terminal reports a dark background
 	termBG      color.Color // the terminal's own background, read before the first paint
 	oscPainted  bool        // the terminal's default colors were set by us
-	fillMode    theme.Fill  // paint the whole screen with the theme background, set by the mode
+	themeSel     string        // the theme under the cursor of the Theme pane, "" when none
+	themeEditing bool          // the cursor of the Theme pane is in the name and color rows
+	themeCat     theme.Catalog // the themes the Theme pane lists
 	profile   colorprofile.Profile // what colors the terminal can show (NO_COLOR gives Ascii)
 	// Command bar: caches for the quick package, the person the palette opened on, the changes of
 	// command lines run this session (newest last) for Undo, and the short syntax switch.
@@ -835,7 +837,7 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Bubble Tea reports what the terminal can show (NO_COLOR and --no-color included).
 		if msg.Profile != m.profile {
 			m.profile = msg.Profile
-			m.setTheme(m.st.Theme)
+			m.setTheme(m.st.Look)
 		}
 		return m, nil
 	case tea.BackgroundColorMsg:
@@ -843,7 +845,7 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if !m.oscPainted {
 			m.termBG = msg.Color
 		}
-		if m.st.Theme.Follows() {
+		if m.appearance == theme.ModeAuto {
 			m.resolveTheme()
 		}
 		return m, nil

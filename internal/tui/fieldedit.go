@@ -236,6 +236,10 @@ func (m *Model) commitTyped() {
 		return
 	}
 	m.finishEdit()
+	if t.ref.Kind == themeRef.Kind { // a theme file, not a record: ctrl+z does not undo it
+		m.setStatus("", false)
+		return
+	}
 	m.setStatus("saved "+t.spec.Label+" (ctrl+z undoes)"+hint, false)
 }
 
@@ -262,6 +266,8 @@ func (m *Model) saveTyped(ref repo.Ref, spec model.FieldSpec, v string) error {
 	switch ref.Kind {
 	case "setting":
 		return m.saveSetting(spec.Key, v)
+	case "theme":
+		return m.saveThemeField(spec.Key, v)
 	case "person":
 		switch spec.Key {
 		case "tier":

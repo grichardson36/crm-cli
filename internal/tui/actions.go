@@ -272,11 +272,11 @@ func buildActions() []action {
 
 		// Detail pane (form).
 		{id: "edit", title: "Edit row", group: "Edit pane", desc: "edit the selected row inline in the detail pane",
-			write: true, when: whenDetail, run: func(m *Model) tea.Cmd { return m.startEdit() }},
+			write: true, when: func(m *Model) bool { return whenDetail(m) && !whenThemeBrowse(m) }, run: func(m *Model) tea.Cmd { return m.startEdit() }},
 		{id: "add", title: "Add row", group: "Edit pane", hint: "a", keys: []string{"a"}, desc: "add a row of the kind under the cursor (email, phone, link, tag, task, note). In the detail pane a adds a row, in a list it opens the add picker",
 			write: true, foot: 11, footIn: inDetail, when: whenAdd, run: func(m *Model) tea.Cmd { return m.addRow(m.form[m.fcur].kind) }},
 		{id: "delete", title: "Delete row", group: "Edit pane", hint: "d", keys: []string{"d"}, desc: "delete the selected row (asks first). Fields are cleared",
-			write: true, foot: 12, footIn: inDetail, when: whenDetail, run: func(m *Model) tea.Cmd { m.askDelete(); return nil }},
+			write: true, foot: 12, footIn: inDetail, when: func(m *Model) bool { return whenDetail(m) && !m.appearanceOpen() }, run: func(m *Model) tea.Cmd { m.askDelete(); return nil }},
 		addKind("add-email", "Add email", "an email", rkEmail),
 		addKind("add-phone", "Add phone", "a phone number", rkPhone),
 		addKind("add-handle", "Add link", "a social or website link", rkHandle),
@@ -285,7 +285,26 @@ func buildActions() []action {
 			run: func(m *Model) tea.Cmd { m.focus = focusDetail; m.fcol = 0; m.syncDetail(); return nil }},
 		{id: "back", title: "Back to list", group: "Edit pane", hint: "esc", keys: []string{"esc", "tab", "shift+tab", "left"}, desc: "return to the list",
 			foot: 15, footIn: inDetail, when: func(m *Model) bool { return m.focus == focusDetail },
-			run: func(m *Model) tea.Cmd { m.focus = focusList; m.fcol = 0; m.endPreview(); m.syncDetail(); return nil }},
+			footDyn: func(m *Model) string {
+				if m.appearanceOpen() && !m.themeEditing {
+					return "close"
+				}
+				return "back"
+			},
+			run: func(m *Model) tea.Cmd {
+				if m.appearanceOpen() && m.themeEditing {
+					m.themeBack()
+					return nil
+				}
+				m.focus = focusList
+				m.fcol = 0
+				m.leaveAppearance()
+				if m.view == viewSettings {
+					m.refreshDetail(true)
+				}
+				m.syncDetail()
+				return nil
+			}},
 
 		// Movement. Arrow keys, tab and shift+tab, pages and jumps. The unit of ctrl+up and ctrl+down and the
 		// home destination of ctrl+shift+up and ctrl+shift+down are declared per view in navunits.go.
@@ -382,7 +401,7 @@ func buildActions() []action {
 			run: func(m *Model) tea.Cmd { m.showDavConflicts(); return nil }},
 		{id: "dav-status", title: "DAV: status", group: "App", desc: "contacts exposed, last device activity and conflict counts (same as crm dav status)",
 			run: func(m *Model) tea.Cmd { m.showDavStatus(); return nil }},
-		{id: "theme-choose", title: "Theme: choose", group: "App", desc: "open Settings, Appearance: the mode and the theme list, themes previewed as the cursor moves, remembered on this device (same as crm theme set)",
+		{id: "theme-choose", title: "Theme: choose", group: "App", desc: "open Settings, Theme: the mode and the theme list (same as crm theme set and crm theme mode)",
 			run: func(m *Model) tea.Cmd { return m.openAppearance() }},
 		{id: "theme-reload", title: "Theme: reload", group: "App", desc: "re-read ~/.crm/themes/*.toml and apply the current theme again",
 			run: func(m *Model) tea.Cmd { m.reloadTheme(); return nil }},
@@ -423,10 +442,13 @@ func (m *Model) step(delta int) {
 		if m.feedScroll(delta) {
 			return
 		}
+		if m.appearanceOpen() {
+			m.stepAppearance(delta)
+			return
+		}
 		m.fcur = clampInt(m.fcur+delta, 0, len(m.form)-1)
 		m.fcol = 0
 		m.syncDetail()
-		m.previewRow()
 		return
 	}
 	m.move(delta)

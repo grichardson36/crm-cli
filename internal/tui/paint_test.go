@@ -32,35 +32,42 @@ func rgbaEqual(a, b color.Color) bool {
 	return ar == br && ag == bg && ab == bb && aa == ba
 }
 
+// setMode makes a mode and theme the drawn state of a model.
+func setMode(t *testing.T, m *Model, md theme.Mode, name string, termDark bool, p colorprofile.Profile) theme.Look {
+	t.Helper()
+	th, ok := theme.Builtin(name)
+	require.True(t, ok)
+	m.profile, m.darkBG, m.appearance = p, termDark, md
+	look := m.look(th)
+	m.setTheme(look)
+	return look
+}
+
 func TestForcedBackgroundPaintsEveryCellOfEveryView(t *testing.T) {
 	tests := []struct {
 		name     string
 		theme    string
-		fill     theme.Fill
+		mode     theme.Mode
 		termDark bool
 		profile  colorprofile.Profile
 		paints   bool
 	}{
-		{"light theme on a dark terminal, auto", "light", theme.FillAuto, true, colorprofile.TrueColor, true},
-		{"anthropocene-light on a dark terminal, auto", "anthropocene-light", theme.FillAuto, true, colorprofile.TrueColor, true},
-		{"anthropocene-light at 16 colors", "anthropocene-light", theme.FillAuto, true, colorprofile.ANSI, true},
-		{"dark theme on a dark terminal, auto", "anthropocene-dark", theme.FillAuto, true, colorprofile.TrueColor, false},
-		{"dark theme on a light terminal, auto", "anthropocene-dark", theme.FillAuto, false, colorprofile.TrueColor, true},
-		{"dark theme forced on", "nord", theme.FillOn, true, colorprofile.TrueColor, true},
-		{"light theme forced off", "light", theme.FillOff, true, colorprofile.TrueColor, false},
-		{"auto theme follows the terminal", "auto", theme.FillAuto, false, colorprofile.TrueColor, false},
-		{"no color support never paints", "light", theme.FillOn, true, colorprofile.Ascii, false},
+		{"light on a dark terminal", "default", theme.ModeLight, true, colorprofile.TrueColor, true},
+		{"light on a light terminal", "anthropocene", theme.ModeLight, false, colorprofile.TrueColor, true},
+		{"light at 16 colors", "anthropocene", theme.ModeLight, true, colorprofile.ANSI, true},
+		{"dark on a light terminal", "nord", theme.ModeDark, false, colorprofile.TrueColor, true},
+		{"dark on a dark terminal", "anthropocene", theme.ModeDark, true, colorprofile.TrueColor, true},
+		{"auto on a dark terminal never paints", "anthropocene", theme.ModeAuto, true, colorprofile.TrueColor, false},
+		{"auto on a light terminal never paints", "nord", theme.ModeAuto, false, colorprofile.TrueColor, false},
+		{"no color support never paints", "default", theme.ModeLight, true, colorprofile.Ascii, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m, _ := newTestModel(t)
-			m.profile, m.darkBG, m.fillMode = tt.profile, tt.termDark, tt.fill
-			th, ok := theme.Builtin(tt.theme, tt.termDark)
-			require.True(t, ok)
-			m.setTheme(th)
+			look := setMode(t, m, tt.mode, tt.theme, tt.termDark, tt.profile)
 			m.Update(tea.WindowSizeMsg{Width: 90, Height: 28})
 
-			wantFg, wantBg := th.DefaultColors()
+			wantFg, wantBg := look.DefaultColors()
 			for _, key := range []string{"1", "2", "3", "4", "5", "6", "7", "8", "?"} {
 				press(m, key)
 				v := m.View()
@@ -87,24 +94,22 @@ func TestForcedBackgroundPaintsEveryCellOfEveryView(t *testing.T) {
 	}
 }
 
-// The picker previews a theme live: moving to a light theme repaints, moving back unpaints.
-func TestPickerPreviewRepaintsTheScreen(t *testing.T) {
+// Changing the mode repaints the screen: light on a dark terminal paints, auto unpaints.
+func TestModeChangeRepaintsTheScreen(t *testing.T) {
 	m := themeModel(t)
-	m.profile, m.darkBG, m.fillMode = colorprofile.TrueColor, true, theme.FillAuto
-	dark, _ := theme.Builtin("anthropocene-dark", true)
-	m.setTheme(dark)
+	m.profile, m.darkBG = colorprofile.TrueColor, true
+	m.appearance = theme.ModeAuto
+	m.resolveTheme()
 	assert.Nil(t, m.View().BackgroundColor)
-	light, _ := theme.Builtin("anthropocene-light", true)
-	m.setTheme(light)
+	require.NoError(t, m.setAppearance(theme.ModeLight))
 	v := m.View()
-	assert.True(t, rgbaEqual(v.BackgroundColor, mustColor(light.Bg)))
-	m.setTheme(dark)
+	assert.True(t, rgbaEqual(v.BackgroundColor, mustColor(m.st.Look.Bg)))
+	require.NoError(t, m.setAppearance(theme.ModeAuto))
 	assert.Nil(t, m.View().BackgroundColor)
 }
 
 func mustColor(hex string) color.Color {
-	t := theme.Theme{Fg: hex, Bg: hex}
-	_, bg := t.DefaultColors()
+	_, bg := theme.Palette{Fg: hex, Bg: hex}.DefaultColors()
 	return bg
 }
 
@@ -117,8 +122,9 @@ func TestModeIsReadAtStartup(t *testing.T) {
 	m2.env = m.env
 	m2.applyStartupTheme()
 	assert.Equal(t, theme.ModeDark, m2.appearance)
-	assert.Equal(t, theme.FillOn, m2.fillMode)
+	assert.True(t, m2.appearance.Paints())
 	assert.Equal(t, "nord", m2.themeName)
+	assert.Equal(t, "dark", m2.st.Look.Variant)
 
 	m.env = Env{}
 	require.Error(t, m.setAppearance(theme.ModeLight), "no data directory, nothing to save to")
@@ -143,9 +149,7 @@ func (b *syncBuffer) String() string { b.mu.Lock(); defer b.mu.Unlock(); return 
 // terminal then shows cannot be checked here.
 func TestRealRendererWritesThemeColorsAndRestoresThem(t *testing.T) {
 	m, _ := newTestModel(t)
-	m.profile, m.darkBG, m.fillMode = colorprofile.TrueColor, true, theme.FillAuto
-	th, _ := theme.Builtin("anthropocene-light", true)
-	m.setTheme(th)
+	setMode(t, m, theme.ModeLight, "anthropocene", true, colorprofile.TrueColor)
 
 	out := &syncBuffer{}
 	p := tea.NewProgram(m, tea.WithInput(nil), tea.WithOutput(out), tea.WithWindowSize(90, 28), tea.WithColorProfile(colorprofile.TrueColor), tea.WithoutSignals())

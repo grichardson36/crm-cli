@@ -12,8 +12,9 @@ import (
 )
 
 func TestResolveKindColor(t *testing.T) {
-	th, ok := theme.Builtin("dark", true)
+	b, ok := theme.Builtin("default")
 	require.True(t, ok)
+	th := b.Resolve(true)
 	tests := []struct {
 		name string
 		ov   map[string]string
@@ -44,7 +45,7 @@ func TestLoadKindColorsDropsBadEntries(t *testing.T) {
 func TestColorsSettingsOverrideAndReset(t *testing.T) {
 	m := settingsModel(t)
 	m.profile = colorprofile.TrueColor
-	m.setTheme(m.st.Theme)
+	m.setTheme(m.st.Look)
 	before := m.st.KindStyle("person").Render("x")
 
 	// the Colors section lists every registered kind
@@ -81,7 +82,7 @@ func TestColorsSettingsOverrideAndReset(t *testing.T) {
 	press(m, "enter")
 	m.input.SetValue("#112233")
 	m.previewKindColorHex()
-	assert.Equal(t, "#112233", resolveKindColor(m.st.Theme, m.kindColors, "person"), "live preview")
+	assert.Equal(t, "#112233", resolveKindColor(m.st.Look, m.kindColors, "person"), "live preview")
 	press(m, "enter")
 	assert.False(t, m.statusIsErr, m.status)
 	assert.Equal(t, "#112233", m.kindColors["person"])
@@ -122,7 +123,7 @@ func TestKindColorsKeepNoColorPrefixes(t *testing.T) {
 	m := settingsModel(t)
 	m.profile = colorprofile.Ascii
 	m.kindColors = map[string]string{"person": "danger"}
-	m.setTheme(m.st.Theme)
+	m.setTheme(m.st.Look)
 	assert.Equal(t, "p: Ann", m.st.KindStyle("person").Render("p: Ann"), "no color support leaves the text and its prefix plain")
 }
 
@@ -130,7 +131,7 @@ func TestRecordHeadingTakesTheKindColor(t *testing.T) {
 	m, _ := newTestModel(t)
 	m.profile = colorprofile.TrueColor
 	m.kindColors = map[string]string{"person": "#123456"}
-	m.setTheme(m.st.Theme)
+	m.setTheme(m.st.Look)
 	assert.Equal(t, "person", m.headingKind())
 	assert.Equal(t, m.st.KindStyle("person").Bold(true).Render("Ann"), m.headingStyle().Render("Ann"))
 	m.switchView(viewSettings)

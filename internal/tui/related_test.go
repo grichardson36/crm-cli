@@ -235,7 +235,7 @@ func TestRelatedGroupsRowsByKindWithHeadings(t *testing.T) {
 	}
 	assert.Equal(t, []string{"Organizations", "People", "Deals", "Tags"}, heads)
 
-	st := theme.NewStyles(mustTheme(t, "dark"), colorprofile.TrueColor)
+	st := theme.NewStyles(mustTheme(t, "default"), colorprofile.TrueColor)
 	ac := &Autocomplete{rows: got}
 	lines := ac.Lines(30, st)
 	require.Len(t, lines, 9, "five rows and four headings")
@@ -243,11 +243,11 @@ func TestRelatedGroupsRowsByKindWithHeadings(t *testing.T) {
 	assert.Contains(t, plain(lines[1]), "o:Acme")
 }
 
-func mustTheme(t *testing.T, name string) theme.Theme {
+func mustTheme(t *testing.T, name string) theme.Look {
 	t.Helper()
-	th, ok := theme.Builtin(name, true)
+	th, ok := theme.Builtin(name)
 	require.True(t, ok)
-	return th
+	return th.Resolve(true)
 }
 
 // A long popup scrolls inside acMaxLines and keeps the highlighted row in view.
@@ -258,7 +258,7 @@ func TestRelatedPopupScrollsInsideItsLines(t *testing.T) {
 	}
 	rows = relatedGroup(rows)
 	ac := &Autocomplete{rows: rows, cur: len(rows) - 1}
-	st := theme.NewStyles(mustTheme(t, "dark"), colorprofile.TrueColor)
+	st := theme.NewStyles(mustTheme(t, "default"), colorprofile.TrueColor)
 	lines := ac.Lines(30, st)
 	assert.Len(t, lines, acMaxLines)
 	assert.Contains(t, plain(lines[len(lines)-1]), "t:l", "the last row is in view")
@@ -269,7 +269,7 @@ func TestKindColorsAndPrefixes(t *testing.T) {
 	kinds := []string{"person", "organization", "deal", "task", model.NoteKind, tagKind}
 	prefixes := map[string]string{"person": "p:", "organization": "o:", "deal": "d:", "task": "t:", model.NoteKind: "n:", tagKind: "#"}
 	for _, name := range theme.BuiltinNames() {
-		th, _ := theme.Builtin(name, true)
+		th := mustTheme(t, name)
 		seen := map[string]string{}
 		for _, k := range kinds {
 			c := th.KindColor(k)
@@ -318,7 +318,7 @@ func TestChipsAreGroupedInStableOrderAndWrap(t *testing.T) {
 	assert.Equal(t, []string{"Zed", "Bob"}, groups[0].names, "the typed order holds inside a group")
 
 	mono := colorprofile.Ascii
-	st := theme.NewStyles(mustTheme(t, "dark"), mono)
+	st := theme.NewStyles(mustTheme(t, "default"), mono)
 	one := renderChips(groups, 200, st)
 	require.Len(t, one, 1)
 	assert.Equal(t, "[p:Zed] [p:Bob]  [o:Acme]  [d:Big deal]  [t:Call]  [n:note]  [#vip]", one[0])

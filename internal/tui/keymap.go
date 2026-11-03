@@ -105,8 +105,8 @@ func (m *Model) scopeChain() []string {
 		if whenCellRow(m) {
 			chain = append(chain, "cells") // left, right and tab move across the cells of this row
 		}
-		if whenAppearanceRow(m) {
-			chain = append(chain, "appearance") // left and right change the mode, enter chooses a theme
+		if whenThemePane(m) {
+			chain = append(chain, "appearance") // the Theme pane: enter loads, e edits, a adds, c copies, d deletes, R resets, tab changes the mode
 		}
 		chain = append(chain, "form")
 	}
@@ -234,7 +234,7 @@ var frameworkIDs = map[string]bool{
 	"down": true, "up": true, "half-down": true, "half-up": true, "page-down": true, "page-up": true,
 	"jump-down": true, "jump-up": true, "top": true, "bottom": true, "home-top": true, "home-bottom": true,
 	"focus-detail": true, "back": true, "cell-next": true, "cell-prev": true,
-	"mode-next": true, "mode-prev": true, "theme-pick": true,
+	"theme-load": true, "theme-edit": true, "theme-add": true, "theme-copy": true, "theme-delete": true, "theme-reset": true, "theme-mode": true,
 	"tag-tree-expand": true, "tag-tree-collapse": true,
 	// app chrome
 	"palette": true, "options": true, "help": true, "quit": true, "goto-view": true, "next-view": true, "prev-view": true, "clear-search": true,
@@ -265,7 +265,7 @@ var scopeByID = map[string]string{
 	"tag-tree-expand": "view:tags", "tag-tree-collapse": "view:tags",
 	// The detail form
 	"delete": "form", "add": "form", "copy": "form", "back": "form", "cell-next": "cells", "cell-prev": "cells",
-	"mode-next": "appearance", "mode-prev": "appearance", "theme-pick": "appearance",
+	"theme-load": "appearance", "theme-edit": "appearance", "theme-add": "appearance", "theme-copy": "appearance", "theme-delete": "appearance", "theme-reset": "appearance", "theme-mode": "appearance",
 	// The compare screen
 	"cmp-left": "compare", "cmp-right": "compare", "cmp-pick": "compare", "cmp-field": "compare", "cmp-survivor": "compare",
 	"cmp-pair": "compare", "cmp-view": "compare", "cmp-confirm": "compare", "cmp-apply": "compare", "cmp-back": "compare", "cmp-dismiss": "compare",

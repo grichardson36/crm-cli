@@ -28,8 +28,10 @@ const (
 	rkNote
 	rkLinked // a link to another object: organization, related person, deal, member
 	rkTyped  // a field with a declared type (model.FieldSpec): edited in place by its type (fieldedit.go)
-	rkMode   // the mode selector of the Appearance pane: left and right change it (theme.go)
-	rkTheme  // a theme of the Appearance pane: the cursor previews it, enter chooses it (theme.go)
+	rkMode   // the mode line of the Theme pane (theme.go)
+	rkTheme  // a theme of the Theme pane: the cursor previews it, enter loads it (theme.go)
+	rkThemeName // the name of the theme under the cursor, renamed in place (theme.go)
+	rkColor     // a color of that theme: plain name, hex field and swatch (theme.go)
 )
 
 // tierNames maps priority_tier (index) to a name. Index 0 clears the tier.
@@ -309,6 +311,9 @@ func (m *Model) personRows(p *model.Person) []formRow {
 }
 
 func (m *Model) firstSelectable() int {
+	if m.appearanceOpen() {
+		return m.entryRow()
+	}
 	for i, r := range m.form {
 		if r.kind != rkInfo {
 			return i
@@ -373,7 +378,7 @@ func (m *Model) refreshDetail(force bool) {
 		m.form = m.buildTagForm(r)
 	case ok && m.view == viewSettings:
 		if r.setting != appearanceID {
-			m.endPreview()
+			m.leaveAppearance()
 		}
 		m.form = m.buildSettingForm(r.setting)
 	case ok && m.view != viewArchived:
@@ -468,6 +473,12 @@ func (m *Model) renderRow(i int, r formRow, w int) []string {
 	if len(r.label) > labelWidth-1 {
 		label = fit(ansi.Truncate(r.label, labelWidth-1, "…"), labelWidth)
 	}
+	if r.kind == rkColor {
+		label = fit(r.label, colorLabelWidth)
+	}
+	if r.kind == rkThemeName {
+		label = ""
+	}
 
 	if m.mode == modeEdit && m.edit != nil && m.edit.row == i && m.edit.typed != nil {
 		if ce := m.edit.typed.cell; ce != nil {
@@ -481,11 +492,15 @@ func (m *Model) renderRow(i int, r formRow, w int) []string {
 	if isFeedRow(r) {
 		return m.renderFeedEntry(i, r, w)
 	}
-	if r.kind == rkMode {
-		return []string{m.renderModeRow(r, label, selected, w)}
-	}
-	if r.kind == rkTheme {
+	switch r.kind {
+	case rkMode:
+		return []string{m.renderModeRow(r, label, w)}
+	case rkTheme:
 		return []string{m.renderThemeRow(r, selected, w)}
+	case rkThemeName:
+		return []string{m.renderThemeName(r, selected, w)}
+	case rkColor:
+		return []string{m.renderColorRow(r, selected, w)}
 	}
 	if m.mode == modeEdit && m.edit != nil && m.edit.row == i {
 		line := m.st.Dim.Render(label) + strings.TrimRight(m.rowInput.View(), " ")
@@ -627,7 +642,7 @@ func (m *Model) startEdit() tea.Cmd {
 	if isFeedRow(r) && m.feedToggle(r) {
 		return nil // an entry that hides text expands (collapses) in place, otherwise enter edits
 	}
-	if r.kind == rkTyped {
+	if r.kind == rkTyped || r.kind == rkColor || r.kind == rkThemeName {
 		return m.beginTyped()
 	}
 	// Task and note rows edit inline on every record page, the same path as a person's page.

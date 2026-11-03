@@ -39,7 +39,7 @@ var keyAreaOrder = []string{keyAreaPeople, keyAreaOrgs, keyAreaDeals, keyAreaTas
 // navigationIDs are navigation actions that are not in the Move group.
 var navigationIDs = map[string]bool{
 	"cell-next": true, "cell-prev": true, "focus-detail": true, "back": true,
-	"mode-next": true, "mode-prev": true,
+	"theme-mode": true,
 	"tag-tree-expand": true, "tag-tree-collapse": true,
 }
 

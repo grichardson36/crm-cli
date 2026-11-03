@@ -6,42 +6,41 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"github.com/BurntSushi/toml"
 )
 
-// file is the TOML layout of a custom theme.
+// paletteFile is one palette table of a theme file.
+type paletteFile struct {
+	Colors map[string]string `toml:"colors"`
+}
+
+// file is the TOML layout of a custom theme. Both palettes are complete, there is no inheritance.
 //
-//	description = "..."
-//	base = "nord"          # optional built-in to start from
-//	variant = "light"      # optional: "dark" or "light", else derived from colors.bg
-//	[colors]
-//	accent = "#ff8800"
+//	name = "Sunset"          # optional, the file name is used without it
+//	description = "..."      # optional
+//	copied_from = "nord"     # optional: the theme shift+r resets to
+//	[dark.colors]
+//	fg = "#d8dee9"
+//	[light.colors]
+//	fg = "#2e3440"
 type file struct {
-	Description string            `toml:"description"`
-	Base        string            `toml:"base"`
-	Variant     string            `toml:"variant"`
-	Colors      map[string]string `toml:"colors"`
+	Name        string      `toml:"name"`
+	Description string      `toml:"description"`
+	CopiedFrom  string      `toml:"copied_from"`
+	Dark        paletteFile `toml:"dark"`
+	Light       paletteFile `toml:"light"`
 }
 
 // Dir returns the custom theme directory inside the data directory.
 func Dir(dataDir string) string { return filepath.Join(dataDir, "themes") }
 
-// Parse reads a custom theme. name comes from the file name. path is only used in messages.
-// Errors name the file and the key, and say how to fix them.
-func Parse(name, path string, data []byte, darkBackground bool) (Theme, error) {
+// Parse reads a custom theme. stem is the file name without .toml and names the theme when the file
+// has no name key. path is only used in messages. Errors name the file and the key.
+func Parse(stem, path string, data []byte) (Theme, error) {
 	fail := func(format string, a ...any) (Theme, error) {
-		return Theme{}, fmt.Errorf("theme %q (%s): %s", name, path, fmt.Sprintf(format, a...))
-	}
-	if err := ValidName(name); err != nil {
-		return fail("%v (rename the file)", err)
-	}
-	for _, b := range BuiltinNames() {
-		if b == name {
-			return fail("the name is taken by a built-in theme, rename the file (try %s-custom.toml)", name)
-		}
+		return Theme{}, fmt.Errorf("theme %q (%s): %s", stem, path, fmt.Sprintf(format, a...))
 	}
 	var f file
 	md, err := toml.Decode(string(data), &f)
@@ -52,59 +51,147 @@ func Parse(name, path string, data []byte, darkBackground bool) (Theme, error) {
 	for _, r := range Roles {
 		known[r] = true
 	}
-	var unknown []string
-	for _, k := range md.Undecoded() {
-		unknown = append(unknown, k.String())
-	}
-	for role := range f.Colors {
-		if !known[role] {
-			msg := fmt.Sprintf("unknown color role %q", role)
-			if s := suggest(role, Roles); s != "" {
-				msg += fmt.Sprintf(", did you mean %q", s)
+	for _, tbl := range []struct {
+		name string
+		p    paletteFile
+	}{{"dark", f.Dark}, {"light", f.Light}} {
+		for role := range tbl.p.Colors {
+			if !known[role] {
+				msg := fmt.Sprintf("unknown color role %q in %s.colors", role, tbl.name)
+				if sg := suggest(role, Roles); sg != "" {
+					msg += fmt.Sprintf(", did you mean %q", sg)
+				}
+				return fail("%s (roles: %s)", msg, strings.Join(Roles, ", "))
 			}
-			return fail("%s (roles: %s)", msg, strings.Join(Roles, ", "))
 		}
 	}
-	if len(unknown) > 0 {
-		return fail("unknown key %s (allowed: description, base, variant, [colors])", strings.Join(unknown, ", "))
-	}
-
-	t := Theme{Name: name, Description: f.Description, Path: path, Base: f.Base}
-	if f.Base != "" {
-		base, ok := Builtin(f.Base, darkBackground)
-		if !ok {
-			msg := fmt.Sprintf("base %q is not a built-in theme", f.Base)
-			if s := suggest(f.Base, BuiltinNames()); s != "" {
-				msg += fmt.Sprintf(", did you mean %q", s)
-			}
-			return fail("%s (built-ins: %s)", msg, strings.Join(BuiltinNames(), ", "))
+	if u := md.Undecoded(); len(u) > 0 {
+		var keys []string
+		for _, k := range u {
+			keys = append(keys, k.String())
 		}
-		t = base
-		t.Name, t.Builtin, t.Path, t.Base = name, false, path, f.Base
-		t.Description = f.Description
+		return fail("unknown key %s (allowed: name, description, copied_from, [dark.colors], [light.colors])", strings.Join(keys, ", "))
 	}
-	for role, v := range f.Colors {
-		*t.slot(role) = strings.TrimSpace(v)
+	name := strings.TrimSpace(f.Name)
+	if name == "" {
+		name = stem
 	}
-	if f.Variant != "" {
-		if f.Variant != "dark" && f.Variant != "light" {
-			return fail("variant %q is not valid, use \"dark\" or \"light\"", f.Variant)
+	if err := ValidName(name); err != nil {
+		return fail("%v", err)
+	}
+	for _, b := range BuiltinNames() {
+		if strings.EqualFold(b, name) {
+			return fail("the name is taken by a built-in theme, choose another (try %s-custom)", name)
 		}
-		t.Variant = f.Variant
-	} else if _, set := f.Colors[RoleBg]; set {
-		t.Variant = "" // derived from the new bg by IsDark
+	}
+	t := Theme{Name: name, Description: strings.TrimSpace(f.Description), Path: path, CopiedFrom: strings.TrimSpace(f.CopiedFrom)}
+	for role, v := range f.Dark.Colors {
+		t.Dark.SetColor(role, strings.TrimSpace(v))
+	}
+	for role, v := range f.Light.Colors {
+		t.Light.SetColor(role, strings.TrimSpace(v))
 	}
 	if err := t.Validate(); err != nil {
-		hint := ""
-		if f.Base == "" {
-			hint = ` (add base = "dark" to inherit missing roles)`
-		}
-		return fail("%v%s", err, hint)
-	}
-	if t.Description == "" {
-		t.Description = "custom theme"
+		return fail("%v", err)
 	}
 	return t, nil
+}
+
+// Marshal writes a theme as the TOML file format, both palettes in role order.
+func Marshal(t Theme) []byte {
+	var b strings.Builder
+	b.WriteString("# Custom crm theme. Colors are \"#rrggbb\", \"#rgb\" or an ANSI number 0-255.\n")
+	fmt.Fprintf(&b, "name = %q\n", t.Name)
+	if t.Description != "" {
+		fmt.Fprintf(&b, "description = %q\n", t.Description)
+	}
+	if t.CopiedFrom != "" {
+		fmt.Fprintf(&b, "copied_from = %q\n", t.CopiedFrom)
+	}
+	for _, p := range []struct {
+		table string
+		pal   Palette
+	}{{"dark", t.Dark}, {"light", t.Light}} {
+		fmt.Fprintf(&b, "\n[%s.colors]\n", p.table)
+		for _, r := range Roles {
+			fmt.Fprintf(&b, "%s = %q\n", r, p.pal.Color(r))
+		}
+	}
+	return []byte(b.String())
+}
+
+// Example returns the text `crm theme init` writes: the default colors as a complete two-table theme.
+func Example(name string) []byte {
+	base, _ := Builtin(DefaultName)
+	base.Name, base.Builtin, base.CopiedFrom, base.Description = name, false, DefaultName, ""
+	return Marshal(base)
+}
+
+// Slug turns a theme name into a file name stem: lower case letters, digits, '-' and '_'.
+func Slug(name string) string {
+	var b strings.Builder
+	dash := false
+	for _, r := range strings.ToLower(strings.TrimSpace(name)) {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '_':
+			b.WriteRune(r)
+			dash = false
+		default:
+			if !dash && b.Len() > 0 {
+				b.WriteByte('-')
+			}
+			dash = true
+		}
+	}
+	s := strings.Trim(b.String(), "-")
+	if s == "" {
+		return "theme"
+	}
+	return s
+}
+
+// Save writes a custom theme. A theme without a path gets a new file named from its name. It returns
+// the theme with its path set.
+func Save(dataDir string, t Theme) (Theme, error) {
+	if t.Builtin {
+		return t, fmt.Errorf("theme %q is built in and cannot be changed", t.Name)
+	}
+	if err := ValidName(t.Name); err != nil {
+		return t, err
+	}
+	if err := t.Validate(); err != nil {
+		return t, err
+	}
+	if t.Path == "" {
+		dir := Dir(dataDir)
+		stem := Slug(t.Name)
+		for i := 2; ; i++ {
+			p := filepath.Join(dir, stem+".toml")
+			if _, err := os.Stat(p); errors.Is(err, fs.ErrNotExist) {
+				t.Path = p
+				break
+			}
+			stem = fmt.Sprintf("%s-%d", Slug(t.Name), i)
+		}
+	}
+	if err := os.MkdirAll(filepath.Dir(t.Path), 0o700); err != nil {
+		return t, fmt.Errorf("create %s: %w", filepath.Dir(t.Path), err)
+	}
+	if err := os.WriteFile(t.Path, Marshal(t), 0o644); err != nil {
+		return t, fmt.Errorf("write %s: %w", t.Path, err)
+	}
+	return t, nil
+}
+
+// Remove deletes the file of a custom theme.
+func Remove(t Theme) error {
+	if t.Builtin || t.Path == "" {
+		return fmt.Errorf("theme %q is built in and cannot be deleted", t.Name)
+	}
+	if err := os.Remove(t.Path); err != nil {
+		return fmt.Errorf("delete %s: %w", t.Path, err)
+	}
+	return nil
 }
 
 // Problem is a custom theme file that could not be loaded.
@@ -114,7 +201,7 @@ type Problem struct {
 }
 
 // LoadDir reads every *.toml file in dir. A missing directory is not an error.
-func LoadDir(dir string, darkBackground bool) ([]Theme, []Problem) {
+func LoadDir(dir string) ([]Theme, []Problem) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
@@ -130,59 +217,69 @@ func LoadDir(dir string, darkBackground bool) ([]Theme, []Problem) {
 			continue
 		}
 		path := filepath.Join(dir, e.Name())
-		name := strings.ToLower(strings.TrimSuffix(e.Name(), filepath.Ext(e.Name())))
+		stem := strings.TrimSuffix(e.Name(), filepath.Ext(e.Name()))
 		data, err := os.ReadFile(path)
 		if err != nil {
 			probs = append(probs, Problem{File: path, Err: err.Error()})
 			continue
 		}
-		t, err := Parse(name, path, data, darkBackground)
+		t, err := Parse(stem, path, data)
 		if err != nil {
 			probs = append(probs, Problem{File: path, Err: err.Error()})
 			continue
 		}
-		if seen[name] {
-			probs = append(probs, Problem{File: path, Err: fmt.Sprintf("duplicate theme name %q", name)})
+		if key := strings.ToLower(t.Name); seen[key] {
+			probs = append(probs, Problem{File: path, Err: fmt.Sprintf("duplicate theme name %q", t.Name)})
 			continue
+		} else {
+			seen[key] = true
 		}
-		seen[name] = true
 		themes = append(themes, t)
 	}
-	sort.Slice(themes, func(i, j int) bool { return themes[i].Name < themes[j].Name })
+	SortThemes(themes)
 	return themes, probs
 }
 
-// Catalog is every theme available: built-ins then custom ones, plus files that failed to load.
+// Catalog is every theme available, sorted by name, plus files that failed to load.
 type Catalog struct {
 	Themes   []Theme
 	Problems []Problem
 }
 
 // LoadCatalog lists built-in and custom themes.
-func LoadCatalog(dataDir string, darkBackground bool) Catalog {
-	c := Catalog{}
-	for _, b := range Builtins() {
-		t, _ := Builtin(b.Name, darkBackground)
-		c.Themes = append(c.Themes, t)
-	}
-	custom, probs := LoadDir(Dir(dataDir), darkBackground)
+func LoadCatalog(dataDir string) Catalog {
+	c := Catalog{Themes: Builtins()}
+	custom, probs := LoadDir(Dir(dataDir))
 	c.Themes = append(c.Themes, custom...)
+	SortThemes(c.Themes)
 	c.Problems = probs
 	return c
 }
 
-// Find returns a theme by name. The error lists the names that exist.
-func (c Catalog) Find(name string) (Theme, error) {
-	name = strings.ToLower(strings.TrimSpace(name))
-	for _, t := range c.Themes {
-		if t.Name == name {
-			return t, nil
-		}
-	}
+// Names lists the theme names in order.
+func (c Catalog) Names() []string {
 	var names []string
 	for _, t := range c.Themes {
 		names = append(names, t.Name)
 	}
+	return names
+}
+
+// Has reports whether a theme with the name exists, ignoring case.
+func (c Catalog) Has(name string) bool {
+	_, err := c.Find(name)
+	return err == nil
+}
+
+// Find returns a theme by name, ignoring case. The error lists the names that exist.
+func (c Catalog) Find(name string) (Theme, error) {
+	name = strings.TrimSpace(name)
+	for _, t := range c.Themes {
+		if strings.EqualFold(t.Name, name) {
+			return t, nil
+		}
+	}
+	names := c.Names()
 	msg := fmt.Sprintf("no theme named %q", name)
 	if s := suggest(name, names); s != "" {
 		msg += fmt.Sprintf(", did you mean %q", s)
@@ -190,32 +287,23 @@ func (c Catalog) Find(name string) (Theme, error) {
 	return Theme{}, fmt.Errorf("%s (available: %s)", msg, strings.Join(names, ", "))
 }
 
-// Example returns the text `crm theme init` writes: a complete theme with every role.
-func Example(name string) []byte {
-	base, _ := Builtin("dark", true)
-	var b strings.Builder
-	fmt.Fprintf(&b, "# Custom crm theme. Save as ~/.crm/themes/%s.toml, then pick it with: crm theme set %s\n", name, name)
-	b.WriteString("# Colors are \"#rrggbb\", \"#rgb\" or an ANSI number 0-255. Terminals without truecolor get the nearest color.\n")
-	b.WriteString("# Remove a line to inherit it from the base theme. Delete \"base\" to define every required role yourself.\n")
-	b.WriteString("description = \"my custom theme\"\n")
-	b.WriteString("base = \"dark\"\n\n[colors]\n")
-	notes := map[string]string{
-		RoleFg: "headings and strong text", RoleDim: "secondary text and hints", RoleAccent: "names, key hints",
-		RoleDanger: "errors and destructive prompts", RoleGood: "success messages", RoleWarn: "cautions, READ-ONLY badge",
-		RoleMark: "marked rows", RoleTabFg: "active tab text", RoleTabBg: "active tab background",
-		RoleSelFg: "selected row text (optional, set with sel_bg)", RoleSelBg: "selected row background (optional)",
-		RoleKindPerson: "people in the related segment (optional)", RoleKindOrg: "organizations (optional)", RoleKindDeal: "deals (optional)",
-		RoleKindTask: "tasks (optional)", RoleKindNote: "notes (optional)", RoleKindTag: "tags (optional)", RoleBg: "screen background, painted when the mode applies (optional)",
+// NewName is the name of a new theme: "New theme", then "New theme 2" and so on.
+func (c Catalog) NewName() string {
+	name := "New theme"
+	for i := 2; c.Has(name); i++ {
+		name = fmt.Sprintf("New theme %d", i)
 	}
-	for _, r := range Roles {
-		v := base.Color(r)
-		if v == "" {
-			fmt.Fprintf(&b, "# %s = \"#334455\"  # %s\n", r, notes[r])
-			continue
+	return name
+}
+
+// CopyName is the name of a copy of the named theme: "<name> - Copy1", then Copy2 and so on.
+func (c Catalog) CopyName(name string) string {
+	for i := 1; ; i++ {
+		n := fmt.Sprintf("%s - Copy%d", name, i)
+		if !c.Has(n) {
+			return n
 		}
-		fmt.Fprintf(&b, "%s = %q  # %s\n", r, v, notes[r])
 	}
-	return []byte(b.String())
 }
 
 // --- remembered choice ---
@@ -229,12 +317,12 @@ const EnvName = "CRM_THEME"
 // Chosen returns the theme name to use and where it came from: "env", "config" or "default".
 func Chosen(dataDir string, getenv func(string) string) (name, source string) {
 	if v := strings.TrimSpace(getenv(EnvName)); v != "" {
-		return strings.ToLower(v), "env"
+		return v, "env"
 	}
-	if v := readConfig(dataDir)["theme"]; v != "" {
-		return strings.ToLower(v), "config"
+	if v := strings.TrimSpace(readConfig(dataDir)["theme"]); v != "" {
+		return v, "config"
 	}
-	return AutoName, "default"
+	return DefaultName, "default"
 }
 
 func readConfig(dataDir string) map[string]string {

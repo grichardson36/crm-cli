@@ -309,6 +309,7 @@ var commandMeta = map[string]cmdMeta{
 	"theme":                {examples: []string{`crm theme list -f json`, `crm theme set nord`}},
 	"theme list":           {fields: themeListFields, examples: []string{`crm theme list -f json`}},
 	"theme set":            {mutates: true, examples: []string{`crm theme set nord`, `crm theme set my-theme --dry-run`}},
+	"theme mode":           {mutates: true, fields: "mode,saved,config", examples: []string{`crm theme mode dark`, `crm theme mode auto`}},
 	"theme show":           {fields: themeShowFields, examples: []string{`crm theme show -f json`, `crm theme show gruvbox`}},
 	"theme path":           {fields: "themes_dir,exists,config", examples: []string{`crm theme path`, `crm theme path -f json`}},
 	"theme init":           {mutates: true, fields: "name,path,created", examples: []string{`crm theme init my-theme`, `crm theme init my-theme --dry-run`}},

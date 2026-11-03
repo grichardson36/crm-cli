@@ -1,94 +1,86 @@
 ---
 type: pattern
 scale: product
-status: proposed 2026-10-30 (owner request), first parts built in feat/themes-more
+status: built 2026-11-03 (feat/theme-slice), later parts proposed
 ---
 
-# Custom themes adapt Obsidian's theme model to TOML
+# Themes: one entry per theme, a dark and a light palette
 
-**Problem.** Built-in themes and one TOML file per custom theme exist ([[features-platform-and-themes]] F15). Missing: light and dark variants in one theme, inheritance between custom themes, sharing, a generator, and a picker that shows more than a name. The owner also wants a light theme to stay light on a dark terminal.
+**Problem.** Built-in themes and custom TOML files existed as separate dark and light entries, with follower themes and a fill setting on top. The owner wants one entry per theme, a mode that picks the palette, and a pane that edits it ([[features-platform-and-themes]] F15).
 
-## What Obsidian does (first party docs)
+## Model
 
-- A theme is a folder in `<vault>/.obsidian/themes/<name>/` with `manifest.json` (name, description) and `theme.css`. The folder name must equal the manifest name. Community themes install from Settings > Appearance > Themes > Manage ("Install and use", "Stop using this theme") and are updated by hand ("Check for updates").
-- `theme.css` only overrides CSS variables. Foundations are a neutral scale (`--color-base-00` to `--color-base-100`, separate light and dark defaults), accent as three numbers (`--accent-h`, `--accent-s`, `--accent-l`) from which `--color-accent`, `-1` and `-2` derive, extended named colors (`--color-red`), and semantic colors derived from those (`--background-primary`, `--text-normal`, `--interactive-accent`). The docs say base values should typically only be defined by themes.
-- Variants: variables go under `.theme-dark` or `.theme-light`, shared ones under `body`. The Base color scheme setting (light, dark, follow system) chooses which block applies.
-- Snippets are plain CSS files in `<vault>/.obsidian/snippets/`, each with an on/off toggle, applied on top of the theme. Saved changes are detected automatically, and "Reload snippets" refreshes the list.
-- Per theme settings are not part of core. Themes expose them through the Style Settings plugin.
-- Variable groups: foundations, components, editor, plugins, window.
+- A theme is one name with two complete palettes (`Theme.Dark`, `Theme.Light` in `internal/theme/theme.go`). Each palette sets every role: `fg`, `dim`, `accent`, `danger`, `good`, `warn`, `mark`, `tab_fg`, `tab_bg`, `sel_fg`, `sel_bg`, `kind_person`, `kind_org`, `kind_deal`, `kind_task`, `kind_note`, `kind_tag`, `bg`. There is no optional role, no base, no inheritance, no follower theme.
+- Built-ins, sorted by name: `anthropocene`, `catppuccin`, `default`, `gruvbox`, `high-contrast`, `nord`, `solarized`. `default` is the old `dark` and `light`. The name stays until the owner names the app.
+- The list, the CLI and the pane sort all themes (built-in and custom) alphanumerically, ignoring case. Names match ignoring case.
+- The mode (`auto`, `light`, `dark`, `internal/theme/mode.go`) picks the palette. `auto` takes the dark or light the terminal reports and never paints the background. `light` and `dark` force that palette and paint the whole screen.
+- An unknown theme name in `config.toml` or `CRM_THEME` falls back to `default` and the TUI status line shows the error. The CLI reports `source: fallback`.
+- Kind colors per object kind in Settings > Colors stay separate overrides of the palette, so people keep them when they change theme ([[kind-colors-are-chosen]]).
 
-Sources: docs.obsidian.md (CSS variables, Foundations > Colors, Build a theme) and obsidian.md/help (Themes, CSS snippets). The docs pages did not state how community themes are listed or versioned, so that part is not copied.
+## Custom theme file
 
-## Adaptation
-
-**O1. Roles are the variables.** Our roles are the foundations (fg, dim, accent, danger, good, warn, mark, tab, selection, bg) and the per-kind colors (`kind_person` and the rest). There is no component layer, views only take styles from the theme. A role left out falls back to another role (kinds) or to the base theme.
-
-**O2. File layout.** Keep `~/.crm/themes/<name>.toml` (the file name is the theme name). Add a folder form for themes with several parts, `~/.crm/themes/<name>/theme.toml` plus optional `README.md` and `LICENSE`. Snippets are small files in `~/.crm/themes/snippets/*.toml` that hold only `[colors]`, applied over the active theme in file name order and switched on in `config.toml` (`snippets = ["warm-selection"]`). As in Obsidian, the theme replaces the look and a snippet adjusts it.
-
-**O3. Variants.** One file declares both variants, like `.theme-dark` and `.theme-light`:
+`~/.crm/themes/<file>.toml`. The file name comes from the theme name (`Warm Sand` is `warm-sand.toml`, a taken file name gets `-2`). A rename rewrites the same file.
 
 ```toml
-description = "warm colors"
-[colors]            # shared by both variants
-accent = "#D97757"
-[dark]
-bg = "#141413"
-fg = "#FAF9F5"
-[light]
-bg = "#FAF9F5"
-fg = "#141413"
-accent = "#B4532F"
+name = "Warm Sand"          # optional, the file name is used without it
+description = "..."         # optional
+copied_from = "nord"        # optional, what shift+r resets to
+[dark.colors]
+fg = "#D8DEE9"              # all 18 roles
+[light.colors]
+fg = "#2E3440"              # all 18 roles
 ```
 
-A bare theme name follows the terminal like `auto` does, and `name-dark` / `name-light` pick one explicitly. Built: the three `anthropocene` entries work this way (generated in code). Not built: `[dark]` and `[light]` tables in a file. Today a file is one variant, declared with `variant = "dark"` or `"light"`, or derived from `bg`.
+Parsing collects every problem with the file and key. A name taken by a built-in or by another file, an unknown role, a bad color and a missing role are errors, and the file is listed as invalid. The old single `[colors]` table is not read.
 
-**O4. Inheritance.** `base = "<built-in>"` exists. Extend it to `base = "<custom name>"` (cycles are an error that names the chain). Missing roles come from the base, so a theme can be two lines.
+## Theme pane (Settings > Theme)
 
-**O5. Validation.** Parsing already collects every problem with file and key. Move the checks into `internal/validate` so `crm validate`, `crm doctor` and the picker report the same codes: unknown role (with suggestion), bad color, half selection pair, bad variant, unknown base, cycle. New checks: a text role below 3:1 against `bg` (error), below 4.5:1 (warning), selected row not distinct from `bg`, two kinds with one color. `crm theme check <name>` prints the report and the 16-color mapping.
+Entered with `enter` on the Theme row. Layout: the mode line (`auto | light | dark`), the theme list (`>` marks the chosen one), then the name and the colors of the highlighted theme for the palette of the mode shown. Color rows use plain names: text, secondary text, accent, error, success, warning, marked, tab text, tab background, selection text, selection background, background. Each is a hex field with a swatch.
 
-**O6. Live reload.** `Theme: reload` re-reads on demand today. Add a watcher on `~/.crm/themes` while the TUI runs (poll the directory mtime every second, no new dependency) so saving a file in an editor repaints, as Obsidian does for snippets. A broken save keeps the current look and shows the error in the status line.
+| Key | Where | Does |
+|---|---|---|
+| `up`, `down` | pane | move, the screen previews the theme under the cursor |
+| `enter` | theme | load it (the chosen theme and `>` move, saved on this device) |
+| `tab` | pane | next mode, saved. While editing it changes which palette is edited |
+| `c` | any theme | copy as `{name} - Copy{n}` |
+| `e` | custom theme | cursor into the name and color rows, `enter` edits a row |
+| `a` | custom theme | add `New theme` (`New theme 2`, ...) from the default colors |
+| `d` | custom theme | delete after a question, deleting the chosen theme chooses `default` |
+| `shift+r` | custom theme with `copied_from` | reset both palettes to that theme after a question |
+| `esc` | pane | from the color rows back to the list, from the list close the pane and restore the chosen theme |
 
-**O7. Sharing and import.** A theme is one TOML file, so sharing is copying the file. `crm theme export <name>` writes the resolved theme (inheritance flattened) to stdout. `crm theme import <path-or-url>` validates, shows the report, refuses built-in names, and copies into `~/.crm/themes` after a yes. The format is data and import never runs anything.
+The footer shows only what the highlighted item can do: a built-in shows `enter`, `c`, `esc` (and `tab`, `up/down`). Built-in colors are listed dim and cannot be edited.
 
-**O8. Picker with preview.** The picker already previews live while the cursor moves and restores on `esc`. Add a sample in the detail pane that renders each role (heading, selected row, tab, kind chips, error, ok, dim), the variant, contrast warnings and whether the fill applies. Group the list as built-in, custom, invalid.
+## CLI
 
-**O9. No per theme settings.** Obsidian needs a plugin for this. We do not copy it. The device settings are global: the theme name and the fill setting.
+`crm theme list|show|set|init|mode|path`. A theme is one name. `list -f json` shows each theme once with `dark` and `light` maps. `show` prints both palettes and the mode. `init <name>` writes the two-table template (the default colors, `copied_from = "default"`). `mode auto|light|dark` saves the mode. No MCP tool.
 
-## Forcing light or dark regardless of the terminal (built)
+## Light palettes authored for the built-ins
 
-Problem: a frame only colors cells that have a style. Unstyled cells and the area outside the grid keep the terminal background, so a light theme on a dark terminal is half dark.
+Each takes the official light variant where there is one and keeps every role. Text roles and kind colors are at least 3:1 against `bg` (a test checks every built-in in both palettes), so a few official hues are darkened until they pass.
 
-Therefore:
+| Theme | Light source | Adjusted for 3:1 |
+|---|---|---|
+| catppuccin | Catppuccin Latte | green `#3F9E2A`, yellow `#C27B19`, pink `#CD67B2`, peach `#EC5D0A` |
+| gruvbox | Gruvbox light (`#FBF1C7`, faded colors) | none |
+| solarized | Solarized light (`#FDF6E3`, base01 text) | green `#839700`, yellow `#B38700`, cyan `#299D94` |
+| nord | Snow Storm (`#ECEFF4`, nord0 text, nord10 accent) | aurora colors darkened: green `#5A8445`, yellow `#9A7418`, purple `#8A5F96`, orange `#B5603F` |
+| high-contrast | white, black text, strong hues, 5.9:1 or more | none |
+| default | the old `light` | none |
+| anthropocene | the old `anthropocene-light` | none |
 
-1. The theme has an optional `bg` role and a variant. All built-ins have both.
-2. The per device mode (`auto`, `light`, `dark`, the first line of the Appearance pane in Settings and `mode` in `config.toml`) decides. `auto` paints for a light theme, and for a dark theme only when the terminal reported a light background. `light` and `dark` always paint and make `auto` and `anthropocene` take that variant. A painted screen that is later unpainted gets the terminal's own background set explicitly (read before the first paint), because not every terminal honors the reset. `auto` and `anthropocene` follow the terminal and never paint by themselves. A theme without `bg`, or a terminal without color (NO_COLOR), never paints.
-3. When painting, `View()` redraws the frame into a cell buffer (ultraviolet, the library under Bubble Tea v2). Every cell with no background gets `bg` and every cell with no foreground gets `fg`. Styled cells keep their colors, so selection, tabs and reverse video still work.
-4. `View.BackgroundColor` and `View.ForegroundColor` set the terminal default colors (OSC 11 and 10), so margins and cleared areas match. Bubble Tea resets them (OSC 111 and 110) on exit and updates them when they change, so the picker preview repaints live.
+## Anthropocene palette
 
-Limits that tests cannot show: a terminal that ignores OSC 10 and 11 (some multiplexers, older Windows consoles) keeps its own color outside the cell grid. At 16 colors the brand hues show as the nearest palette colors. Tests cover the bytes the real renderer writes (OSC 10 and 11 set and reset, background on cells) and every cell of every view in a cell buffer, not the pixels a terminal draws.
+Mood: warm, paper-like, quiet, one terracotta accent. Sources: the near-black `#141413`, off-white `#FAF9F5`, light gray `#E8E6DC`, mid gray `#B0AEA5`, orange `#D97757`, blue `#6A9BCC`, green `#788C5D`. The brand orange fails 4.5:1 on off-white, so the light palette uses terracotta `#B4532F`. Tests check 4.5:1 for every text role and kind, the tab and selection pairs, and that no role lands on the background at 16 colors.
 
-## Anthropocene palette (theme-factory method)
+## Forcing light or dark regardless of the terminal
 
-Mood: warm, paper-like, quiet, one terracotta accent. Sources: the Anthropic brand colors (near-black `#141413`, off-white `#FAF9F5`, light gray `#E8E6DC`, mid gray `#B0AEA5`, orange `#D97757`, blue `#6A9BCC`, green `#788C5D`) and the look of Claude Code in a terminal (orange accent, gray secondary text, no blocks of color).
+A frame only colors cells that have a style, so a light palette on a dark terminal is half dark. When the mode is `light` or `dark`, `View()` redraws the frame into a cell buffer (ultraviolet): every cell with no background gets `bg`, every cell with no foreground gets `fg`, styled cells keep their colors. `View.BackgroundColor` and `View.ForegroundColor` set the terminal default colors (OSC 11 and 10), so margins and cleared areas match, and Bubble Tea resets them on exit. A painted screen that is unpainted gets the terminal's own background set explicitly. NO_COLOR never paints.
 
-| Role | Dark | Light | Why |
-|---|---|---|---|
-| bg | `#141413` | `#FAF9F5` | brand dark and light |
-| fg | `#FAF9F5` | `#141413` | 17.5:1 |
-| dim | `#9C9A91` | `#6B695F` | mid gray adjusted to keep 4.5:1 |
-| accent, tab_bg | `#D97757` | `#B4532F` | the brand orange fails 4.5:1 on off-white, so the light variant uses a darker terracotta |
-| danger, good, warn | `#E5736F`, `#8DAA6B`, `#E2B259` | `#B3392F`, `#5A7240`, `#8A5A00` | red, brand green, amber |
-| mark, person | `#6A9BCC` | `#3F73A6` | brand blue |
-| sel | `#FAF9F5` on `#2E2D2A` | `#141413` on `#E8E6DC` | a warm gray bar |
-
-Kinds: person blue, organization kraft tan, deal green, task violet, note pale gray, tag teal. Tests check 4.5:1 for every text role and kind against `bg`, the tab and selection pairs, and that no role lands on the background color at 16 colors.
-
-## What is built
-
-Eleven built-ins including `anthropocene`, `anthropocene-dark` and `anthropocene-light`, custom TOML themes with `base`, `crm theme list|show|set|path|init`, live preview in the picker, `Theme: reload`, NO_COLOR handling, the nohardcode test, the `bg` role and `variant`, the fill setting.
+Limits tests cannot show: a terminal that ignores OSC 10 and 11 keeps its own color outside the cell grid, and at 16 colors the hues show as the nearest palette colors. Tests cover the bytes the real renderer writes and every cell of every view.
 
 ## Not built
 
-Variant tables in one file, custom `base`, snippets, validate codes, watcher, export and import, the preview pane, the generator ([[roadmap]]).
+An interactive color picker (the pane has hex fields, [[roadmap]]), snippets, theme checks in `internal/validate` with contrast warnings, a file watcher, export and import, a rendered sample in the pane, the generator ([[roadmap]]).
 
-**Because.** Owner request 2026-10-30: more themes, custom themes designed like Obsidian's, and a light theme that stays light on a dark terminal.
+**Because.** Owner decisions 2026-11-02 and 2026-11-03: one entry per theme with both palettes, mode picks the palette, a pane that edits custom themes, and no legacy names in the code.

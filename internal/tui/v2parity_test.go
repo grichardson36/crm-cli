@@ -140,19 +140,25 @@ func TestColorProfileMessageSwitchesToAttributeStyles(t *testing.T) {
 	assert.Contains(t, m.st.Name.Render("x"), "38;")
 }
 
-func TestBackgroundColorMessageResolvesTheAutoTheme(t *testing.T) {
+func TestBackgroundColorMessageResolvesTheAutoMode(t *testing.T) {
 	m := themeModel(t)
 	m.darkBG = true
-	auto, err := m.themeCatalog().Find(theme.AutoName)
-	require.NoError(t, err)
-	m.setTheme(auto)
-	m.themeName = theme.AutoName
-	dark := m.st.Theme.Fg
+	m.appearance = theme.ModeAuto
+	m.themeName = theme.DefaultName
+	m.resolveTheme()
+	dark := m.st.Look.Fg
 	m.Update(tea.BackgroundColorMsg{Color: darkColor{}})
-	assert.Equal(t, dark, m.st.Theme.Fg)
+	assert.Equal(t, dark, m.st.Look.Fg)
 	m.Update(tea.BackgroundColorMsg{Color: lightColor{}})
-	assert.NotEqual(t, dark, m.st.Theme.Fg, "a light terminal gets the light colors")
+	assert.NotEqual(t, dark, m.st.Look.Fg, "a light terminal gets the light palette")
 	assert.False(t, m.darkBG)
+
+	// A forced mode ignores the terminal.
+	m.appearance = theme.ModeDark
+	m.resolveTheme()
+	forced := m.st.Look.Fg
+	m.Update(tea.BackgroundColorMsg{Color: lightColor{}})
+	assert.Equal(t, forced, m.st.Look.Fg)
 }
 
 type lightColor struct{}
