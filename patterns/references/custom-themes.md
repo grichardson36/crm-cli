@@ -75,7 +75,7 @@ Mood: warm, paper-like, quiet, one terracotta accent. Sources: the near-black `#
 
 ## Forcing light or dark regardless of the terminal
 
-A frame only colors cells that have a style, so a light palette on a dark terminal is half dark. When the mode is `light` or `dark`, `View()` redraws the frame into a cell buffer (ultraviolet): every cell with no background gets `bg`, every cell with no foreground gets `fg`, styled cells keep their colors. `View.BackgroundColor` and `View.ForegroundColor` set the terminal default colors (OSC 11 and 10), so margins and cleared areas match, and Bubble Tea resets them on exit. A painted screen that is unpainted gets the terminal's own background set explicitly. NO_COLOR never paints.
+A frame only colors cells that have a style, so a light palette on a dark terminal is half dark. When the mode is `light` or `dark`, `View()` redraws the frame into a cell buffer (ultraviolet): every cell with no background gets `bg`, every cell with no foreground gets `fg`, styled cells keep their colors. `View.BackgroundColor` and `View.ForegroundColor` set the terminal default colors (OSC 11 and 10), so margins and cleared areas match, and Bubble Tea resets them on exit. Auto never sets a terminal color: leaving a painted mode sends the reset (OSC 110 and 111) and nothing else, so a transparent or custom terminal background is kept. NO_COLOR never paints.
 
 Limits tests cannot show: a terminal that ignores OSC 10 and 11 keeps its own color outside the cell grid, and at 16 colors the hues show as the nearest palette colors. Tests cover the bytes the real renderer writes and every cell of every view.
 

@@ -5,7 +5,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"image/color"
 	"os"
 	"strings"
 	"time"
@@ -258,8 +257,6 @@ type Model struct {
 	appearance  theme.Mode  // auto, light or dark (per device setting)
 	previewName string      // theme previewed in the Theme pane, "" when none
 	darkBG      bool        // the terminal reports a dark background
-	termBG      color.Color // the terminal's own background, read before the first paint
-	oscPainted  bool        // the terminal's default colors were set by us
 	themeSel     string        // the theme under the cursor of the Theme pane, "" when none
 	themeEditing bool          // the cursor of the Theme pane is in the name and color rows
 	themeCat     theme.Catalog // the themes the Theme pane lists
@@ -843,12 +840,10 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case tea.BackgroundColorMsg:
+		was := m.darkBG
 		m.darkBG = msg.IsDark()
-		if !m.oscPainted {
-			m.termBG = msg.Color
-		}
-		if m.appearance == theme.ModeAuto {
-			m.resolveTheme()
+		if m.appearance == theme.ModeAuto && m.darkBG != was {
+			m.redrawTheme()
 		}
 		return m, nil
 	case tea.PasteMsg:
