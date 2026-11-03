@@ -131,8 +131,6 @@ func TestSettingsEnterOpensTheThingBehindARow(t *testing.T) {
 		{"archived", viewArchived, ""},
 		{"sync", viewSync, ""},
 		{"views", viewSettings, "Views"},
-		{"deal-stages", viewSettings, "Deal stages"},
-		{"deal-roles", viewSettings, "Deal roles"},
 		{"appearance", viewSettings, ""},
 	} {
 		t.Run(tc.id, func(t *testing.T) {
@@ -144,6 +142,23 @@ func TestSettingsEnterOpensTheThingBehindARow(t *testing.T) {
 				require.NotNil(t, m.ov)
 				assert.Contains(t, m.ov.title, tc.ov)
 			}
+		})
+	}
+	// The list rows open their list in the right pane, no popup.
+	for _, id := range listEditorIDs {
+		t.Run(id, func(t *testing.T) {
+			m := settingsModel(t)
+			cursorToSetting(t, m, id)
+			assert.Equal(t, focusList, m.focus)
+			pressRun(m, "enter")
+			assert.Equal(t, viewSettings, m.view)
+			assert.Nil(t, m.ov, "no popup")
+			assert.Equal(t, focusDetail, m.focus, "enter enters the pane")
+			require.NotNil(t, m.paneList())
+			assert.Equal(t, id, m.lp.d.id)
+			press(m, "esc")
+			assert.Equal(t, focusList, m.focus, "esc leaves the pane")
+			assert.Equal(t, id, m.rows[m.cursor].setting, "the cursor stays on the row")
 		})
 	}
 }

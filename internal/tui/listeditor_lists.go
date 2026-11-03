@@ -2,9 +2,9 @@ package tui
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
-	tea "charm.land/bubbletea/v2"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/jdanielnd/crm-cli/internal/validate"
@@ -24,11 +24,19 @@ func (m *Model) listDescFor(id string) *listDesc {
 		return m.noteTypesDesc()
 	case "relation-kinds":
 		return m.relationKindsDesc()
+	case "company-ignore":
+		return m.companyIgnoreDesc()
 	}
 	return nil
 }
 
 var listYesNo = []model.FieldChoiceOption{{Value: "yes", Label: "yes"}, {Value: "no", Label: "no"}}
+
+// defaultNoteTypes are the note types a new database starts with (migration 004), in the order a reset restores.
+var defaultNoteTypes = []struct {
+	name    string
+	contact bool
+}{{"call", true}, {"email", true}, {"meeting", true}, {"message", true}, {"note", false}}
 
 func yesNo(b bool) string {
 	if b {
@@ -114,6 +122,14 @@ func (m *Model) vocabListDesc(kind, id, title, usedBy string) *listDesc {
 
 func (m *Model) dealRolesDesc() *listDesc {
 	d := m.vocabListDesc(model.DealRoleKind, "deal-roles", "Deal roles", "links")
+	d.defaults = func(*Model) []listItem {
+		vs, _ := model.VocabularyNamed(model.DealRoleKind)
+		var out []listItem
+		for _, name := range vs.Seeds {
+			out = append(out, listItem{name: name})
+		}
+		return out
+	}
 	d.removeOpts = func(*Model, []listItem, []listItem) (listRemoveOpts, error) {
 		return listRemoveOpts{blank: true, blankLabel: "Leave the role blank on those links"}, nil
 	}
@@ -122,8 +138,20 @@ func (m *Model) dealRolesDesc() *listDesc {
 
 func (m *Model) dealStagesDesc() *listDesc {
 	d := m.vocabListDesc(model.DealStageKind, "deal-stages", "Deal stages", "deals")
-	d.cells = []listCellDesc{{id: "outcome", label: "outcome", spec: model.FieldSpec{Key: "outcome", Label: "outcome", Type: model.FieldChoice,
+	d.cells = []listCellDesc{{id: "outcome", label: "outcome", cycle: true, spec: model.FieldSpec{Key: "outcome", Label: "outcome", Type: model.FieldChoice,
 		Choices: []model.FieldChoiceOption{{Value: model.OutcomeOpen, Label: "open"}, {Value: model.OutcomeWon, Label: "won"}, {Value: model.OutcomeLost, Label: "lost"}}}}}
+	d.defaults = func(*Model) []listItem {
+		vs, _ := model.VocabularyNamed(model.DealStageKind)
+		var out []listItem
+		for _, name := range vs.Seeds {
+			outcome := model.OutcomeOpen
+			if o, ok := vs.SeedOutcomes[name]; ok {
+				outcome = o
+			}
+			out = append(out, listItem{name: name, cells: []string{outcome}})
+		}
+		return out
+	}
 	d.setCell = func(m *Model, it listItem, _ string, value string) error {
 		res, err := m.vr.SetOutcome(m.ctx, model.DealStageKind, it.name, value)
 		if err != nil {
@@ -182,8 +210,15 @@ func stageRuleError(err error) error {
 // --- note types ---
 
 func (m *Model) noteTypesDesc() *listDesc {
-	d := &listDesc{id: "note-types", title: "Note types", noun: "note type", plural: "note types", usedBy: "notes"}
-	d.cells = []listCellDesc{{id: "contact", label: "counts as contact", spec: model.FieldSpec{Key: "contact", Label: "counts as contact", Type: model.FieldChoice, Choices: listYesNo}}}
+	d := &listDesc{id: "note-types", title: "Notes", noun: "note type", plural: "note types", usedBy: "notes"}
+	d.cells = []listCellDesc{{id: "contact", label: "mark contacted", cycle: true, spec: model.FieldSpec{Key: "contact", Label: "mark contacted", Type: model.FieldChoice, Choices: listYesNo}}}
+	d.defaults = func(*Model) []listItem {
+		var out []listItem
+		for _, t := range defaultNoteTypes {
+			out = append(out, listItem{name: t.name, cells: []string{yesNo(t.contact)}})
+		}
+		return out
+	}
 	d.load = func(m *Model) ([]listItem, error) {
 		list, err := m.ntr.List(m.ctx, false)
 		if err != nil {
@@ -230,7 +265,7 @@ func (m *Model) noteTypesDesc() *listDesc {
 		if err := m.ntr.SetCountsAsContact(m.ctx, it.name, after); err != nil {
 			return err
 		}
-		m.record("note type "+it.name+" counts as contact: "+value,
+		m.record("note type "+it.name+" mark contacted: "+value,
 			func() error { return m.ntr.SetCountsAsContact(m.ctx, it.name, before) },
 			func() error { return m.ntr.SetCountsAsContact(m.ctx, it.name, after) })
 		return nil
@@ -274,11 +309,31 @@ func (m *Model) noteTypesDesc() *listDesc {
 
 func (m *Model) relationKindsDesc() *listDesc {
 	kr := repo.NewKindRepo(m.db)
-	d := &listDesc{id: "relation-kinds", title: "Relation kinds", noun: "kind", plural: "kinds", usedBy: "links",
-		groups: []listGroup{{key: "person", title: "Person links"}, {key: "organization", title: "Organization links"}}}
+	d := &listDesc{id: "relation-kinds", title: "Links", noun: "kind", plural: "kinds", usedBy: "links",
+		groups: []listGroup{{key: "person", title: "People"}, {key: "organization", title: "Organizations"}}}
+	// A name equal to its inverse means mutual.
 	d.cells = []listCellDesc{
-		{id: "inverse", label: "inverse name", spec: model.FieldSpec{Key: "inverse", Label: "inverse name", Type: model.FieldText, Max: 80}},
-		{id: "mutual", label: "mutual", spec: model.FieldSpec{Key: "mutual", Label: "mutual", Type: model.FieldChoice, Choices: listYesNo}},
+		{id: "inverse", label: "inverse", spec: model.FieldSpec{Key: "inverse", Label: "inverse", Type: model.FieldText, Max: 80}},
+	}
+	d.defaults = func(m *Model) []listItem {
+		var out []listItem
+		for _, typ := range []string{"person", "organization"} {
+			list, err := kr.List(m.ctx, typ)
+			if err != nil {
+				continue
+			}
+			var built []*model.RelationKind
+			for _, k := range list {
+				if k.Builtin {
+					built = append(built, k)
+				}
+			}
+			sort.Slice(built, func(i, j int) bool { return built[i].ID < built[j].ID })
+			for _, k := range built {
+				out = append(out, listItem{name: k.Name, group: typ})
+			}
+		}
+		return out
 	}
 	d.load = func(m *Model) ([]listItem, error) {
 		var out []listItem
@@ -292,7 +347,11 @@ func (m *Model) relationKindsDesc() *listDesc {
 				return nil, err
 			}
 			for _, k := range list {
-				it := listItem{name: k.Name, group: typ, cells: []string{k.InverseName, yesNo(k.Symmetric)}, inUse: counts[k.ID]}
+				inv := k.InverseName
+				if k.Symmetric || inv == "" {
+					inv = k.Name
+				}
+				it := listItem{name: k.Name, group: typ, cells: []string{inv}, inUse: counts[k.ID]}
 				if k.Builtin {
 					it.locked = "built-in, stays"
 				}
@@ -349,7 +408,7 @@ func (m *Model) relationKindsDesc() *listDesc {
 			func() error { _, err := update(m, it.group, oldName, repo.KindPatch{Name: &to}); return err })
 		return fmt.Sprintf("renamed %s kind %s to %s", it.group, oldName, k.Name), nil
 	}
-	d.setCell = func(m *Model, it listItem, cell, value string) error {
+	d.setCell = func(m *Model, it listItem, _, value string) error {
 		old, _, err := kr.Resolve(m.ctx, it.group, it.name)
 		if err != nil {
 			return err
@@ -359,15 +418,6 @@ func (m *Model) relationKindsDesc() *listDesc {
 			prev = ""
 		}
 		next := value
-		if cell == "mutual" {
-			if value == "yes" {
-				next = ""
-			} else if old.Symmetric {
-				return fmt.Errorf("%s is mutual. Type an inverse name in the inverse name cell to make it directional", it.name)
-			} else {
-				return nil
-			}
-		}
 		if _, err := update(m, it.group, it.name, repo.KindPatch{Inverse: &next}); err != nil {
 			return err
 		}
@@ -412,20 +462,87 @@ func (m *Model) relationKindsDesc() *listDesc {
 	return d
 }
 
-// --- palette entries ---
+// --- ignored company texts ---
 
-// listEditorActions are the palette entries of the list editor, one per list. They keep the ids the
-// Manage screens had (deal-stages, deal-roles, note-types) so a Settings row that names the action
-// still works.
-func listEditorActions() []action {
-	mk := func(id, title, desc string) action {
-		return action{id: id, title: title, group: "Contact", desc: desc, write: true,
-			run: func(m *Model) tea.Cmd { return m.openListEditor(id) }}
+// companyIgnoreDesc is the list of company texts that never create an organization. A built-in text
+// cannot be renamed and removing it turns it off. An added text is deleted.
+func (m *Model) companyIgnoreDesc() *listDesc {
+	ig := repo.NewIgnoreRepo(m.db)
+	d := &listDesc{id: "company-ignore", title: "Ignored company texts", noun: "text", plural: "texts", nameLabel: "text", noUsed: true}
+	d.cells = []listCellDesc{{id: "state", label: "state", readonly: true, spec: model.FieldSpec{Key: "state", Label: "state", Type: model.FieldText}}}
+	d.load = func(m *Model) ([]listItem, error) {
+		list, err := ig.List(m.ctx)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]listItem, len(list))
+		for i, e := range list {
+			state := "ignored"
+			if !e.Active {
+				state = "off"
+			}
+			out[i] = listItem{name: cleanCell(e.Text), cells: []string{state}, noRename: e.Builtin}
+			if !e.Active {
+				out[i].locked = "off"
+			}
+		}
+		return out, nil
 	}
-	return []action{
-		mk("deal-stages", "Edit deal stages", "the list editor for the stages of the deal pipeline: a add, enter rename, tab to the outcome cell, shift+up/down order, d remove. The outcome (open, won, lost) decides what closes a deal"),
-		mk("deal-roles", "Edit deal roles", "the list editor for the roles a person has on a deal (champion, decision maker, ...): a add, enter rename, shift+up/down order, d remove"),
-		mk("note-types", "Edit note types", "the list editor for note types (call, email, meeting, ...): a add, enter rename, tab to the counts-as-contact cell, shift+up/down order, d remove"),
-		mk("relation-kinds", "Edit relation kinds", "the list editor for the kinds of person and organization links (friend, parent, manager, ...): a add, enter rename, tab to the inverse name and mutual cells, shift+up/down order, d remove"),
+	set := func(text string, on bool) error {
+		if on {
+			_, err := ig.Add(m.ctx, text)
+			return err
+		}
+		return ig.Remove(m.ctx, text)
 	}
+	d.add = func(m *Model, _, name string) error {
+		changed, err := ig.Add(m.ctx, name)
+		if err != nil {
+			return err
+		}
+		if !changed {
+			return fmt.Errorf("%s is already ignored", model.CleanVocabName(name))
+		}
+		m.record("ignore company text "+name,
+			func() error { return ig.Remove(m.ctx, name) },
+			func() error { _, err := ig.Add(m.ctx, name); return err })
+		return nil
+	}
+	d.rename = func(m *Model, it listItem, to string) (string, error) {
+		on, err := ig.Ignored(m.ctx, to)
+		if err != nil {
+			return "", err
+		}
+		if on {
+			return "", fmt.Errorf("%s is already ignored", model.CleanVocabName(to))
+		}
+		m.beginGroup()
+		defer m.endGroup("rename ignored company text " + it.name)
+		if err := set(it.name, false); err != nil {
+			return "", err
+		}
+		m.record("stop ignoring company text "+it.name,
+			func() error { return set(it.name, true) }, func() error { return set(it.name, false) })
+		if err := set(to, true); err != nil {
+			return "", err
+		}
+		m.record("ignore company text "+to,
+			func() error { return set(to, false) }, func() error { return set(to, true) })
+		return fmt.Sprintf("renamed %s to %s", it.name, model.CleanVocabName(to)), nil
+	}
+	d.removeOpts = func(*Model, []listItem, []listItem) (listRemoveOpts, error) { return listRemoveOpts{}, nil }
+	d.remove = func(m *Model, ts []listItem, _ listDest) (string, error) {
+		m.beginGroup()
+		defer m.endGroup("remove ignored company text " + namesOf(ts))
+		for _, t := range ts {
+			t := t
+			if err := set(t.name, false); err != nil {
+				return "", err
+			}
+			m.record("stop ignoring company text "+t.name,
+				func() error { return set(t.name, true) }, func() error { return set(t.name, false) })
+		}
+		return "removed text " + namesOf(ts), nil
+	}
+	return d
 }

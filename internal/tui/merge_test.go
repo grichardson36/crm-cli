@@ -357,7 +357,7 @@ func TestNewActionsInPaletteWithCorrectGreying(t *testing.T) {
 		return out
 	}
 	newIDs := []string{"find-dupes", "compare", "options", "dismiss", "undo-dismiss", "merge-marked", "archive", "restore", "purge",
-		"cmp-pick", "cmp-field", "cmp-survivor", "cmp-apply", "cmp-back", "note-pick", "note-types", "view-merge", "view-archived"}
+		"cmp-pick", "cmp-field", "cmp-survivor", "cmp-apply", "cmp-back", "note-pick", "view-merge", "view-archived"}
 
 	st := state()
 	for _, id := range newIDs {
@@ -366,7 +366,6 @@ func TestNewActionsInPaletteWithCorrectGreying(t *testing.T) {
 	}
 	assert.Equal(t, "", st["find-dupes"])
 	assert.Equal(t, "", st["archive"])
-	assert.Equal(t, "", st["note-types"])
 	assert.Equal(t, "", st["note-pick"])
 	for _, id := range []string{"compare", "dismiss", "undo-dismiss", "merge-marked", "restore", "purge", "cmp-apply", "cmp-pick", "cmp-survivor", "cmp-back"} {
 		assert.Equal(t, "not here", st[id], id+" in People")
@@ -389,7 +388,7 @@ func TestNewActionsInPaletteWithCorrectGreying(t *testing.T) {
 	for _, id := range []string{"cmp-pick", "cmp-field", "cmp-survivor", "cmp-apply", "cmp-back", "cmp-dismiss", "palette", "help"} {
 		assert.Equal(t, "", st[id], id+" in compare")
 	}
-	for _, id := range []string{"archive", "note", "contacted", "compare", "dismiss", "find-dupes", "view-people", "note-types"} {
+	for _, id := range []string{"archive", "note", "contacted", "compare", "dismiss", "find-dupes", "view-people"} {
 		assert.Equal(t, "not here", st[id], id+" in compare")
 	}
 	press(m, "esc")
@@ -410,7 +409,7 @@ func TestNewActionsInPaletteWithCorrectGreying(t *testing.T) {
 	assert.Equal(t, viewMerge, m.view)
 	m.readOnly = true
 	st = state()
-	for _, id := range []string{"dismiss", "undo-dismiss", "merge-marked", "archive", "restore", "purge", "cmp-apply", "note-pick", "note-types"} {
+	for _, id := range []string{"dismiss", "undo-dismiss", "merge-marked", "archive", "restore", "purge", "cmp-apply", "note-pick"} {
 		assert.Equal(t, "read-only", st[id], id+" read-only")
 	}
 	assert.Equal(t, "", st["compare"])

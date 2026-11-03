@@ -30,7 +30,7 @@ crm deal roles backfill --apply
 
 ## Terminal UI and MCP
 
-On a deal page the `deal role` cell opens the choice editor: type to filter, up and down pick, `enter` saves. A name not on the list adds the row `Create role X`, and `enter` adds it to the list and sets it as one undo step. Set field on selected (palette) offers `deal role` for selected people and asks for the deal. The palette entry Edit deal roles opens the list editor: `a` adds, `enter` renames, `shift+up`/`shift+down` order, `d` removes (roles in use move to another role or are cleared, one undo step), `ctrl+z` undoes. `backfill` stays in the CLI.
+On a deal page the `deal role` cell opens the choice editor: type to filter, up and down pick, `enter` saves. A name not on the list adds the row `Create role X`, and `enter` adds it to the list and sets it as one undo step. Set field on selected (palette) offers `deal role` for selected people and asks for the deal. The Deal roles row of Settings shows the list in its right pane (`enter` enters it, `esc` leaves it): `a` adds, `e` renames, `shift+up`/`shift+down` order, `d` removes (roles in use move to another role or are cleared, one undo step), `shift+r` resets to the built-in roles, `ctrl+z` undoes. `backfill` stays in the CLI.
 
 MCP: `crm_deal_role_list`, `_add`, `_rename`, `_remove` (`replace_with`, `keep`), `_reorder`, `_backfill` (`apply`), and `create` on the link tools. Deal stages use the same vocabulary table, see deal-stages.
 

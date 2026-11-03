@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/stretchr/testify/assert"
@@ -17,10 +18,13 @@ import (
 
 func openLE(t *testing.T, m *Model, id string) *listEditor {
 	t.Helper()
-	runCmds(m, m.openListEditor(id))
-	require.NotNil(t, m.ov, id)
-	require.NotNil(t, m.ov.le, "%s opens the list editor", id)
-	return m.ov.le
+	runCmds(m, m.openListPane(id))
+	require.Equal(t, viewSettings, m.view, id)
+	require.Equal(t, focusDetail, m.focus, "%s: the cursor is in the pane", id)
+	require.Nil(t, m.ov, "the list is not a popup")
+	require.NotNil(t, m.lp, "%s opens the list in the pane", id)
+	require.Equal(t, id, m.lp.d.id)
+	return m.lp
 }
 
 func leNames(le *listEditor, group string) []string {
@@ -77,14 +81,14 @@ func TestListEditor_SameKeysForEveryList(t *testing.T) {
 	}{
 		{"deal-stages", "Deal stages", "", "prospect"},
 		{"deal-roles", "Deal roles", "", "champion"},
-		{"note-types", "Note types", "", "call"},
-		{"relation-kinds", "Relation kinds", "person", "friend"},
+		{"note-types", "Notes", "", "call"},
+		{"relation-kinds", "Links", "person", "friend"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.id, func(t *testing.T) {
 			m, _ := newTestModel(t)
 			le := openLE(t, m, tt.id)
-			assert.Equal(t, tt.title, m.ov.title)
+			assert.Equal(t, tt.title, le.d.title)
 			start := leNames(le, tt.group)
 			require.Contains(t, start, tt.first)
 
@@ -136,7 +140,8 @@ func TestListEditor_SameKeysForEveryList(t *testing.T) {
 			}
 			assert.Equal(t, start, leNames(le, tt.group))
 			press(m, "esc")
-			assert.Equal(t, modeNormal, m.mode, "esc closes")
+			assert.Equal(t, focusList, m.focus, "esc leaves the pane")
+			assert.Equal(t, viewSettings, m.view)
 		})
 	}
 }
@@ -149,7 +154,7 @@ func TestListEditor_EscCancelsInlineInput(t *testing.T) {
 	typeText(m, "nope")
 	press(m, "esc")
 	assert.Equal(t, lpBrowse, le.phase)
-	assert.Equal(t, modeOverlay, m.mode, "esc leaves the input, not the editor")
+	assert.Equal(t, focusDetail, m.focus, "esc leaves the input, not the pane")
 	assert.Equal(t, before, leNames(le, ""))
 	leTo(t, m, le, "champion")
 	press(m, "e")
@@ -358,7 +363,7 @@ func TestListEditor_RemoveInUse(t *testing.T) {
 			}
 			press(m, "enter")
 			require.Equal(t, lpConfirm, le.phase)
-			assert.Contains(t, m.screen(), "y/n")
+			assert.Contains(t, ansi.Strip(m.screen()), "y yes  n no", "the footer offers y and n")
 			press(m, "y")
 			require.Equal(t, lpBrowse, le.phase, le.msg)
 			assert.False(t, le.msgErr, le.msg)
@@ -483,8 +488,8 @@ func TestListEditor_RelationKindRemoval(t *testing.T) {
 		m, _ := newTestModel(t)
 		le := openLE(t, m, "relation-kinds")
 		screen := m.screen()
-		assert.Contains(t, screen, "Person links")
-		assert.Contains(t, screen, "Organization links")
+		assert.Contains(t, screen, "People")
+		assert.Contains(t, screen, "Organizations")
 		press(m, "end")
 		require.Equal(t, "organization", leCur(t, le).group)
 		press(m, "a")
@@ -531,7 +536,7 @@ func TestListEditor_StageRulesBlockRemoval(t *testing.T) {
 		press(m, "a")
 		typeText(m, "signed")
 		press(m, "enter")
-		press(m, "tab", "enter", "right", "enter") // outcome open -> won
+		press(m, "tab") // outcome open -> won
 		it, _ := leItem(le, "signed")
 		assert.Equal(t, "won", it.cells[0])
 		leTo(t, m, le, "won")
@@ -549,7 +554,7 @@ func TestListEditor_BulkSelectionRemoves(t *testing.T) {
 	leTo(t, m, le, "signer")
 	press(m, " ", " ") // signer, billing contact
 	assert.Len(t, le.marked, 2)
-	assert.Contains(t, m.screen(), "2 selected")
+	assert.Contains(t, m.screen(), "* signer")
 	leTo(t, m, le, "signer")
 	press(m, "d")
 	require.Equal(t, lpConfirm, le.phase, "several items ask once")
@@ -601,54 +606,60 @@ func TestListEditor_NoOtherItemToMoveTo(t *testing.T) {
 }
 
 func TestListEditor_CellsAcrossTheRow(t *testing.T) {
-	t.Run("stage outcome with tab and enter", func(t *testing.T) {
+	outcomeOf := func(t *testing.T, m *Model, name string) string {
+		out, err := m.vr.List(m.ctx, model.DealStageKind, false)
+		require.NoError(t, err)
+		for _, e := range out {
+			if e.Name == name {
+				return e.Outcome
+			}
+		}
+		return ""
+	}
+	t.Run("tab cycles the stage outcome open, won, lost", func(t *testing.T) {
 		m, _ := newTestModel(t)
 		le := openLE(t, m, "deal-stages")
 		leTo(t, m, le, "negotiation")
 		press(m, "tab")
-		assert.Equal(t, 1, le.col)
-		assert.Contains(t, m.screen(), "[open]", "the active cell is marked")
-		press(m, "enter")
-		require.Equal(t, lpCell, le.phase)
-		press(m, "right", "right")
-		press(m, "enter")
 		require.Equal(t, lpBrowse, le.phase, le.msg)
-		out, err := m.vr.List(m.ctx, model.DealStageKind, false)
-		require.NoError(t, err)
-		for _, e := range out {
-			if e.Name == "negotiation" {
-				assert.Equal(t, "lost", e.Outcome)
-			}
-		}
+		assert.Equal(t, "won", outcomeOf(t, m, "negotiation"))
+		press(m, "tab")
+		assert.Equal(t, "lost", outcomeOf(t, m, "negotiation"))
+		press(m, "tab")
+		assert.Equal(t, "open", outcomeOf(t, m, "negotiation"), "the cycle wraps")
 		press(m, "ctrl+z")
 		it, _ := leItem(le, "negotiation")
-		assert.Equal(t, "open", it.cells[0])
-		press(m, "shift+tab")
-		assert.Equal(t, 0, le.col, "shift+tab moves back to the name")
+		assert.Equal(t, "lost", it.cells[0])
+		assert.Equal(t, 0, le.col, "tab does not move a column on this list")
 	})
 	t.Run("an outcome change that breaks the rule is refused", func(t *testing.T) {
 		m, _ := newTestModel(t)
 		le := openLE(t, m, "deal-stages")
 		leTo(t, m, le, "won")
-		press(m, "tab", "enter", "left", "enter") // won -> open leaves no won stage
+		press(m, "tab") // won -> lost leaves no won stage
 		assert.True(t, le.msgErr)
 		assert.Contains(t, le.msg, "no won stage")
+		assert.Equal(t, "won", outcomeOf(t, m, "won"))
 	})
-	t.Run("note type counts as contact", func(t *testing.T) {
+	t.Run("tab toggles mark contacted of a note type", func(t *testing.T) {
 		m, _ := newTestModel(t)
 		le := openLE(t, m, "note-types")
 		leTo(t, m, le, "call")
 		it := leCur(t, le)
 		require.Equal(t, "yes", it.cells[0])
-		press(m, "tab", "enter", "right", "enter")
+		press(m, "tab")
 		nt, err := m.ntr.FindByName(m.ctx, "call")
 		require.NoError(t, err)
 		assert.False(t, nt.CountsAsContact)
-		press(m, "ctrl+z")
+		assert.Equal(t, "no", leCur(t, le).cells[0])
+		press(m, "tab")
+		nt, _ = m.ntr.FindByName(m.ctx, "call")
+		assert.True(t, nt.CountsAsContact)
+		press(m, "tab", "ctrl+z")
 		nt, _ = m.ntr.FindByName(m.ctx, "call")
 		assert.True(t, nt.CountsAsContact)
 	})
-	t.Run("relation kind inverse name and mutual", func(t *testing.T) {
+	t.Run("relation kind inverse, a name equal to its inverse is mutual", func(t *testing.T) {
 		m, _ := newTestModel(t)
 		le := openLE(t, m, "relation-kinds")
 		press(m, "a")
@@ -656,8 +667,10 @@ func TestListEditor_CellsAcrossTheRow(t *testing.T) {
 		press(m, "enter")
 		it := leCur(t, le)
 		require.Equal(t, "client", it.name)
-		assert.Equal(t, "yes", it.cells[1], "a new kind is mutual until it has an inverse name")
-		press(m, "tab", "enter")
+		assert.Equal(t, "client", it.cells[0], "a new kind is mutual, its inverse is its own name")
+		press(m, "tab")
+		require.Equal(t, 1, le.col)
+		press(m, "enter")
 		require.Equal(t, lpCell, le.phase)
 		backspaces(m, 10)
 		typeText(m, "vendor")
@@ -665,29 +678,30 @@ func TestListEditor_CellsAcrossTheRow(t *testing.T) {
 		require.Equal(t, lpBrowse, le.phase, le.msg)
 		it = leCur(t, le)
 		assert.Equal(t, "vendor", it.cells[0])
-		assert.Equal(t, "no", it.cells[1], "an inverse name makes it directional")
 		k, _, err := repoKinds(m).Resolve(m.ctx, "person", "vendor")
 		require.NoError(t, err)
 		assert.Equal(t, "client", k.Name)
-		// The mutual cell toggles back to mutual.
-		press(m, "tab", "enter", "left", "enter")
+		assert.False(t, k.Symmetric)
+		// The inverse typed back as the name makes it mutual again.
+		press(m, "enter")
+		backspaces(m, 10)
+		typeText(m, "client")
+		press(m, "enter")
 		it = leCur(t, le)
-		assert.Equal(t, "yes", it.cells[1])
 		assert.Equal(t, "client", it.cells[0])
+		k, _, _ = repoKinds(m).Resolve(m.ctx, "person", "client")
+		assert.True(t, k.Symmetric)
 		press(m, "ctrl+z")
-		it = leCur(t, le)
-		assert.Equal(t, "vendor", it.cells[0])
+		assert.Equal(t, "vendor", leCur(t, le).cells[0])
 	})
 	t.Run("a built-in kind refuses cell edits", func(t *testing.T) {
 		m, _ := newTestModel(t)
 		le := openLE(t, m, "relation-kinds")
 		leTo(t, m, le, "parent")
-		press(m, "tab", "enter")
-		if le.phase == lpCell {
-			backspaces(m, 10)
-			typeText(m, "x")
-			press(m, "enter")
-		}
+		press(m, "tab")
+		assert.Equal(t, 0, le.col, "a built-in kind has no column to move to")
+		press(m, "enter")
+		assert.Equal(t, lpBrowse, le.phase)
 		assert.True(t, le.msgErr)
 		assert.Contains(t, le.msg, "built-in")
 	})
@@ -704,7 +718,7 @@ func TestListEditor_ReadOnlyBlocksWrites(t *testing.T) {
 	m.readOnly = true
 	le := openLE(t, m, "deal-roles")
 	before := leNames(le, "")
-	for _, k := range []string{"a", "enter", "d", "shift+down"} {
+	for _, k := range []string{"a", "enter", "d", "shift+down", "R"} {
 		press(m, k)
 		assert.Equal(t, lpBrowse, le.phase, k)
 	}
@@ -712,41 +726,22 @@ func TestListEditor_ReadOnlyBlocksWrites(t *testing.T) {
 	assert.Equal(t, before, leNames(le, ""))
 }
 
-func TestListEditor_PaletteOpensEachList(t *testing.T) {
-	for _, id := range listEditorIDs {
-		t.Run(id, func(t *testing.T) {
-			m, _ := newTestModel(t)
-			runCmds(m, runID(m, id))
-			require.NotNil(t, m.ov)
-			require.NotNil(t, m.ov.le, "the palette action opens the list editor")
-			assert.Equal(t, id, m.ov.le.d.id)
-		})
-	}
-	t.Run("the separate Manage actions are gone", func(t *testing.T) {
-		m, _ := newTestModel(t)
-		for _, a := range m.actions {
-			assert.False(t, strings.HasPrefix(a.title, "Manage deal"), a.title)
-			assert.NotEqual(t, "Manage note types", a.title)
-		}
-	})
-}
-
 func TestListEditor_DrawsRowsWithCells(t *testing.T) {
 	m, _ := newTestModel(t)
 	openLE(t, m, "deal-stages")
 	screen := m.screen()
-	for _, want := range []string{"Deal stages", "outcome", "lead", "negotiation", "won", "not used"} {
+	for _, want := range []string{"Deal stages", "outcome", "used by", "lead", "negotiation", "won"} {
 		assert.Contains(t, screen, want)
 	}
 }
 
-func TestListEditor_MouseClickMovesTheCursor(t *testing.T) {
+func TestListEditor_ClickInThePaneKeepsIt(t *testing.T) {
 	m, _ := newTestModel(t)
 	le := openLE(t, m, "deal-roles")
-	m.handleMouse(mouseEvent{X: 5, Y: overlayTop + 1 + 2, Button: tea.MouseLeft})
-	require.NotNil(t, m.ov, "a click keeps the editor open")
-	assert.Equal(t, 2, m.ov.cursor)
-	assert.Same(t, le, m.ov.le, "the state of the editor is kept")
+	m.handleMouse(mouseEvent{X: m.width - 5, Y: 5, Button: tea.MouseLeft})
+	assert.Equal(t, viewSettings, m.view)
+	assert.Nil(t, m.ov, "a click does not open a popup")
+	assert.Same(t, le, m.lp, "the state of the list is kept")
 }
 
 func repoKinds(m *Model) *repo.KindRepo { return repo.NewKindRepo(m.db) }

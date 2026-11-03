@@ -37,7 +37,7 @@ The box is centered. Text width is the widest row within 44 to 76 cells (the pal
 
 ## Not a popup
 
-The list editor (`listeditor.go`) still draws a full screen through `overlay.draw`.
+The list editor (`listeditor.go`) is not an overlay. It is drawn in the right pane of its Settings row ([[list-editor-standard]]).
 
 ## Check
 
