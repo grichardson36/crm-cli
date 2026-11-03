@@ -169,9 +169,10 @@ The first missing badge identifies the next gate. A failed gate retains its prev
 1. Update only documentation affected by the implementation.
 2. Confirm the integrated changes pass required checks.
 3. Merge and push to main. Verify the resulting commit.
-4. Add 📚 and mark the task `[x] ✅` only after the implemented result is verified.
-5. Move a concise completion record to [[completed-roadmap]], preserving its ID, outcome, important decisions, exceptions and commit reference.
-6. Remove the completed task and its working notes from the active roadmap.
+4. Deploy a code change to the running program with `deploy/deploy.ps1` ([[references/app/operations|app operations]]). Never build, test, copy or swap `bin/crm.exe` by hand.
+5. Add 📚 and mark the task `[x] ✅` only after the implemented result is verified.
+6. Move a concise completion record to [[completed-roadmap]], preserving its ID, outcome, important decisions, exceptions and commit reference.
+7. Remove the completed task and its working notes from the active roadmap.
 
 **REPORT:** Final implementation reference and archived completion record.
 
