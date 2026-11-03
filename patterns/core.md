@@ -188,21 +188,6 @@ Current app facts live outside the core gates: [[references/app/domain-model|app
 
 Items below here are not built.
 - ## Next
-	- [ ] 🧭 🔨 CRM-016: If the hint bar gets cut off it should wrap to an additional row. (next)
-		- Intent: no hint is lost to a narrow terminal. The footer is one reusable component, not a line each screen draws.
-		- Decisions: owner chose every footer (main screen footer and the mode footers: edit, prompt, confirm, key capture, names panel, view editor, text and help pages, compare) and at most 2 hint rows, a hint too long for the second row is cut. A hint is never split, order is unchanged ([[key-hints-in-one-place]]). One component lays out hints for a width and a row limit and reports each hint's row and columns, and one footer height that every screen subtracts instead of a fixed 2 or 3. Mouse hits on hints use the row and columns. Popup hints stay inside their box ([[popup-component]], [[navigation-standard]]) and are not part of this item. TUI only, no data change, no other door applies.
-		- Scenarios:
-			- Given hints that fit the width, When the footer renders, Then it is one hint row as today.
-			- Given hints wider than the width, When the footer renders, Then the hints that do not fit continue on a second row, in the same order, whole, with two spaces between hints.
-			- Given hints wider than two rows, When the footer renders, Then the rest are cut and the footer is two hint rows at most.
-			- Given a wrapped footer, When the screen renders, Then the body is one row shorter and the screen has exactly the terminal height.
-			- Given a hint on the second row of the main footer, When the user clicks it, Then its action runs.
-			- Given People at 80 columns, When the footer renders, Then `ctrl+o options` and `?` both show.
-			- Given each mode footer with hints wider than the width, When it renders, Then it wraps the same way and the screen keeps the terminal height.
-		- Test seam: the footer component's layout function for placement, and `m.screen()` (line count and the footer rows) for the screens.
-		- Evidence: red, \`TestPlaceHints\` and the wrap screen tests failed against a stub. Green with \`internal/tui/footer.go\` (\`placeHints\`, \`joinHintRows\`, \`footerRows\`, \`pageRows\`, \`footerMax\`). The main footer, \`renderHintItems\`, \`bodyHeight\`, mouse hits, the toast row, the help, text, names and view editor pages use it. Tests: \`footer_test.go\`. \`go vet ./...\`, \`go build ./...\` and \`go test ./...\` pass.
-		- Decisions added while building: \`bodyHeight\` reaches the footer through the field \`hintRowsFn\` (a direct call is an initialization cycle with \`viewNavs\`). A terminal shorter than 8 rows keeps one hint row so the body keeps 3 rows (\`footerMax\`). \`TestKeyHintsAreOnlyInTheFooter\` now expects 2 footer lines for the names panel, the scenario changed it, not the code.
-		- Exceptions: popup hints are not part of this item.
 	- [ ] Interactive color picker for the Theme pane (today a hex field with a swatch): pick a color on a grid or sliders, keep the hex field as the typed path ([[custom-themes]]).
 	- [ ] Custom themes ([[custom-themes]]): snippets in `~/.crm/themes/snippets`, theme checks in `internal/validate` with contrast warnings (`crm theme check`), a file watcher for live reload, `crm theme export` and `import`, a picker detail pane with a rendered sample.
 	- [ ] Theme generator in the style of the theme-factory skill: `crm theme generate` takes a name, a mood or a few seed colors (accent, background) and writes both variants with roles derived from the seeds, checks contrast (4.5:1 text, 3:1 kinds) and the 16-color mapping, then shows the sample in the picker before saving ([[custom-themes]]).
