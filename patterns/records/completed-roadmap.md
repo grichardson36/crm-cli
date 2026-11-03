@@ -64,7 +64,7 @@ Badges show only the gates that have evidence. All items below passed `go build`
   - Outcome: `ctrl+o` has an Order row (ascending or descending) next to Sort in People, Organizations and Tags, remembered per view for the session. No new key. Merge and Archived have no Order row.
   - Decisions: an order the user has not set is the natural one of the sort (name ascending, recent and count descending), so nothing changed until a user flips it. A set order is kept when Sort changes. Mutation sweep killed 14 of 14. Review was by the implementing agent.
   - Exceptions: saved views are out of scope and "Save current view" stores only the sort field. Order has no effect in the Tags duplicates filter or tree layout.
-- [x] ✅ CRM-020: Name sort for Deals and Tasks (see the commit that adds `sortname_test.go`)
+- [x] ✅ CRM-020: Name sort for Deals and Tasks (`29ef004`, `c557cfb`)
   - Outcome: Deals and Tasks have the Sort and Order rows of `ctrl+o` with a Name sort, so the letter jump (CRM-017) follows title order. Defaults are unchanged: Deals newest created first, Tasks soonest due first.
   - Decisions: Tasks sorted by due date keep undated tasks last in both directions. Footer shows `ctrl+o options` in both views because they now have options. `TestFooterShowsViewOptionsWhereTheViewHasThem` now lists Birthdays as the view without options. Mutation sweep killed 12 of 12 after adding `TestSortRowNamesTheDefaultSortOfDealsAndTasks`. Review was by the implementing agent.
   - Exceptions: none.
