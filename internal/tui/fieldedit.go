@@ -40,11 +40,7 @@ type typedEdit struct {
 
 // parseDateField is the date parser handed to FieldSpec.Normalize: the same phrases as "by <date>".
 func (m *Model) parseDateField(raw string) (string, bool) {
-	res := shortsyntax.Parse("by "+raw, shortsyntax.Options{Now: m.now()})
-	if res.Deadline != nil && res.Title == "" {
-		return res.Deadline.String(), true
-	}
-	return "", false
+	return shortsyntax.ParseDate(raw, m.now())
 }
 
 // specRow builds a typed row for a field of a record.

@@ -23,7 +23,7 @@ type clockVal struct{ h, m int }
 var (
 	isoRe     = regexp.MustCompile(`^(\d{4})-(\d{2})-(\d{2})$`)
 	mdRe      = regexp.MustCompile(`^(\d{1,2})/(\d{1,2})$`)
-	mdyRe     = regexp.MustCompile(`^(\d{1,2})/(\d{1,2})/(\d{4})$`)
+	mdyRe     = regexp.MustCompile(`^(\d{1,2})([/-])(\d{1,2})([/-])(\d{4}|\d{2})$`)
 	offsetRe  = regexp.MustCompile(`^\+?(\d{1,3})(d|w|m|y)$`)
 	relTimeRe = regexp.MustCompile(`^\+?(\d{1,4})(h|hr|hrs|min|mins)$`)
 	dayNumRe  = regexp.MustCompile(`^(\d{1,2})(?:st|nd|rd|th)?$`)
@@ -252,6 +252,30 @@ func matchDate(w []string, now time.Time, strict bool) (dateVal, bool) {
 	return dateVal{}, false
 }
 
+// numericDate reads two numbers and an optional year. The first number is the month. A first number
+// above 12 with a second up to 12 is read day-first (25/12/2026). A two-digit year is 20yy. With no
+// year the date is the next one on or after today.
+func numericDate(a, b, year string, today dateVal) (dateVal, bool) {
+	mo, _ := strconv.Atoi(a)
+	d, _ := strconv.Atoi(b)
+	if mo > 12 && d <= 12 {
+		mo, d = d, mo
+	}
+	if mo < 1 || mo > 12 || d < 1 || d > 31 {
+		return dateVal{}, false
+	}
+	if year == "" {
+		dv := yearlessDate(mo, d, today)
+		return dv, dv.y != 0
+	}
+	y, _ := strconv.Atoi(year)
+	if len(year) == 2 {
+		y += 2000
+	}
+	dv := dateVal{y, mo, d}
+	return dv, dv.valid()
+}
+
 func dayOf(s string) (int, bool) {
 	m := dayNumRe.FindStringSubmatch(s)
 	if m == nil {
@@ -325,20 +349,14 @@ func matchDate1(s string, now time.Time, strict bool) (dateVal, bool) {
 		return dv, dv.valid()
 	}
 	if m := mdyRe.FindStringSubmatch(s); m != nil {
-		mo, _ := strconv.Atoi(m[1])
-		d, _ := strconv.Atoi(m[2])
-		y, _ := strconv.Atoi(m[3])
-		dv := dateVal{y, mo, d}
-		return dv, dv.valid()
-	}
-	if m := mdRe.FindStringSubmatch(s); m != nil && !strict {
-		mo, _ := strconv.Atoi(m[1])
-		d, _ := strconv.Atoi(m[2])
-		if mo < 1 || mo > 12 || d < 1 || d > 31 {
+		// One separator for both slots. Two-digit years are 20yy and only after "by" (not strict).
+		if m[2] != m[4] || (strict && len(m[5]) == 2) {
 			return dateVal{}, false
 		}
-		dv := yearlessDate(mo, d, today)
-		return dv, dv.y != 0
+		return numericDate(m[1], m[3], m[5], today)
+	}
+	if m := mdRe.FindStringSubmatch(s); m != nil && !strict {
+		return numericDate(m[1], m[2], "", today)
 	}
 	if m := offsetRe.FindStringSubmatch(s); m != nil && (!strict || strings.HasPrefix(s, "+")) {
 		n, _ := strconv.Atoi(m[1])

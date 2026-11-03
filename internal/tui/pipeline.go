@@ -377,7 +377,7 @@ func (m *Model) pipeSoft(s *pipeSession, seg pipeSeg, rs []rune, start, end, cur
 		if v, ok := m.parseDateField(text); ok {
 			return text + " -> " + prettyDate(v)
 		}
-		return "a date: 2026-12-01 or next friday"
+		return "a date: 2026-12-01, 12/1/2026, Dec 1 or next friday"
 	case model.FieldChoice:
 		var names []string
 		for _, c := range seg.Spec.Choices {

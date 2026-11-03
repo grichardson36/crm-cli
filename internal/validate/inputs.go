@@ -70,6 +70,7 @@ func PersonUpdate(in *model.UpdatePersonInput) Result {
 	v.ptr("notes", &in.Notes)
 	v.ptr("email", &in.Email)
 	v.ptr("phone", &in.Phone)
+	v.ptr("birthday", &in.Birthday)
 	return v.run("person", true, Options{})
 }
 

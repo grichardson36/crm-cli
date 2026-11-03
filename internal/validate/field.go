@@ -10,6 +10,7 @@ import (
 
 	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/jdanielnd/crm-cli/internal/phone"
+	"github.com/jdanielnd/crm-cli/internal/shortsyntax"
 )
 
 // Default length limits by field type, in characters. A FieldSpec.Max overrides them.
@@ -19,21 +20,26 @@ const (
 )
 
 var (
-	emailRe    = regexp.MustCompile(`^[^\s@]+@[^\s@]+\.[^\s@]+$`)
-	urlRe      = regexp.MustCompile(`^([A-Za-z][A-Za-z0-9+.-]*://)?[^\s/@:]+(\.[^\s/@:]+)+(:\d+)?([/?#]\S*)?$`)
-	phoneRe    = regexp.MustCompile(`^\+?[\d\s().\-/]+((x|ext\.?|#)\s*\d+)?$`)
-	isoDateRe  = regexp.MustCompile(`^(\d{4}-\d{2}-\d{2})([ T]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?)?$`)
-	monthDayRe = regexp.MustCompile(`^(--)?(\d{1,2})-(\d{1,2})$`)
-	moneyTrim  = strings.NewReplacer("$", "", ",", "", "_", "")
-	nonDigit   = regexp.MustCompile(`\D`)
+	emailRe     = regexp.MustCompile(`^[^\s@]+@[^\s@]+\.[^\s@]+$`)
+	urlRe       = regexp.MustCompile(`^([A-Za-z][A-Za-z0-9+.-]*://)?[^\s/@:]+(\.[^\s/@:]+)+(:\d+)?([/?#]\S*)?$`)
+	phoneRe     = regexp.MustCompile(`^\+?[\d\s().\-/]+((x|ext\.?|#)\s*\d+)?$`)
+	isoDateRe   = regexp.MustCompile(`^(\d{4}-\d{2}-\d{2})([ T]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?)?$`)
+	shortYearRe = regexp.MustCompile(`^\d{1,2}[/-]\d{1,2}[/-]\d{2}$`)
+	monthDayRe  = regexp.MustCompile(`^(--)?(\d{1,2})-(\d{1,2})$`)
+	moneyTrim   = strings.NewReplacer("$", "", ",", "", "_", "")
+	nonDigit    = regexp.MustCompile(`\D`)
 )
 
 // Options tune a check.
 type Options struct {
 	// Kind is the object kind the field belongs to ("person"). Suggestions name a target field of it.
 	Kind string
-	// ParseDate turns a natural phrase ("next friday") into a stored date. Nil accepts ISO dates only.
+	// ParseDate turns a natural phrase ("next friday") into a stored date. Nil uses the shared parser
+	// (shortsyntax.ParseDate), so every door reads 12/25/2026, Dec 25 and next friday the same way.
 	ParseDate model.DateParser
+	// Now is the clock of the shared date parser (a date with no year is the next one on or after
+	// it). The zero value means time.Now().
+	Now time.Time
 	// Create lets a field backed by a vocabulary take a value that is not on the list yet. The check
 	// then passes and returns the S_VOCAB_CREATE suggestion, and the caller adds the value to the list.
 	// Without it an unknown value is E_VOCAB_UNKNOWN.
@@ -111,7 +117,7 @@ func Field(spec model.FieldSpec, raw string, opt Options) Result {
 		}
 		r.add(Issue{Code: CodeChoiceInvalid, Field: label, Expected: "one of " + spec.ChoiceValues(), Received: v, Fix: "use one of the listed values"})
 	case model.FieldDate:
-		d, ok := parseDate(spec, v, opt.ParseDate)
+		d, ok := parseDate(spec, v, opt)
 		if !ok {
 			fix := "for example 2026-12-01 or next friday"
 			if spec.YearOptional {
@@ -196,7 +202,7 @@ func IsPhone(s string) bool {
 	return n >= 3 && n <= 20
 }
 
-func parseDate(spec model.FieldSpec, v string, parse model.DateParser) (string, bool) {
+func parseDate(spec model.FieldSpec, v string, opt Options) (string, bool) {
 	if m := isoDateRe.FindStringSubmatch(v); m != nil {
 		if _, err := time.Parse("2006-01-02", m[1]); err == nil {
 			return v, true
@@ -213,12 +219,23 @@ func parseDate(spec model.FieldSpec, v string, parse model.DateParser) (string, 
 			return "", false
 		}
 	}
-	if parse != nil {
-		if d, ok := parse(v); ok {
+	if spec.YearOptional {
+		// The field's own year rules: a year is four digits and may be left out.
+		if d, ok := shortsyntax.ParseBirthday(v); ok {
 			return d, true
 		}
+		// A phrase handed in by the TUI ("next friday") still reads, a two-digit year is not guessed.
+		if opt.ParseDate == nil || shortYearRe.MatchString(v) {
+			return "", false
+		}
 	}
-	return "", false
+	if opt.ParseDate != nil {
+		if d, ok := opt.ParseDate(v); ok {
+			return d, true
+		}
+		return "", false
+	}
+	return shortsyntax.ParseDate(v, opt.Now)
 }
 
 // OneOf checks that value is one of options (case-insensitive) and returns the listed spelling. It is

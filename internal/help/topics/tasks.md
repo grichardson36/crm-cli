@@ -4,7 +4,7 @@ Follow-ups with a due date and priority, optionally linked to people and a deal.
 
 ## Add and list
 
-Priorities: low, medium (default), high. Dates are `YYYY-MM-DD` or an ISO 8601 timestamp. `--person` can repeat. `--all` includes completed tasks. `--limit N` caps the list.
+Priorities: low, medium (default), high. Dates are `YYYY-MM-DD` or an ISO 8601 timestamp, or typed as `12/25/2026`, `12-25-2026`, `12/25/26`, `12/25`, `Dec 25`, `December 25 2026`, `25 Dec 2026` or `next friday`. The first number is the month, except a first number above 12 with a second up to 12, which is the day (`25/12/2026`). A date with no year is the next one on or after today. `--person` can repeat. `--all` includes completed tasks. `--limit N` caps the list.
 
 ```sh crm-example
 crm task add "Send proposal" --person 1 --due 2026-11-01 --priority high

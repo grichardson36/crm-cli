@@ -150,7 +150,7 @@ func (f FieldSpec) DefaultHint() string {
 	}
 	switch f.Type {
 	case FieldDate:
-		return "date: 2026-12-01 or next friday"
+		return "date: 2026-12-01, 12/1/2026, Dec 1 or next friday"
 	case FieldNumber:
 		return "number"
 	case FieldChoice:

@@ -182,7 +182,7 @@ func taskAddCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&description, "description", "", "task description")
-	cmd.Flags().StringVar(&due, "due", "", "due date (ISO 8601)")
+	cmd.Flags().StringVar(&due, "due", "", "due date: 2026-12-25, 12/25/2026, Dec 25, next friday")
 	cmd.Flags().StringVar(&priority, "priority", "medium", "priority: "+strings.Join(model.Priorities, ", "))
 	cmd.Flags().Int64SliceVar(&personIDs, "person", nil, "associated person ID (repeatable)")
 	cmd.Flags().Int64SliceVar(&orgIDs, "org", nil, "associated organization ID (repeatable)")
@@ -338,7 +338,7 @@ func taskEditCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&title, "title", "", "task title")
 	cmd.Flags().StringVar(&description, "description", "", "task description")
-	cmd.Flags().StringVar(&due, "due", "", "due date (ISO 8601). --due \"\" clears it")
+	cmd.Flags().StringVar(&due, "due", "", "due date: 2026-12-25, 12/25/2026, Dec 25, next friday. --due \"\" clears it")
 	cmd.Flags().BoolVar(&clearDue, "clear-due", false, "remove the due date (not for a recurring task unless --recurrence \"\" too)")
 	cmd.Flags().StringVar(&priority, "priority", "", "priority: "+strings.Join(model.Priorities, ", "))
 	cmd.Flags().Int64Var(&personID, "person", 0, "also link this person")

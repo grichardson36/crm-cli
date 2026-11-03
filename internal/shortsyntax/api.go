@@ -69,10 +69,16 @@ func ParseBirthday(s string) (string, bool) {
 		return "", false
 	}
 	if m := mdyRe.FindStringSubmatch(s); m != nil {
-		return birthdayOut(atoi(m[1]), atoi(m[2]), atoi(m[3]))
+		// A birthday year is four digits, so a two-digit year is not guessed.
+		if m[2] != m[4] || len(m[5]) != 4 {
+			return "", false
+		}
+		mo, d := dayFirst(atoi(m[1]), atoi(m[3]))
+		return birthdayOut(mo, d, atoi(m[5]))
 	}
 	if m := mdRe.FindStringSubmatch(s); m != nil {
-		return birthdayOut(atoi(m[1]), atoi(m[2]), 0)
+		mo, d := dayFirst(atoi(m[1]), atoi(m[2]))
+		return birthdayOut(mo, d, 0)
 	}
 	w := strings.Fields(s)
 	if len(w) < 2 || len(w) > 3 {
@@ -103,6 +109,27 @@ func TierOf(priority string) int { return Result{Priority: priority}.Tier() }
 
 // FormatMinutes writes minutes as 45m, 2h or 1h30m.
 func FormatMinutes(n int) string { return formatMinutes(n) }
+
+// dayFirst swaps a first number above 12 with a second up to 12 (25/12 is 12 December).
+func dayFirst(a, b int) (month, day int) {
+	if a > 12 && b <= 12 {
+		return b, a
+	}
+	return a, b
+}
+
+// ParseDate reads a date as typed by a person, the way "by <date>" does: 2026-12-25, 12/25/2026,
+// 12-25-2026, 12/25/26, 12/25, Dec 25, December 25 2026, 25 Dec 2026, next friday, in 2 weeks. The first
+// number is the month, except a first number above 12 with a second up to 12, which is day-first.
+// A date with no year is the next one on or after now. It returns the stored form, YYYY-MM-DD with
+// HH:MM when a time was typed. now is the clock, the zero value means time.Now().
+func ParseDate(raw string, now time.Time) (string, bool) {
+	res := Parse("by "+strings.TrimSpace(raw), Options{Now: now})
+	if res.Deadline != nil && res.Title == "" {
+		return res.Deadline.String(), true
+	}
+	return "", false
+}
 
 func atoi(s string) int {
 	n, _ := strconv.Atoi(s)
