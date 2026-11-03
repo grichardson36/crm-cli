@@ -546,23 +546,6 @@ func TestThemePaneReadOnlyChangesNothing(t *testing.T) {
 	assert.NotContains(t, themeNames(m), "nord - Copy1")
 }
 
-// A light mode on a dark terminal paints the screen. Going back to auto sets the terminal background
-// explicitly instead of relying on the terminal to honor a reset.
-func TestThemeModeBackToAutoRestoresTheTerminalBackground(t *testing.T) {
-	m := themeModel(t)
-	m.profile, m.darkBG, m.width, m.height = colorprofile.TrueColor, true, 80, 24
-	m.termBG = lipgloss.Color("#101010")
-	openThemePane(t, m)
-	press(m, "tab")
-	require.Equal(t, theme.ModeLight, m.appearance)
-	assert.NotNil(t, m.View().BackgroundColor, "light paints on a dark terminal")
-	press(m, "tab", "tab")
-	require.Equal(t, theme.ModeAuto, m.appearance)
-	v := m.View()
-	require.NotNil(t, v.BackgroundColor, "the terminal background is set, not left to a reset")
-	assert.True(t, rgbaEqual(v.BackgroundColor, m.termBG))
-}
-
 func TestThemeReloadPicksUpEditedFile(t *testing.T) {
 	m := themeModel(t)
 	m.appearance = theme.ModeDark

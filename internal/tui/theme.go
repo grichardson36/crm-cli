@@ -39,6 +39,10 @@ func defaultStyles() theme.Styles {
 func (m *Model) setTheme(l theme.Look) {
 	m.st = theme.NewStyles(l, m.profile)
 	m.applyKindColors()
+	// The detail viewport holds text drawn with the old styles. Draw it again.
+	if m.width > 0 {
+		m.syncDetail()
+	}
 }
 
 // dark says whether the dark palette is used: the mode, else what the terminal reported.
@@ -118,12 +122,19 @@ func (m *Model) setAppearance(md theme.Mode) error {
 		return err
 	}
 	m.appearance = md
+	m.redrawTheme()
+	return nil
+}
+
+// redrawTheme draws the chosen theme again after the mode, the terminal background or a theme file
+// changed. A preview under the cursor of the Theme pane stays, and the pane and the Settings rows
+// are rebuilt for the palette now shown.
+func (m *Model) redrawTheme() {
 	m.resolveTheme()
-	if m.appearanceOpen() && m.focus == focusDetail && m.themeSel != "" && m.themeSel != m.themeName {
+	if m.appearanceOpen() && m.focus == focusDetail && m.themeSel != "" && !strings.EqualFold(m.themeSel, m.themeName) {
 		m.previewTheme(m.themeSel)
 	}
 	m.refreshAppearance()
-	return nil
 }
 
 // refreshAppearance rebuilds the Settings rows and the Theme pane after the theme state changed.
@@ -161,8 +172,7 @@ func (m *Model) reloadTheme() {
 		m.setStatus("theme reload: "+err.Error(), true)
 		return
 	}
-	m.previewName = ""
-	m.setTheme(m.look(t))
+	m.redrawTheme()
 	if n := len(cat.Problems); n > 0 {
 		m.setStatus(fmt.Sprintf("%d theme file(s) have errors: %s", n, cat.Problems[0].Err), true)
 		return
@@ -181,14 +191,10 @@ func (m *Model) fillScreen() bool {
 // colors when the program exits, and sets or resets them when the view's fields change.
 func (m *Model) paintView(v *tea.View) {
 	if !m.fillScreen() || m.width <= 0 {
-		// Not every terminal honors the reset sequence. A screen that was painted gives the
-		// terminal's own background back explicitly.
-		if m.oscPainted && m.termBG != nil {
-			v.BackgroundColor = m.termBG
-		}
+		// Auto never sets a terminal color. Nil colors make Bubble Tea reset OSC 10 and 11, so a
+		// transparent or custom terminal background is kept.
 		return
 	}
-	m.oscPainted = true
 	t := m.st.Look
 	v.Content = t.Paint(v.Content, m.width, m.height)
 	v.ForegroundColor, v.BackgroundColor = t.DefaultColors()
