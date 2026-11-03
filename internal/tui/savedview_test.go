@@ -667,3 +667,11 @@ func TestSavedViewDeletedElsewhereLeavesTheScreen(t *testing.T) {
 	assert.Nil(t, m.sv)
 	assert.Len(t, m.rows, 3)
 }
+
+func TestFooterShowsViewOptionsInASavedView(t *testing.T) {
+	m := svModel(t)
+	m.width = 160
+	v := svCreate(t, m, "Everyone", "person", query.Query{}, true)
+	m.openSaved(v.UUID)
+	assert.Contains(t, footHints(m), "ctrl+o")
+}

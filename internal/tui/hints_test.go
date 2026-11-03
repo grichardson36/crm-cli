@@ -188,3 +188,27 @@ func TestHintClassOfActions(t *testing.T) {
 		assert.Equal(t, tt.class, hintClassOf(a), tt.id)
 	}
 }
+
+// CRM-015: the footer shows ctrl+o in every list view that has view options.
+func TestFooterShowsViewOptionsWhereTheViewHasThem(t *testing.T) {
+	m := newDefaultModel(t)
+	m.width = 160
+	for _, v := range []viewKind{viewPeople, viewOrgs, viewTags, viewMerge, viewArchived} {
+		m.switchView(v)
+		assert.Contains(t, footHints(m), "ctrl+o", "%s has view options", viewNames[v])
+	}
+	for _, v := range []viewKind{viewDeals, viewTasks} {
+		m.switchView(v)
+		assert.NotContains(t, footHints(m), "ctrl+o", "%s has no view options", viewNames[v])
+	}
+}
+
+func TestFooterViewOptionsHintFollowsTheKeymap(t *testing.T) {
+	m := newDefaultModel(t)
+	m.width = 160
+	m.switchView(viewPeople)
+	m.applyKeys(keys.Overrides{"options": {"ctrl+g"}})
+	h := footHints(m)
+	assert.Contains(t, h, "ctrl+g")
+	assert.NotContains(t, h, "ctrl+o")
+}
