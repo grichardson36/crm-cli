@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -176,6 +177,8 @@ type Model struct {
 	query  string
 	// sortRecentIn says per view which sort a list has: name or recent (view options, ctrl+o).
 	sortChoice map[viewKind]string
+	// orderChoice says per view whether the sort runs ascending or descending, once the user set it.
+	orderChoice map[viewKind]string
 	marked     map[int64]bool
 	// extend is the selection extension in progress (shift+up, shift+down), nil otherwise.
 	extend *extendState
@@ -613,9 +616,14 @@ func (m *Model) openTaskRows() ([]row, error) {
 
 func (m *Model) peopleRows() []row {
 	people := m.people
-	if m.sortedRecent(viewPeople) {
+	if m.sortedRecent(viewPeople) || m.flipped(viewPeople) {
 		sorted := append([]model.PersonSummary(nil), people...)
-		sortByUpdated(sorted)
+		if m.sortedRecent(viewPeople) {
+			sortByUpdated(sorted)
+		}
+		if m.flipped(viewPeople) {
+			slices.Reverse(sorted)
+		}
 		people = sorted
 	}
 	terms := strings.Fields(strings.ToLower(m.query))

@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -148,6 +149,7 @@ func tagViewOptions() []viewOption {
 				m.sortChoice[viewTags] = value
 			},
 		},
+		orderOption(viewTags),
 		{
 			id: "filter", label: "Filter",
 			choices: []optChoice{{"", "tags in use"}, {"unused", "unused tags"}, {"duplicates", "possible case duplicates"}, {"all", "all tags"}},
@@ -257,7 +259,15 @@ func (m *Model) tagRows() ([]row, error) {
 		return g.rows, nil
 	}
 	if m.sortOf(viewTags) == "count" {
-		sort.SliceStable(list, func(i, j int) bool { return list[i].Count > list[j].Count })
+		fewestFirst := m.flipped(viewTags)
+		sort.SliceStable(list, func(i, j int) bool {
+			if fewestFirst {
+				return list[i].Count < list[j].Count
+			}
+			return list[i].Count > list[j].Count
+		})
+	} else if m.flipped(viewTags) {
+		slices.Reverse(list)
 	}
 	rows := make([]row, 0, len(list))
 	for _, s := range list {

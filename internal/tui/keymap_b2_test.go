@@ -224,8 +224,8 @@ func TestOneViewOptionsOverlayServesEveryListView(t *testing.T) {
 		}
 		return out
 	}
-	assert.Equal(t, []string{"sort"}, ids(viewPeople))
-	assert.Equal(t, []string{"sort"}, ids(viewOrgs))
+	assert.Equal(t, []string{"sort", "order"}, ids(viewPeople))
+	assert.Equal(t, []string{"sort", "order"}, ids(viewOrgs))
 	assert.Equal(t, []string{"level"}, ids(viewMerge))
 	assert.Equal(t, []string{"type"}, ids(viewArchived))
 }

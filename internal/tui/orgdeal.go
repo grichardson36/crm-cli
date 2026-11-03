@@ -3,6 +3,7 @@ package tui
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -64,6 +65,9 @@ func (m *Model) orgRows() ([]row, error) {
 	similar := m.similarOrgs()
 	if !m.sortedRecent(viewOrgs) {
 		sort.SliceStable(list, func(i, j int) bool { return strings.ToLower(list[i].Name) < strings.ToLower(list[j].Name) })
+	}
+	if m.flipped(viewOrgs) {
+		slices.Reverse(list)
 	}
 	rows := make([]row, 0, len(list))
 	for _, o := range list {
