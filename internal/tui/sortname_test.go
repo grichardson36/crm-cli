@@ -104,3 +104,17 @@ func TestSortAndOrderAreRememberedPerDealsAndTasksView(t *testing.T) {
 	m.settle()
 	assert.Equal(t, "name", m.sortOf(viewDeals))
 }
+
+func TestSortRowNamesTheDefaultSortOfDealsAndTasks(t *testing.T) {
+	deals := threeDeals(t)
+	press(deals, "ctrl+o")
+	require.NotNil(t, deals.ov)
+	assert.Equal(t, "recently created", deals.ov.items[0].current)
+	press(deals, "esc")
+
+	tasks := threeTasks(t)
+	press(tasks, "ctrl+o")
+	require.NotNil(t, tasks.ov)
+	assert.Equal(t, "due date", tasks.ov.items[0].current)
+	press(tasks, "esc")
+}
