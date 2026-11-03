@@ -69,18 +69,19 @@ func TestNoteTypeIsACellOfTheRow(t *testing.T) {
 	assert.Nil(t, m.actionByID("link-edit"), "E is gone")
 	press(m, "E")
 	assert.Equal(t, modeNormal, m.mode, "E does nothing now")
-	require.Len(t, m.form[m.fcur].cells, 1)
-	assert.Equal(t, "type", m.form[m.fcur].cells[0].key)
-	setCell(t, m, 1, "meeting")
+	require.Len(t, m.form[m.fcur].cells, 2)
+	assert.Equal(t, "date", m.form[m.fcur].cells[0].key)
+	assert.Equal(t, "type", m.form[m.fcur].cells[1].key)
+	setCell(t, m, 2, "meeting")
 	assert.Equal(t, "meeting", noteContent(t, m, id).Type)
 	assert.Contains(t, m.status, "saved type")
 	assert.Equal(t, id, m.form[m.fcur].id)
 	assert.Equal(t, "meeting", m.form[m.fcur].typ)
-	assert.Equal(t, 1, m.fcol, "the cursor stays on the cell")
+	assert.Equal(t, 2, m.fcol, "the cursor stays on the cell")
 	// ctrl+z undoes it and left goes back to the row.
 	press(m, "ctrl+z")
 	assert.Equal(t, "note", noteContent(t, m, id).Type)
-	press(m, "left")
+	press(m, "left", "left")
 	assert.Equal(t, 0, m.fcol)
 	press(m, "left")
 	assert.Equal(t, focusList, m.focus, "left from the first cell returns to the list")
@@ -201,4 +202,46 @@ func TestNoteActionsInPalette(t *testing.T) {
 	m.width = 100
 
 	assert.LessOrEqual(t, lipgloss.Width(strings.Split(m.screen(), "\n")[len(strings.Split(m.screen(), "\n"))-1]), 100)
+}
+
+func TestNoteDateIsACellEditedInPlace(t *testing.T) {
+	m, _ := newTestModel(t)
+	n, err := m.ir.Create(context.Background(), model.CreateInteractionInput{Type: "note", Content: sp("dated"), OccurredAt: sp("2026-10-01 09:30:00"), PersonIDs: []int64{2}})
+	require.NoError(t, err)
+	press(m, "down", "tab")
+	focusNote(t, m)
+	cells := m.form[m.fcur].cells
+	require.Len(t, cells, 2)
+	assert.Equal(t, "date", cells[0].key)
+	assert.Equal(t, "2026-10-01", cells[0].value, "shown the way the feed shows the date")
+	assert.Equal(t, model.FieldDate, cells[0].spec.Type)
+
+	// enter edits, a valid date saves as one undo step and keeps the time of day
+	setCell(t, m, 1, "2026-09-15")
+	assert.Equal(t, "2026-09-15 09:30:00", noteContent(t, m, n.ID).OccurredAt)
+	assert.Equal(t, "2026-09-15", m.form[m.fcur].cells[0].value)
+	assert.Contains(t, m.status, "saved date")
+	press(m, "ctrl+z")
+	assert.Equal(t, "2026-10-01 09:30:00", noteContent(t, m, n.ID).OccurredAt, "undo restores the date")
+
+	// the shared date parser accepts a phrase
+	focusNote(t, m)
+	setCell(t, m, 1, "2026-10-12")
+	assert.Equal(t, "2026-10-12", shortDate(noteContent(t, m, n.ID).OccurredAt))
+
+	// an invalid date shows the error and keeps the editor
+	focusNote(t, m)
+	m.fcol = 1
+	press(m, "enter")
+	require.NotNil(t, m.edit)
+	replaceText(m, "not a date at all")
+	press(m, "enter")
+	assert.Equal(t, modeEdit, m.mode, "the editor stays open")
+	assert.True(t, m.statusIsErr)
+	assert.Equal(t, "2026-10-12", shortDate(noteContent(t, m, n.ID).OccurredAt))
+
+	// esc cancels
+	press(m, "esc")
+	assert.Equal(t, modeNormal, m.mode)
+	assert.Equal(t, "2026-10-12", shortDate(noteContent(t, m, n.ID).OccurredAt))
 }

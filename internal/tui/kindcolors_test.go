@@ -1,11 +1,10 @@
 package tui
 
 import (
-	"os"
 	"testing"
 
 	"github.com/charmbracelet/colorprofile"
-	"github.com/jdanielnd/crm-cli/internal/modules"
+	"github.com/jdanielnd/crm-cli/internal/model"
 	"github.com/jdanielnd/crm-cli/internal/theme"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -42,81 +41,78 @@ func TestLoadKindColorsDropsBadEntries(t *testing.T) {
 	assert.Empty(t, loadKindColors(""))
 }
 
-func TestColorsSettingsOverrideAndReset(t *testing.T) {
+func TestColorsPaneEditsAndResetsAKindColor(t *testing.T) {
 	m := settingsModel(t)
 	m.profile = colorprofile.TrueColor
 	m.setTheme(m.st.Look)
 	before := m.st.KindStyle("person").Render("x")
 
-	// the Colors section lists every registered kind
-	for _, ck := range colorKinds() {
-		require.NotNil(t, m.settingByID("color-"+ck.kind), ck.kind)
+	cursorToSetting(t, m, "colors")
+	require.NotNil(t, m.paneSP())
+	press(m, "enter")
+	require.Equal(t, focusDetail, m.focus)
+	out := paneText(m)
+	for _, k := range []string{"person", "organization", "deal", "task", "note", "tag"} {
+		assert.Contains(t, out, k)
 	}
-	assert.Len(t, colorKinds(), 7)
+	assert.NotContains(t, out, "view ", "the saved view kind is not listed")
 
-	// pick a palette color from the picker
-	cursorToSetting(t, m, "color-person")
-	pressRun(m, "enter")
-	require.NotNil(t, m.ov)
-	typeText(m, "danger")
-	press(m, "enter")
-	assert.Equal(t, "danger", m.kindColors["person"])
-	assert.NotEqual(t, before, m.st.KindStyle("person").Render("x"), "the style changed")
-	data, err := os.ReadFile(modules.ConfigFile(m.env.DataDir))
-	require.NoError(t, err)
-	assert.Contains(t, string(data), "[colors]")
-	assert.Contains(t, m.rows[m.cursor].sub, "danger")
+	// one row per kind, in the order of the Views (people, tasks, organizations, deals, tags), note last
+	var got []string
+	for _, ck := range m.paneColorKinds() {
+		got = append(got, ck.kind)
+	}
+	assert.Equal(t, []string{"person", "task", "organization", "deal", "tag", model.NoteKind}, got)
 
-	// a custom hex color, with a live preview while typing and validation on enter
-	pressRun(m, "enter")
-	typeText(m, "Custom")
-	press(m, "enter")
-	require.Equal(t, modePrompt, m.mode)
-	typeText(m, "zz")
+	// footer: only keys that work on the row. Nothing is custom yet, so no reset.
+	h := hintsText(m)
+	assert.Contains(t, h, "e edit")
+	assert.Contains(t, h, "esc close")
+	assert.NotContains(t, h, "shift+r reset")
+
+	// edit in place: a bad value is refused, a hex is saved to [colors]
+	press(m, "e")
+	assert.Contains(t, hintsText(m), "enter save")
+	m.sp.(*colorsPane).in.SetValue("zz")
 	press(m, "enter")
 	assert.True(t, m.statusIsErr, "a bad color is refused")
-	assert.Equal(t, "danger", m.kindColors["person"])
-
-	pressRun(m, "enter")
-	typeText(m, "Custom")
-	press(m, "enter")
-	m.input.SetValue("#112233")
-	m.previewKindColorHex()
-	assert.Equal(t, "#112233", resolveKindColor(m.st.Look, m.kindColors, "person"), "live preview")
+	assert.Empty(t, m.kindColors)
+	m.sp.(*colorsPane).in.SetValue("#112233")
 	press(m, "enter")
 	assert.False(t, m.statusIsErr, m.status)
 	assert.Equal(t, "#112233", m.kindColors["person"])
 	assert.Equal(t, "#112233", loadKindColors(m.env.DataDir)["person"])
+	assert.NotEqual(t, before, m.st.KindStyle("person").Render("x"))
+	assert.Contains(t, paneText(m), "#112233")
+	assert.Contains(t, hintsText(m), "shift+r reset", "reset shows once the row is custom")
 
-	// esc on the prompt restores the saved color
-	pressRun(m, "enter")
-	typeText(m, "Custom")
-	press(m, "enter")
-	m.input.SetValue("#ffffff")
-	m.previewKindColorHex()
+	// esc while editing cancels and keeps the saved color
+	press(m, "e")
+	m.sp.(*colorsPane).in.SetValue("#ffffff")
 	press(m, "esc")
+	assert.Equal(t, focusDetail, m.focus, "esc closed the input only")
 	assert.Equal(t, "#112233", m.kindColors["person"])
 
-	// reset one kind from the picker
-	pressRun(m, "enter")
-	typeText(m, "Reset")
-	press(m, "enter")
+	// shift+r resets the row
+	press(m, "R")
 	_, has := m.kindColors["person"]
 	assert.False(t, has)
+	assert.Empty(t, loadKindColors(m.env.DataDir))
 	assert.Equal(t, before, m.st.KindStyle("person").Render("x"))
-	_, err = os.Stat(modules.ConfigFile(m.env.DataDir))
-	require.NoError(t, err)
-	assert.Empty(t, loadKindColors(m.env.DataDir))
+	assert.NotContains(t, hintsText(m), "shift+r reset")
 
-	// reset all after a yes
-	require.NoError(t, m.setKindColor("deal", "mark"))
-	require.NoError(t, m.setKindColor("task", "#010203"))
-	cursorToSetting(t, m, "colors-reset")
-	pressRun(m, "enter")
-	require.Equal(t, modeConfirm, m.mode)
-	press(m, "y")
-	assert.Empty(t, m.kindColors)
-	assert.Empty(t, loadKindColors(m.env.DataDir))
+	// the other rows move with down, and esc leaves the pane
+	press(m, "down")
+	assert.Equal(t, 1, m.sp.(*colorsPane).cursor)
+	press(m, "esc")
+	assert.Equal(t, focusList, m.focus)
+}
+
+func TestColorsAreOneSettingsRow(t *testing.T) {
+	m := settingsModel(t)
+	assert.NotNil(t, m.settingByID("colors"))
+	assert.Nil(t, m.settingByID("color-person"), "the per-kind rows and their picker are gone")
+	assert.Len(t, colorKinds(), 7)
 }
 
 func TestKindColorsKeepNoColorPrefixes(t *testing.T) {

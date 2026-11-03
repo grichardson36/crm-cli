@@ -473,6 +473,9 @@ func (m *Model) cmdPopup(o *overlay, spec popupSpec) popupSpec {
 		for _, wn := range p.Warnings {
 			rows = append(rows, m.st.Dim.Render("  note: "+wn))
 		}
+		if len(c.comp.Candidates) == 0 && len(p.Problems) == 0 && len(p.Warnings) == 0 && c.msg == "" {
+			rows = append(rows, m.st.Dim.Render(cmdSyntaxRow))
+		}
 	}
 	page := m.popupPage()
 	if len(rows) > page {
@@ -482,6 +485,10 @@ func (m *Model) cmdPopup(o *overlay, spec popupSpec) popupSpec {
 	spec.box = m.popupBoxAt(w, len(rows))
 	return spec
 }
+
+// cmdSyntaxRow is the helper of the command line while nothing else fills the list: the verbs and
+// the short syntax tokens, as dim words.
+const cmdSyntaxRow = "  verbs: n note, t task, log, set, tag, snooze   tokens: #tag @Name !high ~30m by fri remind fri every 3m"
 
 func orNone(s string) string {
 	if s == "" {

@@ -3,6 +3,8 @@ package tui
 import (
 	"context"
 	"strings"
+
+	"github.com/charmbracelet/x/ansi"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -67,7 +69,7 @@ func TestSavedViewShowsInTheViewsScreenHiddenAndOpens(t *testing.T) {
 	hiddenAt := -1
 	for i, idx := range m.ov.shown {
 		it := m.ov.items[idx]
-		if it.divider && it.label == "Hidden" {
+		if it.divider && it.label == "" {
 			hiddenAt = i
 		}
 		if strings.HasPrefix(it.value, savedPrefix) {
@@ -102,7 +104,7 @@ func TestSavedViewXShowsItInTheTabsAndTakesTheNextNumberKey(t *testing.T) {
 	for m.ov.items[m.ov.shown[m.ov.cursor]].value != savedPrefix+v.UUID {
 		press(m, "down")
 	}
-	press(m, "x")
+	press(m, "shift+up", "shift+up", "shift+up", "shift+up", "shift+up") // up over the other hidden views and the line
 	got, err := m.svr.FindByID(context.Background(), v.ID)
 	require.NoError(t, err)
 	assert.True(t, got.ShowInTabs)
@@ -148,7 +150,7 @@ func TestSavedViewXShowsItInTheTabsAndTakesTheNextNumberKey(t *testing.T) {
 	for m.ov.items[m.ov.shown[m.ov.cursor]].value != savedPrefix+v.UUID {
 		press(m, "down")
 	}
-	press(m, "x")
+	press(m, "shift+down") // the last shown view crosses the line
 	press(m, "esc")
 	assert.Equal(t, "", m.svKeyOf(v.UUID))
 	for _, seg := range m.tabLayout() {
@@ -502,24 +504,39 @@ func TestEditViewEditorRefusesWhatTheValidationRefusesAndKeepsChangesUntilSaved(
 	assert.Equal(t, "name", m.sve.q.Filter[0].Field, "company is a person field, name is shared")
 }
 
-func TestViewsScreenEditDeleteRestoreKeys(t *testing.T) {
+// A saved view is edited, deleted and restored in the Settings Views pane. The popup has no such keys.
+func TestSettingsViewsPaneEditDeleteRestoreKeys(t *testing.T) {
 	m := svModel(t)
 	ctx := context.Background()
 	v := svCreate(t, m, "Mine", "task", query.Query{}, true)
+	enter := func() {
+		if m.focus == focusDetail {
+			press(m, "esc")
+		}
+		m.switchView(viewSettings)
+		cursorToSetting(t, m, "views")
+		press(m, "enter")
+		require.Equal(t, focusDetail, m.focus)
+	}
 	focus := func(value string) {
-		for m.ov.items[m.ov.shown[m.ov.cursor]].value != value {
+		press(m, "home")
+		p := m.sp.(*viewsPane)
+		for i := 0; p.o.items[p.o.shown[p.o.cursor]].value != value; i++ {
+			require.Less(t, i, 40, "no row %s in the pane", value)
 			press(m, "down")
 		}
 	}
 
-	press(m, "v")
+	enter()
 	focus(savedPrefix + v.UUID)
+	assert.Contains(t, hintsText(m), "e edit")
+	assert.Contains(t, hintsText(m), "d delete")
 	press(m, "e")
 	require.NotNil(t, m.sve, "e edits the saved view")
 	assert.Equal(t, v.ID, m.sve.id)
 	press(m, "esc")
 
-	press(m, "v")
+	enter()
 	focus(savedPrefix + v.UUID)
 	press(m, "d")
 	require.Equal(t, modeConfirm, m.mode, "d asks y or n")
@@ -528,37 +545,54 @@ func TestViewsScreenEditDeleteRestoreKeys(t *testing.T) {
 	got, _ := m.svr.FindByID(ctx, v.ID)
 	assert.False(t, got.Deleted)
 
-	press(m, "v")
+	enter()
 	focus(savedPrefix + v.UUID)
 	press(m, "d", "y")
 	got, _ = m.svr.FindByID(ctx, v.ID)
 	assert.True(t, got.Deleted)
-	require.Equal(t, modeOverlay, m.mode, "the Views screen is back")
-	var hasDeleted bool
-	for _, idx := range m.ov.shown {
-		if m.ov.items[idx].label == "Deleted views" {
-			hasDeleted = true
-		}
-	}
-	assert.True(t, hasDeleted)
+	require.Equal(t, modeNormal, m.mode)
+	require.Equal(t, focusDetail, m.focus, "the pane stays")
+	require.NotNil(t, m.paneSPFocused())
+	assert.Contains(t, paneText(m), "Deleted views")
 	focus(savedPrefix + v.UUID)
+	h := hintsText(m)
+	assert.Contains(t, h, "r restore")
+	assert.NotContains(t, h, "e edit", "a deleted view cannot be edited")
+	assert.NotContains(t, h, "shift+up/down move")
 	press(m, "enter")
 	assert.True(t, m.statusIsErr, "a deleted view does not open")
 	assert.Nil(t, m.sv)
-
-	press(m, "v")
-	focus(savedPrefix + v.UUID)
 	press(m, "r")
 	got, _ = m.svr.FindByID(ctx, v.ID)
 	assert.False(t, got.Deleted, "r restores")
-	press(m, "esc")
 
-	// built-in views are not edited or deleted from here
-	press(m, "v")
+	// built-in views: no edit or delete, and the footer does not offer them
 	focus("people")
+	h = hintsText(m)
+	assert.NotContains(t, h, "e edit")
+	assert.NotContains(t, h, "d delete")
+	assert.Contains(t, h, "enter open")
 	press(m, "d")
-	assert.True(t, m.statusIsErr)
-	assert.Equal(t, modeOverlay, m.mode)
+	assert.Equal(t, modeNormal, m.mode, "a built-in view has no delete")
+}
+
+func TestViewsPopupHasNoEditDeleteRestoreKeys(t *testing.T) {
+	m := svModel(t)
+	v := svCreate(t, m, "Mine", "task", query.Query{}, true)
+	press(m, "v")
+	for m.ov.items[m.ov.shown[m.ov.cursor]].value != savedPrefix+v.UUID {
+		press(m, "down")
+	}
+	h := ansi.Strip(m.renderPopupHints(m.overlayHints(), 200))
+	for _, bad := range []string{"edit", "delete", "restore", "ctrl+e", "ctrl+d", "ctrl+r"} {
+		assert.NotContains(t, h, bad)
+	}
+	for _, k := range []string{"ctrl+e", "ctrl+d", "ctrl+r", "e", "d", "r"} {
+		press(m, k)
+		assert.Equal(t, modeOverlay, m.mode, k)
+		assert.Nil(t, m.sve)
+	}
+	assert.Equal(t, "edr", m.ov.filter.Value(), "bare letters went to the filter")
 }
 
 func TestObjectRegistryGivesTheSavedViewItsVerbs(t *testing.T) {

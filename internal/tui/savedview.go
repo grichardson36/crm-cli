@@ -574,6 +574,33 @@ func (m *Model) hUpdateSaved(id int64, p repo.SavedViewPatch) (*repo.SavedView, 
 	return after, nil
 }
 
+// svShift moves a saved view one place in the Views list. Inside its group (shown or hidden) it
+// swaps with the next view of the group. At the edge of its group a move toward the line shows or
+// hides it, a move away from the line does nothing.
+func (m *Model) svShift(v repo.SavedView, d int) error {
+	idx := -1
+	for i, x := range m.svs {
+		if x.ID == v.ID {
+			idx = i
+		}
+	}
+	if idx < 0 {
+		return nil
+	}
+	for j := idx + d; j >= 0 && j < len(m.svs); j += d {
+		if m.svs[j].ShowInTabs == v.ShowInTabs {
+			m.svMove(v.ID, d)
+			return nil
+		}
+	}
+	if (v.ShowInTabs && d > 0) || (!v.ShowInTabs && d < 0) {
+		on := !v.ShowInTabs
+		_, err := m.hUpdateSaved(v.ID, repo.SavedViewPatch{ShowInTabs: &on})
+		return err
+	}
+	return nil
+}
+
 // svMove moves a view among the views in its state (shown or hidden), so a view never jumps across
 // the divider of the Views screen: it steps until it has passed one view of its own state.
 func (m *Model) svMove(id int64, d int) {

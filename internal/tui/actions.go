@@ -339,7 +339,7 @@ func buildActions() []action {
 
 		// Views and search.
 		viewAction(viewHome), viewAction(viewPeople), viewAction(viewDue), viewAction(viewTasks), viewAction(viewOrgs), viewAction(viewBirthdays), viewAction(viewMerge), viewAction(viewArchived), viewAction(viewSync), viewAction(viewDeals), viewAction(viewSettings), viewAction(viewTags),
-		{id: "goto-view", title: "Go to view", group: "Views", hint: "v", keys: []string{"v"}, desc: "the Views screen: every view, shown ones first, hidden ones under a divider. Go to a view, show or hide it and reorder them. Per device",
+		{id: "goto-view", title: "Go to view", group: "Views", hint: "v", keys: []string{"v"}, desc: "the Views screen: shown views, a line, hidden views in gray. Type to filter, open a view, move a view with shift+up and shift+down (across the line hides or shows it). Per device",
 			foot: 85, footIn: inList, run: func(m *Model) tea.Cmd { return m.openViews() }},
 		{id: "next-view", title: "Next view", group: "Views", hint: "]", keys: []string{"]", "ctrl+right"}, desc: "next view",
 			run: func(m *Model) tea.Cmd { m.stepView(1); return nil }},

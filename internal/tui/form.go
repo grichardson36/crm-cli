@@ -407,6 +407,17 @@ func (m *Model) refreshDetail(force bool) {
 // syncDetail renders the form into the detail viewport and keeps the cursor row in view.
 func (m *Model) syncDetail() {
 	w := m.detail.Width()
+	if p := m.paneSP(); p != nil && len(m.form) > 0 {
+		lines := p.lines(m, w, m.detail.Height())
+		m.lineRow = m.lineRow[:0]
+		for range lines {
+			m.lineRow = append(m.lineRow, -1)
+		}
+		m.rowStart, m.rowEnd = make([]int, len(m.form)), make([]int, len(m.form))
+		m.detail.SetContent(strings.Join(lines, "\n"))
+		m.detail.GotoTop()
+		return
+	}
 	if le := m.paneList(); le != nil && len(m.form) > 0 {
 		lines := le.paneLines(m, w, m.detail.Height())
 		m.lineRow = m.lineRow[:0]

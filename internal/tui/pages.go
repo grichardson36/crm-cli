@@ -121,7 +121,7 @@ func (m *Model) timelineRows(f model.InteractionFilters) []formRow {
 		}
 		r := formRow{kind: rkNote, label: shortDate(it.OccurredAt), key: val, value: str(it.Content), id: it.ID, typ: it.Type,
 			feed: &feedData{subject: str(it.Subject), links: m.feedLinksOf(it, own, names)}}
-		r.cells = []rowCell{{key: "type", label: "type", value: it.Type, spec: cells[0].spec}}
+		r.cells = []rowCell{noteDateCell(it.OccurredAt), {key: "type", label: "type", value: it.Type, spec: cells[0].spec}}
 		if i == 0 {
 			r.head = "Recent"
 		}

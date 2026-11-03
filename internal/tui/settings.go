@@ -81,8 +81,6 @@ type setting struct {
 	// field editor when both exist.
 	action string
 	run    func(m *Model) tea.Cmd
-	// colorKind is set on the rows of the Colors section: the detail pane shows a live sample in it.
-	colorKind string
 }
 
 func onOff(b bool) string {
@@ -128,7 +126,7 @@ func (m *Model) settingList() []setting {
 			return countText(len(list), noun)
 		}
 	}
-	return append(m.colorSettings(), []setting{
+	return append([]setting{m.colorsSetting()}, []setting{
 		// Appearance
 		{id: appearanceID, section: secAppearance, name: "Theme", words: "appearance theme mode colors colours dark light auto look background", scope: scopeDevice,
 			value: func(m *Model) string { return m.themeName + ", " + string(m.appearance) },
@@ -153,7 +151,7 @@ func (m *Model) settingList() []setting {
 				n := m.mods.Normalize()
 				return fmt.Sprintf("%d shown, %d hidden", len(n.Order)-len(n.Hidden), len(n.Hidden))
 			},
-			run: func(m *Model) tea.Cmd { return m.openViews() }},
+			run: func(m *Model) tea.Cmd { return m.openSettingsPane(viewsPaneID) }},
 		{id: "views-reset", section: secViews, name: "Views: reset", words: "modules default arrangement", desc: "show the default views in the default order", scope: scopeDevice,
 			action: "modules-reset"},
 
@@ -436,6 +434,9 @@ func (m *Model) buildSettingForm(id string) []formRow {
 	if listPaneID(id) == "" {
 		m.lp = nil
 	}
+	if paneSPID(id) == "" {
+		m.sp = nil
+	}
 	if strings.HasPrefix(id, "key:") {
 		return m.keyDetail(strings.TrimPrefix(id, "key:"))
 	}
@@ -445,6 +446,11 @@ func (m *Model) buildSettingForm(id string) []formRow {
 		return nil
 	}
 	m.formTitle = s.name
+	if pid := paneSPID(id); pid != "" {
+		// The pane is the Views list or the Colors list (syncDetail draws it). The one row keeps the pane focusable.
+		m.ensureSettingsPane(pid)
+		return []formRow{infoRow("", "")}
+	}
 	if lid := listPaneID(id); lid != "" {
 		// The pane is the list itself (syncDetail draws it). The one row keeps the pane focusable.
 		m.ensurePaneList(lid)
@@ -466,11 +472,6 @@ func (m *Model) buildSettingForm(id string) []formRow {
 		rows = append(rows, r)
 	default:
 		v := s.valueOf(m)
-		if s.colorKind != "" {
-			sr := infoRow("preview", m.colorSample(s.colorKind, s.name))
-			sr.head = "Preview"
-			rows = append(rows, sr)
-		}
 		if v != "" {
 			vr := infoRow("value", v)
 			vr.head = "Value"

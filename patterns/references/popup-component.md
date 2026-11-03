@@ -31,9 +31,20 @@ Call `m.openPicker(title, items, onPick)`, or build an `overlay` with `m.newOver
 
 The box is centered. Text width is the widest row within 44 to 76 cells (the palette 96), then cut to the terminal width minus 4. The list is at most 14 rows and at most the terminal height minus 8, and scrolls. A popup with a filter keeps its height while the filter changes.
 
+## Syntax helpers stay
+
+A popup shows no explanatory sentences or action descriptions, but the helpers that guide typing stay:
+
+1. The palette has one dim helper row under its filter line (`popupBox.helper`) with the scope prefixes as short words (`> actions @ people # tags = settings ? help`). It shows while the box is empty or holds only a prefix.
+2. The palette command line (a verb and a space) keeps the grey shape after the cursor (`hint.go`), the token row (`#tag @Name !high ~30m by fri remind fri every 3m`) while nothing else fills the list, the preview, errors, warnings and candidates.
+3. The footer prompts (task, note, organization, deal, person add lines) are not popups. They keep the pipe labels after the cursor, the error of a closed segment, the soft indicator, the autocomplete list and the chips (`pipeview.go`).
+4. Record context (people, organizations) and disabled reasons stay in rows. Action descriptions are tooltips and are not drawn (they stay searchable).
+
 ## Views list
 
 `m.newViewsList(focus)` returns the Views list as an overlay that is not shown. The Views popup shows it. A pane that embeds the list draws its rows with `m.popupListRows(o, width, rows)` and keeps the same `onKey`, `onPick` and `hintsFor`.
+
+The list is the shown views numbered 1 to 0, a divider with no label (drawn as a line), then the hidden views as `dim` rows (gray, no number). `shift+up` and `shift+down` move the highlighted view inside its group. At the edge of its group a move toward the line crosses it: a shown view is hidden and lands first below the line, a hidden view is shown and lands last above it. A move away from the line at the edge does nothing. Settings refuses to cross because it cannot be hidden. The data is the `[modules]` table (order and hidden) and the saved views' `ShowInTabs`, a view's number follows its place among the shown ones. The filter matches names only (`nameOnly`), digits pick a view only while the filter is empty, `enter` opens the highlighted row. `shift+r` restores `modules.Default()`. Hints show only keys of the highlighted row: `up/down select`, `enter open`, `shift+up/down move` (not while a filter is typed), `shift+r reset`, `esc close`. The popup has no edit, delete or restore key: plain letters are typed into the filter. Saved views are managed in the Settings Views pane, which embeds the same list (`m.newViewsListFor(focus, true)` and `popupListRows`, `settingspane.go`) with no filter line, so `e` edit, `d` delete and `r` restore work there and the footer shows them only for the highlighted row.
 
 ## Not a popup
 
@@ -41,4 +52,4 @@ The list editor (`listeditor.go`) is not an overlay. It is drawn in the right pa
 
 ## Check
 
-`popup_test.go`: centered box, width limits on a small terminal, hints inside the box, filter and title variants. `TestEveryOverlayClosesWithEsc` covers esc.
+`popup_test.go`: centered box, width limits on a small terminal, hints inside the box, filter and title variants. `helpers_visible_test.go`: palette prefix helpers, command line helpers and footer prompt helpers fail the build if they disappear. `views_screen_test.go`: line, crossing, filter, reset and hints of the Views list. `TestEveryOverlayClosesWithEsc` covers esc.

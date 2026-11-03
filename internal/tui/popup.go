@@ -40,6 +40,7 @@ type popupBox struct {
 	textW      int
 	listY      int
 	rows       int
+	helper     bool // one dim row under the filter line for the syntax helpers (the palette)
 }
 
 // popupSpec is everything the box draws.
@@ -49,11 +50,19 @@ type popupSpec struct {
 	rows  []string // list lines, already styled
 	empty string   // shown in place of rows when there are none
 	hints string   // the hint row, from renderPopupHints
+	helper string  // the syntax helper row under the filter line, drawn when box.helper is set
 	box   popupBox
 }
 
 // popupPage is how many list rows fit on this screen: one blank line above and below the box.
-func (m *Model) popupPage() int { return max(1, min(popupMaxRows, m.height-popupChrome-2)) }
+// The palette has the helper row, so it has one list row less on a short screen.
+func (m *Model) popupPage() int {
+	chrome := popupChrome + 2
+	if m.ov != nil && m.ov.palette {
+		chrome++
+	}
+	return max(1, min(popupMaxRows, m.height-chrome))
+}
 
 // popupTextW clamps a wanted row width to the screen.
 func (m *Model) popupTextW(want int) int {
@@ -61,12 +70,21 @@ func (m *Model) popupTextW(want int) int {
 }
 
 // popupBoxAt centers a box for a row width and a number of list rows.
-func (m *Model) popupBoxAt(textW, rows int) popupBox {
+func (m *Model) popupBoxAt(textW, rows int) popupBox { return m.popupBoxWith(textW, rows, false) }
+
+// popupBoxWith is popupBoxAt with an optional helper row under the filter line.
+func (m *Model) popupBoxWith(textW, rows int, helper bool) popupBox {
 	rows = max(1, rows)
-	b := popupBox{textW: textW, rows: rows, w: textW + 4, h: rows + popupChrome}
+	b := popupBox{textW: textW, rows: rows, w: textW + 4, h: rows + popupChrome, helper: helper}
+	if helper {
+		b.h++
+	}
 	b.x = max(0, (m.width-b.w)/2)
 	b.y = max(0, (m.height-b.h)/2)
 	b.listY = b.y + 3
+	if helper {
+		b.listY++
+	}
 	return b
 }
 
@@ -110,7 +128,11 @@ func (m *Model) popupLines(s popupSpec) []string {
 	if top == "" {
 		top = m.st.Head.Render(s.title)
 	}
-	lines := []string{rule("┌", "┐"), row(top), rule("├", "┤")}
+	lines := []string{rule("┌", "┐"), row(top)}
+	if b.helper {
+		lines = append(lines, row(s.helper))
+	}
+	lines = append(lines, rule("├", "┤"))
 	body := s.rows
 	if len(body) == 0 && s.empty != "" {
 		body = []string{m.st.Dim.Render(s.empty)}

@@ -286,7 +286,7 @@ func TestNoteTypesStillWorkOnAnOrganizationPage(t *testing.T) {
 	m.afterWrite()
 	press(m, "tab")
 	focusRow(t, m, rkNote)
-	assert.Equal(t, "call", m.form[m.fcur].cells[0].value, "the type is a cell of the row")
-	setCell(t, m, 1, "meeting")
+	assert.Equal(t, "call", m.form[m.fcur].cells[1].value, "the type is a cell of the row")
+	setCell(t, m, 2, "meeting")
 	assert.Equal(t, "meeting", notesAbout(t, m, ref)[0].Type)
 }

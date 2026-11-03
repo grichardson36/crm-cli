@@ -318,11 +318,14 @@ func (m *Model) renderFeedEntry(i int, r formRow, w int) []string {
 	}
 	typ := fit(ansi.Truncate(r.typ, l.typeW, "…"), l.typeW)
 	typeCell := m.st.Dim.Render(typ)
-	if cellSel {
+	if cellSel && m.fcol == 2 {
 		typeCell = m.st.Sel.Render(typ)
 	}
+	// Cell 1 is the date, cell 2 the type. A selected date shows even when it repeats the day above.
 	head := mark + m.st.Head.Render(date) + " " + typeCell
-	if !m.feedFirstOfDay(i) {
+	if cellSel && m.fcol == 1 {
+		head = mark + m.st.Sel.Render(fit(r.label, feedDateW)) + " " + typeCell
+	} else if !m.feedFirstOfDay(i) {
 		head = mark + date + " " + typeCell
 	}
 

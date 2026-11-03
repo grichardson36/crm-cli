@@ -28,7 +28,7 @@ type rowCell struct {
 }
 
 // cellWidths are the column widths by cell key.
-var cellWidths = map[string]int{"role": 16, "from": 10, "to": 10, "primary": 8, "kind": 12, "notes": 16, "stage": 11, "value": 10, "type": 10}
+var cellWidths = map[string]int{"role": 16, "from": 10, "to": 10, "primary": 8, "kind": 12, "notes": 16, "stage": 11, "value": 10, "type": 10, "date": 10}
 
 func cellWidth(key string) int {
 	if w, ok := cellWidths[key]; ok {
@@ -128,6 +128,11 @@ func (m *Model) noteCells(typ string) []rowCell {
 	return []rowCell{{key: "type", label: "type", value: typ, spec: model.FieldSpec{Key: "type", Label: "type", Type: model.FieldChoice, Choices: choices}}}
 }
 
+// noteDateCell is the date cell of a note row: the occurred date as the feed shows it (YYYY-MM-DD).
+func noteDateCell(occurredAt string) rowCell {
+	return rowCell{key: "date", label: "date", value: shortDate(occurredAt), spec: model.FieldSpec{Key: "date", Label: "date", Type: model.FieldDate}}
+}
+
 // --- moving across cells ---
 
 func whenCellRow(m *Model) bool {
@@ -140,7 +145,7 @@ func whenCellPrev(m *Model) bool { return whenCellRow(m) && m.fcol > 0 }
 
 func cellActions() []action {
 	return []action{
-		{id: "cell-next", title: "Next cell", group: "Edit pane", hint: "right", keys: []string{"right", "tab"}, desc: "move to the next attribute cell of a linked row or note (role, dates, primary, kind, type). From the last cell it goes back to the list",
+		{id: "cell-next", title: "Next cell", group: "Edit pane", hint: "right", keys: []string{"right", "tab"}, desc: "move to the next attribute cell of a linked row or note (role, dates, primary, kind, type, note date). From the last cell it goes back to the list",
 			foot: 16, footIn: inDetail, footLabel: "cell", when: whenCellNext, run: func(m *Model) tea.Cmd { m.fcol++; m.syncDetail(); return nil }},
 		{id: "cell-prev", title: "Previous cell", group: "Edit pane", hint: "left", keys: []string{"left", "shift+tab"}, desc: "move to the previous cell of a linked row or note. From the first cell left goes back to the list",
 			when: whenCellPrev, run: func(m *Model) tea.Cmd { m.fcol--; m.syncDetail(); return nil }},
@@ -189,6 +194,16 @@ func (m *Model) saveCell(ce *cellEdit, src repo.Ref, v string) error {
 		return m.saveTyped(repo.Ref{Kind: "deal", ID: r.li.ID}, c.spec, v)
 	case "type":
 		_, err := m.hUpdateNote(m.ctx, r.id, model.UpdateInteractionInput{Type: &v})
+		return err
+	case "date":
+		before, err := m.ir.FindByID(m.ctx, r.id)
+		if err != nil {
+			return err
+		}
+		if len(v) == 10 && len(before.OccurredAt) > 10 {
+			v += before.OccurredAt[10:] // a new day keeps the time of day
+		}
+		_, err = m.hUpdateNote(m.ctx, r.id, model.UpdateInteractionInput{OccurredAt: &v})
 		return err
 	}
 	if r.li == nil {
