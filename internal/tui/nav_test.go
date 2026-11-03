@@ -21,7 +21,7 @@ func TestViewSwitcherListsEveryViewWithItsKey(t *testing.T) {
 		assert.Equal(t, viewNames[v], m.ov.items[i].label)
 		assert.Equal(t, modules.Key(i+1), m.ov.items[i].hint)
 	}
-	assert.Contains(t, m.ov.items[1].desc, "current view")
+	assert.True(t, m.ov.items[1].isCur, "the open view is marked")
 
 	// A number key picks at once.
 	press(m, "8")

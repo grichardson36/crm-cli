@@ -146,8 +146,9 @@ func TestTextViewerAndModulesScreenLostTheirExtraKeys(t *testing.T) {
 	require.NotNil(t, m.ov)
 	press(m, "down", "K")
 	assert.Equal(t, "home", m.mods.Normalize().Order[0], "K no longer moves a module")
-	press(m, "J")
+	press(m, "backspace", "J")
 	assert.Equal(t, "home", m.mods.Normalize().Order[0])
+	press(m, "backspace", "esc", "v", "down")
 	press(m, "shift+down") // shift+up and shift+down still reorder inside the Modules screen
 	assert.Equal(t, "follow-up", m.mods.Normalize().Order[1], "the row under the cursor (People) moved down")
 	press(m, "esc")

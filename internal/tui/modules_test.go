@@ -91,9 +91,7 @@ func TestViewsScreenSavesAndResetResetsIt(t *testing.T) {
 	assert.Equal(t, "Home", m.ov.items[0].label)
 	assert.Equal(t, "1", m.ov.items[0].hint)
 
-	// x hides Home (People keeps the start screen), shift+up moves a view up.
-	press(m, "x")
-	assert.Equal(t, 0, m.mods.Position("home"))
+	// shift+up moves a view up and the arrangement is saved.
 	cursorTo(t, m, "tasks")
 	press(m, "shift+up")
 	assert.Equal(t, "tasks", m.mods.Normalize().Order[2], "the cursor row moved up")
@@ -102,12 +100,11 @@ func TestViewsScreenSavesAndResetResetsIt(t *testing.T) {
 	assert.Contains(t, string(data), "[modules]")
 
 	// Hiding the last start screen is refused with a message.
-	cursorTo(t, m, "people")
-	press(m, "x")
+	require.NoError(t, m.setModules(mustWith(t, m.mods, "home", false)))
+	_, err = m.mods.With("people", false)
+	require.Error(t, err)
 	assert.NotZero(t, m.mods.Position("people"), "People stays on")
-	assert.True(t, m.statusIsErr)
 
-	press(m, "r") // r is not a key of the screen
 	assert.False(t, m.mods.IsDefault())
 	press(m, "esc")
 	runID(m, "modules-reset") // the palette entry puts the default arrangement back
