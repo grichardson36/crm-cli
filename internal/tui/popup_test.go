@@ -60,8 +60,7 @@ func TestPopupFilterAndTitleVariants(t *testing.T) {
 	m, _ = newTestModel(t)
 	press(m, "v")
 	top, _, _, lines = boxOf(t, m)
-	assert.Contains(t, lines[top+1], "Views", "the Views list has a plain title")
-	assert.NotContains(t, lines[top+1], ">")
+	assert.Contains(t, lines[top+1], "> Views", "the Views list has a filter line, its title is the placeholder")
 	assert.Contains(t, strings.Join(lines, "\n"), "esc close")
 
 	m, _ = newTestModel(t)
@@ -81,7 +80,7 @@ func TestPopupHintsFollowTheHighlightedRow(t *testing.T) {
 		saved = saved || strings.HasPrefix(it.value, savedPrefix)
 	}
 	hints := m.renderPopupHints(m.overlayHints(), 200)
-	assert.Contains(t, ansi.Strip(hints), "x ")
+	assert.Contains(t, ansi.Strip(hints), "shift+up/down move")
 	assert.NotContains(t, ansi.Strip(hints), "delete", "a built-in view cannot be deleted")
 	_ = saved
 }
@@ -111,7 +110,7 @@ func TestPopupWidthIsLimitedOnWideTerminals(t *testing.T) {
 	press(m, "ctrl+k")
 	box := m.overlayBox(m.ov)
 	assert.Equal(t, popupPaletteW+4, box.w)
-	assert.Equal(t, popupMaxRows+popupChrome, box.h)
+	assert.Equal(t, popupMaxRows+popupChrome+1, box.h, "the palette adds the helper row")
 }
 
 func TestPopupListScrollsPastTheMaximum(t *testing.T) {

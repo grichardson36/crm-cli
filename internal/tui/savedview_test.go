@@ -67,7 +67,7 @@ func TestSavedViewShowsInTheViewsScreenHiddenAndOpens(t *testing.T) {
 	hiddenAt := -1
 	for i, idx := range m.ov.shown {
 		it := m.ov.items[idx]
-		if it.divider && it.label == "Hidden" {
+		if it.divider && it.label == "" {
 			hiddenAt = i
 		}
 		if strings.HasPrefix(it.value, savedPrefix) {
@@ -102,7 +102,7 @@ func TestSavedViewXShowsItInTheTabsAndTakesTheNextNumberKey(t *testing.T) {
 	for m.ov.items[m.ov.shown[m.ov.cursor]].value != savedPrefix+v.UUID {
 		press(m, "down")
 	}
-	press(m, "x")
+	press(m, "shift+up", "shift+up", "shift+up", "shift+up", "shift+up") // up over the other hidden views and the line
 	got, err := m.svr.FindByID(context.Background(), v.ID)
 	require.NoError(t, err)
 	assert.True(t, got.ShowInTabs)
@@ -148,7 +148,7 @@ func TestSavedViewXShowsItInTheTabsAndTakesTheNextNumberKey(t *testing.T) {
 	for m.ov.items[m.ov.shown[m.ov.cursor]].value != savedPrefix+v.UUID {
 		press(m, "down")
 	}
-	press(m, "x")
+	press(m, "shift+down") // the last shown view crosses the line
 	press(m, "esc")
 	assert.Equal(t, "", m.svKeyOf(v.UUID))
 	for _, seg := range m.tabLayout() {
@@ -514,15 +514,15 @@ func TestViewsScreenEditDeleteRestoreKeys(t *testing.T) {
 
 	press(m, "v")
 	focus(savedPrefix + v.UUID)
-	press(m, "e")
-	require.NotNil(t, m.sve, "e edits the saved view")
+	press(m, "ctrl+e")
+	require.NotNil(t, m.sve, "ctrl+e edits the saved view")
 	assert.Equal(t, v.ID, m.sve.id)
 	press(m, "esc")
 
 	press(m, "v")
 	focus(savedPrefix + v.UUID)
-	press(m, "d")
-	require.Equal(t, modeConfirm, m.mode, "d asks y or n")
+	press(m, "ctrl+d")
+	require.Equal(t, modeConfirm, m.mode, "ctrl+d asks y or n")
 	assert.Contains(t, m.confirm.prompt, "Mine")
 	press(m, "n")
 	got, _ := m.svr.FindByID(ctx, v.ID)
@@ -530,7 +530,7 @@ func TestViewsScreenEditDeleteRestoreKeys(t *testing.T) {
 
 	press(m, "v")
 	focus(savedPrefix + v.UUID)
-	press(m, "d", "y")
+	press(m, "ctrl+d", "y")
 	got, _ = m.svr.FindByID(ctx, v.ID)
 	assert.True(t, got.Deleted)
 	require.Equal(t, modeOverlay, m.mode, "the Views screen is back")
@@ -548,17 +548,16 @@ func TestViewsScreenEditDeleteRestoreKeys(t *testing.T) {
 
 	press(m, "v")
 	focus(savedPrefix + v.UUID)
-	press(m, "r")
+	press(m, "ctrl+r")
 	got, _ = m.svr.FindByID(ctx, v.ID)
-	assert.False(t, got.Deleted, "r restores")
+	assert.False(t, got.Deleted, "ctrl+r restores")
 	press(m, "esc")
 
 	// built-in views are not edited or deleted from here
 	press(m, "v")
 	focus("people")
-	press(m, "d")
-	assert.True(t, m.statusIsErr)
-	assert.Equal(t, modeOverlay, m.mode)
+	press(m, "ctrl+d")
+	assert.Equal(t, modeOverlay, m.mode, "a built-in view has no delete key")
 }
 
 func TestObjectRegistryGivesTheSavedViewItsVerbs(t *testing.T) {

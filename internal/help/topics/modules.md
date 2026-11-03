@@ -16,7 +16,7 @@ The number key of a module is its place among the modules that are shown (1 to 9
 
 ## In the terminal UI
 
-Press `v` for the Views screen. It lists every view: the shown ones first with their number key, then a Hidden divider and the hidden ones. `enter` goes to the view, `x` shows or hides it, `shift+up` and `shift+down` move it up and down inside its group, `esc` closes. The palette entry "Modules: reset" puts the default arrangement back. The separate Modules screen is gone. A key you rebound with `crm keys set` stays yours.
+Press `v` for the Views screen. It lists the shown views with their number key, a horizontal line, and the hidden views in gray below it. `shift+up` and `shift+down` move the highlighted view, and a view that crosses the line is hidden or shown. Type to filter the list by name, `enter` opens the highlighted view, `shift+r` puts the default order and hidden set back, `esc` closes. The palette entry "Modules: reset" does the same. The separate Modules screen is gone. A key you rebound with `crm keys set` stays yours.
 
 ## Where it is stored
 

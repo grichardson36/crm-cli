@@ -8,10 +8,11 @@ import (
 	"github.com/jdanielnd/crm-cli/internal/query"
 )
 
-// The saved views in the Views screen (v). A saved view is listed like a built-in one: shown ones in
-// tab order after the built-in views, a Hidden group, and below them the deleted views. The keys are the
-// ones of the screen: enter opens, x shows or hides, shift+up and shift+down move, and for a saved
-// view e edits, d deletes (asks y or n) and r restores a deleted one.
+// The saved views in the Views popup (v). A saved view is listed like a built-in one: shown ones in
+// tab order after the built-in views, the line, the hidden ones in gray, and below them the deleted
+// views. The keys are the ones of the popup: enter opens, shift+up and shift+down move (across the
+// line shows or hides), and for a saved view ctrl+e edits, ctrl+d deletes (asks y or n) and ctrl+r
+// restores a deleted one. Plain letters are the filter, so these three use ctrl.
 
 const savedPrefix = "saved:"
 
@@ -49,39 +50,34 @@ func (m *Model) savedViewsKey(o *overlay, key, cur string, focus func(string)) b
 		m.pendingCmd = m.showToast(err.Error(), true)
 		return true
 	}
-	if m.readOnly && (key == "x" || key == "e" || key == "d" || key == "r" || key == "shift+up" || key == "shift+down") {
-		return fail(fmt.Errorf("read-only: changing views is disabled"))
+	switch key {
+	case "ctrl+e", "ctrl+d", "ctrl+r", "shift+up", "shift+down":
+		if m.readOnly {
+			return fail(fmt.Errorf("read-only: changing views is disabled"))
+		}
 	}
 	switch key {
-	case "x":
-		if !isLive {
-			return fail(fmt.Errorf("restore the view first (r)"))
-		}
-		on := !live.ShowInTabs
-		if _, err := m.hUpdateSaved(live.ID, repo.SavedViewPatch{ShowInTabs: &on}); err != nil {
-			return fail(err)
-		}
-		refresh()
-		return true
 	case "shift+up", "shift+down":
-		if !isLive {
+		if !isLive || o.filter.Value() != "" {
 			return true
 		}
 		d := -1
 		if key == "shift+down" {
 			d = 1
 		}
-		m.svMove(live.ID, d)
+		if err := m.svShift(live, d); err != nil {
+			return fail(err)
+		}
 		refresh()
 		return true
-	case "e":
+	case "ctrl+e":
 		if !isLive {
-			return fail(fmt.Errorf("restore the view first (r)"))
+			return fail(fmt.Errorf("restore the view first (ctrl+r)"))
 		}
 		m.closeOverlay()
 		m.pendingCmd = m.openSVEditor(live.ID)
 		return true
-	case "d":
+	case "ctrl+d":
 		if !isLive {
 			return true
 		}
@@ -99,7 +95,7 @@ func (m *Model) savedViewsKey(o *overlay, key, cur string, focus func(string)) b
 			},
 		}
 		return true
-	case "r":
+	case "ctrl+r":
 		if !isDead {
 			return true
 		}

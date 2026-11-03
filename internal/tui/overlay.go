@@ -37,6 +37,8 @@ type overlayItem struct {
 	selector bool
 	current  string
 	isCur    bool
+	// dim draws the row gray (a hidden view). The row stays usable.
+	dim bool
 }
 
 // overlay is a filterable list shown instead of the main screen: the command palette or a picker.
@@ -48,7 +50,9 @@ type overlay struct {
 	cursor  int
 	offset  int
 	palette bool
-	digits  bool // a number key picks the item with that hint (view switcher)
+	digits  bool // a number key picks the item with that hint (view switcher), while the filter is empty
+	// nameOnly makes the filter match the label only (the Views list).
+	nameOnly bool
 	letters bool // a letter key picks the item whose hint is that letter (the add picker)
 	// focusResults is the bar mode where plain keys are verbs of the highlighted row (barverbs.go).
 	focusResults bool
@@ -111,7 +115,11 @@ func (o *overlay) refilter() {
 		o.items = o.items[:o.baseLen]
 	}
 	for i, it := range o.items {
-		s, ok := sg.Fuzzy(q, it.label+" "+it.hint+" "+it.id+" "+it.desc)
+		hay := it.label + " " + it.hint + " " + it.id + " " + it.desc
+		if o.nameOnly {
+			hay = it.label
+		}
+		s, ok := sg.Fuzzy(q, hay)
 		if !ok {
 			continue
 		}
@@ -366,7 +374,7 @@ func (m *Model) overlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		o.move(page, page)
 		return m, nil
 	}
-	if k := keyName(msg); o.digits && len(k) == 1 && k[0] >= '0' && k[0] <= '9' {
+	if k := keyName(msg); o.digits && o.filter.Value() == "" && len(k) == 1 && k[0] >= '0' && k[0] <= '9' {
 		for i, idx := range o.shown {
 			if o.items[idx].hint == k {
 				return m, m.pickOverlay(i)
@@ -502,7 +510,20 @@ func (o *overlay) popupRowCount(page int) int {
 
 // overlayBox is where the popup of o sits.
 func (m *Model) overlayBox(o *overlay) popupBox {
-	return m.popupBoxAt(m.popupTextW(o.popupWidth()), o.popupRowCount(m.popupPage()))
+	return m.popupBoxWith(m.popupTextW(o.popupWidth()), o.popupRowCount(m.popupPage()), o.palette)
+}
+
+// paletteHelpers are the scope prefixes of the palette, as the dim helper row shows them.
+const paletteHelpers = "> actions   @ people   # tags   = settings   ? help"
+
+// paletteHelper is the helper row of the palette: the prefixes, while the box is empty or holds
+// only a prefix. It is not a sentence and it is not shown once a query is typed.
+func (o *overlay) paletteHelper() string {
+	v := strings.TrimSpace(o.filter.Value())
+	if v == "" || (len(v) == 1 && strings.ContainsAny(v, ">@#?=")) {
+		return paletteHelpers
+	}
+	return ""
 }
 
 // overlayPopup is what the popup of o draws now.
@@ -517,6 +538,9 @@ func (m *Model) overlayPopup(o *overlay) popupSpec {
 		spec.input = o.filter.View()
 	}
 	spec.rows = m.popupListRows(o, box.textW, box.rows)
+	if box.helper {
+		spec.helper = m.st.Dim.Render(o.paletteHelper())
+	}
 	if o.focusResults {
 		if it, ok := o.highlighted(); ok {
 			spec.hints = m.st.Head.Render(ansi.Truncate(m.barVerbLine(it), box.textW, "…"))
@@ -547,7 +571,11 @@ func (m *Model) popupListRows(o *overlay, textW, n int) []string {
 	for i := o.offset; i < end; i++ {
 		it := o.items[o.shown[i]]
 		if it.divider {
-			out = append(out, m.st.Dim.Render(ruleLine(it.label, it.desc, textW)))
+			line := ruleLine(it.label, it.desc, textW)
+			if it.label == "" && it.desc == "" {
+				line = strings.Repeat("─", textW) // the line between shown and hidden views
+			}
+			out = append(out, m.st.Dim.Render(line))
 			continue
 		}
 		right := ""
@@ -573,7 +601,7 @@ func (m *Model) popupListRows(o *overlay, textW, n int) []string {
 		switch {
 		case i == o.cursor:
 			out = append(out, m.st.Sel.Render(keyCol+labelCol+rightCol))
-		case it.disabled != "":
+		case it.disabled != "" || it.dim:
 			out = append(out, m.st.Dim.Render(keyCol+labelCol+rightCol))
 		default:
 			label := labelCol

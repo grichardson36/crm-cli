@@ -2,6 +2,7 @@ package tui
 
 import (
 	"os"
+	"github.com/charmbracelet/x/ansi"
 	"strings"
 	"testing"
 
@@ -103,68 +104,113 @@ func TestViewsScreenEnterGoesToTheViewHiddenOnesToo(t *testing.T) {
 	assert.Equal(t, viewMerge, m.view, "a number key still picks a shown view")
 }
 
-func TestViewsScreenXTogglesShowAndHide(t *testing.T) {
-	for _, tc := range []struct {
-		name   string
-		id     string
-		wantOn bool
-		after  []string
-	}{
-		{"hide birthdays", "birthdays", false, []string{"home", "people", "follow-up", "tasks", "organizations", "deals", "merge", "settings", "|", "tags", "birthdays", "archived", "sync"}},
-		{"show archived", "archived", true, []string{"home", "people", "follow-up", "tasks", "organizations", "deals", "birthdays", "merge", "archived", "settings", "|", "tags", "sync"}},
-		{"show sync", "sync", true, []string{"home", "people", "follow-up", "tasks", "organizations", "deals", "birthdays", "merge", "sync", "settings", "|", "tags", "archived"}},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			m := newDefaultModel(t)
-			m.env.DataDir = t.TempDir()
-			press(m, "v")
-			cursorTo(t, m, tc.id)
-			press(m, "x")
-			assert.Equal(t, tc.wantOn, m.mods.Position(tc.id) > 0)
-			assert.Equal(t, tc.after, viewsScreen(m))
-			assert.Equal(t, tc.id, cursorID(m), "the cursor follows the view")
-			assert.False(t, m.statusIsErr)
-			_, err := os.Stat(modules.ConfigFile(m.env.DataDir))
-			assert.NoError(t, err, "the arrangement is saved")
-		})
+func TestViewsListShiftAcrossTheLineHidesAndShows(t *testing.T) {
+	m := newDefaultModel(t)
+	m.env.DataDir = t.TempDir()
+	press(m, "v")
+	// Merge swaps with Settings, then moves past the last shown view and is hidden.
+	cursorTo(t, m, "merge")
+	press(m, "shift+down")
+	assert.Equal(t, "merge", cursorID(m))
+	assert.Equal(t, []string{"home", "people", "follow-up", "tasks", "organizations", "deals", "birthdays", "settings", "merge", "|", "tags", "archived", "sync"}, viewsScreen(m), "swapped with Settings")
+	press(m, "shift+down")
+	assert.Zero(t, m.mods.Position("merge"), "moving past the last shown view crosses the line and hides it")
+	assert.Equal(t, []string{"home", "people", "follow-up", "tasks", "organizations", "deals", "birthdays", "settings", "|", "merge", "tags", "archived", "sync"}, viewsScreen(m), "it lands first under the line")
+	assert.Equal(t, "merge", cursorID(m), "the cursor follows the view")
+	_, err := os.Stat(modules.ConfigFile(m.env.DataDir))
+	assert.NoError(t, err, "the arrangement is saved")
+
+	press(m, "shift+up")
+	assert.Equal(t, 9, m.mods.Position("merge"), "moving up over the line shows it as the last shown view")
+	assert.Equal(t, []string{"home", "people", "follow-up", "tasks", "organizations", "deals", "birthdays", "settings", "merge", "|", "tags", "archived", "sync"}, viewsScreen(m))
+
+	// A hidden view moves inside the hidden group, and away from the line at the edge does nothing.
+	cursorTo(t, m, "tags")
+	press(m, "shift+down")
+	assert.Equal(t, []string{"home", "people", "follow-up", "tasks", "organizations", "deals", "birthdays", "settings", "merge", "|", "archived", "tags", "sync"}, viewsScreen(m))
+	press(m, "shift+up", "shift+up")
+	assert.Equal(t, 10, m.mods.Position("tags"), "the top hidden view crosses up and shows")
+	cursorTo(t, m, "sync")
+	press(m, "shift+down")
+	assert.Zero(t, m.mods.Position("sync"), "the bottom hidden view stays")
+	// The number key follows the position among the shown views.
+	press(m, "esc")
+	assert.Equal(t, 10, m.viewPosition(viewTags))
+}
+
+func TestViewsListHasNoHideKey(t *testing.T) {
+	m := newDefaultModel(t)
+	press(m, "v")
+	cursorTo(t, m, "birthdays")
+	press(m, "x")
+	assert.Equal(t, "x", m.ov.filter.Value(), "x is typed into the filter now")
+	assert.NotZero(t, m.mods.Position("birthdays"))
+	for _, h := range m.viewsHints(m.ov) {
+		assert.NotEqual(t, "x", h.key)
 	}
 }
 
-func TestViewsScreenReorderStaysInsideItsGroup(t *testing.T) {
-	for _, tc := range []struct {
-		name  string
-		id    string
-		key   string
-		after []string
-	}{
-		{"down", "home", "shift+down", []string{"people", "home", "follow-up", "tasks", "organizations", "deals", "birthdays", "merge", "settings", "|", "tags", "archived", "sync"}},
-		{"up", "tasks", "shift+up", []string{"home", "people", "tasks", "follow-up", "organizations", "deals", "birthdays", "merge", "settings", "|", "tags", "archived", "sync"}},
-		{"first up does nothing", "home", "shift+up", []string{"home", "people", "follow-up", "tasks", "organizations", "deals", "birthdays", "merge", "settings", "|", "tags", "archived", "sync"}},
-		{"last shown does not cross the divider", "settings", "shift+down", []string{"home", "people", "follow-up", "tasks", "organizations", "deals", "birthdays", "merge", "settings", "|", "tags", "archived", "sync"}},
-		{"hidden group reorders", "sync", "shift+up", []string{"home", "people", "follow-up", "tasks", "organizations", "deals", "birthdays", "merge", "settings", "|", "tags", "sync", "archived"}},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			m := newDefaultModel(t)
-			press(m, "v")
-			cursorTo(t, m, tc.id)
-			press(m, tc.key)
-			assert.Equal(t, tc.after, viewsScreen(m))
-			assert.Equal(t, tc.id, cursorID(m))
-		})
-	}
-	// The tab order follows.
+func TestViewsListFilterNarrowsAndEnterOpens(t *testing.T) {
 	m := newDefaultModel(t)
 	press(m, "v")
-	press(m, "shift+down", "esc")
-	assert.Equal(t, 2, m.viewPosition(viewHome))
-	assert.Equal(t, 1, m.viewPosition(viewPeople))
+	typeText(m, "arch")
+	assert.Equal(t, []string{"archived"}, viewsScreen(m), "the hidden view that matches is listed, the line is not")
+	assert.Equal(t, "archived", cursorID(m))
+	press(m, "enter")
+	assert.Equal(t, viewArchived, m.view)
+
+	m = newDefaultModel(t)
+	press(m, "v")
+	typeText(m, "tas")
+	assert.Equal(t, "tasks", cursorID(m))
+	assert.Contains(t, ansi.Strip(m.screen()), "> tas")
+	press(m, "enter")
+	assert.Equal(t, viewTasks, m.view)
+	// Digits type into a filter, they only pick while it is empty.
+	m = newDefaultModel(t)
+	press(m, "v", "t", "1")
+	assert.Equal(t, "t1", m.ov.filter.Value())
+}
+
+func TestViewsListShowsHiddenRowsGrayBelowTheLineAndTheKeysOfTheRow(t *testing.T) {
+	m := newDefaultModel(t)
+	press(m, "v")
+	out := ansi.Strip(m.screen())
+	assert.Contains(t, out, strings.Repeat("─", 20), "a horizontal line")
+	hidden := 0
+	for _, idx := range m.ov.shown {
+		if it := m.ov.items[idx]; it.dim && !strings.HasPrefix(it.value, savedPrefix) {
+			hidden++
+			assert.Empty(t, it.hint, "a hidden view has no number key")
+		}
+	}
+	assert.Equal(t, 3, hidden)
+	for _, want := range []string{"up/down select", "enter open", "shift+up/down move", "shift+r reset", "esc close"} {
+		assert.Contains(t, out, want)
+	}
+	assert.NotContains(t, out, "hide")
+	assert.NotContains(t, out, "x show")
+	typeText(m, "t")
+	assert.NotContains(t, ansi.Strip(m.screen()), "shift+up/down move", "a move needs the whole list")
+}
+
+func TestViewsListResetPutsTheDefaultBack(t *testing.T) {
+	m := newDefaultModel(t)
+	m.env.DataDir = t.TempDir()
+	require.NoError(t, m.setModules(mustWith(t, m.mods, "birthdays", false)))
+	press(m, "v")
+	cursorTo(t, m, "home")
+	press(m, "shift+down", "R")
+	assert.True(t, m.mods.IsDefault())
+	assert.Equal(t, "home", cursorID(m))
+	assert.Equal(t, []string{"home", "people", "follow-up", "tasks", "organizations", "deals", "tags", "birthdays", "merge", "settings", "|", "archived", "sync"}, viewsScreen(m), "the shipped order and hidden set")
 }
 
 func TestSettingsAndTheViewsScreenCanNeverBeHidden(t *testing.T) {
 	m := newDefaultModel(t)
 	press(m, "v")
 	cursorTo(t, m, "settings")
-	press(m, "x")
+	press(m, "shift+down")
 	assert.True(t, m.statusIsErr)
 	assert.Contains(t, m.status, "stays on")
 	assert.NotZero(t, m.mods.Position("settings"))
