@@ -78,9 +78,10 @@ The first missing badge identifies the next gate. A failed gate retains its prev
 1. Select or capture a roadmap request. Preserve its intent and assign a stable ID.
 2. Inspect relevant code, tests, domain vocabulary, patterns and architectural decisions.
 3. Identify applicable rules, boundaries, assumptions and existing test seams. Prefer the highest reliable observable seam.
-4. Challenge ambiguity, contradictions, missing behavior, edge cases and failure conditions through ATDD/BDD discovery.
-5. Formulate agreed behavior as concise, testable Given/When/Then scenarios. Record implementation decisions, exclusions and applicable doors.
-6. Resolve blocking questions with the owner. Do not silently turn assumptions into requirements.
+4. Load `/grilling` skill.
+5. Challenge ambiguity, contradictions, missing behavior, edge cases and failure conditions through `/grilling` and ATDD/BDD discovery.
+6. Formulate agreed behavior as concise, testable Given/When/Then scenarios. Record implementation decisions, exclusions and applicable doors.
+7. Resolve blocking questions with the owner. Do not silently turn assumptions into requirements.
 
 **REPORT:** Update the roadmap item with intent, decisions, scenarios, test seam and unresolved exceptions.
 
@@ -187,17 +188,32 @@ Current app facts live outside the core gates: [[references/app/domain-model|app
 # Roadmap
 
 Items below here are not built.
+
 - ## Next
 	- [ ] Interactive color picker for the Theme pane (today a hex field with a swatch): pick a color on a grid or sliders, keep the hex field as the typed path ([[custom-themes]]).
 	- [ ] Custom themes ([[custom-themes]]): snippets in `~/.crm/themes/snippets`, theme checks in `internal/validate` with contrast warnings (`crm theme check`), a file watcher for live reload, `crm theme export` and `import`, a picker detail pane with a rendered sample.
 	- [ ] Theme generator in the style of the theme-factory skill: `crm theme generate` takes a name, a mood or a few seed colors (accent, background) and writes both variants with roles derived from the seeds, checks contrast (4.5:1 text, 3:1 kinds) and the 16-color mapping, then shows the sample in the picker before saving ([[custom-themes]]).
 	- [ ] Phone number normalization to the E.164 standard. Today `PhoneKey` (`internal/dedupe/normalize.go`) only reduces a number to its last 10 digits for matching, and the stored value stays as typed. Plan: parse with a phone number library using a default region, store the original and the E.164 form, display in national format, match on E.164, and keep the original text for the vCard round trip (see [[research-sync-standard]]).
 	- [ ] Smart linking suggestions (kind of how we want to suggest via enrichment) but these link suggestions come from 1. links you've made (Joey and Hannah Osgood are spouses, Jude Osgood is child of Joey Osgood, so Hannah Osgood may also be parent of Jude Osgood, so Hannah Osgood's link section in her note grayscale-suggests Jude Osgood as a child link) 2. Corroborated from link evidence found via social media networks (Joey lists Hannah as his wife on his profile). Never automatically make a link - suggest it in grayscale and let the user accept or reject the suggestion. We should collect the link suggestions in a place the user can go through them (kind of like Merge view) and further deepen their node graph of relationships. Related connections (orgs, tags, mutual friends, previous related school or work) can help strengthen the suggestion algorithm but should really be left to really strong links typically within family of origin and super close friends. If A is sibling with B and B sibling with C then A is probably sibling with C. We need to think through relationships like that to build a strong semantic model we can convert into code.
-- ## Someday / maybe
-	- [ ] User-defined commands (shell templates like `lazygit` custom commands). The verb set stays fixed for now ([[research-tui-building-blocks]], Q30).
-	- [ ] Node graph view of object nodes and their link edges like [[obsidian]]
+	- [ ] ctrl+up/down jumps to the next first letter ("Ag..."->"Be...) in every list that is not separated by groups. Built for People and Organizations. Deals and Tasks still jump by a page.
 	- [ ] Anniversaries for the spouse-spouse link type - a day-long event that operates similarly to a birthday
 		- [ ] We want to add anniversaries into the birthdays views and instead call the view {not sure} that can be sorted/filtered by anniversaries or birthdays if needed otherwise the current grouping by date is great we're just going to add anniversaries in as rows along w/ birthdays as {Spouse Name}-{Spouse Name} Anniversary
+	- [ ] Merge candidates for other object types (Orgs, Tags) to keep the data clean (&=and for instance) all put in the Merge list screen and ctrl+o sortable/filterable/groupable. Base merge screen shows all objects grouped by confidence with object type the user's object type colors. Need to think through merge behavior for these.
+	- [ ] Middle name variable for People
+	- [ ] nicknames/aliases variable for People ("Bob" would also show in a search, their official name on social is Robert Borer but I call them Bob Borer), organizations, and tags
+		- [ ] Incorporate maiden names
+	- [ ] Standardizing the hint bar across the program
+		- [ ] Same verbs for similar actions
+	- [ ] Sorting/Filtering/Grouping improvements
+		- [ ] Add full functionality to all views - make this a modular component
+		- [ ] Add ascending/descending toggle
+		- [ ] Be able to sort and group by other variables - maybe the user can pick from all our tracked variables
+	- [ ] Like Dex, track changes to LinkedIn title/subscript and aggregate them to a list. Look and function very similar to Dex. This can go in Home screen just like Dex.
+	- [ ] Home screen
+		- [ ] Customizable - user can see what modules they'd like
+	- [ ] Locations as a view w/ standard sort/filter/group - research Dex implementation
+- ## Someday / maybe
+	- [ ] Node graph view of object nodes and their link edges like [[obsidian]]
 	- [ ] Deep enrichment capabilities - sync to LinkedIn, Facebook, email servers (Gmail, etc), Beeper/messaging apps, phone call history
 		- [ ] Enrichment view screen
 			- [ ] User approves linking and data suggestions
@@ -206,23 +222,14 @@ Items below here are not built.
 			- [ ] Web searches can confirm general tags for people/organizations (i.e. "construction", "engineering", "architecture", "law", "nonprofit" etc.)
 			- [ ] Having a link following that platform's pattern creates a sync job in the sync engine (we still need to build)
 			- [ ] Facebook relationships show up as object links (Rylan Mort and Emily Edwards are spouses)
-	- [ ] Merge candidates for other object types (Orgs, Tags) to keep the data clean (&=and for instance) all put in the Merge list screen and filterable to object type. Base merge screen shows all objects grouped by confidence with object type the user's object type colors. Need to think through merge behavior for these.
-	- [ ] Middle name variable for People
-	- [ ] nicknames/aliases for People ("Bob" would also show in a search, their official name on social is Robert Borer but I call them Bob Borer), organizations, and tags
-		- [ ] Incorporate maiden names
-	- [ ] ctrl+up/down jumps to the next first letter ("Ag..."->"Be...) in every list that is not separated by groups. Built for People and Organizations. Deals and Tasks still jump by a page.
 	- [ ] Peer sharing of syncing contact data - shares contacts of a group/tag with another person - they merge and sync to the best version of "Nathan Walter" - some vars will need to be private and some synced
 	- [ ] import-export
 		- [ ] Bulk import, sanitization, validation and dedupe from clipboard
 		- [ ] CSV, XLSX, etc
 	- [ ] Link select have the inverse available as an option (for example could select parent or child)
 	- [ ] Tony/Anthony Ricordati merge candidate  has two companies - he may have worked for one beforehand so it should show up in his history. Not sure how the user gets to pick how that history works via the merge screen.
-	- [ ] Home screen
-		- [ ] Customizable - user can see what modules they'd like
-	- [ ] Like Dex, track changes to LinkedIn title/subscript and aggregate them to a list. Look and function very similar to Dex
-	- [ ] Custom fonts alongside themes
+	- [ ] User-defined commands (shell templates like `lazygit` custom commands). The verb set stays fixed for now ([[research-tui-building-blocks]], Q30).
+	- [ ] Custom fonts integrated into themes
 	- [ ] "Keys" and "Framework verbs" in Settings seems extremely redundant and confusing for the user. Grill with user before settling on how best to configure these controls
-	- [ ] Display ctrl+o *sort* below in the hint bar where applicable.
-	- [ ] Sorting/Filtering/Grouping improvements
-		- [ ] Add ascending/descending to sort
-		- [ ] Be able to sort and group by other variables - maybe the user can pick from all our tracked variables
+
+
