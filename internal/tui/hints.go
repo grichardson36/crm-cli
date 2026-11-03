@@ -188,6 +188,9 @@ func (m *Model) helpHints() []hintItem {
 
 // modalHintsLine is the footer line of a mode that takes over the screen, "" for the main screen.
 func (m *Model) modalHintsLine() (string, bool) {
+	if p := m.paneSPFocused(); p != nil && m.mode == modeNormal {
+		return m.renderHintItems(p.hints(m)), true
+	}
 	if le := m.paneListFocused(); le != nil && m.mode == modeNormal {
 		return m.renderHintItems(le.hints(m)), true
 	}

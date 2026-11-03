@@ -10,9 +10,8 @@ import (
 
 // The saved views in the Views popup (v). A saved view is listed like a built-in one: shown ones in
 // tab order after the built-in views, the line, the hidden ones in gray, and below them the deleted
-// views. The keys are the ones of the popup: enter opens, shift+up and shift+down move (across the
-// line shows or hides), and for a saved view ctrl+e edits, ctrl+d deletes (asks y or n) and ctrl+r
-// restores a deleted one. Plain letters are the filter, so these three use ctrl.
+// views. The popup opens a view, moves it (across the line shows or hides) and filters by typing.
+// A saved view is edited, deleted (asks y or n) and restored in the Settings Views pane (settingspane.go).
 
 const savedPrefix = "saved:"
 
@@ -29,8 +28,11 @@ func (m *Model) savedItem(v repo.SavedView) overlayItem {
 	return overlayItem{id: "saved:" + v.UUID, label: label, value: savedPrefix + v.UUID, desc: desc, isCur: m.sv != nil && m.sv.v.UUID == v.UUID}
 }
 
-// savedViewsKey handles the keys of the Views screen on a saved view. It returns true when it used the key.
-func (m *Model) savedViewsKey(o *overlay, key, cur string, focus func(string)) bool {
+// savedViewsKey handles the keys of the Views list on a saved view. It returns true when it used the key.
+// The popup only moves a view (shift+up and shift+down), plain letters are its filter. The Settings
+// pane (pane true) has no filter, so e edits, d deletes and r restores. after redraws the list the
+// key was used in once a delete is confirmed.
+func (m *Model) savedViewsKey(o *overlay, key, cur string, pane bool, focus func(string), after func()) bool {
 	uuid := strings.TrimPrefix(cur, savedPrefix)
 	live, isLive := m.savedByUUID(uuid)
 	var dead repo.SavedView
@@ -50,13 +52,22 @@ func (m *Model) savedViewsKey(o *overlay, key, cur string, focus func(string)) b
 		m.pendingCmd = m.showToast(err.Error(), true)
 		return true
 	}
+	act := ""
 	switch key {
-	case "ctrl+e", "ctrl+d", "ctrl+r", "shift+up", "shift+down":
-		if m.readOnly {
-			return fail(fmt.Errorf("read-only: changing views is disabled"))
+	case "shift+up", "shift+down":
+		act = key
+	case "e", "d", "r":
+		if pane {
+			act = key
 		}
 	}
-	switch key {
+	if act == "" {
+		return false
+	}
+	if m.readOnly {
+		return fail(fmt.Errorf("read-only: changing views is disabled"))
+	}
+	switch act {
 	case "shift+up", "shift+down":
 		if !isLive || o.filter.Value() != "" {
 			return true
@@ -70,18 +81,16 @@ func (m *Model) savedViewsKey(o *overlay, key, cur string, focus func(string)) b
 		}
 		refresh()
 		return true
-	case "ctrl+e":
+	case "e":
 		if !isLive {
-			return fail(fmt.Errorf("restore the view first (ctrl+r)"))
+			return fail(fmt.Errorf("restore the view first (r)"))
 		}
-		m.closeOverlay()
 		m.pendingCmd = m.openSVEditor(live.ID)
 		return true
-	case "ctrl+d":
+	case "d":
 		if !isLive {
 			return true
 		}
-		m.closeOverlay()
 		m.mode = modeConfirm
 		m.confirm = &confirmState{
 			prompt: fmt.Sprintf("delete view %q?", truncateLabel(live.Name)),
@@ -90,12 +99,12 @@ func (m *Model) savedViewsKey(o *overlay, key, cur string, focus func(string)) b
 					m.setStatus(err.Error(), true)
 					return
 				}
-				m.setStatus("view deleted (ctrl+z undoes, v then r restores)", false)
-				m.pendingCmd = m.showViews("")
+				m.setStatus("view deleted (ctrl+z undoes, r restores)", false)
+				after()
 			},
 		}
 		return true
-	case "ctrl+r":
+	case "r":
 		if !isDead {
 			return true
 		}

@@ -7,7 +7,7 @@ status: decided by owner 2026-10-30
 
 **Problem.** Kind colors came only from the theme roles, so a user could not make deals stand out or tell two kinds apart on their terminal.
 
-**Therefore.** Settings > Colors has one row per registered kind (person, organization, deal, task, note, tag, view) and a reset. A row opens a picker of the theme palette names (accent, good, warn, danger, mark, fg, dim, tab), Custom hex and Reset. Moving the cursor previews the color live, esc restores it. A hex color is checked by `validate.HexColor` (`E_COLOR_INVALID`) and previews while typing. Stored per device in `config.toml`:
+**Therefore.** Settings > Colors is one row whose right pane lists person, task, organization, deal, tag and note in the order of the Views, each with a swatch and a hex field (`settingspane.go`). `e` edits the hex in place (a hex or a theme palette name: accent, good, warn, danger, mark, fg, dim, tab), `shift+r` resets the highlighted row, `esc` closes. The footer shows a key only when it works on the row. A hex color is checked by `validate.HexColor` (`E_COLOR_INVALID`) and previews while typing. Stored per device in `config.toml`:
 
 ```toml
 [colors]

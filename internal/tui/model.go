@@ -213,10 +213,8 @@ type Model struct {
 	form       []formRow
 	formTitle  string
 
-	// Per-kind colors (kindcolors.go): the saved overrides, and the state of the custom hex prompt.
-	kindColors       map[string]string
-	colorKindEditing string
-	colorBase        map[string]string
+	// Per-kind colors (kindcolors.go): the saved overrides.
+	kindColors map[string]string
 	formPerson int64
 	fcur       int
 	feed       feedState // expanded and selected entries of the activity feed (feed.go)
@@ -234,6 +232,8 @@ type Model struct {
 	pendingCmd tea.Cmd
 	// lp is the list editor of the Settings row under the cursor (listeditor.go), nil on any other row.
 	lp *listEditor
+	// sp is the Views or Colors pane of the Settings row under the cursor (settingspane.go), nil on any other row.
+	sp settingsPane
 
 	// Merge view: duplicate groups parallel to rows, the minimum level and the dismissals made
 	// this session (newest last) for undo. cmp is the open compare screen, if any.
@@ -890,6 +890,9 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case modeConfirm:
 			return m.handleConfirmKey(msg)
 		}
+		if p := m.paneSPFocused(); p != nil {
+			return m.settingsPaneKey(p, msg)
+		}
 		if le := m.paneListFocused(); le != nil {
 			return m.paneListKey(le, msg)
 		}
@@ -983,7 +986,6 @@ func (m *Model) handlePromptKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		m.mode = modeNormal
 		m.input.Blur()
-		m.endKindColorPrompt()
 		m.addSugg, m.pipe = nil, nil
 		m.pipeRes, m.pipeLinks = map[string]pendingLink{}, nil
 		return m, nil
@@ -996,7 +998,6 @@ func (m *Model) handlePromptKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	m.input, cmd = m.input.Update(msg)
 	m.pipeRefresh()
-	m.previewKindColorHex()
 	return m, cmd
 }
 
@@ -1114,9 +1115,6 @@ func (m *Model) runPrompt(kind, value string) {
 		return
 	case "task-edit":
 		m.saveTaskEdit(m.lineID, value)
-		return
-	case "kind-color-hex":
-		m.saveKindColorHex(value)
 		return
 	case "tag-new":
 		m.saveNewTag(value)

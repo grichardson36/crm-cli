@@ -71,38 +71,51 @@ func (m *Model) openViews() tea.Cmd { return m.showViews("") }
 
 func (m *Model) showViews(focusID string) tea.Cmd { return m.showOverlay(m.newViewsList(focusID)) }
 
-// viewsHints are the keys that work on the highlighted row of the Views list, one word each.
-func (m *Model) viewsHints(o *overlay) []hintItem {
+// viewsHints are the keys that work on the highlighted row of the Views list, one word each. The
+// popup (pane false) has a filter, so it only opens and moves. The Settings pane (pane true) also
+// edits, deletes and restores saved views.
+func (m *Model) viewsHints(o *overlay, pane bool) []hintItem {
 	it, ok := o.highlighted()
 	if !ok {
 		return []hintItem{fk("esc", "close")}
 	}
 	typed := o.filter.Value() != ""
 	h := []hintItem{fk("up/down", "select")}
+	dead := false
 	if uuid, saved := strings.CutPrefix(it.value, savedPrefix); saved {
-		if _, live := m.savedByUUID(uuid); !live {
-			return []hintItem{fk("up/down", "select"), fk("ctrl+r", "restore"), fk("esc", "close")}
+		_, live := m.savedByUUID(uuid)
+		dead = !live
+		switch {
+		case dead && pane && !m.readOnly:
+			h = append(h, fk("r", "restore"))
+		case dead:
+		case pane && !m.readOnly:
+			h = append(h, fk("enter", "open"), fk("e", "edit"), fk("d", "delete"))
+		default:
+			h = append(h, fk("enter", "open"))
 		}
-		h = append(h, fk("enter", "open"), fk("ctrl+e", "edit"), fk("ctrl+d", "delete"))
 	} else {
 		h = append(h, fk("enter", "open"))
 	}
-	if !typed {
+	if !typed && !dead {
 		h = append(h, fk("shift+up/down", "move"))
 	}
 	return append(h, fk("shift+r", "reset"), fk("esc", "close"))
 }
 
-// newViewsList is the Views list as an overlay that is not shown yet. The Views popup shows it, and
-// the Settings pane that lists views embeds the same overlay: draw its rows with popupListRows and
-// give it keys through its onKey and onPick.
-func (m *Model) newViewsList(focusID string) *overlay {
+// newViewsList is the Views popup list as an overlay that is not shown yet.
+func (m *Model) newViewsList(focusID string) *overlay { return m.newViewsListFor(focusID, false) }
+
+// newViewsListFor builds the Views list. The popup (pane false) shows it with a filter line. The
+// Settings pane (pane true) embeds the same overlay with no filter: draw its rows with popupListRows,
+// give it keys through onKey and onPick, and the bare keys e, d and r work on saved views.
+func (m *Model) newViewsListFor(focusID string, pane bool) *overlay {
 	o := m.newOverlay("Views", m.viewItems(), false)
 	o.nameOnly = true
 	o.noDesc = true
-	o.minW = 76 // the hints of a saved view
-	o.digits = true
-	o.hintsFor = func(m *Model) []hintItem { return m.viewsHints(o) }
+	o.minW = 80
+	o.digits = !pane
+	o.hintsFor = func(m *Model) []hintItem { return m.viewsHints(o, pane) }
 	focus := func(id string) {
 		for i, idx := range o.shown {
 			if id != "" && o.items[idx].value == id {
@@ -143,7 +156,11 @@ func (m *Model) newViewsList(focusID string) *overlay {
 			return false
 		}
 		if strings.HasPrefix(cur, savedPrefix) {
-			return m.savedViewsKey(o, key, cur, focus)
+			after := func() { m.pendingCmd = m.showViews("") }
+			if pane {
+				after = func() { refresh("") }
+			}
+			return m.savedViewsKey(o, key, cur, pane, focus, after)
 		}
 		var d int
 		switch key {
@@ -151,6 +168,12 @@ func (m *Model) newViewsList(focusID string) *overlay {
 			d = -1
 		case "shift+down":
 			d = 1
+		case "e", "d", "r":
+			if pane {
+				m.setStatus("a built-in view cannot be edited, deleted or restored", true)
+				return true
+			}
+			return false
 		default:
 			return false
 		}

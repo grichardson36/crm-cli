@@ -145,7 +145,7 @@ func TestViewsListHasNoHideKey(t *testing.T) {
 	press(m, "x")
 	assert.Equal(t, "x", m.ov.filter.Value(), "x is typed into the filter now")
 	assert.NotZero(t, m.mods.Position("birthdays"))
-	for _, h := range m.viewsHints(m.ov) {
+	for _, h := range m.viewsHints(m.ov, false) {
 		assert.NotEqual(t, "x", h.key)
 	}
 }
@@ -278,4 +278,46 @@ func TestArchivedAndSyncStartHiddenAndExplicitConfigIsRespected(t *testing.T) {
 	assert.Equal(t, 10, m2.viewPosition(viewSync))
 	assert.Equal(t, 11, m2.viewPosition(viewTags), "a module the config does not list is appended")
 	assert.Equal(t, 12, m2.viewPosition(viewSettings))
+}
+
+func TestSettingsViewsPaneKeysAndFooter(t *testing.T) {
+	m := settingsModel(t)
+	cursorToSetting(t, m, "views")
+	require.NotNil(t, m.paneSP(), "the pane shows the list as soon as the row is under the cursor")
+	press(m, "enter")
+	require.Equal(t, focusDetail, m.focus)
+	assert.Nil(t, m.ov, "no popup")
+	out := paneText(m)
+	assert.NotContains(t, out, "> Views", "the pane has no filter line")
+	assert.Contains(t, out, strings.Repeat("─", 10), "the line between shown and hidden views")
+
+	// bare letters are not a filter here
+	press(m, "t")
+	assert.Equal(t, "", m.sp.(*viewsPane).o.filter.Value())
+
+	// footer: keys of the highlighted built-in view only
+	h := hintsText(m)
+	for _, want := range []string{"up/down select", "enter open", "shift+up/down move", "shift+r reset", "esc close"} {
+		assert.Contains(t, h, want)
+	}
+	for _, bad := range []string{"e edit", "d delete", "r restore", "hide", "x "} {
+		assert.NotContains(t, h, bad)
+	}
+
+	// shift+down on Merge: past the last shown view crosses the line and hides it
+	p := m.sp.(*viewsPane)
+	for p.o.items[p.o.shown[p.o.cursor]].value != "merge" {
+		press(m, "down")
+	}
+	press(m, "shift+down", "shift+down")
+	assert.Zero(t, m.mods.Position("merge"), "crossing the line hides the view")
+	press(m, "shift+up")
+	assert.NotZero(t, m.mods.Position("merge"), "crossing back shows it")
+
+	// shift+r puts the shipped order back
+	press(m, "R")
+	assert.True(t, m.mods.IsDefault())
+
+	press(m, "esc")
+	assert.Equal(t, focusList, m.focus)
 }
