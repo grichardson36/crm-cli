@@ -583,6 +583,8 @@ func newTextInput() textinput.Model {
 	st.Focused.Prompt = lipgloss.NewStyle()
 	st.Blurred.Prompt = lipgloss.NewStyle()
 	st.Blurred.Text = lipgloss.NewStyle()
+	st.Focused.Placeholder = lipgloss.NewStyle().Faint(true)
+	st.Blurred.Placeholder = lipgloss.NewStyle().Faint(true)
 	st.Cursor.Color = nil
 	in.SetStyles(st)
 	return in

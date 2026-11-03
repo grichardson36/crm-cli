@@ -364,7 +364,10 @@ func (m *Model) normalizeDue(raw string) string {
 
 // --- drawing ---
 
-func (m *Model) cmdInputLine(o *overlay) string {
+func (m *Model) cmdInputLine(o *overlay) string { return m.cmdInputLineW(o, m.width) }
+
+// cmdInputLineW is the command line cut to width cells.
+func (m *Model) cmdInputLineW(o *overlay, width int) string {
 	val := o.filter.Value()
 	marks := o.cmd.plan.Marks
 	cursor := o.byteCursor()
@@ -393,7 +396,7 @@ func (m *Model) cmdInputLine(o *overlay) string {
 		cursorIdx = len(cells)
 		cells = append(cells, cell{" ", lipgloss.NewStyle().Reverse(true), 1})
 	}
-	room := m.width - 3
+	room := width - 3
 	total := 0
 	for _, c := range cells {
 		total += c.w
@@ -414,16 +417,18 @@ func (m *Model) cmdInputLine(o *overlay) string {
 	return b.String()
 }
 
-// cmdView draws the palette in command mode.
-func (m *Model) cmdView() string {
-	o := m.ov
+// cmdPopup is the palette in command mode: the command line in the top row, the preview, the
+// candidates or the confirmation as rows.
+func (m *Model) cmdPopup(o *overlay, spec popupSpec) popupSpec {
 	c := o.cmd
 	p := c.plan
-	cut := lipgloss.NewStyle().MaxWidth(m.width)
-	var lines []string
-	lines = append(lines, cut.Render(m.st.Head.Render("Command bar")))
-	lines = append(lines, cut.Render(m.cmdInputLine(o)))
-
+	w := spec.box.textW
+	spec.input = m.cmdInputLineW(o, w)
+	spec.hints = m.renderPopupHints(m.overlayHints(), w)
+	wrap := func(s string) []string {
+		return strings.Split(lipgloss.NewStyle().Width(max(1, w)).Render(s), "\n")
+	}
+	var rows []string
 	preview := p.Preview
 	style := m.st.Name
 	switch {
@@ -434,52 +439,48 @@ func (m *Model) cmdView() string {
 	case !p.Ready():
 		style = m.st.Dim
 	}
-	preview = ansi.Truncate(preview, 3*max(1, m.width)-3, "…")
-	lines = append(lines, lipgloss.NewStyle().Width(max(1, m.width)).Render(style.Render(preview)))
-
+	preview = ansi.Truncate(preview, 3*max(1, w)-3, "…")
+	for _, l := range wrap(preview) {
+		rows = append(rows, style.Render(strings.TrimRight(l, " ")))
+	}
 	if c.confirming {
-		lines = append(lines, cut.Render(m.st.Head.Render("Confirm "+p.Subject.Name)))
+		rows = append(rows, m.st.Head.Render("Confirm "+p.Subject.Name))
 		for _, ch := range p.Changes {
 			switch ch.Op {
 			case "update":
-				lines = append(lines, cut.Render(fmt.Sprintf("  %s  %s -> %s", fit(ch.Field, 10), m.st.Dim.Render(orNone(ch.Old)), m.st.Name.Render(orNone(ch.New)))))
+				rows = append(rows, fmt.Sprintf("  %s  %s -> %s", fit(ch.Field, 10), m.st.Dim.Render(orNone(ch.Old)), m.st.Name.Render(orNone(ch.New))))
 			default:
-				lines = append(lines, cut.Render("  "+ch.Describe()))
+				rows = append(rows, "  "+ch.Describe())
 			}
 		}
-		lines = append(lines, cut.Render(m.overlayFooter()))
-		return strings.Join(lines, "\n")
-	}
-	if c.msg != "" {
-		lines = append(lines, cut.Render(m.st.Err.Render(c.msg)))
-	}
-	room := max(0, m.height-strings.Count(strings.Join(lines, "\n"), "\n")-2)
-	var rest []string
-	for i, cand := range c.comp.Candidates {
-		line := "  " + cand
-		if i == c.sel {
-			rest = append(rest, cut.Render(m.st.Sel.Render(fit(line, m.width))))
-		} else {
-			rest = append(rest, cut.Render(line))
+	} else {
+		if c.msg != "" {
+			rows = append(rows, m.st.Err.Render(c.msg))
+		}
+		for i, cand := range c.comp.Candidates {
+			line := "  " + cand
+			if i == c.sel {
+				rows = append(rows, m.st.Sel.Render(fit(line, w)))
+			} else {
+				rows = append(rows, line)
+			}
+		}
+		if len(p.Problems) > 0 {
+			for _, cand := range p.Problems[0].Candidates {
+				rows = append(rows, m.st.Dim.Render("  "+cand.Name))
+			}
+		}
+		for _, wn := range p.Warnings {
+			rows = append(rows, m.st.Dim.Render("  note: "+wn))
 		}
 	}
-	if len(p.Problems) > 0 {
-		for _, cand := range p.Problems[0].Candidates {
-			rest = append(rest, cut.Render(m.st.Dim.Render("  "+cand.Name)))
-		}
+	page := m.popupPage()
+	if len(rows) > page {
+		rows = rows[:page]
 	}
-	for _, w := range p.Warnings {
-		rest = append(rest, cut.Render(m.st.Dim.Render("  note: "+w)))
-	}
-	if len(rest) == 0 {
-		rest = append(rest, cut.Render(m.st.Dim.Render("  verbs: n note, t task, log, set, tag, snooze   tokens: #tag @Name !high ~30m by fri remind fri every 3m")))
-	}
-	if len(rest) > room {
-		rest = rest[:room]
-	}
-	lines = append(lines, rest...)
-	lines = append(lines, cut.Render(m.overlayFooter()))
-	return strings.Join(lines, "\n")
+	spec.rows = rows
+	spec.box = m.popupBoxAt(w, len(rows))
+	return spec
 }
 
 func orNone(s string) string {

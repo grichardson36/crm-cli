@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"fmt"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -130,7 +129,8 @@ func (m *Model) viewOptionItems(opts []viewOption) []overlayItem {
 		for _, c := range o.choices {
 			names = append(names, c.label)
 		}
-		items = append(items, overlayItem{id: "opt:" + o.id, label: fmt.Sprintf("%-16s %s", o.label, o.current(m)), desc: strings.Join(names, " | "), value: o.id})
+		// desc lists the choices for the filter (searchable, not drawn): the row shows the current value.
+		items = append(items, overlayItem{id: "opt:" + o.id, label: o.label, current: o.current(m), desc: strings.Join(names, " | "), selector: true, value: o.id})
 	}
 	return items
 }
@@ -143,7 +143,6 @@ func (m *Model) openViewOptions() tea.Cmd {
 	view := m.view
 	ov := m.newOverlay("View options, "+viewNames[view], m.viewOptionItems(opts), false)
 	ov.noFilter = true
-	ov.hints = []hintItem{fk("left/right", "change"), fk("esc", "close"), fk("up/down", "choose")}
 	ov.onKey = func(m *Model, key string) bool {
 		var back bool
 		switch key {

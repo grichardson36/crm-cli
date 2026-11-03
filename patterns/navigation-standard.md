@@ -17,7 +17,7 @@ domains: [interface]
 3. A two-pane screen (Settings, Tags, Views, Keys, the record pages): `up` and `down` move in the pane that has focus. `right` or `tab` enters the right pane. `left` at the left edge of the right pane, `shift+tab` and `esc` go back to the list.
 4. `left` and `right` change a value only on a row that is a selector (the mode line of Appearance, a value in view options). On a selector, `left` of the first value goes back to the list and `right` of the last value stays.
 5. A popup that chooses how far to go back (undo history, `ctrl+shift+z`) lists the newest first. Picking an entry applies it and everything between it and the top.
-6. Key hints show in the footer only ([[key-hints-in-one-place]]), never in a title or body.
+6. Key hints show in the footer ([[key-hints-in-one-place]]), never in a title or body. A popup shows its own hints in the bottom row inside its box ([[popup-component]]) and not in the footer.
 
 **Exception.** The help view (`?`) closes on any key, and a text entry line (the footer prompt) keeps the keys of its field.
 

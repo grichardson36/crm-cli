@@ -191,7 +191,7 @@ func (m *Model) openGlobalAdd(bar *overlay) tea.Cmd {
 	m.addSugg = sugg
 	items := addKinds()
 	m.openPicker("Add", items, func(m *Model, it overlayItem) { m.pendingCmd = m.startGlobalAdd(it.value) })
-	m.ov.letters, m.ov.noFilter = true, true
+	m.ov.letters, m.ov.noFilter, m.ov.noDesc = true, true, true
 	m.ov.onCancel = func(m *Model) { m.addSugg = nil }
 	for pos, idx := range m.ov.shown {
 		if m.ov.items[idx].value == def {

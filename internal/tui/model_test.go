@@ -886,13 +886,14 @@ func TestPaletteFilterAndRun(t *testing.T) {
 		}
 	}
 	assert.Len(t, m.ov.items, on, "palette lists every action of a module that is on")
-	out := m.screen()
-	assert.Contains(t, out, "Command bar")
-	assert.Contains(t, out, "Toggle favorite")
+	out := plain(m.screen())
+	assert.Contains(t, out, "elect a command")
+	assert.Contains(t, out, "elect a command")
 
 	typeText(m, "toggle favor")
 	require.NotEmpty(t, m.ov.shown)
 	assert.Equal(t, "favorite", m.ov.items[m.ov.shown[0]].id)
+	assert.Contains(t, plain(m.screen()), "Toggle favorite")
 	press(m, "enter")
 	assert.Equal(t, modeNormal, m.mode)
 	assert.True(t, personByID(t, pr, 1).IsFavorite)
@@ -942,7 +943,7 @@ func TestPaletteReadOnlyIsGreyedOut(t *testing.T) {
 	}
 	assert.Equal(t, "favorite", it.id)
 	assert.Equal(t, "read-only", it.disabled)
-	assert.Contains(t, m.screen(), "(read-only)")
+	assert.Contains(t, m.screen(), "read-only")
 	press(m, "enter")
 	assert.True(t, m.statusIsErr)
 	assert.False(t, personByID(t, pr, 1).IsFavorite)

@@ -126,13 +126,30 @@ func (m *Model) overlayHints() []hintItem {
 		return []hintItem{fk("enter", "apply"), fk("esc", "back")}
 	case o.cmd != nil:
 		return []hintItem{fk("enter", "run"), fk("esc", "close"), ak("prompt-tab", "complete")}
+	case o.hintsFor != nil:
+		return o.hintsFor(m)
 	case o.hints != nil:
 		return o.hints
-	case o.palette:
-		return []hintItem{fk("enter", "run"), fk("esc", "close"), fk("up/down", "choose"), fk("tab", "verbs"),
-			fk(">", "actions"), fk("@", "people"), fk("#", "tags"), fk("=", "settings"), fk("?", "help")}
 	}
-	return []hintItem{fk("enter", "pick"), fk("esc", "close"), fk("up/down", "choose")}
+	// The keys that work on the highlighted row, one word each.
+	it, ok := o.highlighted()
+	var h []hintItem
+	switch {
+	case ok && it.selector:
+		h = append(h, fk("left/right", "change"))
+	case ok && it.disabled == "" && !it.divider && o.palette:
+		h = append(h, fk("enter", "run"))
+	case ok && it.disabled == "" && !it.divider:
+		h = append(h, fk("enter", "pick"))
+	}
+	h = append(h, fk("esc", "close"))
+	if len(o.shown) > 1 {
+		h = append(h, fk("up/down", "select"))
+	}
+	if o.palette {
+		h = append(h, fk("tab", "verbs"))
+	}
+	return h
 }
 
 // namesHints are the hints of the panel that settles the names of a line.

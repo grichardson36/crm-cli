@@ -35,6 +35,7 @@ Start with [[core]]. Use this index only to find the relevant supporting pattern
 - [[input-grammar]]
 - [[keyboard-and-feedback]]
 - [[key-hints-in-one-place]]
+- [[popup-component]]
 - [[web-search-engines]]
 - [[kind-colors-are-chosen]]
 - [[list-editor-standard]]

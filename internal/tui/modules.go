@@ -149,6 +149,7 @@ func (m *Model) viewItems() []overlayItem {
 		mod, _ := modules.Lookup(id)
 		v := moduleViews[id]
 		it := overlayItem{id: "view:" + id, label: mod.Name, value: id, desc: mod.Blurb}
+		it.isCur = v == m.view && m.sv == nil
 		if v == m.view {
 			it.desc = "current view. " + mod.Blurb
 		}
@@ -196,12 +197,44 @@ func (m *Model) viewItems() []overlayItem {
 // openViews shows the Views screen.
 func (m *Model) openViews() tea.Cmd { return m.showViews("") }
 
-func (m *Model) showViews(focusID string) tea.Cmd {
+func (m *Model) showViews(focusID string) tea.Cmd { return m.showOverlay(m.newViewsList(focusID)) }
+
+// viewsHints are the keys that work on the highlighted row of the Views list.
+func (m *Model) viewsHints() []hintItem {
+	o := m.ov
+	it, ok := o.highlighted()
+	if !ok {
+		return []hintItem{fk("esc", "close")}
+	}
+	h := []hintItem{fk("enter", "go"), fk("esc", "close"), fk("up/down", "select")}
+	if uuid, saved := strings.CutPrefix(it.value, savedPrefix); saved {
+		v, live := m.savedByUUID(uuid)
+		if !live {
+			return []hintItem{fk("r", "restore"), fk("esc", "close"), fk("up/down", "select")}
+		}
+		return append(h, fk("e", "edit"), fk("d", "delete"), fk("x", showWord(v.ShowInTabs)), fk("shift+up/down", "move"))
+	}
+	return append(h, fk("x", showWord(m.mods.Position(it.value) > 0)), fk("shift+up/down", "move"))
+}
+
+// showWord is the action of x on a view: it hides a shown view and shows a hidden one.
+func showWord(shown bool) string {
+	if shown {
+		return "hide"
+	}
+	return "show"
+}
+
+// newViewsList is the Views list as an overlay that is not shown yet. The Views popup shows it, and
+// the Settings pane that lists views embeds the same overlay: draw its rows with popupListRows and
+// give it keys through its onKey and onPick.
+func (m *Model) newViewsList(focusID string) *overlay {
 	o := m.newOverlay("Views", m.viewItems(), false)
 	o.noFilter = true
+	o.noDesc = true
+	o.minW = 88 // the hints of a saved view
 	o.digits = true
-	o.hints = []hintItem{fk("enter", "go"), fk("esc", "close"), fk("d", "delete"), fk("r", "restore"), fk("e", "edit"), fk("x", "show or hide"), fk("shift+up/down", "move"), fk("1-9", "go to a view")}
-	o.note = "Settings and this screen are always available."
+	o.hintsFor = func(m *Model) []hintItem { return m.viewsHints() }
 	focus := func(id string) {
 		for i, idx := range o.shown {
 			if id != "" && o.items[idx].value == id {
@@ -262,7 +295,7 @@ func (m *Model) showViews(focusID string) tea.Cmd {
 		m.setStatus("", false)
 		return true
 	}
-	return m.showOverlay(o)
+	return o
 }
 
 // shiftModule moves a module one place up or down among the modules of its own group (shown or

@@ -24,7 +24,20 @@ func TestEveryOverlayClosesWithEsc(t *testing.T) {
 			m.record("one", func() error { return nil }, func() error { return nil })
 			m.openHistory(false)
 		}},
-		{"list editor", func(m *Model) { m.openListEditor("deal-stages") }},
+		{"palette command line", func(m *Model) { press(m, "ctrl+k"); typeText(m, "task buy milk ") }},
+		{"long picker with a filter", func(m *Model) {
+			var items []overlayItem
+			for i := 0; i < 20; i++ {
+				items = append(items, overlayItem{id: string(rune('a' + i)), label: string(rune('A' + i))})
+			}
+			m.openPicker("Pick", items, func(*Model, overlayItem) {})
+		}},
+		{"redo history", func(m *Model) {
+			m.record("one", func() error { return nil }, func() error { return nil })
+			m.undoLast()
+			m.openHistory(true)
+		}},
+		{"list editor",func(m *Model) { m.openListEditor("deal-stages") }},
 		{"keys customize", func(m *Model) { m.openKeysCustomize() }},
 	}
 	for _, tc := range tests {

@@ -172,7 +172,8 @@ func TestBarShowsKeysOnTheRight(t *testing.T) {
 		}
 	}
 	require.NotEmpty(t, row)
-	assert.Equal(t, "f", strings.TrimSpace(row[len(row)-3:]), "the key sits at the right edge: %q", row)
+	row = strings.TrimSpace(strings.TrimSpace(row)[:len(strings.TrimSpace(row))-len("│")])
+	assert.Equal(t, "f", strings.TrimSpace(row[len(row)-3:]), "the key sits at the right edge of the box: %q", row)
 }
 func settingLabels(m *Model) []string { return barNames(m, kindSetting) }
 
