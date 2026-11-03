@@ -199,7 +199,6 @@ Items below here are not built.
 	- [ ] Anniversaries for the spouse-spouse link type - a day-long event that operates similarly to a birthday
 		- [ ] We want to add anniversaries into the birthdays views and instead call the view {not sure} that can be sorted/filtered by anniversaries or birthdays if needed otherwise the current grouping by date is great we're just going to add anniversaries in as rows along w/ birthdays as {Spouse Name}-{Spouse Name} Anniversary
 	- [ ] Merge candidates for other object types (Orgs, Tags) to keep the data clean (&=and for instance) all put in the Merge list screen and ctrl+o sortable/filterable/groupable. Base merge screen shows all objects grouped by confidence with object type the user's object type colors. Need to think through merge behavior for these.
-	- [ ] Middle name variable for People
 	- [ ] nicknames/aliases variable for People ("Bob" would also show in a search, their official name on social is Robert Borer but I call them Bob Borer), organizations, and tags
 		- [ ] Incorporate maiden names
 	- [ ] Standardizing the hint bar across the program
