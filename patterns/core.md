@@ -188,7 +188,7 @@ Current app facts live outside the core gates: [[references/app/domain-model|app
 
 Items below here are not built.
 - ## Next
-	- [ ] 🧭 🔨 CRM-015: Display ctrl+o *sort* below in the hint bar where applicable. (next)
+	- [ ] 🧭 🔨 🧪 🔍 CRM-015: Display ctrl+o *sort* below in the hint bar where applicable. (next)
 		- Intent: the user can see in the footer that a list has view options (sort and more).
 		- Decisions: owner chose the label `options` for every view (not `sort`). Shown wherever the view has options (`optionsForView` is not empty, saved views included), replacing today's Merge/Archived-only `footIf`. Key comes from the registry action `options`, so rebinding follows ([[key-hints-in-one-place]]). One registry action, so every door that has a footer gets it. No CLI, MCP or agent door applies (TUI footer only). No data change. Order: the hint is last in the footer (foot 90, after help) so a narrow terminal drops it before `?`. Owner to confirm.
 		- Scenarios:
@@ -200,6 +200,8 @@ Items below here are not built.
 			- Given `options` rebound to another key, When the footer renders in People, Then it shows that key.
 		- Test seam: `footerSegs()` in `internal/tui` (pattern of `TestFooterHintsFollowTheKeymap` in `hints_test.go`).
 		- Evidence: red, 4 new tests failed for People, Organizations, Tags, saved view and the rebound key (Merge, Archived, Deals, Tasks already matched). Green after `footIf` became `len(m.optionsForView()) > 0` in `viewoptions.go`. At foot 50 the hint pushed `?` off an 80 column footer (`TestFooterButtonsAndStatusTap` failed), fixed by foot 90. `go vet ./internal/tui` and `go test ./internal/tui` pass. Tests: `TestFooterShowsViewOptionsWhereTheViewHasThem`, `TestFooterViewOptionsHintFollowsTheKeymap` (hints_test.go), `TestFooterShowsViewOptionsInASavedView` (savedview_test.go).
+		- Test: mutation sweep, `footIf` forced true fails `TestFooterShowsViewOptionsWhereTheViewHasThem`, foot 90 back to 50 fails `TestFooterButtonsAndStatusTap`. No survivors, no redundant tests.
+		- Review: self-review by the implementing agent against the eight gates, not independent. Gate 4 one term `options`. Gate 6 TUI footer only, one registry action, palette already has View options. Gates 3, 5, 7 untouched (no data). No findings.
 		- Exceptions: footer is cut to the width, so the hint may drop on narrow terminals (existing behavior).
 	- [ ] Interactive color picker for the Theme pane (today a hex field with a swatch): pick a color on a grid or sliders, keep the hex field as the typed path ([[custom-themes]]).
 	- [ ] Custom themes ([[custom-themes]]): snippets in `~/.crm/themes/snippets`, theme checks in `internal/validate` with contrast warnings (`crm theme check`), a file watcher for live reload, `crm theme export` and `import`, a picker detail pane with a rendered sample.
