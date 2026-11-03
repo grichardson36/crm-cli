@@ -5,7 +5,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/format"
@@ -23,13 +22,11 @@ func parseInteractionID(arg string) (int64, error) {
 
 // normalizeOccurredAt accepts RFC 3339, "YYYY-MM-DD HH:MM[:SS]" or "YYYY-MM-DD".
 func normalizeOccurredAt(s string) (string, error) {
-	s = strings.TrimSpace(s)
-	for _, layout := range []string{time.RFC3339, "2006-01-02 15:04:05", "2006-01-02 15:04", "2006-01-02T15:04:05", "2006-01-02"} {
-		if t, err := time.Parse(layout, s); err == nil {
-			return t.UTC().Format("2006-01-02 15:04:05"), nil
-		}
+	d, err := repo.NormalizeOccurredAt(s)
+	if err != nil {
+		return "", model.NewExitError(model.ErrValidation, "invalid date %q (use YYYY-MM-DD or an ISO 8601 timestamp)", strings.TrimSpace(s))
 	}
-	return "", model.NewExitError(model.ErrValidation, "invalid date %q (use YYYY-MM-DD or an ISO 8601 timestamp)", s)
+	return d, nil
 }
 
 func logEditCmd() *cobra.Command {

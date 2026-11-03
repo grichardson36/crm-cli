@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jdanielnd/crm-cli/internal/model"
@@ -133,8 +134,12 @@ func (r *InteractionRepo) Update(ctx context.Context, id int64, input model.Upda
 		if strings.TrimSpace(*input.OccurredAt) == "" {
 			return nil, fmt.Errorf("occurred_at cannot be empty: %w", model.ErrValidation)
 		}
+		at, err := NormalizeOccurredAt(*input.OccurredAt)
+		if err != nil {
+			return nil, err
+		}
 		sets = append(sets, "occurred_at = ?")
-		args = append(args, *input.OccurredAt)
+		args = append(args, at)
 	}
 	if len(sets) == 0 {
 		return r.FindByID(ctx, id)
@@ -313,4 +318,17 @@ func (r *InteractionRepo) loadTargets(ctx context.Context, interactions ...*mode
 		}
 	}
 	return nil
+}
+
+// NormalizeOccurredAt accepts RFC 3339, "YYYY-MM-DD HH:MM[:SS]" or "YYYY-MM-DD" and returns the stored
+// form "YYYY-MM-DD HH:MM:SS" (UTC). Every door that edits an activity date goes through the repository,
+// so they all accept the same dates.
+func NormalizeOccurredAt(s string) (string, error) {
+	s = strings.TrimSpace(s)
+	for _, layout := range []string{time.RFC3339, "2006-01-02 15:04:05", "2006-01-02 15:04", "2006-01-02T15:04:05", "2006-01-02"} {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t.UTC().Format("2006-01-02 15:04:05"), nil
+		}
+	}
+	return "", fmt.Errorf("invalid date %q (use YYYY-MM-DD or an ISO 8601 timestamp): %w", s, model.ErrValidation)
 }

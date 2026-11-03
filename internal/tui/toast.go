@@ -8,7 +8,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// A toast is a one-line message on the bottom line of the screen that goes away by itself. It is
+// A toast is a one-line message on the bottom line of the screen (above the status and input line on the main screen) that goes away by itself. It is
 // drawn over whatever screen is showing (lists, palette, help, text pages), works in read-only
 // mode and is cut to the terminal width. showToast returns the command that clears it.
 
@@ -48,11 +48,11 @@ func (m *Model) screen() string {
 	}
 	lines := strings.Split(out, "\n")
 	at := len(lines) - 1
-	// On the main screen keep the key hints and replace the status line above them.
-	if at > 0 && m.mode != modeOverlay && m.mode != modeNames && m.tv == nil && !m.help && m.cmp == nil {
-		at--
-	}
-	if len(lines) < m.height && at == len(lines)-1 {
+	// On the main screen the last two lines are the status/input line and the key hints. The toast
+	// goes on the last content row above them, so it never covers a prompt, confirm or status line.
+	if at > 2 && m.mode != modeOverlay && m.mode != modeNames && m.tv == nil && !m.help && m.cmp == nil {
+		at -= 2
+	} else if len(lines) < m.height {
 		lines = append(lines, "") // a short screen: add a line instead of covering one
 		at = len(lines) - 1
 	}

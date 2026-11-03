@@ -422,7 +422,7 @@ func TestFeedTypeCellStillEdits(t *testing.T) {
 	m, _ := feedFixture(t, "person", entry("note", "2026-10-27", "one"))
 	focusEntry(t, m, 0)
 	id := m.form[m.fcur].id
-	setCell(t, m, 1, "meeting")
+	setCell(t, m, 2, "meeting")
 	assert.Equal(t, "meeting", noteContent(t, m, id).Type)
 	assert.Contains(t, plainLines(m, m.fcur)[0], "meet")
 }
