@@ -130,7 +130,6 @@ func TestSettingsEnterOpensTheThingBehindARow(t *testing.T) {
 	}{
 		{"archived", viewArchived, ""},
 		{"sync", viewSync, ""},
-		{"views", viewSettings, "Views"},
 		{"appearance", viewSettings, ""},
 	} {
 		t.Run(tc.id, func(t *testing.T) {
@@ -144,7 +143,20 @@ func TestSettingsEnterOpensTheThingBehindARow(t *testing.T) {
 			}
 		})
 	}
-	// The list rows open their list in the right pane, no popup.
+	// The Views and Colors rows open their pane, the list rows open their list in the right pane, no popup.
+	for _, id := range []string{viewsPaneID, colorsPaneID} {
+		t.Run(id, func(t *testing.T) {
+			m := settingsModel(t)
+			cursorToSetting(t, m, id)
+			pressRun(m, "enter")
+			assert.Nil(t, m.ov, "no popup")
+			assert.Equal(t, focusDetail, m.focus)
+			require.NotNil(t, m.paneSP())
+			assert.Equal(t, id, m.sp.id())
+			press(m, "esc")
+			assert.Equal(t, focusList, m.focus)
+		})
+	}
 	for _, id := range listEditorIDs {
 		t.Run(id, func(t *testing.T) {
 			m := settingsModel(t)

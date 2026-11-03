@@ -9,6 +9,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/jdanielnd/crm-cli/internal/model"
+	"github.com/jdanielnd/crm-cli/internal/theme"
 )
 
 // Panes of the Settings screen that are not the list editor (listeditor.go): the Views row shows the
@@ -264,7 +265,7 @@ func (p *colorsPane) lines(m *Model, w, h int) []string {
 
 // themeSwatch is the swatch in a hex color, or plain when the terminal has no color.
 func themeSwatch(m *Model, hex string) string {
-	return lipgloss.NewStyle().Foreground(lipgloss.Color(hex)).Render("██")
+	return theme.ForegroundStyle(hex).Render("██")
 }
 
 func (p *colorsPane) hints(m *Model) []hintItem {
