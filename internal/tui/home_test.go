@@ -67,7 +67,7 @@ func TestHomeShowsOnlySectionsWithContent(t *testing.T) {
 	m := homeModel(t)
 	out := m.screen()
 	assert.Contains(t, out, "1 Home")
-	for _, h := range []string{"Due to reach out", "Tasks due today"} {
+	for _, h := range []string{"Follow-up", "Tasks due today"} {
 		assert.Contains(t, out, h)
 	}
 	assert.NotContains(t, out, "plan retreat", "tasks due later stay off Home")

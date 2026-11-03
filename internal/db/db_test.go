@@ -148,4 +148,30 @@ func TestMigration002_Constraints(t *testing.T) {
 	assert.NoError(t, err)
 	_, err = d.Exec(`INSERT INTO person_handles (person_id, kind, value) VALUES (1, 'linkedin', 'jane2')`)
 	assert.Error(t, err, "one handle per kind per person")
+	_, err = d.Exec(`INSERT INTO person_handles (person_id, kind, value) VALUES (1, 'discord', 'jane#1')`)
+	assert.NoError(t, err, "discord is a handle kind")
+}
+
+func TestMigration021_DiscordHandleKindKeepsRows(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "old.db")
+	d, err := db.OpenUpTo(path, db.LatestVersion()-1)
+	require.NoError(t, err)
+	_, err = d.Exec(`INSERT INTO people (uuid, first_name) VALUES ('a', 'A')`)
+	require.NoError(t, err)
+	_, err = d.Exec(`INSERT INTO person_handles (person_id, kind, value) VALUES (1, 'youtube', 'jane')`)
+	require.NoError(t, err)
+	_, err = d.Exec(`INSERT INTO person_handles (person_id, kind, value) VALUES (1, 'discord', 'x')`)
+	require.Error(t, err, "the version before 021 does not know discord")
+	require.NoError(t, d.Close())
+
+	d, err = db.Open(path)
+	require.NoError(t, err)
+	defer d.Close()
+	_, err = d.Exec(`INSERT INTO person_handles (person_id, kind, value) VALUES (1, 'discord', '123456789012345678')`)
+	require.NoError(t, err)
+	_, err = d.Exec(`INSERT INTO person_handles (person_id, kind, value) VALUES (1, 'myspace', 'x')`)
+	assert.Error(t, err, "other kinds are still rejected")
+	var n int
+	require.NoError(t, d.QueryRow(`SELECT COUNT(*) FROM person_handles`).Scan(&n))
+	assert.Equal(t, 2, n)
 }

@@ -163,7 +163,7 @@ var ignoredTypes = map[string]bool{
 var socialKinds = map[string]string{
 	"linkedin": "linkedin", "twitter": "twitter", "x": "twitter", "facebook": "facebook",
 	"instagram": "instagram", "telegram": "telegram", "whatsapp": "whatsapp", "tiktok": "tiktok",
-	"youtube": "youtube", "other": "other",
+	"youtube": "youtube", "discord": "discord", "other": "other",
 }
 
 func titleCase(s string) string {

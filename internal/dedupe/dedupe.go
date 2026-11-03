@@ -134,7 +134,7 @@ var conflictKinds = []string{"linkedin", "facebook", "twitter"}
 // because people at one company share a site.
 var matchKinds = map[string]bool{
 	"linkedin": true, "twitter": true, "facebook": true, "instagram": true,
-	"telegram": true, "whatsapp": true, "tiktok": true, "youtube": true,
+	"telegram": true, "whatsapp": true, "tiktok": true, "youtube": true, "discord": true,
 }
 
 type pair [2]int

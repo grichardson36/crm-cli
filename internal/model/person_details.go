@@ -21,7 +21,7 @@ func ValidCadence(c string) bool {
 }
 
 // HandleKinds lists valid social handle kinds.
-var HandleKinds = []string{"linkedin", "twitter", "facebook", "instagram", "telegram", "whatsapp", "tiktok", "youtube", "website", "other"}
+var HandleKinds = []string{"linkedin", "twitter", "facebook", "instagram", "telegram", "whatsapp", "tiktok", "youtube", "discord", "website", "other"}
 
 // ValidHandleKind checks if the given handle kind is valid.
 func ValidHandleKind(k string) bool {

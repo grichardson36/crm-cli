@@ -93,7 +93,7 @@ func (m *Model) homeRows() ([]row, error) {
 		return nil, err
 	}
 	if len(due) > 0 {
-		head("Due to reach out", fmt.Sprint(len(due)))
+		head("Follow-up", fmt.Sprint(len(due)))
 		for i, d := range due {
 			if i == homeDueMax {
 				rows = append(rows, row{title: fmt.Sprintf("all %d in Follow-up", len(due)), jump: int(viewDue) + 1})

@@ -460,6 +460,7 @@ func TestRenderMapsFields(t *testing.T) {
 	require.NoError(t, e.people.SetHandle(ctx, p.ID, "website", "https://jane.example"))
 	require.NoError(t, e.people.SetHandle(ctx, p.ID, "twitter", "https://twitter.com/jane"))
 	require.NoError(t, e.people.SetHandle(ctx, p.ID, "telegram", "@jane"))
+	require.NoError(t, e.people.SetHandle(ctx, p.ID, "discord", "123456789012345678"))
 	_, err = e.people.Update(ctx, p.ID, model.UpdatePersonInput{Birthday: ptr("--03-14"), PriorityTier: ptr(1), KeepInTouch: ptr("14 days")})
 	require.NoError(t, err)
 
@@ -471,7 +472,7 @@ func TestRenderMapsFields(t *testing.T) {
 		"VERSION:3.0", "UID:" + p.UUID, "N:Smith;Jane;;;", "FN:Jane Smith", "ORG:Acme\\, Inc", "TITLE:CEO",
 		"NOTE:line one\\nline two", "BDAY:--03-14", "EMAIL;TYPE=INTERNET;TYPE=PREF:jane@example.com",
 		"EMAIL;TYPE=INTERNET;TYPE=WORK:jane@work.example", "ADR;TYPE=HOME:;;12 Main St\\, Springfield\\, IL;;;;",
-		"URL:https://jane.example", "X-SOCIALPROFILE;TYPE=twitter:https://twitter.com/jane", "X-SOCIALPROFILE;TYPE=telegram:@jane",
+		"URL:https://jane.example", "X-SOCIALPROFILE;TYPE=twitter:https://twitter.com/jane", "X-SOCIALPROFILE;TYPE=telegram:@jane", "X-SOCIALPROFILE;TYPE=discord:123456789012345678",
 		"REV:",
 	} {
 		assert.Contains(t, text, want)
@@ -494,6 +495,7 @@ func TestRenderMapsFields(t *testing.T) {
 	assert.Equal(t, "--03-14", c1.Birthday)
 	assert.Equal(t, "https://jane.example", c1.Handles["website"])
 	assert.Equal(t, "@jane", c1.Handles["telegram"])
+	assert.Equal(t, "123456789012345678", c1.Handles["discord"])
 	require.Len(t, c1.Phones, 2)
 	assert.Equal(t, "Gym", c1.Phones[1].Label)
 	c2, _ := dav.Parse(card)

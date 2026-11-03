@@ -1246,6 +1246,7 @@ var handleHosts = map[string]string{
 	"linkedin": "https://www.linkedin.com/in/", "twitter": "https://x.com/", "facebook": "https://www.facebook.com/",
 	"instagram": "https://www.instagram.com/", "telegram": "https://t.me/", "tiktok": "https://www.tiktok.com/@",
 	"youtube": "https://www.youtube.com/@", "whatsapp": "https://wa.me/",
+	"discord": "https://discord.com/users/",
 }
 
 // linkFor builds an openable URL for a row, or "".
@@ -1278,6 +1279,7 @@ func inferHandleKind(v string) string {
 		{"linkedin.", "linkedin"}, {"twitter.", "twitter"}, {"x.com", "twitter"}, {"facebook.", "facebook"}, {"fb.com", "facebook"},
 		{"instagram.", "instagram"}, {"t.me", "telegram"}, {"telegram.", "telegram"}, {"wa.me", "whatsapp"}, {"whatsapp.", "whatsapp"},
 		{"tiktok.", "tiktok"}, {"youtube.", "youtube"}, {"youtu.be", "youtube"},
+		{"discord.", "discord"}, {"discordapp.", "discord"},
 	} {
 		if strings.Contains(l, p.sub) {
 			return p.kind

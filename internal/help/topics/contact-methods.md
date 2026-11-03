@@ -23,7 +23,7 @@ crm person handle set 1 website https://janesmith.example
 crm person handle rm 1 linkedin
 ```
 
-Kinds: linkedin, twitter, facebook, instagram, telegram, whatsapp, tiktok, youtube, website, other.
+Kinds: linkedin, twitter, facebook, instagram, telegram, whatsapp, tiktok, youtube, discord, website, other.
 
 ## Read them back
 

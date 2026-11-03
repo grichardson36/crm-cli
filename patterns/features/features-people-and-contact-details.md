@@ -19,7 +19,7 @@ Person fields, labels, favorites, priority tier and the person record. Archive a
 | A01 | Name, job title, company, description (REA, csv) | Dex | DONE | TUI detail pane is an editable form: Enter edits the row inline (commit 4e19422). | - | TUI: edit row in detail pane (Enter). DEFAULT (confirm if wrong): inline one-line text box on the selected row. DECIDED: right pane is the form; inline box on the row. New contact opens the pane with empty rows to fill in quickly. | fast, tactile | P1 |
 | A02 | Multiple emails with labels (REA) | Dex | DONE | TUI add/edit/delete email rows; CLI and MCP. | - | TUI: add `a`, delete `d`, edit Enter on email rows | fast | P1 |
 | A03 | Multiple phones with country code (REA) | Dex | PART | TUI add/edit/delete phone rows; no E.164 normalization yet. | - | TUI rows as A02. Normalize to E.164 at write | smart | P1 |
-| A04 | Social links: linkedin, facebook, instagram, twitter, telegram, whatsapp, tiktok, youtube, website (REA) | Dex | DONE | TUI add/edit/delete/open handle rows; CLI and MCP. | - | TUI rows as A02; `o` opens link | fast | P1 |
+| A04 | Social links: linkedin, facebook, instagram, twitter, telegram, whatsapp, tiktok, youtube, discord, website (REA) | Dex | DONE | TUI add/edit/delete/open handle rows; CLI and MCP. | - | TUI rows as A02; `o` opens link | fast | P1 |
 | A05 | Birthday with optional year (docs, REA) | Dex | DONE | TUI edits birthday; CLI and MCP. | - | TUI edit row; accept `--MM-DD` and `YYYY-MM-DD` | smart | P1 |
 | A06 | Location text (docs, REA) | Dex | PART | `location` text on person | Geocode ever? Only if map or `near` is wanted. | TUI edit row. Geocoding is C11 | - | P2 |
 | A07 | Favorite (REA) | Dex | DONE | `--favorite`, TUI `f`, MCP | - | none | - |  |

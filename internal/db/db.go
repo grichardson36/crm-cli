@@ -124,6 +124,10 @@ func runMigrations(db *sql.DB, limit int) error {
 		if err != nil {
 			return err
 		}
+		// A migration may edit the schema text in place. Make the connection read it again.
+		if _, err := db.Exec("PRAGMA writable_schema = RESET"); err != nil {
+			return fmt.Errorf("migration %s: reset schema: %w", entry.Name(), err)
+		}
 	}
 
 	return nil
