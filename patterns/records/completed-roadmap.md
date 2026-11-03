@@ -48,3 +48,7 @@ Badges show only the gates that have evidence. All items below passed `go build`
 - [ ] 🧭 🔨 CRM-014: Discord profile links (`8e8fa0c`)
   - Outcome: `discord` handle kind in every door, with the vCard social profile map. Migration 021 edits the stored CHECK text without rebuilding the table.
   - Exceptions: no web-search entry for Discord. The migration was tested without device sync enabled.
+- [x] ✅ CRM-015: Footer shows ctrl+o options (`808431a`, `688061b`, `f3e554d`)
+  - Outcome: `ctrl+o options` shows in the footer of every view that has view options (People, Organizations, Tags, saved views, Merge, Archived). Deals and Tasks show nothing. The key follows the registry.
+  - Decisions: owner chose the label `options` for every view, not `sort`, and the hint before `?`. Mutation sweep on the footer condition had no survivors. Review was by the implementing agent, not independent.
+  - Exceptions: a footer too narrow for the hint also drops `?` (People at 80 columns). Two tests that need the help hint, `TestFooterButtonsAndStatusTap` and `TestHelpAndFooterMentionNewKeys`, now use width 160.
