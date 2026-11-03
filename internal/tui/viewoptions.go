@@ -27,7 +27,7 @@ type viewOption struct {
 // viewOptionsFor lists the options of a view, in the order the overlay shows them.
 func viewOptionsFor(v viewKind) []viewOption {
 	switch v {
-	case viewPeople, viewOrgs:
+	case viewPeople, viewOrgs, viewDeals, viewTasks:
 		return []viewOption{sortOption(v), orderOption(v)}
 	case viewTags:
 		return tagViewOptions()
@@ -53,12 +53,28 @@ func viewOptionsFor(v viewKind) []viewOption {
 	return nil
 }
 
-// sortOption is the sort of a list that orders by name or by when it changed last.
-func sortOption(v viewKind) viewOption {
-	choices := []optChoice{{"name", "name"}, {"recent", "recently updated"}}
-	if defaultSort(v) == "recent" {
-		choices = []optChoice{{"recent", "recently updated"}, {"name", "name"}}
+// sortChoices are the sorts of a list, its default first: name, plus when it changed last (People,
+// Organizations), when it was created (Deals) or when it is due (Tasks).
+func sortChoices(v viewKind) []optChoice {
+	name := optChoice{"name", "name"}
+	var other optChoice
+	switch v {
+	case viewDeals:
+		other = optChoice{"recent", "recently created"}
+	case viewTasks:
+		other = optChoice{"due", "due date"}
+	default:
+		other = optChoice{"recent", "recently updated"}
 	}
+	if defaultSort(v) == "name" {
+		return []optChoice{name, other}
+	}
+	return []optChoice{other, name}
+}
+
+// sortOption is the sort of a list: by name, or by a date that depends on the view (sortChoices).
+func sortOption(v viewKind) viewOption {
+	choices := sortChoices(v)
 	return viewOption{
 		id: "sort", label: "Sort", choices: choices,
 		get: func(m *Model) string { return m.sortOf(v) },
@@ -89,7 +105,8 @@ func orderOption(v viewKind) viewOption {
 // orderOf is the direction of a view: "asc" or "desc". Name ascending is A to Z. Recently updated
 // ascending is oldest first and number of objects ascending is fewest first. Until the user sets the
 // order of a view it is the natural one of the current sort: ascending for name, descending for
-// recent and count (newest first, most first, which is how those lists were always ordered).
+// recent and count (newest first, most first, which is how those lists were always ordered) and
+// ascending for due (soonest first).
 func (m *Model) orderOf(v viewKind) string {
 	if o, ok := m.orderChoice[v]; ok {
 		return o
@@ -99,7 +116,7 @@ func (m *Model) orderOf(v viewKind) string {
 
 // naturalOrder is the direction a sort has until the user changes it.
 func naturalOrder(sort string) string {
-	if sort == "name" {
+	if sort == "name" || sort == "due" {
 		return "asc"
 	}
 	return "desc"
@@ -114,8 +131,11 @@ func (m *Model) flipped(v viewKind) bool {
 // defaultSort is the order a list has until the view options change it. People are listed by name,
 // organizations by when they changed last.
 func defaultSort(v viewKind) string {
-	if v == viewOrgs {
+	switch v {
+	case viewOrgs, viewDeals:
 		return "recent"
+	case viewTasks:
+		return "due"
 	}
 	return "name"
 }

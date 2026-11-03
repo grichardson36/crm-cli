@@ -193,11 +193,11 @@ func TestHintClassOfActions(t *testing.T) {
 func TestFooterShowsViewOptionsWhereTheViewHasThem(t *testing.T) {
 	m := newDefaultModel(t)
 	m.width = 160
-	for _, v := range []viewKind{viewPeople, viewOrgs, viewTags, viewMerge, viewArchived} {
+	for _, v := range []viewKind{viewPeople, viewOrgs, viewTags, viewDeals, viewTasks, viewMerge, viewArchived} {
 		m.switchView(v)
 		assert.Contains(t, footHints(m), "ctrl+o", "%s has view options", viewNames[v])
 	}
-	for _, v := range []viewKind{viewDeals, viewTasks} {
+	for _, v := range []viewKind{viewBirthdays} {
 		m.switchView(v)
 		assert.NotContains(t, footHints(m), "ctrl+o", "%s has no view options", viewNames[v])
 	}

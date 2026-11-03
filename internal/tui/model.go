@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -591,6 +592,12 @@ func (m *Model) openTaskRows() ([]row, error) {
 	if err != nil {
 		return nil, err
 	}
+	if m.sortOf(viewTasks) == "name" {
+		sort.SliceStable(tasks, func(i, j int) bool { return strings.ToLower(tasks[i].Title) < strings.ToLower(tasks[j].Title) })
+	}
+	if m.flipped(viewTasks) {
+		tasks = flipTasks(tasks, m.sortOf(viewTasks) == "due")
+	}
 	var rows []row
 	for _, t := range tasks {
 		r := row{taskID: t.ID, title: cleanCell(t.Title)}
@@ -612,6 +619,21 @@ func (m *Model) openTaskRows() ([]row, error) {
 		rows = append(rows, r)
 	}
 	return rows, nil
+}
+
+// flipTasks turns the task list around. Sorted by due date the tasks without one stay last, so only
+// the dated tasks are reversed.
+func flipTasks(tasks []*model.Task, keepUndatedLast bool) []*model.Task {
+	if !keepUndatedLast {
+		slices.Reverse(tasks)
+		return tasks
+	}
+	n := 0
+	for n < len(tasks) && tasks[n].DueAt != nil {
+		n++
+	}
+	slices.Reverse(tasks[:n])
+	return tasks
 }
 
 func (m *Model) peopleRows() []row {

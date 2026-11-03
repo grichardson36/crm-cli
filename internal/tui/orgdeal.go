@@ -113,6 +113,12 @@ func (m *Model) dealRows() ([]row, error) {
 	if err != nil {
 		return nil, err
 	}
+	if m.sortOf(viewDeals) == "name" {
+		sort.SliceStable(list, func(i, j int) bool { return strings.ToLower(list[i].Title) < strings.ToLower(list[j].Title) })
+	}
+	if m.flipped(viewDeals) {
+		slices.Reverse(list)
+	}
 	m.deals = map[int64]*model.Deal{}
 	rows := make([]row, 0, len(list))
 	for _, d := range list {
