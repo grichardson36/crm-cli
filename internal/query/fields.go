@@ -209,7 +209,7 @@ func defs() map[string]*kindDef {
 	person := &kindDef{
 		table: "people", live: "t.archived = 0 AND t.merged_into IS NULL", tagEntity: "person",
 		label: personName, sub: "COALESCE(NULLIF(t.company, ''), NULLIF(t.title, ''), '')", meta: "COALESCE(t.keep_in_touch, '')",
-		search: []string{personName, "t.company", "t.title", "t.email", "t.location", "t.notes"},
+		search: []string{personName, "t.middle_name", "t.company", "t.title", "t.email", "t.location", "t.notes"},
 		def:    []Sort{{Field: "name"}},
 	}
 	birthday := fromSpec("person", "birthday", "")
@@ -218,6 +218,7 @@ func defs() map[string]*kindDef {
 		textF("person", "name", "name", "LOWER("+personName+")"),
 		fromSpec("person", "first", "t.first_name"),
 		fromSpec("person", "last", "t.last_name"),
+		fromSpec("person", "middle", "t.middle_name"),
 		fromSpec("person", "title", "t.title"),
 		fromSpec("person", "company", "t.company"),
 		relF("organization", "organizations", "organization", farOf(rel{table: "person_organization_link", owner: "r.person_id", other: "r.org_id", live: "r.deleted_at IS NULL"}, "organizations", "f.name")),

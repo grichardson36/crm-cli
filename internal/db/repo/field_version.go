@@ -46,6 +46,7 @@ func personFieldValues(p *model.Person) map[string]string {
 	return map[string]string{
 		"first_name":                  "s:" + p.FirstName,
 		"last_name":                   strVal(p.LastName),
+		"middle_name":                 strVal(p.MiddleName),
 		"email":                       strVal(p.Email),
 		"phone":                       strVal(p.Phone),
 		"title":                       strVal(p.Title),

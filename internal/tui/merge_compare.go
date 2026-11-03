@@ -216,6 +216,7 @@ func (c *compareState) buildRows() {
 	}
 
 	single("name", []string{"first_name", "last_name"}, false, true, fullName)
+	single("middle name", []string{"middle_name"}, false, false, func(p *model.Person) string { return str(p.MiddleName) })
 	single("title", []string{"title"}, false, false, func(p *model.Person) string { return str(p.Title) })
 	single("company", []string{"company"}, false, false, func(p *model.Person) string { return str(p.Company) })
 	single("location", []string{"location"}, false, false, func(p *model.Person) string { return str(p.Location) })

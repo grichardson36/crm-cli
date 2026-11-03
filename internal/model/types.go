@@ -8,15 +8,17 @@ type Person struct {
 	UUID      string  `json:"uuid"`
 	FirstName string  `json:"first_name"`
 	LastName  *string `json:"last_name"`
-	Email     *string `json:"email"`
-	Phone     *string `json:"phone"`
-	Title     *string `json:"title"`
-	Company   *string `json:"company"`
-	Location  *string `json:"location"`
-	Notes     *string `json:"notes"`
-	Summary   *string `json:"summary"`
-	CreatedAt string  `json:"created_at"`
-	UpdatedAt string  `json:"updated_at"`
+	// MiddleName is a detail field. The display name stays "First Last".
+	MiddleName *string `json:"middle_name"`
+	Email      *string `json:"email"`
+	Phone      *string `json:"phone"`
+	Title      *string `json:"title"`
+	Company    *string `json:"company"`
+	Location   *string `json:"location"`
+	Notes      *string `json:"notes"`
+	Summary    *string `json:"summary"`
+	CreatedAt  string  `json:"created_at"`
+	UpdatedAt  string  `json:"updated_at"`
 
 	BirthdayMonth           *int    `json:"birthday_month"`
 	BirthdayDay             *int    `json:"birthday_day"`
@@ -37,30 +39,32 @@ type Person struct {
 
 // CreatePersonInput holds fields for creating a person. OrgID makes that organization the primary one.
 type CreatePersonInput struct {
-	FirstName string
-	LastName  *string
-	Email     *string
-	Phone     *string
-	Title     *string
-	Company   *string
-	Location  *string
-	Notes     *string
-	OrgID     *int64
+	FirstName  string
+	LastName   *string
+	MiddleName *string
+	Email      *string
+	Phone      *string
+	Title      *string
+	Company    *string
+	Location   *string
+	Notes      *string
+	OrgID      *int64
 }
 
 // UpdatePersonInput holds optional fields for updating a person.
 // Pointer fields: nil = don't change, non-nil = set to this value.
 type UpdatePersonInput struct {
-	FirstName *string
-	LastName  *string
-	Email     *string
-	Phone     *string
-	Title     *string
-	Company   *string
-	Location  *string
-	Notes     *string
-	Summary   *string
-	OrgID     *int64
+	FirstName  *string
+	LastName   *string
+	MiddleName *string
+	Email      *string
+	Phone      *string
+	Title      *string
+	Company    *string
+	Location   *string
+	Notes      *string
+	Summary    *string
+	OrgID      *int64
 
 	// Birthday is "YYYY-MM-DD" or "--MM-DD"; an empty string clears it.
 	Birthday *string
@@ -97,13 +101,13 @@ type NoteType struct {
 
 // Organization represents a company or group.
 type Organization struct {
-	ID        int64   `json:"id"`
-	UUID      string  `json:"uuid"`
-	Name      string  `json:"name"`
-	Domain    *string `json:"domain"`
-	Industry  *string `json:"industry"`
-	Notes     *string `json:"notes"`
-	Summary   *string `json:"summary"`
+	ID       int64   `json:"id"`
+	UUID     string  `json:"uuid"`
+	Name     string  `json:"name"`
+	Domain   *string `json:"domain"`
+	Industry *string `json:"industry"`
+	Notes    *string `json:"notes"`
+	Summary  *string `json:"summary"`
 	// Native fields (M15). Size is free text, OrgSizes lists the suggested buckets. LogoPath is a path only.
 	Website     *string `json:"website"`
 	Size        *string `json:"size"`

@@ -117,6 +117,7 @@ func RecurrenceOf(raw string) (string, bool) {
 	}
 	return fmt.Sprintf("%d %s", n, u), true
 }
+
 // OccurredAt is the stored time of a logged interaction for an @date: the date with its time, or noon.
 func OccurredAt(w shortsyntax.When) string { return occurredAt(w) }
 
@@ -430,6 +431,7 @@ func StaleFields(cur *model.Person, expected model.UpdatePersonInput) []string {
 	}
 	cmp(expected.Email, strOf(cur.Email), "email")
 	cmp(expected.Phone, strOf(cur.Phone), "phone")
+	cmp(expected.MiddleName, strOf(cur.MiddleName), "middle name")
 	cmp(expected.Title, strOf(cur.Title), "title")
 	cmp(expected.Company, strOf(cur.Company), "company")
 	cmp(expected.Location, strOf(cur.Location), "location")
@@ -463,6 +465,7 @@ func InverseUpdate(before *model.Person, in model.UpdatePersonInput) model.Updat
 	}
 	inv.FirstName = str(in.FirstName != nil, before.FirstName)
 	inv.LastName = str(in.LastName != nil, strOf(before.LastName))
+	inv.MiddleName = str(in.MiddleName != nil, strOf(before.MiddleName))
 	inv.Email = str(in.Email != nil, strOf(before.Email))
 	inv.Phone = str(in.Phone != nil, strOf(before.Phone))
 	inv.Title = str(in.Title != nil, strOf(before.Title))
@@ -499,6 +502,7 @@ func UpdateFields(in model.UpdatePersonInput) []string {
 		}
 	}
 	add(in.FirstName != nil || in.LastName != nil, "name")
+	add(in.MiddleName != nil, "middle name")
 	add(in.Email != nil, "email")
 	add(in.Phone != nil, "phone")
 	add(in.Title != nil, "title")

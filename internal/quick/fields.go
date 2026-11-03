@@ -68,6 +68,8 @@ var personFields = []fieldDef{
 	},
 	textField("last", []string{"lastname", "last_name", "surname"},
 		func(p *model.Person) *string { return p.LastName }, func(in *model.UpdatePersonInput, v *string) { in.LastName = v }),
+	textField("middle", []string{"middlename", "middle_name"},
+		func(p *model.Person) *string { return p.MiddleName }, func(in *model.UpdatePersonInput, v *string) { in.MiddleName = v }),
 	textField("company", []string{"org", "employer"},
 		func(p *model.Person) *string { return p.Company }, func(in *model.UpdatePersonInput, v *string) { in.Company = v }),
 	textField("title", []string{"role", "job"},
@@ -243,4 +245,3 @@ func tierText(n int) string {
 	}
 	return tierNames[n]
 }
-

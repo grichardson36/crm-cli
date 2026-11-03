@@ -198,6 +198,7 @@ var Fields = map[string][]FieldSpec{
 	"person": {
 		{Key: "first", Label: "first name", Type: FieldText, Required: true},
 		{Key: "last", Label: "last name", Type: FieldText},
+		{Key: "middle", Label: "middle name", Type: FieldText},
 		{Key: "title", Label: "title", Type: FieldText},
 		{Key: "company", Label: "company", Type: FieldText},
 		{Key: "organization", Label: "organizations", Type: FieldRelation, Kind: "organization"},

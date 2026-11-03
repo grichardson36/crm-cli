@@ -185,7 +185,7 @@ func complete(line string, cursor int, env Env) Completion {
 	return c
 }
 
-var setKeys = []string{"company", "title", "email", "phone", "location", "birthday", "cadence", "tier", "favorite", "notes", "name", "first", "last", "linkedin", "website", "twitter"}
+var setKeys = []string{"company", "title", "email", "phone", "location", "birthday", "cadence", "tier", "favorite", "notes", "name", "first", "last", "middle", "linkedin", "website", "twitter"}
 
 func sortedTags(tags []string) []string {
 	out := append([]string(nil), tags...)
