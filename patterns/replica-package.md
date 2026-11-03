@@ -70,6 +70,6 @@ The largest value wins. | `people.last_contacted_at`. |
 - Replication is complete in v1: a view's query does not filter what syncs.
 - No encryption, no signed authorship, one owner. The relay refuses a public bind unless `--allow-public`.
 - A device id must belong to one database. Copy a database before `crm peers init`, never after. The relay refuses to enroll a device id twice, and refuses a push that claims its own id with a sequence it never wrote.
-- No terminal UI screen for review or peers yet (see [[roadmap]]).
+- No terminal UI screen for review or peers yet (see [[completed-roadmap]]).
 
 ## Cost of capture Measured on 5000 contacts with about 14 synced values each (`go test -v -run Overhead ./internal/replica/replicasql`): inserting them in one transaction takes 0.23 s without sync and 1.4 s with it (+0.24 ms per contact). Turning sync on for 5000 existing contacts takes 2.5 s and writes 70,000 baseline changes. A single field edit costs 1.1 ms. Pulling all 70,000 changes in pages of 5000 takes 0.7 s. Related: [[reversible-records]], [[edge-adapters]], [[research-sync-building-blocks]].

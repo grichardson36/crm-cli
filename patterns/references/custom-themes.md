@@ -81,6 +81,6 @@ Limits tests cannot show: a terminal that ignores OSC 10 and 11 keeps its own co
 
 ## Not built
 
-An interactive color picker (the pane has hex fields, [[roadmap]]), snippets, theme checks in `internal/validate` with contrast warnings, a file watcher, export and import, a rendered sample in the pane, the generator ([[roadmap]]).
+An interactive color picker (the pane has hex fields, [[completed-roadmap]]), snippets, theme checks in `internal/validate` with contrast warnings, a file watcher, export and import, a rendered sample in the pane, the generator ([[completed-roadmap]]).
 
 **Because.** Owner decisions 2026-11-02 and 2026-11-03: one entry per theme with both palettes, mode picks the palette, a pane that edits custom themes, and no legacy names in the code.

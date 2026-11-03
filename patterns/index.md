@@ -79,4 +79,4 @@ Start with [[core]]. Use this index only to find the relevant supporting pattern
 - [[research/research-tui-building-blocks|TUI research]]
 - [[research/research-sync-standard|sync research]]
 - [[open-discrepancies]]
-- [[roadmap]]
+- [[completed-roadmap]]

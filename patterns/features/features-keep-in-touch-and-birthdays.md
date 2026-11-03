@@ -8,7 +8,7 @@ Cadences, due dates, snooze, birthdays, digests and the Home action queue. D18 (
 
 **Follows patterns:** [[core]]
 
-**See also:** [[roadmap]], [[index]]
+**See also:** [[completed-roadmap]], [[index]]
 
 ## Rows
 

@@ -10,7 +10,7 @@ Person fields, labels, favorites, priority tier and the person record. Archive a
 
 **Research:** [[research-sync-standard]], [[research-relationship-models]]
 
-**See also:** [[roadmap]], [[index]]
+**See also:** [[completed-roadmap]], [[index]]
 
 ## Rows
 
