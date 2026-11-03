@@ -208,6 +208,7 @@ type Model struct {
 	status         string
 	statusIsErr    bool
 	readOnly       bool
+	hintRowsFn     func() int // footerHintRows, set in New. A field so bodyHeight does not reach the hints at init
 
 	// Detail form.
 	form       []formRow
@@ -375,6 +376,7 @@ func New(ctx context.Context, db *sql.DB) (*Model, error) {
 		st:         defaultStyles(),
 		appearance: theme.ModeAuto,
 	}
+	m.hintRowsFn = m.footerHintRows
 	if err := m.reload(); err != nil {
 		return nil, err
 	}
@@ -698,7 +700,7 @@ func sortByUpdated(p []model.PersonSummary) {
 }
 
 func (m *Model) bodyHeight() int {
-	h := m.height - 3
+	h := m.height - 2 - m.footerRows()
 	if h < 3 {
 		h = 3
 	}
@@ -820,10 +822,10 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.detail.SetWidth(m.width - m.listWidth() - 3)
 		m.detail.SetHeight(m.bodyHeight())
 		m.helpVP.SetWidth(m.width)
-		m.helpVP.SetHeight(max(1, m.height-2))
+		m.helpVP.SetHeight(max(1, m.pageRows(m.helpHints())))
 		if m.tv != nil {
 			m.tv.vp.SetWidth(m.width)
-			m.tv.vp.SetHeight(max(1, m.height-2))
+			m.tv.vp.SetHeight(max(1, m.pageRows(m.textHints())))
 		}
 		m.clamp()
 		m.refreshDetail(true)

@@ -35,7 +35,7 @@ type textView struct {
 
 // openText shows body in a scrollable page.
 func (m *Model) openText(title, body string, back func(m *Model)) {
-	vp := viewport.New(viewport.WithWidth(m.width), viewport.WithHeight(max(1, m.height-2)))
+	vp := viewport.New(viewport.WithWidth(m.width), viewport.WithHeight(max(1, m.pageRows(m.textHints()))))
 	if m.width > 0 {
 		body = lipgloss.NewStyle().Width(m.width).Render(body)
 	}

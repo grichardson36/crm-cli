@@ -74,9 +74,9 @@ func (m *Model) handleMouse(msg mouseEvent) (tea.Model, tea.Cmd) {
 			if a := m.actionByID("palette"); a != nil {
 				return m, m.runAction(a)
 			}
-		case msg.Y == footerY+1:
+		case msg.Y > footerY && msg.Y <= footerY+m.footerRows():
 			for _, s := range m.footerSegs() {
-				if msg.X >= s.x0 && msg.X < s.x1 {
+				if s.row == msg.Y-footerY-1 && msg.X >= s.x0 && msg.X < s.x1 {
 					if a := m.actionByID(s.id); a != nil && a.enabled(m) {
 						return m, m.runAction(a)
 					}
@@ -128,9 +128,9 @@ func (m *Model) compareMouse(msg mouseEvent) (tea.Model, tea.Cmd) {
 			if a := m.actionByID("palette"); a != nil {
 				return m, m.runAction(a)
 			}
-		case msg.Y == footerY+1:
+		case msg.Y > footerY && msg.Y <= footerY+m.footerRows():
 			for _, s := range m.footerSegs() {
-				if msg.X >= s.x0 && msg.X < s.x1 {
+				if s.row == msg.Y-footerY-1 && msg.X >= s.x0 && msg.X < s.x1 {
 					if a := m.actionByID(s.id); a != nil && a.enabled(m) {
 						return m, m.runAction(a)
 					}

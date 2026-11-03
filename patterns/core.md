@@ -231,5 +231,3 @@ Items below here are not built.
 	- [ ] User-defined commands (shell templates like `lazygit` custom commands). The verb set stays fixed for now ([[research-tui-building-blocks]], Q30).
 	- [ ] Custom fonts integrated into themes
 	- [ ] "Keys" and "Framework verbs" in Settings seems extremely redundant and confusing for the user. Grill with user before settling on how best to configure these controls
-
-

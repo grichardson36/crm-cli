@@ -48,10 +48,10 @@ func (m *Model) screen() string {
 	}
 	lines := strings.Split(out, "\n")
 	at := len(lines) - 1
-	// On the main screen the last two lines are the status/input line and the key hints. The toast
+	// On the main screen the last lines are the status/input line and the key hint rows. The toast
 	// goes on the last content row above them, so it never covers a prompt, confirm or status line.
 	if at > 2 && m.mode != modeOverlay && m.mode != modeNames && m.tv == nil && !m.help && m.cmp == nil {
-		at -= 2
+		at -= 1 + m.footerRows()
 	} else if len(lines) < m.height {
 		lines = append(lines, "") // a short screen: add a line instead of covering one
 		at = len(lines) - 1

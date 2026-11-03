@@ -384,6 +384,7 @@ func TestMouseSelectsDetailRowAndSecondClickEdits(t *testing.T) {
 
 func TestFooterButtonsAndStatusTap(t *testing.T) {
 	m, _ := newTestModel(t)
+	m.width = 160 // wide enough for every footer hint, the test taps the help button
 	var help *footSeg
 	for _, s := range m.footerSegs() {
 		if s.id == "help" {

@@ -75,6 +75,7 @@ func TestViewSwitcherReachableByMouseOnMore(t *testing.T) {
 
 func TestHelpAndFooterMentionNewKeys(t *testing.T) {
 	m, _ := newTestModel(t)
+	m.width = 160 // wide enough for every footer hint
 	help := m.helpText()
 	for _, want := range []string{"the Views screen", "open the highlighted thing further", "mark the highlighted thing", "an object: a picker of kinds", "merge the space-selected rows"} {
 		assert.Contains(t, help, want)
