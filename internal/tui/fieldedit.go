@@ -372,26 +372,55 @@ func (m *Model) clearTyped(r formRow) {
 }
 
 // typedEditLine is the row while a typed edit is open: the input with its hint, or the options.
-func (m *Model) typedEditLine(label string, w int) string {
+func (m *Model) typedEditLines(label string, w int) []string {
 	t := m.edit.typed
-	if t.vocab != nil {
-		return m.vocabEditLine(label, w)
-	}
-	if t.spec.Type == model.FieldChoice {
-		var parts []string
+	if t.vocab == nil && t.spec.Type == model.FieldChoice {
+		// The options flow onto as many lines as the pane needs, so the chosen one is always visible.
+		room := max(1, w-labelWidth)
+		var lines []string
+		cur, curW := "", 0
+		flush := func() {
+			head := fit("", labelWidth)
+			if len(lines) == 0 {
+				head = m.st.Dim.Render(label)
+			}
+			lines = append(lines, head+cur)
+			cur, curW = "", 0
+		}
 		for i, c := range t.spec.Choices {
 			text := c.Label
 			if c.Label != c.Value && t.spec.Clear != "" {
 				text = fmt.Sprintf("%s (%s)", c.Label, c.Value)
 			}
+			text = ansi.Truncate(text, max(1, room-2), "…")
+			cell := text
 			if i == t.choice {
-				parts = append(parts, m.st.Sel.Render(" "+text+" "))
-			} else {
-				parts = append(parts, m.st.Dim.Render(text))
+				cell = " " + text + " "
 			}
+			if curW > 0 && curW+1+ansi.StringWidth(cell) > room {
+				flush()
+			}
+			if curW > 0 {
+				cur += " "
+				curW++
+			}
+			if i == t.choice {
+				cur += m.st.Sel.Render(cell)
+			} else {
+				cur += m.st.Dim.Render(cell)
+			}
+			curW += ansi.StringWidth(cell)
 		}
-		line := m.st.Dim.Render(label) + strings.Join(parts, " ")
-		return lipgloss.NewStyle().MaxWidth(w).Render(line)
+		flush()
+		return lines
+	}
+	return []string{m.typedEditLine(label, w)}
+}
+
+func (m *Model) typedEditLine(label string, w int) string {
+	t := m.edit.typed
+	if t.vocab != nil {
+		return m.vocabEditLine(label, w)
 	}
 	line := m.st.Dim.Render(label) + strings.TrimRight(m.rowInput.View(), " ")
 	line += m.st.Dim.Render(m.fieldHint(t.spec, m.rowInput.Value(), w-labelWidth-ansi.StringWidth(m.rowInput.Value())-2))

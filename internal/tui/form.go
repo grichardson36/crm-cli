@@ -473,7 +473,7 @@ func (m *Model) renderRow(i int, r formRow, w int) []string {
 		if ce := m.edit.typed.cell; ce != nil {
 			label = fit(ce.cell.label, labelWidth)
 		}
-		return []string{m.typedEditLine(label, w)}
+		return m.typedEditLines(label, w)
 	}
 	if m.mode == modeEdit && m.edit != nil && m.edit.row == i && m.edit.ta != nil {
 		return m.typeaheadLines(label, w)
@@ -534,6 +534,23 @@ func (m *Model) renderRow(i int, r formRow, w int) []string {
 	vw := w - labelWidth - ansi.StringWidth(suffix)
 	if vw < 1 {
 		vw, suffix = max(1, w-labelWidth), ""
+	}
+	if r.kind == rkInfo && suffix == "" && ansi.StringWidth(first) > vw && vw >= 8 {
+		// A long read-only value wraps under its label instead of running off the pane.
+		var out []string
+		for j, l := range wrapText(first, vw) {
+			head := fit("", labelWidth)
+			if j == 0 {
+				head = label
+			}
+			switch {
+			case selected:
+				out = append(out, m.st.Sel.Render(fit(head+l, w)))
+			default:
+				out = append(out, m.st.Dim.Render(head)+l)
+			}
+		}
+		return out
 	}
 	first = ansi.Truncate(first, vw, "…")
 
