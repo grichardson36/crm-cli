@@ -6,7 +6,7 @@ import (
 )
 
 // Key hints live in one place (patterns/key-hints-in-one-place). Every screen and mode shows the
-// keys that work in it on the last line of the screen, the footer, in one format and one order:
+// keys that work in it on the last rows of the screen, the footer, in one format and one order:
 // verbs first, then navigation, then what is specific to the screen. Nothing else on a screen
 // restates a key (rows, descriptions, titles), except the dim syntax hint after the cursor of an
 // input (patterns/show-syntax-inline-as-you-type).

@@ -130,3 +130,14 @@ func TestHelpPageHintsWrapUnderTheBody(t *testing.T) {
 	assert.Contains(t, lines[len(lines)-2], "any key close")
 	assert.Contains(t, lines[len(lines)-1], "up/down scroll")
 }
+
+func TestDetailPaneFollowsTheWrappedFooter(t *testing.T) {
+	m := newDefaultModel(t)
+	m.switchView(viewPeople)
+	m.width = 200
+	m.screen()
+	assert.Equal(t, m.bodyHeight(), m.detail.Height())
+	m.width = 80
+	m.screen()
+	assert.Equal(t, m.bodyHeight(), m.detail.Height(), "the detail pane gives up the row the footer took")
+}
