@@ -78,8 +78,8 @@ The first missing badge identifies the next gate. A failed gate retains its prev
 1. Select or capture a roadmap request. Preserve its intent and assign a stable ID.
 2. Inspect relevant code, tests, domain vocabulary, patterns and architectural decisions.
 3. Identify applicable rules, boundaries, assumptions and existing test seams. Prefer the highest reliable observable seam.
-4. Load `/grilling` skill.
-5. Challenge ambiguity, contradictions, missing behavior, edge cases and failure conditions through `/grilling` and ATDD/BDD discovery.
+4. Load `/grilling` and `/ascii-wireframe` skills.
+5. Challenge ambiguity, contradictions, missing behavior, edge cases and failure conditions through `/grilling`, ATDD/BDD discovery, and wireframing.
 6. Formulate agreed behavior as concise, testable Given/When/Then scenarios. Record implementation decisions, exclusions and applicable doors.
 7. Resolve blocking questions with the owner. Do not silently turn assumptions into requirements.
 
