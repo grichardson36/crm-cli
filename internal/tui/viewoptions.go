@@ -28,7 +28,7 @@ type viewOption struct {
 func viewOptionsFor(v viewKind) []viewOption {
 	switch v {
 	case viewPeople, viewOrgs:
-		return []viewOption{sortOption(v)}
+		return []viewOption{sortOption(v), orderOption(v)}
 	case viewTags:
 		return tagViewOptions()
 	case viewMerge:
@@ -69,6 +69,46 @@ func sortOption(v viewKind) viewOption {
 			m.sortChoice[v] = value
 		},
 	}
+}
+
+// orderOption is the direction of the sort of a view: ascending or descending.
+func orderOption(v viewKind) viewOption {
+	return viewOption{
+		id: "order", label: "Order",
+		choices: []optChoice{{"asc", "ascending"}, {"desc", "descending"}},
+		get:     func(m *Model) string { return m.orderOf(v) },
+		set: func(m *Model, value string) {
+			if m.orderChoice == nil {
+				m.orderChoice = map[viewKind]string{}
+			}
+			m.orderChoice[v] = value
+		},
+	}
+}
+
+// orderOf is the direction of a view: "asc" or "desc". Name ascending is A to Z. Recently updated
+// ascending is oldest first and number of objects ascending is fewest first. Until the user sets the
+// order of a view it is the natural one of the current sort: ascending for name, descending for
+// recent and count (newest first, most first, which is how those lists were always ordered).
+func (m *Model) orderOf(v viewKind) string {
+	if o, ok := m.orderChoice[v]; ok {
+		return o
+	}
+	return naturalOrder(m.sortOf(v))
+}
+
+// naturalOrder is the direction a sort has until the user changes it.
+func naturalOrder(sort string) string {
+	if sort == "name" {
+		return "asc"
+	}
+	return "desc"
+}
+
+// flipped says whether the user's order runs against the natural order of the sort, so a list built
+// in the natural order (A to Z, newest first, most first) must be turned around.
+func (m *Model) flipped(v viewKind) bool {
+	return m.orderOf(v) != naturalOrder(m.sortOf(v))
 }
 
 // defaultSort is the order a list has until the view options change it. People are listed by name,
