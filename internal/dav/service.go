@@ -344,7 +344,7 @@ func (s *Service) create(ctx context.Context, davID string, contact *Contact, ex
 		// Already tied to another phone contact: this one is a separate card.
 	}
 
-	in := model.CreatePersonInput{FirstName: contact.First, LastName: nilIfEmpty(contact.Last),
+	in := model.CreatePersonInput{FirstName: contact.First, LastName: nilIfEmpty(contact.Last), MiddleName: nilIfEmpty(contact.Middle),
 		Title: nilIfEmpty(contact.Title), Company: nilIfEmpty(contact.Company),
 		Location: nilIfEmpty(contact.Location), Notes: nilIfEmpty(contact.Notes)}
 	if in.FirstName == "" {
@@ -525,7 +525,7 @@ func (s *Service) applyDeviceOrg(ctx context.Context, personID int64, value stri
 
 func rawScalars(p *model.Person) map[string]string {
 	return map[string]string{
-		fieldFirst: strings.TrimSpace(p.FirstName), fieldLast: nonNil(p.LastName), fieldCompany: nonNil(p.Company),
+		fieldFirst: strings.TrimSpace(p.FirstName), fieldLast: nonNil(p.LastName), fieldMiddle: strings.TrimSpace(nonNil(p.MiddleName)), fieldCompany: nonNil(p.Company),
 		fieldTitle: nonNil(p.Title), fieldNotes: nonNil(p.Notes), fieldLocation: nonNil(p.Location),
 		fieldBirthday: personBirthday(p),
 	}
@@ -559,6 +559,8 @@ func (s *Service) mergeInto(ctx context.Context, p *model.Person, st *model.DavS
 				in.FirstName = &v
 			case fieldLast:
 				in.LastName = &v
+			case fieldMiddle:
+				in.MiddleName = &v
 			case fieldCompany:
 				handled, err := s.applyDeviceOrg(ctx, p.ID, v)
 				if err != nil {

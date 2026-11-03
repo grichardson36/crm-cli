@@ -81,6 +81,8 @@ func UndoConflict(ctx context.Context, db *sql.DB, id int64) (*model.SyncConflic
 			in.FirstName = &loserVal
 		case fieldLast:
 			in.LastName = &loserVal
+		case fieldMiddle:
+			in.MiddleName = &loserVal
 		case fieldCompany:
 			in.Company = &loserVal
 		case fieldTitle:

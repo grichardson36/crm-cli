@@ -4,7 +4,8 @@
 // vCard mapping (vCard 3.0, which DAVx5, iOS and macOS all read):
 //
 //	UID         the device's external id, or the person's uuid for people created in the CRM
-//	N, FN       last name, first name (middle name, prefix and suffix from the phone are kept aside)
+//	N, FN       last name, first name and middle name (the additional names part of N). The prefix and
+//	            suffix from the phone are kept aside
 //	EMAIL, TEL  every address and number, TYPE carries the label, the primary one gets TYPE=PREF
 //	ORG, TITLE  company and title (extra ORG components such as a department are kept aside)
 //	NOTE        the person's notes
@@ -35,11 +36,12 @@ import (
 )
 
 // MapVersion is part of every ETag, so a change to the mapping makes phones refetch.
-const MapVersion = "1"
+const MapVersion = "2"
 
 const (
 	fieldFirst    = "first_name"
 	fieldLast     = "last_name"
+	fieldMiddle   = "middle_name"
 	fieldCompany  = "company"
 	fieldTitle    = "title"
 	fieldNotes    = "notes"
@@ -50,7 +52,7 @@ const (
 )
 
 // scalarFields are the single-value fields that merge three-way. The names match field_versions.
-var scalarFields = []string{fieldFirst, fieldLast, fieldCompany, fieldTitle, fieldNotes, fieldLocation, fieldBirthday}
+var scalarFields = []string{fieldFirst, fieldLast, fieldMiddle, fieldCompany, fieldTitle, fieldNotes, fieldLocation, fieldBirthday}
 
 // Item is one email address or phone number with its label.
 type Item struct {
@@ -64,6 +66,7 @@ type Item struct {
 type Contact struct {
 	First    string            `json:"first,omitempty"`
 	Last     string            `json:"last,omitempty"`
+	Middle   string            `json:"middle,omitempty"`
 	Company  string            `json:"company,omitempty"`
 	Title    string            `json:"title,omitempty"`
 	Notes    string            `json:"notes,omitempty"`
@@ -76,7 +79,7 @@ type Contact struct {
 
 func (c *Contact) scalars() map[string]string {
 	return map[string]string{
-		fieldFirst: c.First, fieldLast: c.Last, fieldCompany: c.Company, fieldTitle: c.Title,
+		fieldFirst: c.First, fieldLast: c.Last, fieldMiddle: c.Middle, fieldCompany: c.Company, fieldTitle: c.Title,
 		fieldNotes: c.Notes, fieldLocation: c.Location, fieldBirthday: c.Birthday,
 	}
 }
@@ -345,10 +348,11 @@ func Render(p *model.Person, extra vcard.Card, uid string) vcard.Card {
 	card.SetValue(vcard.FieldUID, uid)
 
 	given, family := strings.TrimSpace(p.FirstName), nonNil(p.LastName)
-	var additional, prefix, suffix string
+	additional := strings.TrimSpace(nonNil(p.MiddleName))
+	var prefix, suffix string
 	if f := extra.Get(vcard.FieldName); f != nil {
 		parts := splitStructured(f.Value)
-		additional, prefix, suffix = comp(parts, 2), comp(parts, 3), comp(parts, 4)
+		prefix, suffix = comp(parts, 3), comp(parts, 4)
 	}
 	card.SetValue(vcard.FieldName, strings.Join([]string{
 		compOut(family), compOut(given), compOut(additional), compOut(prefix), compOut(suffix)}, ";"))
@@ -497,7 +501,8 @@ func Parse(card vcard.Card) (*Contact, vcard.Card) {
 	if n := card.Get(vcard.FieldName); n != nil {
 		parts := splitStructured(n.Value)
 		fam, giv = comp(parts, 0), comp(parts, 1)
-		if comp(parts, 2) != "" || comp(parts, 3) != "" || comp(parts, 4) != "" {
+		c.Middle = comp(parts, 2)
+		if comp(parts, 3) != "" || comp(parts, 4) != "" {
 			extra.Set(vcard.FieldName, &vcard.Field{Value: n.Value})
 		}
 	}

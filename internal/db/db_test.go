@@ -154,7 +154,7 @@ func TestMigration002_Constraints(t *testing.T) {
 
 func TestMigration021_DiscordHandleKindKeepsRows(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "old.db")
-	d, err := db.OpenUpTo(path, db.LatestVersion()-1)
+	d, err := db.OpenUpTo(path, 19) // the version before 021 added discord (migration 022 came later, so not LatestVersion()-1)
 	require.NoError(t, err)
 	_, err = d.Exec(`INSERT INTO people (uuid, first_name) VALUES ('a', 'A')`)
 	require.NoError(t, err)

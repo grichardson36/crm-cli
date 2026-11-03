@@ -2,6 +2,8 @@ package tui
 
 import (
 	"context"
+
+	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 	"testing"
 
@@ -49,7 +51,9 @@ func TestNotePromptDefaultsToNoteAndRemembersType(t *testing.T) {
 	assert.Equal(t, "note: ", m.input.Prompt)
 	press(m, "esc")
 
-	// The detail pane shows the type of each note.
+	// The detail pane shows the type of each note. The screen is taller than the default so the
+	// notes under the longer person form (it has a middle name row) stay in view.
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 40})
 	press(m, "tab")
 	out := m.screen()
 	assert.Contains(t, out, "call")

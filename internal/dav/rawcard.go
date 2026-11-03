@@ -325,8 +325,8 @@ func patchRaw(raw string, base, view *Contact, updatedAt string, serverRendered 
 
 	bs, vs := base.scalars(), view.scalars()
 	moved := func(f string) bool { return bs[f] != vs[f] }
-	if moved(fieldFirst) || moved(fieldLast) {
-		rc.patchName(view.First, view.Last)
+	if moved(fieldFirst) || moved(fieldLast) || moved(fieldMiddle) {
+		rc.patchName(view.First, view.Last, view.Middle)
 		changed = true
 	}
 	if moved(fieldCompany) {
@@ -397,12 +397,12 @@ func (rc *rawCard) patchBirthday(birthday string) {
 	rc.Props[idx[0]] = rc.line(p.Group, p.Name, params, value)
 }
 
-// patchName edits N and FN. The additional names, prefix and suffix of the card stay.
-func (rc *rawCard) patchName(given, family string) {
-	var additional, prefix, suffix string
+// patchName edits N and FN. The prefix and suffix of the card stay, the additional names are the middle name.
+func (rc *rawCard) patchName(given, family, additional string) {
+	var prefix, suffix string
 	if idx := rc.index(vcard.FieldName); len(idx) > 0 {
 		parts := splitStructured(rc.Props[idx[0]].field().Value)
-		additional, prefix, suffix = comp(parts, 2), comp(parts, 3), comp(parts, 4)
+		prefix, suffix = comp(parts, 3), comp(parts, 4)
 	}
 	n := strings.Join([]string{compOut(family), compOut(given), compOut(additional), compOut(prefix), compOut(suffix)}, ";")
 	rc.setStructured(vcard.FieldName, n)
@@ -718,4 +718,3 @@ func rawKeys(raw string, name string) map[string]bool {
 	}
 	return out
 }
-

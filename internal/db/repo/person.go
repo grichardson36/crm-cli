@@ -25,12 +25,12 @@ func NewPersonRepo(db *sql.DB) *PersonRepo {
 // DB returns the database the repository works on.
 func (r *PersonRepo) DB() *sql.DB { return r.db }
 
-var personColumns = "id, uuid, first_name, last_name, email, phone, title, company, location, notes, summary, created_at, updated_at, birthday_month, birthday_day, birthday_year, keep_in_touch, keep_in_touch_snoozed_until, last_contacted_at, is_favorite, priority_tier"
+var personColumns = "id, uuid, first_name, last_name, middle_name, email, phone, title, company, location, notes, summary, created_at, updated_at, birthday_month, birthday_day, birthday_year, keep_in_touch, keep_in_touch_snoozed_until, last_contacted_at, is_favorite, priority_tier"
 
 func scanPerson(row interface{ Scan(...any) error }) (*model.Person, error) {
 	var p model.Person
 	err := row.Scan(
-		&p.ID, &p.UUID, &p.FirstName, &p.LastName,
+		&p.ID, &p.UUID, &p.FirstName, &p.LastName, &p.MiddleName,
 		&p.Email, &p.Phone, &p.Title, &p.Company,
 		&p.Location, &p.Notes, &p.Summary,
 		&p.CreatedAt, &p.UpdatedAt,
@@ -56,9 +56,9 @@ func (r *PersonRepo) Create(ctx context.Context, input model.CreatePersonInput) 
 
 	id := uuid.New().String()
 	result, err := r.db.ExecContext(ctx,
-		`INSERT INTO people (uuid, first_name, last_name, email, phone, title, company, location, notes)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		id, input.FirstName, input.LastName, input.Email, input.Phone,
+		`INSERT INTO people (uuid, first_name, last_name, middle_name, email, phone, title, company, location, notes)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		id, input.FirstName, input.LastName, input.MiddleName, input.Email, input.Phone,
 		input.Title, input.Company, input.Location, input.Notes,
 	)
 	if err != nil {
@@ -210,6 +210,10 @@ func (r *PersonRepo) Update(ctx context.Context, id int64, input model.UpdatePer
 	if input.LastName != nil {
 		setClauses = append(setClauses, "last_name = ?")
 		args = append(args, *input.LastName)
+	}
+	if input.MiddleName != nil {
+		setClauses = append(setClauses, "middle_name = ?")
+		args = append(args, *input.MiddleName)
 	}
 	if input.Email != nil {
 		setClauses = append(setClauses, "email = ?")

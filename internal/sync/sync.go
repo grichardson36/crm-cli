@@ -42,15 +42,16 @@ const (
 
 // PersonPatch is the person data an adapter knows. Nil and empty fields mean "no opinion".
 type PersonPatch struct {
-	FirstName *string           `json:"first_name,omitempty"`
-	LastName  *string           `json:"last_name,omitempty"`
-	Title     *string           `json:"title,omitempty"`
-	Company   *string           `json:"company,omitempty"`
-	Location  *string           `json:"location,omitempty"`
-	Emails    []string          `json:"emails,omitempty"`
-	Phones    []string          `json:"phones,omitempty"`
-	Handles   map[string]string `json:"handles,omitempty"` // kind -> value
-	ETag      string            `json:"etag,omitempty"`
+	FirstName  *string           `json:"first_name,omitempty"`
+	LastName   *string           `json:"last_name,omitempty"`
+	MiddleName *string           `json:"middle_name,omitempty"`
+	Title      *string           `json:"title,omitempty"`
+	Company    *string           `json:"company,omitempty"`
+	Location   *string           `json:"location,omitempty"`
+	Emails     []string          `json:"emails,omitempty"`
+	Phones     []string          `json:"phones,omitempty"`
+	Handles    map[string]string `json:"handles,omitempty"` // kind -> value
+	ETag       string            `json:"etag,omitempty"`
 }
 
 // PersonRef points at a person in an incoming interaction.

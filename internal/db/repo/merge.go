@@ -20,6 +20,7 @@ type mergeUnit struct {
 var mergeUnits = []mergeUnit{
 	{"first_name", []string{"first_name"}},
 	{"last_name", []string{"last_name"}},
+	{"middle_name", []string{"middle_name"}},
 	{"title", []string{"title"}},
 	{"company", []string{"company"}},
 	{"location", []string{"location"}},

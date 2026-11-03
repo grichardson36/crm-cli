@@ -16,6 +16,7 @@ import (
 var personShowColumns = []format.ColumnDef{
 	{Header: "ID", Field: "id"},
 	{Header: "Name", Field: "name"},
+	{Header: "Middle name", Field: "middle_name"},
 	{Header: "Emails", Field: "emails_text"},
 	{Header: "Phones", Field: "phones_text"},
 	{Header: "Handles", Field: "handles_text"},

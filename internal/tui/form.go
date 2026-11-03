@@ -26,10 +26,10 @@ const (
 	rkTag
 	rkTask
 	rkNote
-	rkLinked // a link to another object: organization, related person, deal, member
-	rkTyped  // a field with a declared type (model.FieldSpec): edited in place by its type (fieldedit.go)
-	rkMode   // the mode line of the Theme pane (theme.go)
-	rkTheme  // a theme of the Theme pane: the cursor previews it, enter loads it (theme.go)
+	rkLinked    // a link to another object: organization, related person, deal, member
+	rkTyped     // a field with a declared type (model.FieldSpec): edited in place by its type (fieldedit.go)
+	rkMode      // the mode line of the Theme pane (theme.go)
+	rkTheme     // a theme of the Theme pane: the cursor previews it, enter loads it (theme.go)
 	rkThemeName // the name of the theme under the cursor, renamed in place (theme.go)
 	rkColor     // a color of that theme: plain name, hex field and swatch (theme.go)
 )
@@ -202,6 +202,7 @@ func (m *Model) personRows(p *model.Person) []formRow {
 	} else {
 		add(field("first", "first name", p.FirstName))
 		add(field("last", "last name", str(p.LastName)))
+		add(field("middle", "middle name", str(p.MiddleName)))
 	}
 	var title, company, location, notes string
 	if p != nil {
@@ -900,6 +901,8 @@ func (m *Model) applyEdit(e *editState, v string) error {
 			in.FirstName = &v
 		case "last":
 			in.LastName = &v
+		case "middle":
+			in.MiddleName = &v
 		case "title":
 			in.Title = &v
 		case "company":
@@ -1198,6 +1201,8 @@ func (m *Model) askDelete() {
 			switch r.field {
 			case "last":
 				in.LastName = &e
+			case "middle":
+				in.MiddleName = &e
 			case "title":
 				in.Title = &e
 			case "company":

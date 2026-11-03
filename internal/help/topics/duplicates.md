@@ -22,7 +22,7 @@ crm person merge 1 3 --dry-run -f json
 crm person merge 1 3 --prefer title=3
 ```
 
-`--prefer field=ID` takes one field from a specific person and can repeat. Fields: first_name, last_name, title, company, location, notes, summary, org_id, birthday, keep_in_touch, last_contacted_at, is_favorite, priority_tier, email, phone, or a link kind such as linkedin.
+`--prefer field=ID` takes one field from a specific person and can repeat. Fields: first_name, last_name, middle_name, title, company, location, notes, summary, org_id, birthday, keep_in_touch, last_contacted_at, is_favorite, priority_tier, email, phone, or a link kind such as linkedin.
 
 ## Dismiss
 

@@ -233,7 +233,7 @@ func (s *dbSink) createPerson(ctx context.Context, source, externalID string, pa
 		return nil, fmt.Errorf("record has no name or email to create a person from: %w", model.ErrValidation)
 	}
 	in := model.CreatePersonInput{FirstName: strDeref(patch.FirstName), LastName: nonEmpty(patch.LastName),
-		Title: nonEmpty(patch.Title), Company: nonEmpty(patch.Company), Location: nonEmpty(patch.Location)}
+		MiddleName: nonEmpty(patch.MiddleName), Title: nonEmpty(patch.Title), Company: nonEmpty(patch.Company), Location: nonEmpty(patch.Location)}
 	if in.FirstName == "" {
 		in.FirstName = strings.TrimSpace(patch.Emails[0])
 	}
@@ -292,6 +292,7 @@ func (s *dbSink) applyPatch(ctx context.Context, id int64, patch PersonPatch, ov
 		changed = true
 	}
 	in.LastName = pick(p.LastName, patch.LastName)
+	in.MiddleName = pick(p.MiddleName, patch.MiddleName)
 	in.Title = pick(p.Title, patch.Title)
 	in.Company = pick(p.Company, patch.Company)
 	in.Location = pick(p.Location, patch.Location)

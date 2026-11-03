@@ -11,7 +11,7 @@ crm person list --limit 10
 crm person list --tag vip
 ```
 
-The name is split at the first space into first and last name. Use `--first-name` and `--last-name` with `person edit` to correct it.
+The name is split at the first space into first and last name. Use `--first-name` and `--last-name` with `person edit` to correct it. `--middle-name` (on `person add` and `person edit`) sets the middle name, which search finds and a phone keeps as the additional names of the vCard N. The display name stays First Last.
 
 ## Show and find
 

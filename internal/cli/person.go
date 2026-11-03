@@ -8,8 +8,8 @@ import (
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/format"
 	"github.com/jdanielnd/crm-cli/internal/model"
-	"github.com/jdanielnd/crm-cli/internal/validate"
 	"github.com/jdanielnd/crm-cli/internal/shortsyntax"
+	"github.com/jdanielnd/crm-cli/internal/validate"
 	"github.com/spf13/cobra"
 )
 
@@ -37,6 +37,9 @@ func personToMap(p *model.Person) map[string]any {
 	}
 	if p.LastName != nil {
 		m["last_name"] = *p.LastName
+	}
+	if p.MiddleName != nil {
+		m["middle_name"] = *p.MiddleName
 	}
 	if p.Email != nil {
 		m["email"] = *p.Email
@@ -92,7 +95,7 @@ func registerPersonCommands(rootCmd *cobra.Command) {
 }
 
 func personAddCmd() *cobra.Command {
-	var email, phone, title, company, location, notes, birthday, keepInTouch string
+	var email, phone, title, company, location, notes, birthday, keepInTouch, middleName string
 	var orgID int64
 	var favorite, dryRun, noSyntax bool
 
@@ -132,14 +135,15 @@ func personAddCmd() *cobra.Command {
 
 			firstName, lastName := parseName(in.Res.Title)
 			input := model.CreatePersonInput{
-				FirstName: firstName,
-				LastName:  nilIfEmpty(lastName),
-				Email:     nilIfEmpty(email),
-				Phone:     nilIfEmpty(phone),
-				Title:     nilIfEmpty(title),
-				Company:   nilIfEmpty(company),
-				Location:  nilIfEmpty(location),
-				Notes:     nilIfEmpty(notes),
+				FirstName:  firstName,
+				LastName:   nilIfEmpty(lastName),
+				MiddleName: nilIfEmpty(middleName),
+				Email:      nilIfEmpty(email),
+				Phone:      nilIfEmpty(phone),
+				Title:      nilIfEmpty(title),
+				Company:    nilIfEmpty(company),
+				Location:   nilIfEmpty(location),
+				Notes:      nilIfEmpty(notes),
 			}
 			if cmd.Flags().Changed("org") {
 				input.OrgID = &orgID
@@ -187,6 +191,7 @@ func personAddCmd() *cobra.Command {
 		},
 	}
 
+	cmd.Flags().StringVar(&middleName, "middle-name", "", "middle name (a detail field, the display name stays First Last)")
 	cmd.Flags().StringVar(&email, "email", "", "email address")
 	cmd.Flags().StringVar(&phone, "phone", "", "phone number")
 	cmd.Flags().StringVar(&title, "title", "", "job title")
@@ -258,7 +263,7 @@ func personShowCmd() *cobra.Command {
 }
 
 func personEditCmd() *cobra.Command {
-	var firstName, lastName, email, phone, title, company, location, notes string
+	var firstName, lastName, middleName, email, phone, title, company, location, notes string
 	var birthday, keepInTouch, lastContacted, snoozeUntil string
 	var orgID int64
 	var tier int
@@ -286,6 +291,9 @@ func personEditCmd() *cobra.Command {
 			}
 			if cmd.Flags().Changed("last-name") {
 				input.LastName = &lastName
+			}
+			if cmd.Flags().Changed("middle-name") {
+				input.MiddleName = &middleName
 			}
 			if cmd.Flags().Changed("email") {
 				input.Email = &email
@@ -346,6 +354,7 @@ func personEditCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&firstName, "first-name", "", "first name")
 	cmd.Flags().StringVar(&lastName, "last-name", "", "last name")
+	cmd.Flags().StringVar(&middleName, "middle-name", "", "middle name (empty clears)")
 	cmd.Flags().StringVar(&email, "email", "", "email address")
 	cmd.Flags().StringVar(&phone, "phone", "", "phone number")
 	cmd.Flags().StringVar(&title, "title", "", "job title")

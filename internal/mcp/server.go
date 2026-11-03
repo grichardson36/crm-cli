@@ -61,6 +61,7 @@ func NewServer(db *sql.DB, version string, opts ...Option) *server.MCPServer {
 			gomcp.WithDescription("Create a new person"),
 			gomcp.WithString("first_name", gomcp.Required(), gomcp.Description("First name")),
 			gomcp.WithString("last_name", gomcp.Description("Last name")),
+			gomcp.WithString("middle_name", gomcp.Description("Middle name (a detail field, the display name stays First Last)")),
 			gomcp.WithString("email", gomcp.Description("Email address")),
 			gomcp.WithString("phone", gomcp.Description("Phone number")),
 			gomcp.WithString("title", gomcp.Description("Job title")),
@@ -77,6 +78,7 @@ func NewServer(db *sql.DB, version string, opts ...Option) *server.MCPServer {
 			gomcp.WithNumber("id", gomcp.Required(), gomcp.Description("Person ID")),
 			gomcp.WithString("first_name", gomcp.Description("First name")),
 			gomcp.WithString("last_name", gomcp.Description("Last name")),
+			gomcp.WithString("middle_name", gomcp.Description("Middle name. Empty string clears it")),
 			gomcp.WithString("email", gomcp.Description("Email address")),
 			gomcp.WithString("phone", gomcp.Description("Phone number")),
 			gomcp.WithString("title", gomcp.Description("Job title")),
@@ -507,14 +509,15 @@ func personGetHandler(pr *repo.PersonRepo) server.ToolHandlerFunc {
 func personCreateHandler(pr *repo.PersonRepo) server.ToolHandlerFunc {
 	return func(ctx context.Context, req gomcp.CallToolRequest) (*gomcp.CallToolResult, error) {
 		input := model.CreatePersonInput{
-			FirstName: req.GetString("first_name", ""),
-			LastName:  strPtr(req.GetString("last_name", "")),
-			Email:     strPtr(req.GetString("email", "")),
-			Phone:     strPtr(req.GetString("phone", "")),
-			Title:     strPtr(req.GetString("title", "")),
-			Company:   strPtr(req.GetString("company", "")),
-			Location:  strPtr(req.GetString("location", "")),
-			Notes:     strPtr(req.GetString("notes", "")),
+			FirstName:  req.GetString("first_name", ""),
+			LastName:   strPtr(req.GetString("last_name", "")),
+			MiddleName: strPtr(req.GetString("middle_name", "")),
+			Email:      strPtr(req.GetString("email", "")),
+			Phone:      strPtr(req.GetString("phone", "")),
+			Title:      strPtr(req.GetString("title", "")),
+			Company:    strPtr(req.GetString("company", "")),
+			Location:   strPtr(req.GetString("location", "")),
+			Notes:      strPtr(req.GetString("notes", "")),
 		}
 		person, err := pr.Create(ctx, input)
 		if err != nil {
@@ -538,6 +541,9 @@ func personUpdateHandler(pr *repo.PersonRepo) server.ToolHandlerFunc {
 		}
 		if s, ok := argString(args, "last_name"); ok {
 			input.LastName = &s
+		}
+		if s, ok := argString(args, "middle_name"); ok {
+			input.MiddleName = &s
 		}
 		if s, ok := argString(args, "email"); ok {
 			input.Email = &s
