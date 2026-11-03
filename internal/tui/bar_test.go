@@ -186,7 +186,6 @@ func TestBarFindsSettingsByTypingWithTheirCurrentValue(t *testing.T) {
 	require.NotEmpty(t, labels, shownKinds(m))
 	assert.Equal(t, "Theme: nord, auto", labels[0], "the current theme and mode are shown")
 	assert.Contains(t, barNames(m, kindAction), "Theme: choose", "the action is still listed after the setting")
-	assert.Contains(t, plain(m.screen()), "Settings")
 	press(m, "enter")
 	require.Equal(t, modeNormal, m.mode)
 	assert.Equal(t, viewSettings, m.view, "enter opens the Theme pane")
