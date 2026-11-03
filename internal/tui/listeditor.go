@@ -12,19 +12,22 @@ import (
 	"github.com/jdanielnd/crm-cli/internal/validate"
 )
 
-// The list editor (patterns/list-editor-standard): ONE screen that edits every user-managed list
-// (deal stages, deal roles, note types, relation kinds). It is driven by a descriptor (listDesc):
-// the title, the word for an item, the storage functions, optional per-item cells and the removal
-// rules. The keys are the canonical ones:
+// The list editor (patterns/list-editor-standard): the right pane of a Settings row that edits a
+// user-managed list (deal stages, deal roles, note types, relation kinds, ignored company texts).
+// It lives only in that pane: no popup, no screen of its own, no palette entry and no key outside
+// Settings. enter on the row enters the pane, esc leaves it. It is driven by a descriptor (listDesc):
+// the title, the word for an item, the storage functions, optional per-item cells, the removal rules
+// and the built-in defaults. The keys, each shown in the footer only when it works on the row:
 //
+//	up, down             select
 //	a                    add an item inline (type the name, enter saves)
-//	enter, e             edit the cell under the cursor (the name by default, rename inline)
-//	tab, shift+tab       move across the cells of the row
+//	enter, e             rename (the cell under the cursor on a list with text cells)
+//	tab                  cycle the value of the row (outcome, mark contacted) or move across text cells
 //	shift+up, shift+down move the item in the order
-//	d                    remove (several with space or ctrl+a). Items in use ask where their records go
-//	space, ctrl+a        select, select all
-//	ctrl+z, ctrl+y       undo, redo (a removal is ONE step)
-//	esc                  close
+//	d                    remove. Items in use ask where their records go
+//	shift+r              reset to the built-in defaults, after a confirm that lists the changes
+//	ctrl+z, ctrl+y       undo, redo (a removal or a reset is ONE step)
+//	esc, left, shift+tab leave the pane
 //
 // A new list is one more descriptor in listeditor_lists.go.
 
@@ -47,6 +50,8 @@ type listItem struct {
 	inUse int      // records that use the item
 	// locked is the reason the item cannot be renamed or removed, empty when it can.
 	locked string
+	// noRename says the name cannot change although the item can be removed.
+	noRename bool
 }
 
 func (it listItem) id() string { return it.group + "\x00" + it.name }
@@ -54,12 +59,16 @@ func (it listItem) id() string { return it.group + "\x00" + it.name }
 // listGroup is a divider of a grouped list.
 type listGroup struct{ key, title string }
 
-// listCellDesc declares a per-item cell edited with tab and enter. The spec comes from the field
-// vocabulary (model.FieldSpec) so the check is the one every other editor uses.
+// listCellDesc declares a per-item cell. The spec comes from the field vocabulary (model.FieldSpec)
+// so the check is the one every other editor uses.
 type listCellDesc struct {
 	id    string
 	label string
 	spec  model.FieldSpec
+	// cycle makes tab step the cell through its choices and save (outcome, mark contacted).
+	cycle bool
+	// readonly cells are shown and never edited.
+	readonly bool
 }
 
 // listRemoveOpts is what the removal of items that are in use may do besides moving them to another
@@ -71,17 +80,21 @@ type listRemoveOpts struct {
 
 // listDest is where the records of removed items go. All false and to empty means nothing uses them.
 type listDest struct {
-	to                     string
-	blank, keep, entirely  bool
+	to                    string
+	blank, keep, entirely bool
 }
 
 // listDesc declares a list.
 type listDesc struct {
-	id     string // the id of openListEditor: deal-stages, deal-roles, note-types, relation-kinds
+	id     string // deal-stages, deal-roles, note-types, relation-kinds, company-ignore (the Settings row ids)
 	title  string
 	noun   string // one item: "stage"
 	plural string // "stages"
 	usedBy string // what uses an item: "deals"
+	// nameLabel heads the name column, "name" when empty.
+	nameLabel string
+	// noUsed leaves out the used by column (a list whose items no record uses).
+	noUsed bool
 	groups []listGroup
 	cells  []listCellDesc
 	// load lists the items in order, groups in the order of groups.
@@ -99,27 +112,37 @@ type listDesc struct {
 	removeOpts func(m *Model, targets, all []listItem) (listRemoveOpts, error)
 	// remove removes the items as ONE undo step and returns what it did for the status line.
 	remove func(m *Model, targets []listItem, dest listDest) (string, error)
+	// defaults lists the built-in items in their default order with their default cells. A list
+	// without it has no reset.
+	defaults func(m *Model) []listItem
 }
 
-// listEditor is the state of an open editor.
+// listRow is a line of the list: a group divider or an item.
+type listRow struct {
+	divider bool
+	title   string
+	idx     int // index in items, -1 for a divider
+}
+
+// listEditor is the state of the list shown in the pane.
 type listEditor struct {
 	d      *listDesc
 	items  []listItem
-	at     []int // for each overlay row, the index in items, -1 for a divider
+	rows   []listRow
+	cursor int // index in rows, never on a divider
+	offset int // first row drawn
+	page   int // rows that fit in the pane, set when it is drawn
 	marked map[string]bool
 	phase  listPhase
 	col    int // 0 is the name, n is cell n-1
 	in     textinput.Model
-	choice int // option index of a choice cell, cursor of the destination picker
+	choice int // cursor of the destination picker
 	// addGroup is the group an inline add goes to.
 	addGroup string
 	pick     []listPick
 	pend     *listPending
 	msg      string
 	msgErr   bool
-	o        *overlay
-	// rowsCache are the overlay rows built by buildRows.
-	rowsCache []overlayItem
 }
 
 type listPick struct {
@@ -131,26 +154,119 @@ type listPending struct {
 	targets []listItem
 	dest    listDest
 	prompt  string
+	// reset is set for the confirm of a reset: steps run in order, plan is what the pane lists.
+	reset bool
+	plan  []string
+	steps []func() error
 }
 
-// openListEditor opens the editor of a list by id: "deal-stages", "deal-roles", "note-types" or
-// "relation-kinds". The Settings rows, the bar and the palette call it.
-func (m *Model) openListEditor(id string) tea.Cmd {
+// listEditorIDs are the ids of the lists, in the order Settings shows them. Each is also the id of its Settings row.
+var listEditorIDs = []string{"deal-stages", "deal-roles", "note-types", "relation-kinds", "company-ignore"}
+
+// listPaneID is the list a Settings row shows in its pane, "" for any other row.
+func listPaneID(settingID string) string {
+	for _, id := range listEditorIDs {
+		if id == settingID {
+			return id
+		}
+	}
+	return ""
+}
+
+// paneList is the list editor of the Settings row under the cursor, nil on any other screen or row.
+func (m *Model) paneList() *listEditor {
+	if m.lp == nil || m.view != viewSettings || m.cmp != nil {
+		return nil
+	}
+	return m.lp
+}
+
+// paneListFocused is the list editor while the cursor is inside its pane.
+func (m *Model) paneListFocused() *listEditor {
+	if le := m.paneList(); le != nil && m.focus == focusDetail {
+		return le
+	}
+	return nil
+}
+
+// ensurePaneList makes m.lp the editor of the list id. The same list is read again and keeps its cursor.
+func (m *Model) ensurePaneList(id string) {
+	if m.lp != nil && m.lp.d.id == id {
+		cur := ""
+		if it, ok := m.lp.cur(); ok {
+			cur = it.id()
+		}
+		if err := m.lp.load(m); err != nil {
+			m.lp.fail(err)
+			return
+		}
+		m.lp.focus(cur)
+		return
+	}
 	d := m.listDescFor(id)
 	if d == nil {
-		m.setStatus("unknown list "+id, true)
-		return nil
+		m.lp = nil
+		return
 	}
 	le := &listEditor{d: d, marked: map[string]bool{}}
 	if err := le.load(m); err != nil {
 		m.setStatus(err.Error(), true)
-		return nil
+		m.lp = nil
+		return
 	}
-	return le.show(m, "")
+	le.focus("")
+	m.lp = le
 }
 
-// listEditorIDs are the ids openListEditor takes, in the order Settings shows them.
-var listEditorIDs = []string{"deal-stages", "deal-roles", "note-types", "relation-kinds"}
+// openListPane goes to the Settings row of a list with the cursor in its pane.
+func (m *Model) openListPane(id string) tea.Cmd {
+	m.gotoSetting(id)
+	if m.view == viewSettings && m.paneList() != nil && m.lp.d.id == id {
+		m.focus = focusDetail
+		m.fcol = 0
+		m.syncDetail()
+	}
+	return nil
+}
+
+// leavePane puts the cursor back on the list of settings.
+func (m *Model) leavePane() {
+	if le := m.paneList(); le != nil {
+		le.phase, le.col, le.pend = lpBrowse, 0, nil
+	}
+	m.focus = focusList
+	m.fcol = 0
+	m.refreshDetail(true)
+	m.syncDetail()
+}
+
+// paneListKey takes every key while the cursor is in a list pane. A key the pane does not use goes on
+// to the registry (the palette, help, quit).
+func (m *Model) paneListKey(le *listEditor, msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	k := keyName(msg)
+	if le.phase == lpBrowse && !le.usesKey(k) {
+		return m.handleKey(msg)
+	}
+	m.pendingCmd = nil
+	le.key(m, msg)
+	if m.paneList() != nil {
+		m.setStatus(le.msg, le.msgErr)
+		m.syncDetail()
+	}
+	cmd := m.pendingCmd
+	m.pendingCmd = nil
+	return m, cmd
+}
+
+// usesKey says whether the pane handles a key while browsing.
+func (le *listEditor) usesKey(k string) bool {
+	switch k {
+	case "esc", "left", "shift+tab", "up", "down", "pgup", "pgdown", "home", "end", "shift+up", "shift+down",
+		" ", "ctrl+a", "tab", "a", "e", "enter", "d", "R", "ctrl+z", "ctrl+y":
+		return true
+	}
+	return false
+}
 
 func (le *listEditor) load(m *Model) error {
 	items, err := le.d.load(m)
@@ -169,77 +285,101 @@ func (le *listEditor) load(m *Model) error {
 	return nil
 }
 
-// buildRows makes the overlay rows: a divider per group, then the items.
+// buildRows makes the rows: a divider per group, then the items.
 func (le *listEditor) buildRows() {
-	var rows []overlayItem
-	le.at = le.at[:0]
-	add := func(i int) {
-		it := le.items[i]
-		rows = append(rows, overlayItem{id: it.id(), label: it.name, value: it.name})
-		le.at = append(le.at, i)
-	}
+	le.rows = le.rows[:0]
 	if len(le.d.groups) == 0 {
 		for i := range le.items {
-			add(i)
+			le.rows = append(le.rows, listRow{idx: i})
 		}
-	} else {
-		for _, g := range le.d.groups {
-			rows = append(rows, overlayItem{id: "divider:" + g.key, label: g.title, divider: true})
-			le.at = append(le.at, -1)
-			for i, it := range le.items {
-				if it.group == g.key {
-					add(i)
-				}
+		return
+	}
+	for _, g := range le.d.groups {
+		le.rows = append(le.rows, listRow{divider: true, title: g.title, idx: -1})
+		for i, it := range le.items {
+			if it.group == g.key {
+				le.rows = append(le.rows, listRow{idx: i})
 			}
 		}
 	}
-	if le.o != nil {
-		le.o.items = rows
-		le.o.refilter()
-	}
-	le.rowsCache = rows
 }
 
-// show opens (or reopens) the overlay on the item with id focus.
-func (le *listEditor) show(m *Model, focus string) tea.Cmd {
-	le.buildRows()
-	o := m.newOverlay(le.d.title, le.rowsCache, false)
-	o.noFilter = true
-	o.le = le
-	o.onMsg = le.key
-	o.draw = le.view
-	o.extraTop = 1 // the column heading line
-	o.onPick = func(m *Model, it overlayItem) { m.pendingCmd = le.show(m, it.id) }
-	le.o = o
-	le.focus(m, focus)
-	return m.showOverlay(o)
+// move steps the cursor over the items, skipping dividers.
+func (le *listEditor) move(delta int) {
+	step := 1
+	if delta < 0 {
+		step = -1
+	}
+	i := le.cursor
+	for n := abs(delta); n > 0; n-- {
+		j := i + step
+		for j >= 0 && j < len(le.rows) && le.rows[j].divider {
+			j += step
+		}
+		if j < 0 || j >= len(le.rows) {
+			break
+		}
+		i = j
+	}
+	le.cursor = i
+	le.fixOffset()
+}
+
+// settle puts the cursor in range and off a divider.
+func (le *listEditor) settle() {
+	le.cursor = clampInt(le.cursor, 0, max(0, len(le.rows)-1))
+	if len(le.rows) == 0 || !le.rows[le.cursor].divider {
+		return
+	}
+	for j := le.cursor; j < len(le.rows); j++ {
+		if !le.rows[j].divider {
+			le.cursor = j
+			return
+		}
+	}
+	for j := le.cursor; j >= 0; j-- {
+		if !le.rows[j].divider {
+			le.cursor = j
+			return
+		}
+	}
+}
+
+// fixOffset keeps the cursor row, and the divider above it, in the window.
+func (le *listEditor) fixOffset() {
+	page := max(1, le.page)
+	top := le.cursor
+	if top > 0 && le.rows[top-1].divider {
+		top--
+	}
+	if top < le.offset {
+		le.offset = top
+	}
+	if le.cursor >= le.offset+page {
+		le.offset = le.cursor - page + 1
+	}
+	le.offset = max(0, min(le.offset, max(0, len(le.rows)-1)))
 }
 
 // focus puts the cursor on the item with id, else keeps it in range and off a divider.
-func (le *listEditor) focus(m *Model, id string) {
-	o := le.o
+func (le *listEditor) focus(id string) {
 	if id != "" {
-		for i, idx := range o.shown {
-			if o.items[idx].id == id {
-				o.cursor = i
+		for i, r := range le.rows {
+			if !r.divider && le.items[r.idx].id() == id {
+				le.cursor = i
 			}
 		}
 	}
-	o.cursor = clampInt(o.cursor, 0, max(0, len(o.shown)-1))
-	o.move(0, m.overlayPage())
+	le.settle()
+	le.fixOffset()
 }
 
 // cur is the item under the cursor.
 func (le *listEditor) cur() (listItem, bool) {
-	o := le.o
-	if o == nil || o.cursor < 0 || o.cursor >= len(o.shown) {
+	if le.cursor < 0 || le.cursor >= len(le.rows) || le.rows[le.cursor].divider {
 		return listItem{}, false
 	}
-	i := le.at[o.shown[o.cursor]]
-	if i < 0 || i >= len(le.items) {
-		return listItem{}, false
-	}
-	return le.items[i], true
+	return le.items[le.rows[le.cursor].idx], true
 }
 
 // targets are the selected items, else the item under the cursor.
@@ -268,7 +408,7 @@ func (le *listEditor) reload(m *Model, focus string) {
 		le.fail(err)
 		return
 	}
-	le.focus(m, focus)
+	le.focus(focus)
 }
 
 // writeOK says whether the list may change, and why not.
@@ -287,8 +427,8 @@ func (le *listEditor) startInput(prompt, value string, width int) {
 	le.in.SetWidth(max(8, width))
 }
 
-// key handles every key while the editor is open. It always uses the key.
-func (le *listEditor) key(m *Model, msg tea.KeyPressMsg) bool {
+// key handles a key of the pane.
+func (le *listEditor) key(m *Model, msg tea.KeyPressMsg) {
 	k := keyName(msg)
 	switch le.phase {
 	case lpAdd, lpRename:
@@ -302,27 +442,29 @@ func (le *listEditor) key(m *Model, msg tea.KeyPressMsg) bool {
 	default:
 		le.browseKey(m, k)
 	}
-	return true
 }
 
+// bodyRows is how many item rows the pane shows: its height minus the title and the column heading.
+func (le *listEditor) bodyRows(m *Model) int { return max(1, m.detail.Height()-2) }
+
 func (le *listEditor) browseKey(m *Model, k string) {
-	o := le.o
-	page := m.overlayPage()
+	le.page = le.bodyRows(m)
+	page := le.page
 	switch k {
-	case "esc", "ctrl+c":
-		m.closeOverlay()
+	case "esc", "left", "shift+tab":
+		m.leavePane()
 	case "up":
-		o.move(-1, page)
+		le.move(-1)
 	case "down":
-		o.move(1, page)
+		le.move(1)
 	case "pgup":
-		o.move(-page, page)
+		le.move(-page)
 	case "pgdown":
-		o.move(page, page)
+		le.move(page)
 	case "home":
-		o.move(-len(o.shown), page)
+		le.move(-len(le.rows))
 	case "end":
-		o.move(len(o.shown), page)
+		le.move(len(le.rows))
 	case "shift+up":
 		le.shift(m, -1)
 	case "shift+down":
@@ -334,7 +476,7 @@ func (le *listEditor) browseKey(m *Model, k string) {
 			} else {
 				le.marked[it.id()] = true
 			}
-			o.move(1, page)
+			le.move(1)
 		}
 	case "ctrl+a":
 		all := len(le.items) > 0
@@ -349,26 +491,73 @@ func (le *listEditor) browseKey(m *Model, k string) {
 				le.marked[it.id()] = true
 			}
 		}
-	case "tab", "shift+tab":
-		if n := len(le.d.cells) + 1; n > 1 {
-			if k == "tab" {
-				le.col = (le.col + 1) % n
-			} else {
-				le.col = (le.col + n - 1) % n
-			}
-		}
+	case "tab":
+		le.tab(m)
 	case "a":
 		le.startAdd(m)
 	case "enter", "e":
 		le.startEdit(m)
 	case "d":
 		le.startRemove(m)
+	case "R":
+		le.startReset(m)
 	case "ctrl+z":
 		m.pendingCmd = m.undoLast()
 		le.afterHistory(m)
 	case "ctrl+y":
 		m.pendingCmd = m.redoLast()
 		le.afterHistory(m)
+	}
+}
+
+// cycleCell is the index of the cell that tab steps through, -1 when the list has none.
+func (d *listDesc) cycleCell() int {
+	for i, c := range d.cells {
+		if c.cycle {
+			return i
+		}
+	}
+	return -1
+}
+
+// editCols says whether the list has text cells that tab moves across.
+func (d *listDesc) editCols() bool {
+	for _, c := range d.cells {
+		if !c.cycle && !c.readonly {
+			return true
+		}
+	}
+	return false
+}
+
+// tab steps the cycle cell of the row to its next choice, or moves across the text cells.
+func (le *listEditor) tab(m *Model) {
+	it, ok := le.cur()
+	if !ok {
+		return
+	}
+	if ci := le.d.cycleCell(); ci >= 0 {
+		if !le.writeOK(m) {
+			return
+		}
+		c := le.d.cells[ci]
+		next := 0
+		for i, o := range c.spec.Choices {
+			if strings.EqualFold(o.Value, it.cells[ci]) {
+				next = (i + 1) % len(c.spec.Choices)
+			}
+		}
+		le.applyCell(m, it, c, c.spec.Choices[next].Value)
+		return
+	}
+	if !le.d.editCols() || it.locked != "" {
+		le.col = 0
+		return
+	}
+	n := len(le.d.cells) + 1
+	le.col = (le.col + 1) % n
+	for le.col > 0 && le.d.cells[le.col-1].readonly {
+		le.col = (le.col + 1) % n
 	}
 }
 
@@ -385,7 +574,7 @@ func (le *listEditor) afterHistory(m *Model) {
 // shift moves the item under the cursor one place inside its group.
 func (le *listEditor) shift(m *Model, d int) {
 	it, ok := le.cur()
-	if !ok || !le.writeOK(m) {
+	if !ok || le.d.reorder == nil || !le.writeOK(m) {
 		return
 	}
 	var names []string
@@ -403,9 +592,6 @@ func (le *listEditor) shift(m *Model, d int) {
 		return
 	}
 	names[pos], names[to] = names[to], names[pos]
-	if le.d.reorder == nil {
-		return
-	}
 	if err := le.d.reorder(m, it.group, names); err != nil {
 		le.fail(err)
 		return
@@ -425,8 +611,8 @@ func (le *listEditor) startAdd(m *Model) {
 	} else if len(le.d.groups) > 0 {
 		le.addGroup = le.d.groups[0].key
 	}
-	le.startInput("+ ", "", m.width/2)
-	le.in.Placeholder = "name of the new " + le.d.noun
+	le.startInput("+ ", "", m.detail.Width()-4)
+	le.in.Placeholder = le.d.noun
 	le.phase = lpAdd
 	m.pendingCmd = le.in.Focus()
 	le.say("", false)
@@ -437,31 +623,22 @@ func (le *listEditor) startEdit(m *Model) {
 	if !ok || !le.writeOK(m) {
 		return
 	}
+	le.say("", false)
+	if it.locked != "" {
+		le.say(it.name+": "+it.locked, true)
+		return
+	}
 	if le.col == 0 {
-		if it.locked != "" {
-			le.say(it.name+": "+it.locked, true)
+		if it.noRename {
+			le.say(it.name+": built-in, stays", true)
 			return
 		}
 		le.startInput("", it.name, 30)
 		le.phase = lpRename
 		m.pendingCmd = le.in.Focus()
-		le.say("", false)
 		return
 	}
-	c := le.d.cells[le.col-1]
-	val := it.cells[le.col-1]
-	le.say("", false)
-	if c.spec.Type == model.FieldChoice {
-		le.choice = 0
-		for i, o := range c.spec.Choices {
-			if strings.EqualFold(o.Value, val) || strings.EqualFold(o.Label, val) {
-				le.choice = i
-			}
-		}
-		le.phase = lpCell
-		return
-	}
-	le.startInput("", val, 30)
+	le.startInput("", it.cells[le.col-1], 30)
 	le.phase = lpCell
 	m.pendingCmd = le.in.Focus()
 }
@@ -503,7 +680,7 @@ func (le *listEditor) commitText(m *Model) {
 				}
 			}
 		}
-		le.focus(m, focus)
+		le.focus(focus)
 		return
 	}
 	it, ok := le.cur()
@@ -526,52 +703,45 @@ func (le *listEditor) commitText(m *Model) {
 	le.reload(m, (listItem{group: it.group, name: model.CleanVocabName(name)}).id())
 }
 
-// cellKey is a key while a cell is edited: left and right choose an option, enter saves.
+// cellKey is a key while a text cell is edited: enter saves, esc cancels.
 func (le *listEditor) cellKey(m *Model, msg tea.KeyPressMsg, k string) {
 	c := le.d.cells[le.col-1]
-	choice := c.spec.Type == model.FieldChoice
-	switch {
-	case k == "esc":
+	switch k {
+	case "esc":
 		le.phase = lpBrowse
 		le.say("", false)
-	case k == "enter":
-		le.commitCell(m, c)
-	case choice && (k == "left" || k == "up" || k == "shift+tab"):
-		n := len(c.spec.Choices)
-		le.choice = (le.choice + n - 1) % n
-	case choice && (k == "right" || k == "down" || k == "tab"):
-		le.choice = (le.choice + 1) % len(c.spec.Choices)
-	case !choice:
+	case "enter":
+		it, ok := le.cur()
+		if !ok {
+			le.phase = lpBrowse
+			return
+		}
+		if le.applyCell(m, it, c, le.in.Value()) {
+			le.phase = lpBrowse
+		}
+	default:
 		var cmd tea.Cmd
 		le.in, cmd = le.in.Update(msg)
 		m.pendingCmd = cmd
 	}
 }
 
-func (le *listEditor) commitCell(m *Model, c listCellDesc) {
-	it, ok := le.cur()
-	if !ok {
-		le.phase = lpBrowse
-		return
-	}
-	raw := le.in.Value()
-	if c.spec.Type == model.FieldChoice {
-		raw = c.spec.Choices[le.choice].Value
-	}
+// applyCell checks the value with the field type, saves it and reports. It returns false when the
+// value was refused and the input should stay open.
+func (le *listEditor) applyCell(m *Model, it listItem, c listCellDesc, raw string) bool {
 	res := validate.Field(c.spec, raw, validate.Options{})
 	if errs := res.Errors(); len(errs) > 0 {
 		le.say(errs[0].Fix+": "+errs[0].Expected, true)
-		return
+		return false
 	}
 	if err := le.d.setCell(m, it, c.id, res.Value); err != nil {
 		le.fail(err)
-		le.phase = lpBrowse
-		return
+		return true
 	}
 	m.afterWrite()
-	le.phase = lpBrowse
 	le.say(c.label+" of "+it.name+" is now "+res.Value+" (ctrl+z undoes)", false)
 	le.reload(m, it.id())
+	return true
 }
 
 // --- removal ---
@@ -627,7 +797,7 @@ func (le *listEditor) startRemove(m *Model) {
 			le.apply(m, targets, listDest{})
 			return
 		}
-		le.ask(targets, listDest{}, fmt.Sprintf("Remove %d %s (%s)? y/n", len(targets), d.plural, namesOf(targets)))
+		le.ask(targets, listDest{}, fmt.Sprintf("Remove %d %s (%s)?", len(targets), d.plural, namesOf(targets)))
 		return
 	}
 	var picks []listPick
@@ -672,7 +842,7 @@ func (le *listEditor) pickKey(m *Model, k string) {
 			total += t.inUse
 		}
 		p := le.pick[le.choice]
-		le.ask(le.pend.targets, p.dest, fmt.Sprintf("Remove %s (%d %s). %s? y/n", namesOf(le.pend.targets), total, le.d.usedBy, p.label))
+		le.ask(le.pend.targets, p.dest, fmt.Sprintf("Remove %s (%d %s). %s?", namesOf(le.pend.targets), total, le.d.usedBy, p.label))
 	}
 }
 
@@ -687,6 +857,10 @@ func (le *listEditor) confirmKey(m *Model, k string) {
 	case "y", "Y":
 		p := le.pend
 		le.pend = nil
+		if p.reset {
+			le.applyReset(m, p)
+			return
+		}
 		le.apply(m, p.targets, p.dest)
 	case "n", "N", "esc":
 		le.phase = lpBrowse
@@ -711,106 +885,338 @@ func (le *listEditor) apply(m *Model, targets []listItem, dest listDest) {
 	le.reload(m, "")
 }
 
-// --- drawing ---
+// --- reset to the built-in defaults ---
 
-// hints are the footer hints of the list editor for its phase (hints.go): verbs, navigation, specifics.
-func (le *listEditor) hints() []hintItem {
-	switch le.phase {
-	case lpAdd, lpRename:
-		return []hintItem{fk("enter", "save"), fk("esc", "cancel")}
-	case lpCell:
-		if le.d.cells[le.col-1].spec.Type == model.FieldChoice {
-			return []hintItem{fk("enter", "save"), fk("esc", "cancel"), fk("left/right", "choose")}
+// findItem finds an item by group and name, ignoring case.
+func findItem(items []listItem, group, name string) (listItem, bool) {
+	for _, it := range items {
+		if it.group == group && strings.EqualFold(it.name, name) {
+			return it, true
 		}
+	}
+	return listItem{}, false
+}
+
+// resetPlan lists what a reset changes and the steps that do it. It adds the built-in items that are
+// missing, sets the cells of built-in items back to their defaults and puts the built-in items first
+// in their default order. Items the user added stay, after the built-in ones, and nothing is
+// removed, so no record loses its value.
+func (le *listEditor) resetPlan(m *Model) (plan []string, steps []func() error) {
+	d := le.d
+	defs := d.defaults(m)
+	var added []listItem
+	for _, df := range defs {
+		if _, ok := findItem(le.items, df.group, df.name); ok {
+			continue
+		}
+		df := df
+		plan = append(plan, "add "+df.name)
+		steps = append(steps, func() error {
+			if err := d.add(m, df.group, df.name); err != nil {
+				return err
+			}
+			items, err := d.load(m)
+			if err != nil {
+				return err
+			}
+			got, ok := findItem(items, df.group, df.name)
+			if !ok {
+				return nil
+			}
+			for ci, c := range d.cells {
+				if c.readonly || ci >= len(df.cells) || ci >= len(got.cells) || got.cells[ci] == df.cells[ci] || d.setCell == nil {
+					continue
+				}
+				if err := d.setCell(m, got, c.id, df.cells[ci]); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		added = append(added, df)
+	}
+	for _, df := range defs {
+		cur, ok := findItem(le.items, df.group, df.name)
+		if !ok {
+			continue
+		}
+		for ci, c := range d.cells {
+			if c.readonly || ci >= len(df.cells) || ci >= len(cur.cells) || df.cells[ci] == cur.cells[ci] || d.setCell == nil {
+				continue
+			}
+			cur, ci, c, df := cur, ci, c, df
+			plan = append(plan, fmt.Sprintf("%s %s %s", cur.name, c.label, df.cells[ci]))
+			steps = append(steps, func() error { return d.setCell(m, cur, c.id, df.cells[ci]) })
+		}
+	}
+	if d.reorder != nil {
+		groups := []string{""}
+		if len(d.groups) > 0 {
+			groups = nil
+			for _, g := range d.groups {
+				groups = append(groups, g.key)
+			}
+		}
+		for _, g := range groups {
+			var have []string
+			for _, it := range le.items {
+				if it.group == g {
+					have = append(have, it.name)
+				}
+			}
+			for _, df := range added {
+				if df.group == g {
+					have = append(have, df.name)
+				}
+			}
+			var want []string
+			used := map[string]bool{}
+			for _, df := range defs {
+				if df.group != g {
+					continue
+				}
+				for _, h := range have {
+					if strings.EqualFold(h, df.name) {
+						want = append(want, h)
+						used[strings.ToLower(h)] = true
+					}
+				}
+			}
+			for _, h := range have {
+				if !used[strings.ToLower(h)] {
+					want = append(want, h)
+				}
+			}
+			if strings.Join(want, "\x00") == strings.Join(have, "\x00") {
+				continue
+			}
+			g, want := g, want
+			title := "order"
+			for _, gd := range d.groups {
+				if gd.key == g {
+					title = "order " + strings.ToLower(gd.title)
+				}
+			}
+			plan = append(plan, title)
+			steps = append(steps, func() error { return d.reorder(m, g, want) })
+		}
+	}
+	return plan, steps
+}
+
+// startReset is shift+r: it asks, with the list of changes, before anything is written.
+func (le *listEditor) startReset(m *Model) {
+	if le.d.defaults == nil || !le.writeOK(m) {
+		return
+	}
+	plan, steps := le.resetPlan(m)
+	if len(plan) == 0 {
+		le.say("already the defaults", false)
+		return
+	}
+	le.pend = &listPending{reset: true, plan: plan, steps: steps, prompt: fmt.Sprintf("Reset %s to the defaults?", strings.ToLower(le.d.title))}
+	le.phase = lpConfirm
+	le.say("", false)
+}
+
+// applyReset runs the steps of a reset as ONE undo step.
+func (le *listEditor) applyReset(m *Model, p *listPending) {
+	le.phase = lpBrowse
+	m.beginGroup()
+	var failed error
+	for _, s := range p.steps {
+		if err := s(); err != nil {
+			failed = err
+			break
+		}
+	}
+	m.endGroup("reset " + strings.ToLower(le.d.title))
+	m.afterWrite()
+	le.reload(m, "")
+	if failed != nil {
+		le.fail(failed)
+		return
+	}
+	le.say(fmt.Sprintf("reset %s, %d changes (ctrl+z undoes)", strings.ToLower(le.d.title), len(p.plan)), false)
+}
+
+// --- hints and drawing ---
+
+// canEdit says whether e works on the item under the cursor: it renames the name or edits a text cell.
+func (le *listEditor) canEdit(it listItem) bool {
+	if it.locked != "" {
+		return false
+	}
+	return le.col > 0 || !it.noRename
+}
+
+// movable says whether shift+up or shift+down can move the item.
+func (le *listEditor) movable(it listItem) bool {
+	if le.d.reorder == nil {
+		return false
+	}
+	n := 0
+	for _, x := range le.items {
+		if x.group == it.group {
+			n++
+		}
+	}
+	return n > 1
+}
+
+// hints are the footer hints of the pane for its phase: only the keys that work on the row.
+func (le *listEditor) hints(m *Model) []hintItem {
+	switch le.phase {
+	case lpAdd, lpRename, lpCell:
 		return []hintItem{fk("enter", "save"), fk("esc", "cancel")}
 	case lpPick:
 		return []hintItem{fk("enter", "ok"), fk("esc", "cancel"), fk("up/down", "choose")}
 	case lpConfirm:
 		return []hintItem{fk("y", "yes"), fk("n", "no")}
 	}
-	h := []hintItem{fk("a", "add"), fk("enter", "edit"), fk("d", "remove"), fk("space", "select"), ak("undo", "undo"), fk("esc", "close"), fk("shift+up/down", "move")}
-	if len(le.d.cells) > 0 {
-		h = append(h, fk("tab", "cell"))
+	var h []hintItem
+	if len(le.items) > 1 {
+		h = append(h, fk("up/down", "select"))
 	}
-	return h
+	it, onItem := le.cur()
+	if !m.readOnly {
+		h = append(h, fk("a", "add"))
+		if onItem && le.canEdit(it) {
+			label := "rename"
+			if le.col > 0 {
+				label = le.d.cells[le.col-1].label
+			}
+			h = append(h, fk("e", label))
+		}
+		if onItem {
+			if ci := le.d.cycleCell(); ci >= 0 {
+				h = append(h, fk("tab", le.d.cells[ci].label))
+			} else if le.d.editCols() && it.locked == "" {
+				h = append(h, fk("tab", "column"))
+			}
+			if it.locked == "" {
+				h = append(h, fk("d", "delete"))
+			}
+			if le.movable(it) {
+				h = append(h, fk("shift+up/down", "move"))
+			}
+		}
+		if le.d.defaults != nil {
+			h = append(h, fk("shift+r", "reset"))
+		}
+	}
+	return append(h, fk("esc", "close"))
 }
 
-// view draws the list editor with its key hints on the last line.
-func (le *listEditor) view(m *Model) string {
-	return le.body(m) + "\n" + m.renderHintItems(le.hints())
+// promptLines is the confirm question, wrapped to the pane.
+func (le *listEditor) promptLines(m *Model, w int) []string {
+	var out []string
+	for _, l := range strings.Split(ansi.Wrap(le.pend.prompt, w, ""), "\n") {
+		out = append(out, m.st.Warn.Render(l))
+	}
+	return out
 }
 
-func (le *listEditor) body(m *Model) string {
-	o := le.o
-	w := m.width
-	var b strings.Builder
-	b.WriteString(lipgloss.NewStyle().MaxWidth(w).Render(m.st.Head.Render(le.d.title)) + "\n")
+func width2(on bool) int {
+	if on {
+		return 2
+	}
+	return 0
+}
+
+// paneLines draws the pane: the title, the column heading, the rows. Every line fits w cells.
+func (le *listEditor) paneLines(m *Model, w, h int) []string {
+	if w < 1 || h < 1 {
+		return nil
+	}
+	cut := func(s string) string { return ansi.Truncate(s, w, "…") }
+	lines := []string{lipgloss.NewStyle().MaxWidth(w).Render(m.headingStyle().Render(cut(le.d.title)))}
 	switch {
-	case le.phase == lpConfirm && le.pend != nil:
-		b.WriteString(m.st.Warn.Render(ansi.Truncate(le.pend.prompt, w, "…")) + "\n")
-	case le.msg != "" && le.msgErr:
-		b.WriteString(m.st.Err.Render(ansi.Truncate(le.msg, w, "…")) + "\n")
-	case le.msg != "":
-		b.WriteString(m.st.Dim.Render(ansi.Truncate(le.msg, w, "…")) + "\n")
-	default:
-		b.WriteString(m.st.Dim.Render(ansi.Truncate(le.defaultNote(), w, "…")) + "\n")
+	case le.phase == lpPick && le.pend != nil:
+		return append(lines, le.pickLines(m, w)...)
+	case le.phase == lpConfirm && le.pend != nil && le.pend.reset:
+		lines = append(lines, le.promptLines(m, w)...)
+		plan := le.pend.plan
+		if room := max(0, h-len(lines)); room < len(plan) {
+			keep := max(0, room-1)
+			plan = append(append([]string{}, plan[:keep]...), fmt.Sprintf("and %d more", len(le.pend.plan)-keep))
+		}
+		for _, p := range plan {
+			lines = append(lines, cut("  "+p))
+		}
+		return lines
 	}
-	if le.phase == lpPick {
-		b.WriteString(le.pickView(m))
-		return b.String()
+	nameLabel := le.d.nameLabel
+	if nameLabel == "" {
+		nameLabel = "name"
 	}
-	nameW := 12
+	bracket := le.d.editCols()
+	nameW := ansi.StringWidth(nameLabel)
 	for _, it := range le.items {
-		nameW = max(nameW, ansi.StringWidth(it.name)+2)
+		nameW = max(nameW, ansi.StringWidth(it.name)+width2(bracket))
 	}
-	nameW = min(nameW, max(12, w/3))
+	nameW += 2
 	cellW := make([]int, len(le.d.cells))
+	sum := 0
 	for i, c := range le.d.cells {
 		cellW[i] = ansi.StringWidth(c.label) + 2
 		for _, it := range le.items {
 			if i < len(it.cells) {
-				cellW[i] = max(cellW[i], ansi.StringWidth(it.cells[i])+4)
+				cellW[i] = max(cellW[i], ansi.StringWidth(it.cells[i])+2+width2(bracket))
 			}
 		}
+		sum += cellW[i]
 	}
-	head := fit("", 2) + fit("name", nameW)
+	usedW := 0
+	if !le.d.noUsed {
+		usedW = ansi.StringWidth("used by") + 1
+	}
+	if 2+nameW+sum+usedW > w {
+		nameW = max(6, w-2-sum-usedW)
+	}
+	head := fit("", 2) + fit(nameLabel, nameW)
 	for i, c := range le.d.cells {
 		head += fit(c.label, cellW[i])
 	}
-	b.WriteString(m.st.Dim.Render(ansi.Truncate(head, w, "")) + "\n")
-	page := m.overlayPage() - 2
-	if len(o.shown) == 0 && le.phase != lpAdd {
-		b.WriteString(m.st.Dim.Render("The list is empty."))
-		return b.String()
+	if usedW > 0 {
+		head += "used by"
 	}
-	end := min(len(o.shown), o.offset+max(1, page))
-	var lines []string
-	for i := o.offset; i < end; i++ {
-		row := o.items[o.shown[i]]
-		if row.divider {
-			lines = append(lines, m.st.Dim.Render(ruleLine(row.label, "", w)))
+	if le.phase == lpConfirm && le.pend != nil {
+		lines = append(lines, le.promptLines(m, w)...)
+	}
+	lines = append(lines, m.st.Dim.Render(cut(head)))
+	le.page = max(1, h-len(lines))
+	le.fixOffset()
+	if len(le.rows) == 0 && le.phase != lpAdd {
+		return append(lines, m.st.Dim.Render("empty"))
+	}
+	end := min(len(le.rows), le.offset+le.page)
+	focused := m.focus == focusDetail
+	addRow := lipgloss.NewStyle().MaxWidth(w).Render("  " + le.in.View())
+	for i := le.offset; i < end; i++ {
+		r := le.rows[i]
+		if r.divider {
+			lines = append(lines, m.st.Dim.Render(ruleLine(r.title, "", w)))
 		} else {
-			lines = append(lines, le.rowLine(m, i, nameW, cellW))
+			lines = append(lines, le.rowLine(m, i, w, nameW, cellW, usedW, bracket, focused))
 		}
 		if le.phase == lpAdd && i == le.lastOfGroup(end) {
-			lines = append(lines, le.addLine(m))
+			lines = append(lines, addRow)
 		}
 	}
-	if le.phase == lpAdd && len(o.shown) == 0 {
-		lines = append(lines, le.addLine(m))
+	if le.phase == lpAdd && len(le.rows) == 0 {
+		lines = append(lines, addRow)
 	}
-	b.WriteString(strings.Join(lines, "\n"))
-	return b.String()
+	return lines
 }
 
-// lastOfGroup is the shown index after which the inline add row is drawn: the last row of the
+// lastOfGroup is the row index after which the inline add row is drawn: the last row of the
 // group the add goes to, within the visible rows.
 func (le *listEditor) lastOfGroup(end int) int {
-	o := le.o
 	last := -1
-	for i := o.offset; i < end; i++ {
-		idx := le.at[o.shown[i]]
-		if idx >= 0 && le.items[idx].group == le.addGroup {
+	for i := le.offset; i < end; i++ {
+		r := le.rows[i]
+		if !r.divider && le.items[r.idx].group == le.addGroup {
 			last = i
 		}
 	}
@@ -820,35 +1226,19 @@ func (le *listEditor) lastOfGroup(end int) int {
 	return last
 }
 
-func (le *listEditor) addLine(m *Model) string {
-	return lipgloss.NewStyle().MaxWidth(m.width).Render("  " + le.in.View())
-}
-
-func (le *listEditor) defaultNote() string {
-	n := len(le.marked)
-	if n > 0 {
-		return fmt.Sprintf("%d selected", n)
-	}
-	if len(le.d.cells) > 0 {
-		return "each row has cells that are edited in place"
-	}
-	return "renaming updates the records that use the name"
-}
-
-func (le *listEditor) rowLine(m *Model, i, nameW int, cellW []int) string {
-	o := le.o
-	it := le.items[le.at[o.shown[i]]]
-	onRow := i == o.cursor
+func (le *listEditor) rowLine(m *Model, i, w, nameW int, cellW []int, usedW int, bracket, focused bool) string {
+	it := le.items[le.rows[i].idx]
+	onRow := i == le.cursor
 	mark := "  "
 	if le.marked[it.id()] {
 		mark = "* "
 	}
-	name := it.name
-	nameCell := fit(name, nameW)
-	if onRow && le.phase == lpRename {
+	nameCell := fit(it.name, nameW)
+	switch {
+	case onRow && le.phase == lpRename:
 		nameCell = fit(le.in.View(), nameW)
-	} else if onRow && le.col == 0 && le.phase == lpBrowse && len(le.d.cells) > 0 {
-		nameCell = fit("["+name+"]", nameW)
+	case onRow && focused && le.col == 0 && le.phase == lpBrowse && bracket:
+		nameCell = fit("["+it.name+"]", nameW)
 	}
 	line := mark + nameCell
 	for ci, c := range le.d.cells {
@@ -857,64 +1247,40 @@ func (le *listEditor) rowLine(m *Model, i, nameW int, cellW []int) string {
 			val = it.cells[ci]
 		}
 		text := val
-		active := onRow && le.col == ci+1
 		switch {
-		case active && le.phase == lpCell && c.spec.Type == model.FieldChoice:
-			var opts []string
-			for oi, op := range c.spec.Choices {
-				if oi == le.choice {
-					opts = append(opts, "["+op.Label+"]")
-				} else {
-					opts = append(opts, op.Label)
-				}
-			}
-			text = strings.Join(opts, " ")
-		case active && le.phase == lpCell:
+		case onRow && le.col == ci+1 && le.phase == lpCell:
 			text = le.in.View()
-		case active:
+		case onRow && focused && le.col == ci+1 && le.phase == lpBrowse && !c.cycle && !c.readonly:
 			text = "[" + val + "]"
 		}
-		line += fit(text, max(cellW[ci], ansi.StringWidth(text)+1))
+		line += fit(text, cellW[ci])
 	}
 	use := ""
-	switch {
-	case it.locked != "":
-		use = it.locked
-	case it.inUse > 0:
-		use = fmt.Sprintf("%d %s", it.inUse, le.d.usedBy)
-	default:
-		use = "not used"
+	if usedW > 0 {
+		use = fmt.Sprint(it.inUse)
 	}
-	room := m.width - ansi.StringWidth(line) - 1
-	if room > 4 {
-		line += " " + m.st.Dim.Render(ansi.Truncate(use, room, "…"))
-		if onRow {
-			line = fit(ansi.Strip(line), m.width)
-		}
+	if onRow && focused {
+		return m.st.Sel.Render(fit(ansi.Strip(line+use), w))
 	}
-	if onRow {
-		return m.st.Sel.Render(fit(ansi.Strip(line), m.width))
+	if use != "" {
+		line += m.st.Dim.Render(use)
 	}
-	return ansi.Truncate(line, m.width, "…")
+	return ansi.Truncate(line, w, "…")
 }
 
-func (le *listEditor) pickView(m *Model) string {
+func (le *listEditor) pickLines(m *Model, w int) []string {
 	total := 0
 	for _, t := range le.pend.targets {
 		total += t.inUse
 	}
-	var b strings.Builder
-	b.WriteString(m.st.Head.Render(fmt.Sprintf("%d %s use %s. Where do they go?", total, le.d.usedBy, namesOf(le.pend.targets))) + "\n")
+	lines := []string{ansi.Truncate(m.st.Head.Render(fmt.Sprintf("%d %s use %s. Where do they go?", total, le.d.usedBy, namesOf(le.pend.targets))), w, "…")}
 	for i, p := range le.pick {
-		line := fit("  "+p.label, m.width)
+		line := fit("  "+p.label, w)
 		if i == le.choice {
-			b.WriteString(m.st.Sel.Render(line))
+			lines = append(lines, m.st.Sel.Render(line))
 		} else {
-			b.WriteString(line)
-		}
-		if i < len(le.pick)-1 {
-			b.WriteString("\n")
+			lines = append(lines, line)
 		}
 	}
-	return b.String()
+	return lines
 }

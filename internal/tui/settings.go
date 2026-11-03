@@ -158,21 +158,22 @@ func (m *Model) settingList() []setting {
 			action: "modules-reset"},
 
 		// Deals
-		{id: "deal-stages", section: secDeals, name: "Deal stages", words: "pipeline stage won lost outcome vocabulary", desc: "add, rename, order and remove the stages of a deal", scope: scopeSynced,
-			value: vocabCount(model.DealStageKind, "stage"), action: "deal-stages"},
-		{id: "deal-roles", section: secDeals, name: "Deal roles", words: "role champion buyer vocabulary", desc: "add, rename, order and remove the roles a person has on a deal", scope: scopeSynced,
-			value: vocabCount(model.DealRoleKind, "role"), action: "deal-roles"},
+		// The rows below open a list in their right pane (listeditor.go). enter on the row enters the pane.
+		{id: "deal-stages", section: secDeals, name: "Deal stages", words: "pipeline stage won lost outcome vocabulary", desc: "the stages of a deal and their outcome", scope: scopeSynced,
+			value: vocabCount(model.DealStageKind, "stage"), run: func(m *Model) tea.Cmd { return m.openListPane("deal-stages") }},
+		{id: "deal-roles", section: secDeals, name: "Deal roles", words: "role champion buyer vocabulary", desc: "the roles a person has on a deal", scope: scopeSynced,
+			value: vocabCount(model.DealRoleKind, "role"), run: func(m *Model) tea.Cmd { return m.openListPane("deal-roles") }},
 
 		// Types and vocabularies
-		{id: "note-types", section: secTypes, name: "Note types", words: "call email meeting kinds interaction vocabulary", desc: "add or archive note types (call, email, meeting, ...)", scope: scopeSynced,
+		{id: "note-types", section: secTypes, name: "Notes", words: "note types call email meeting kinds interaction mark contacted vocabulary", desc: "note types and whether each marks a person contacted", scope: scopeSynced,
 			value: func(m *Model) string {
 				list, err := m.ntr.List(m.ctx, false)
 				if err != nil {
 					return ""
 				}
 				return countText(len(list), "type")
-			}, action: "note-types"},
-		{id: "relation-kinds", section: secTypes, name: "Relation kinds", words: "friend parent manager inverse mutual link kinds vocabulary", desc: "add, rename, order and remove the kinds of person and organization links (friend, parent, manager, ...)", scope: scopeSynced,
+			}, run: func(m *Model) tea.Cmd { return m.openListPane("note-types") }},
+		{id: "relation-kinds", section: secTypes, name: "Links", words: "relation kinds friend parent manager inverse mutual link vocabulary", desc: "the kinds of person and organization links", scope: scopeSynced,
 			value: func(m *Model) string {
 				kr := repo.NewKindRepo(m.db)
 				n := 0
@@ -183,7 +184,7 @@ func (m *Model) settingList() []setting {
 				}
 				return countText(n, "kind")
 			},
-			run: func(m *Model) tea.Cmd { return m.openListEditor("relation-kinds") }},
+			run: func(m *Model) tea.Cmd { return m.openListPane("relation-kinds") }},
 
 		// Names
 		{id: "aliases", section: secNames, name: "Name aliases", words: "nicknames zach zachary alias table", desc: "the table that lets Zach find Zachary. Manage it with: crm alias list, add, remove", scope: scopeSynced,
@@ -191,7 +192,7 @@ func (m *Model) settingList() []setting {
 				return m.showToast("name aliases have no screen yet. Use crm alias list, crm alias add and crm alias remove", false)
 			}},
 		{id: "company-ignore", section: secNames, name: "Ignored company texts", words: "company ignore organization backfill never create", desc: "texts that never create an organization", scope: scopeSynced,
-			action: "org-ignore"},
+			run: func(m *Model) tea.Cmd { return m.openListPane("company-ignore") }},
 
 		// Behavior
 		{id: "syntax", section: secBehavior, name: "Short syntax", words: "inline tokens hash at toggle", desc: "#tag @Name !high ~30m by fri every 3m in the bar and prompts. Enter toggles", scope: scopeSession,
@@ -432,6 +433,9 @@ func (m *Model) curSetting() *setting {
 // buildSettingForm is the detail pane of a setting: what it is, where it is stored and, for a field
 // setting, the value as a typed row that enter or e edits in place.
 func (m *Model) buildSettingForm(id string) []formRow {
+	if listPaneID(id) == "" {
+		m.lp = nil
+	}
 	if strings.HasPrefix(id, "key:") {
 		return m.keyDetail(strings.TrimPrefix(id, "key:"))
 	}
@@ -441,6 +445,11 @@ func (m *Model) buildSettingForm(id string) []formRow {
 		return nil
 	}
 	m.formTitle = s.name
+	if lid := listPaneID(id); lid != "" {
+		// The pane is the list itself (syncDetail draws it). The one row keeps the pane focusable.
+		m.ensurePaneList(lid)
+		return []formRow{infoRow("", "")}
+	}
 	if id == appearanceID {
 		return m.appearanceRows()
 	}

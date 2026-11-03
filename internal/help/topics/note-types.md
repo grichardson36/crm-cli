@@ -16,7 +16,7 @@ crm log add --type call 1 "Talked about the offsite"
 
 Logging a call, email, meeting or message counts as contact. Notes count only for types defined with `--counts-as-contact`.
 
-Edit note types in the palette opens the list editor: `a` adds, `enter` renames (notes follow), `tab` then `enter` sets counts as contact, `shift+up`/`shift+down` order, `d` removes (notes move to another type or keep the type, one undo step). In the terminal UI, `a n` adds a note of the last used type (press `tab` in the prompt to change the type) and "Add note (pick type)" in the palette picks the type first. The palette action "Manage note types" adds and archives types.
+The Notes row of Settings shows the list in its right pane (`enter` enters it, `esc` leaves it): `a` adds, `e` renames (notes follow), `tab` toggles mark contacted, `shift+up`/`shift+down` order, `d` removes (notes move to another type or keep the type, one undo step), `shift+r` resets to the built-in types. In the terminal UI, `a n` adds a note of the last used type (press `tab` in the prompt to change the type) and "Add note (pick type)" in the palette picks the type first.
 
 Tag an interaction with `crm tag apply interaction ID NAME`.
 

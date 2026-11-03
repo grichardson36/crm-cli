@@ -33,6 +33,6 @@ crm person link person 1 2 --kind friend
 
 `crm person merge` moves every link to the survivor. Only exact duplicate links are dropped (a Person–Organization link is a duplicate when organization, role, start and end all match, so CTO and Advisor at one organization both stay), and the old id and uuid are kept as an alias so old references resolve.
 
-The palette entry Edit relation kinds opens the list editor for link kinds: `a` adds a mutual kind, `tab` and `enter` set the inverse name, `d` removes (links move to another kind or are unlinked). CLI: `crm relation-kind list|add|rename|set|rm`.
+The Links row of Settings shows the kinds in its right pane (`enter` enters it, `esc` leaves it), in two groups, People and Organizations: `a` adds a mutual kind, `e` renames, `tab` then `e` sets the inverse (a name equal to its inverse is mutual), `d` removes (links move to another kind or are unlinked), `shift+r` resets the order. CLI: `crm relation-kind list|add|rename|set|rm`.
 
 See also: links, orgs, convert, duplicates, dav, people.

@@ -426,7 +426,6 @@ func buildActions() []action {
 	out = append(out, orgMergeActions()...)
 	out = append(out, moduleActions()...)
 	out = append(out, savedViewActions()...)
-	out = append(out, listEditorActions()...)
 	out = append(out, settingActions()...)
 	annotateActions(out)
 	return out

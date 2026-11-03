@@ -19,7 +19,7 @@ domains: [interface]
 5. A popup that chooses how far to go back (undo history, `ctrl+shift+z`) lists the newest first. Picking an entry applies it and everything between it and the top.
 6. Key hints show in the footer ([[key-hints-in-one-place]]), never in a title or body. A popup shows its own hints in the bottom row inside its box ([[popup-component]]) and not in the footer.
 
-**Exception.** The help view (`?`) closes on any key, and a text entry line (the footer prompt) keeps the keys of its field. Inside the Theme pane of Settings `tab` changes the mode and does not leave the pane, `esc` and `shift+tab` still do ([[custom-themes]]).
+**Exception.** The help view (`?`) closes on any key, and a text entry line (the footer prompt) keeps the keys of its field. Inside the Theme pane of Settings `tab` changes the mode and does not leave the pane, `esc` and `shift+tab` still do ([[custom-themes]]). Inside a list pane of Settings (deal stages, deal roles, Notes, Links, ignored company texts) `tab` cycles the value of the row where it has one and does not leave the pane, `esc`, `left` and `shift+tab` do ([[list-editor-standard]]).
 
 **Check.** `TestEveryOverlayClosesWithEsc` and `TestTwoPaneScreensFollowTheStandard` in `internal/tui/navstandard_test.go`. A new overlay or two-pane screen is added to their tables in the same change.
 

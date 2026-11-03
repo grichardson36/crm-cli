@@ -37,7 +37,6 @@ func TestEveryOverlayClosesWithEsc(t *testing.T) {
 			m.undoLast()
 			m.openHistory(true)
 		}},
-		{"list editor",func(m *Model) { m.openListEditor("deal-stages") }},
 		{"keys customize", func(m *Model) { m.openKeysCustomize() }},
 	}
 	for _, tc := range tests {

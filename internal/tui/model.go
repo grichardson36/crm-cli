@@ -232,6 +232,8 @@ type Model struct {
 	confirm    *confirmState
 	ov         *overlay
 	pendingCmd tea.Cmd
+	// lp is the list editor of the Settings row under the cursor (listeditor.go), nil on any other row.
+	lp *listEditor
 
 	// Merge view: duplicate groups parallel to rows, the minimum level and the dismissals made
 	// this session (newest last) for undo. cmp is the open compare screen, if any.
@@ -887,6 +889,9 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.handleEditKey(msg)
 		case modeConfirm:
 			return m.handleConfirmKey(msg)
+		}
+		if le := m.paneListFocused(); le != nil {
+			return m.paneListKey(le, msg)
 		}
 		return m.handleKey(msg)
 	}

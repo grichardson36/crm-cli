@@ -48,7 +48,7 @@ The list is the shown views numbered 1 to 0, a divider with no label (drawn as a
 
 ## Not a popup
 
-The list editor (`listeditor.go`) still draws a full screen through `overlay.draw`.
+The list editor (`listeditor.go`) is not an overlay. It is drawn in the right pane of its Settings row ([[list-editor-standard]]).
 
 ## Check
 
