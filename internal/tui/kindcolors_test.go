@@ -67,7 +67,7 @@ func TestColorsPaneEditsAndResetsAKindColor(t *testing.T) {
 	// footer: only keys that work on the row. Nothing is custom yet, so no reset.
 	h := hintsText(m)
 	assert.Contains(t, h, "e edit")
-	assert.Contains(t, h, "esc close")
+	assert.Contains(t, h, "esc back")
 	assert.NotContains(t, h, "shift+r reset")
 
 	// edit in place: a bad value is refused, a hex is saved to [colors]

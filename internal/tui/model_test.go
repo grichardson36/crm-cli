@@ -63,7 +63,7 @@ func newTestModel(t *testing.T) (*Model, *repo.PersonRepo) {
 // Tags sits after Deals in the shipped order, so here it is last and off: the number keys stay what these
 // tests assume (tests of the Tags view switch to it with switchView).
 func useAllViews(m *Model) {
-	m.mods = modules.Arrangement{Order: []string{"home", "people", "follow-up", "tasks", "organizations", "deals", "birthdays", "merge", "archived", "sync", "settings", "tags"}, Hidden: []string{"tags"}}.Normalize()
+	m.mods = modules.Arrangement{Order: []string{"home", "people", "follow-up", "tasks", "organizations", "deals", "dates", "merge", "archived", "sync", "settings", "tags"}, Hidden: []string{"tags"}}.Normalize()
 	m.patchModuleActions()
 }
 
@@ -262,7 +262,7 @@ func TestViewsDueBirthdaysTasks(t *testing.T) {
 	press(m, "]")
 	assert.Equal(t, viewDeals, m.view, "Deals follows Organizations")
 	press(m, "]")
-	assert.Equal(t, viewBirthdays, m.view)
+	assert.Equal(t, viewDates, m.view)
 	press(m, "]", "]", "]")
 	assert.Equal(t, viewSync, m.view)
 	press(m, "]")

@@ -15,7 +15,7 @@ import (
 // key the framework layer owns (TestAppLayerKeepsOffFrameworkKeys).
 //
 // Scopes say where an action's keys are live: "app" (everywhere), a view type ("type:person",
-// "type:task", "form", "compare", ...) or one view ("view:birthdays"). A key is looked up from the most
+// "type:task", "form", "compare", ...) or one view ("view:dates"). A key is looked up from the most
 // specific scope of the current context outward (scopeChain) and the first enabled action wins. A scope
 // can erase an inherited key so the lookup stops there. Two actions conflict only when they share a key
 // in the same scope and the same mode. Text-entry keys (the footer prompt) are a separate mode, so a

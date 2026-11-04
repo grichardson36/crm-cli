@@ -32,7 +32,7 @@ The steps are in [INSTALL.md](INSTALL.md). Agents learn the program from the pro
 - **Relationships** — person-to-person links (colleague, mentor, referred-by, …)
 - **Full-Text Search** — find anything across all entities instantly
 - **Context Briefing** — one command to get everything about a person before a meeting
-- **Keep in Touch** — cadences, a due list, birthdays, duplicate detection and merge, archive and restore
+- **Keep in Touch** — cadences, a due list, birthdays and anniversaries, duplicate detection and merge, archive and restore
 - **Agent-Ready** — built-in help topics, a JSON command manifest, `--dry-run` on every change, JSON errors, and an optional MCP server
 - **Multiple Output Formats** — table, JSON, CSV, TSV — pipe into anything
 - **Zero Dependencies** — single binary, pure-Go SQLite, runs anywhere

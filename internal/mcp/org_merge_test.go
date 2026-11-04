@@ -74,13 +74,13 @@ func TestModulesTools(t *testing.T) {
 	callJSON(t, s, "crm_modules_set", map[string]any{"module": "deals", "on": false}, &rows)
 	callJSON(t, s, "crm_modules_set", map[string]any{"module": "deals", "on": true}, &rows)
 	callJSON(t, s, "crm_modules_set", map[string]any{"module": "organizations", "position": 2}, &rows)
-	callJSON(t, s, "crm_modules_set", map[string]any{"module": "birthdays", "on": false}, &rows)
+	callJSON(t, s, "crm_modules_set", map[string]any{"module": "dates", "on": false}, &rows)
 	byID := map[string]map[string]any{}
 	for _, r := range rows {
 		byID[r["id"].(string)] = r
 	}
 	assert.EqualValues(t, 2, byID["organizations"]["order"])
-	assert.Equal(t, false, byID["birthdays"]["on"])
+	assert.Equal(t, false, byID["dates"]["on"])
 	assert.Equal(t, true, byID["deals"]["on"])
 
 	_, isErr := call(t, s, "crm_modules_set", map[string]any{"module": "nope", "on": true})

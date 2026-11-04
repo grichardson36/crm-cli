@@ -8,7 +8,7 @@ This is the current link vocabulary, not a pattern. Use it to decide whether a f
 | Objects | Meaning | Variables | Constraint | Internal storage key |
 |---|---|---|---|---|
 | Person → Organization | A person's organization connection | role, from, to, primary, notes | Links can repeat for separate roles or time periods. One current primary organization per person. | `person_organization_link` |
-| Person → Person | A directed or mutual personal relationship | kind, notes | One live link for the same pair and kind. | `person_relation` |
+| Person → Person | A directed or mutual personal relationship | kind, anniversary (spouse kind only), notes | One live link for the same pair and kind. | `person_relation` |
 | Organization → Organization | A directed or mutual organization relationship | kind, notes | One live link for the same pair and kind. | `org_relation` |
 | Deal → Person | A person's role in a deal | role | One live link per pair. | `deal_person` |
 | Deal → Organization | An organization's role in a deal | role, primary | One live link per pair. One primary organization per deal. | `deal_org` |

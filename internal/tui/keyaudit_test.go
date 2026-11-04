@@ -87,7 +87,7 @@ func auditContexts(t *testing.T) []auditCtx {
 	require.NoError(t, m.pr.Archive(ctx, arch.ID))
 	m.afterWrite()
 
-	for _, v := range []viewKind{viewHome, viewPeople, viewDue, viewTasks, viewOrgs, viewDeals, viewBirthdays, viewArchived, viewSync} {
+	for _, v := range []viewKind{viewHome, viewPeople, viewDue, viewTasks, viewOrgs, viewDeals, viewDates, viewArchived, viewSync} {
 		m.switchView(v)
 		m.focus = focusList
 		m.settle()

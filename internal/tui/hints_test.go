@@ -64,7 +64,7 @@ func hintScreens() []hintScreen {
 		{"people list", 2, view(viewPeople)},
 		{"follow-up", 2, view(viewDue)},
 		{"tasks", 2, view(viewTasks)},
-		{"birthdays", 2, view(viewBirthdays)},
+		{"dates", 2, view(viewDates)},
 		{"merge", 2, view(viewMerge)},
 		{"archived", 2, view(viewArchived)},
 		{"sync", 2, view(viewSync)},
@@ -193,11 +193,11 @@ func TestHintClassOfActions(t *testing.T) {
 func TestFooterShowsViewOptionsWhereTheViewHasThem(t *testing.T) {
 	m := newDefaultModel(t)
 	m.width = 160
-	for _, v := range []viewKind{viewPeople, viewOrgs, viewTags, viewDeals, viewTasks, viewMerge, viewArchived} {
+	for _, v := range []viewKind{viewPeople, viewOrgs, viewTags, viewDeals, viewTasks, viewMerge, viewArchived, viewDates} {
 		m.switchView(v)
 		assert.Contains(t, footHints(m), "ctrl+o", "%s has view options", viewNames[v])
 	}
-	for _, v := range []viewKind{viewBirthdays} {
+	for _, v := range []viewKind{viewHome, viewDue, viewSync} {
 		m.switchView(v)
 		assert.NotContains(t, footHints(m), "ctrl+o", "%s has no view options", viewNames[v])
 	}

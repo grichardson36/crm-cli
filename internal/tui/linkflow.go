@@ -36,6 +36,9 @@ type linkDraft struct {
 	// offeredRole is a deal role typed that is not on the list: the prompt offered to create it and
 	// the next enter with the same text does. createRole is the role to add while saving.
 	offeredRole, createRole string
+	// spouse says the kind picked is the built-in spouse kind, which asks for an anniversary once
+	// (askedAnniv). Other kinds ask nothing.
+	spouse, askedAnniv bool
 }
 
 func (d *linkDraft) targetName(m *Model) string {
@@ -147,10 +150,39 @@ func (m *Model) nextLinkStep() tea.Cmd {
 	if d.rel.Kinded && d.attrs.Kind == nil && d.existing == nil {
 		return m.pickKind(d)
 	}
+	if d.spouse && !d.askedAnniv && d.existing == nil && len(d.also) == 0 {
+		return m.askAnniversary(d, "")
+	}
 	if len(d.rel.AskAttrs()) > 0 && !d.prompted {
 		return m.askLinkAttrs(d)
 	}
 	return m.finishLink(d)
+}
+
+// askAnniversary is the one optional line after the Spouse kind is picked. Blank skips it.
+func (m *Model) askAnniversary(d *linkDraft, initial string) tea.Cmd {
+	m.startInput("link-anniversary", "Anniversary (blank skips): ", initial)
+	return m.input.Focus()
+}
+
+// runLinkAnniversary reads the anniversary line. A date that is not YYYY-MM-DD or --MM-DD is refused
+// with a message and asked again.
+func (m *Model) runLinkAnniversary(line string) {
+	d := m.draft
+	if d == nil {
+		return
+	}
+	v, err := model.NormalizeAnniversary(line)
+	if err != nil {
+		m.pendingCmd = m.askAnniversary(d, line)
+		m.setStatus(err.Error(), true)
+		return
+	}
+	if v != "" {
+		d.attrs.Anniversary = &v
+	}
+	d.askedAnniv = true
+	m.pendingCmd = m.nextLinkStep()
 }
 
 // pickKind lists the relation kinds with both labels, so the direction is clear before it is saved.
@@ -180,6 +212,11 @@ func (m *Model) pickKind(d *linkDraft) tea.Cmd {
 	m.openPicker("Kind of link between "+srcName+" and "+tgtName, items, func(m *Model, it overlayItem) {
 		name := it.value
 		d.attrs.Kind = &name
+		for _, k := range kinds {
+			if k.Name == name {
+				d.spouse = repo.IsSpouseKind(k)
+			}
+		}
 		m.pendingCmd = m.nextLinkStep()
 	})
 	return nil
@@ -437,6 +474,9 @@ func linkSummary(li model.LinkedObject) string {
 	}
 	if d := linkDates(li); d != "" {
 		parts = append(parts, d)
+	}
+	if a := str(li.Anniversary); a != "" {
+		parts = append(parts, "anniversary "+a)
 	}
 	if li.Primary {
 		parts = append(parts, "primary")

@@ -35,6 +35,9 @@ func (m *Model) linkSuffix(li model.LinkedObject) string {
 	if d := linkDates(li); d != "" {
 		parts = append(parts, d)
 	}
+	if a := str(li.Anniversary); a != "" {
+		parts = append(parts, "anniversary "+a)
+	}
 	if !li.Current {
 		parts = append(parts, "past")
 	}

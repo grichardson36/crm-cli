@@ -51,6 +51,9 @@ type action struct {
 	foot   int
 	footIn focusMask
 	footIf func(m *Model) bool
+	// footCtx marks a contextual hint: shown only while the highlighted row supports the verb, and the
+	// first to go (the last one first) when the keys of the view and the app would not fit (footerSegs).
+	footCtx bool
 
 	// when says if the action applies in the current context. nil means always.
 	when func(m *Model) bool
@@ -169,7 +172,7 @@ func buildActions() []action {
 		{id: "cmp-right", title: "Use candidate 2", group: "Compare", hint: "→", keys: []string{"right"}, desc: "compare: keep the right person's value for this field (a list item goes in)",
 			inCompare: true, when: whenCmpEdit, run: func(m *Model) tea.Cmd { m.cmpTake(1); return nil }},
 		{id: "cmp-field", title: "Next field", group: "Compare", hint: "tab", keys: []string{"tab"}, desc: "compare: move to the next field, from the last back to the first (up and down move one row too)",
-			foot: 5, footIn: inBoth, footLabel: "next field", inCompare: true, when: whenCmpEdit, run: func(m *Model) tea.Cmd { m.cmp.cycle(); return nil }},
+			foot: 5, footIn: inBoth, footLabel: hwNextField, inCompare: true, when: whenCmpEdit, run: func(m *Model) tea.Cmd { m.cmp.cycle(); return nil }},
 		{id: "cmp-pick", title: "Toggle value or item", group: "Compare", hint: "space", keys: []string{" "}, desc: "compare: switch a field to the other person's value, or put a list item in or out of the result (left and right pick a side directly)",
 			foot: 7, footIn: inBoth, inCompare: true, when: whenCmpEdit, run: func(m *Model) tea.Cmd { m.cmp.toggle(); m.cmpPreview(); return nil }},
 		{id: "cmp-survivor", title: "Change survivor", group: "Compare", hint: "ctrl+e", keys: []string{"ctrl+e"}, desc: "compare: keep the other person's record and id as the survivor",
@@ -200,7 +203,7 @@ func buildActions() []action {
 				return nil
 			}},
 		{id: "cmp-dismiss", title: "Dismiss group", group: "Compare", hint: "d", keys: []string{"d"}, desc: "compare: mark the group as not duplicates and leave (d is the Delete verb)",
-			write: true, foot: 10, footIn: inBoth, footLabel: "dismiss", inCompare: true, when: whenDismiss, run: func(m *Model) tea.Cmd { m.dismissGroup(); return nil }},
+			write: true, foot: 10, footIn: inBoth, footIf: func(m *Model) bool { return m.cmp != nil }, inCompare: true, when: whenDismiss, run: func(m *Model) tea.Cmd { m.dismissGroup(); return nil }},
 
 		// Contact actions. The verbs of every object (Add, Edit, Delete, Restore, Link, Unlink) are generated
 		// from the registry in objects.go and inserted after them.
@@ -209,12 +212,12 @@ func buildActions() []action {
 		{id: "note-pick", title: "Add note (pick type)", group: "Contact", desc: "pick a note type from a list, then add the note",
 			write: true, when: whenPerson, run: func(m *Model) tea.Cmd { m.pickNoteType(); return nil }},
 		{id: "snooze", title: "Snooze keep-in-touch", group: "Contact", hint: "s", keys: []string{"s"}, desc: "snooze keep-in-touch for N days (a person)",
-			write: true, when: whenPerson, run: func(m *Model) tea.Cmd {
+			write: true, foot: footSnooze, footIn: inBoth, footCtx: true, when: whenPerson, run: func(m *Model) tea.Cmd {
 				m.startPrompt("snooze", "snooze days: ", "7")
 				return m.input.Focus()
 			}},
 		{id: "favorite", title: "Toggle favorite", group: "Contact", hint: "f", keys: []string{"f"}, desc: "toggle favorite (all marked people if any)",
-			write: true, when: whenPerson, run: func(m *Model) tea.Cmd { m.toggleFavorite(); return nil }},
+			write: true, foot: footFavorite, footIn: inBoth, footCtx: true, when: whenPerson, run: func(m *Model) tea.Cmd { m.toggleFavorite(); return nil }},
 		{id: "task-tag", title: "Tag task", group: "Contact", desc: "add a tag to the selected task (prefix with - to remove). In the Tasks view, or on a task row in the detail pane. l links a tag too",
 			write: true, when: whenTaskTarget, run: func(m *Model) tea.Cmd {
 				m.startInput("tasktag", "tag task (-name removes): ", "")
@@ -256,7 +259,7 @@ func buildActions() []action {
 		{id: "compare", title: "Compare group", group: "Merge", desc: "open the side by side compare for the selected group",
 			when: whenMergeRows, run: func(m *Model) tea.Cmd { m.openGroupCompare(); return nil }},
 		{id: "dismiss", title: "Dismiss group", group: "Merge", hint: "d", keys: []string{"d"}, desc: "mark the group as not duplicates (d is the Delete verb). Undo dismiss in the palette brings it back",
-			write: true, foot: 22, footIn: inList, footLabel: "dismiss", when: whenDismiss, run: func(m *Model) tea.Cmd { m.dismissGroup(); return nil }},
+			write: true, foot: 22, footIn: inList, when: whenDismiss, run: func(m *Model) tea.Cmd { m.dismissGroup(); return nil }},
 		{id: "undo-dismiss", title: "Undo dismiss", group: "Merge", desc: "bring back the group dismissed last in this session (palette)",
 			write: true, when: whenMergeList, run: func(m *Model) tea.Cmd { m.undoDismiss(); return nil }},
 		{id: "merge-marked", title: "Merge marked", group: "Merge", desc: "compare and merge the marked people (mark with space, then m)",
@@ -285,12 +288,6 @@ func buildActions() []action {
 			run: func(m *Model) tea.Cmd { m.focus = focusDetail; m.fcol = 0; m.syncDetail(); return nil }},
 		{id: "back", title: "Back to list", group: "Edit pane", hint: "esc", keys: []string{"esc", "tab", "shift+tab", "left"}, desc: "return to the list",
 			foot: 15, footIn: inDetail, when: func(m *Model) bool { return m.focus == focusDetail },
-			footDyn: func(m *Model) string {
-				if m.appearanceOpen() && !m.themeEditing {
-					return "close"
-				}
-				return "back"
-			},
 			run: func(m *Model) tea.Cmd {
 				if m.appearanceOpen() && m.themeEditing {
 					m.themeBack()
@@ -320,17 +317,17 @@ func buildActions() []action {
 			run: func(m *Model) tea.Cmd { m.step(max(1, m.bodyHeight()-1)); return nil }},
 		{id: "page-up", inCompare: true, title: "Page up", group: "Move", hint: "pgup", keys: []string{"pgup"}, desc: "a full page up",
 			run: func(m *Model) tea.Cmd { m.step(-max(1, m.bodyHeight()-1)); return nil }},
-		{id: "jump-down", inCompare: true, title: "Jump down", group: "Move", hint: "ctrl+down", keys: []string{"ctrl+down"}, desc: "jump by the unit the view declares: a day in Birthdays, the next first letter in People, Organizations, Deals and Tasks, a page elsewhere",
+		{id: "jump-down", inCompare: true, title: "Jump down", group: "Move", hint: "ctrl+down", keys: []string{"ctrl+down"}, desc: "jump by the unit the view declares: a day in Dates, the next first letter in People, Organizations, Deals and Tasks, a page elsewhere",
 			run: func(m *Model) tea.Cmd { m.jump(1); return nil }},
-		{id: "jump-up", inCompare: true, title: "Jump up", group: "Move", hint: "ctrl+up", keys: []string{"ctrl+up"}, desc: "jump back by the unit the view declares: a day in Birthdays, the previous first letter in People, Organizations, Deals and Tasks, a page elsewhere",
+		{id: "jump-up", inCompare: true, title: "Jump up", group: "Move", hint: "ctrl+up", keys: []string{"ctrl+up"}, desc: "jump back by the unit the view declares: a day in Dates, the previous first letter in People, Organizations, Deals and Tasks, a page elsewhere",
 			run: func(m *Model) tea.Cmd { m.jump(-1); return nil }},
 		{id: "top", inCompare: true, title: "Go to top", group: "Move", hint: "home", keys: []string{"home"}, desc: "first row",
 			run: func(m *Model) tea.Cmd { m.step(-1 << 20); return nil }},
 		{id: "bottom", inCompare: true, title: "Go to bottom", group: "Move", hint: "end", keys: []string{"end"}, desc: "last row",
 			run: func(m *Model) tea.Cmd { m.step(1 << 20); return nil }},
-		{id: "home-top", inCompare: true, title: "Go to home or top", group: "Move", hint: "ctrl+shift+up", keys: []string{"ctrl+shift+up"}, desc: "the view's home destination (today in Birthdays), else the first row",
+		{id: "home-top", inCompare: true, title: "Go to home or top", group: "Move", hint: "ctrl+shift+up", keys: []string{"ctrl+shift+up"}, desc: "the view's home destination (today in Dates), else the first row",
 			run: func(m *Model) tea.Cmd { m.goHome(-1); return nil }},
-		{id: "home-bottom", inCompare: true, title: "Go to home or bottom", group: "Move", hint: "ctrl+shift+down", keys: []string{"ctrl+shift+down"}, desc: "the view's home destination (today in Birthdays), else the last row",
+		{id: "home-bottom", inCompare: true, title: "Go to home or bottom", group: "Move", hint: "ctrl+shift+down", keys: []string{"ctrl+shift+down"}, desc: "the view's home destination (today in Dates), else the last row",
 			run: func(m *Model) tea.Cmd { m.goHome(1); return nil }},
 		{id: "scroll-down", title: "Scroll detail down", group: "Move", desc: "scroll the detail pane down (palette)",
 			run: func(m *Model) tea.Cmd { m.detail.ScrollDown(3); return nil }},
@@ -338,7 +335,7 @@ func buildActions() []action {
 			run: func(m *Model) tea.Cmd { m.detail.ScrollUp(3); return nil }},
 
 		// Views and search.
-		viewAction(viewHome), viewAction(viewPeople), viewAction(viewDue), viewAction(viewTasks), viewAction(viewOrgs), viewAction(viewBirthdays), viewAction(viewMerge), viewAction(viewArchived), viewAction(viewSync), viewAction(viewDeals), viewAction(viewSettings), viewAction(viewTags),
+		viewAction(viewHome), viewAction(viewPeople), viewAction(viewDue), viewAction(viewTasks), viewAction(viewOrgs), viewAction(viewDates), viewAction(viewMerge), viewAction(viewArchived), viewAction(viewSync), viewAction(viewDeals), viewAction(viewSettings), viewAction(viewTags),
 		{id: "goto-view", title: "Go to view", group: "Views", hint: "v", keys: []string{"v"}, desc: "the Views screen: shown views, a line, hidden views in gray. Type to filter, open a view, move a view with shift+up and shift+down (across the line hides or shows it). Per device",
 			foot: 85, footIn: inList, run: func(m *Model) tea.Cmd { return m.openViews() }},
 		{id: "next-view", title: "Next view", group: "Views", hint: "]", keys: []string{"]", "ctrl+right"}, desc: "next view",
@@ -417,7 +414,7 @@ func buildActions() []action {
 			break
 		}
 	}
-	out := append(append(append(append(append(append(append(appearanceActions(), cellActions()...),tagViewActions()...), todayActions()...), globalAddActions()...), verbActions()...), orgAutoActions()...), acts[:at]...)
+	out := append(append(append(append(append(append(append(appearanceActions(), cellActions()...), tagViewActions()...), todayActions()...), globalAddActions()...), verbActions()...), orgAutoActions()...), acts[:at]...)
 	out = append(out, tagTreeActions()...)
 	out = append(out, objectActions()...)
 	out = append(out, selectionActions()...)

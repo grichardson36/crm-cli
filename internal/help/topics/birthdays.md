@@ -23,12 +23,12 @@ crm birthdays --days 90
 crm birthdays -f json
 ```
 
-Fields: `person_id`, `name`, `date`, `days_until`, `relative`, `turning`. `turning` is absent when the year is unknown. The default window is 30 days.
+Fields: `person_id`, `name`, `date`, `days_until`, `relative`, `turning`. `turning` is absent when the year is unknown. The default window is 30 days. The list has birthdays only, anniversaries are in the Dates view (see `crm help anniversaries`).
 
 `relative` reads the distance in calendar units: `today`, `in 6d`, `in 1w 1d`, `in 2w`, `in 1mo`, `in 1mo 1w 2d`, `in 1y 2mo`, and for the past `3d ago`, `1w 2d ago`. Days roll up into weeks at 7, months are real calendar months, zero parts are left out and at most three parts show.
 
 ## In the terminal UI
 
-The Birthdays view groups by month (OCTOBER), then by day with a divider: the date at the left and the relative time at the right, the people below it with the age they turn at the right edge (blank when the year is unknown). It opens at today with the last 90 days above and the next 365 below. Scroll up to see past birthdays. `ctrl+shift+up` or `ctrl+shift+down` jumps back to today (`home` and `end` are the first and last row, and the fallback where a terminal does not report the chord). `ctrl+up` and `ctrl+down` jump a day. "Go to today" is also a palette entry.
+The Dates view groups by month (OCTOBER), then by day with a divider: the date at the left and the relative time at the right, the people below it with the age they turn at the right edge (blank when the year is unknown). It opens at today with the last 90 days above and the next 365 below. Scroll up to see past dates. `ctrl+shift+up` or `ctrl+shift+down` jumps back to today (`home` and `end` are the first and last row, and the fallback where a terminal does not report the chord). `ctrl+up` and `ctrl+down` jump a day. "Go to today" is also a palette entry. `ctrl+o` Show narrows it to birthdays or anniversaries.
 
-See also: keep-in-touch, tui (Birthdays view, key 7), modules.
+See also: anniversaries, keep-in-touch, tui (Dates view, key 7), modules.

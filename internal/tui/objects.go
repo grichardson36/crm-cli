@@ -338,7 +338,7 @@ func personDef() *objDef {
 			case vAdd:
 				// the detail form's own a adds a row, so a person is added from a people list only.
 				switch m.view {
-				case viewHome, viewPeople, viewDue, viewBirthdays:
+				case viewHome, viewPeople, viewDue, viewDates:
 					return m.focus == focusList
 				}
 				return false
@@ -346,7 +346,7 @@ func personDef() *objDef {
 				// d only in the list (in the detail form it deletes a row).
 				return m.focus == focusList
 			case vEdit:
-				return m.focus == focusList && (m.view == viewPeople || m.view == viewDue || m.view == viewBirthdays)
+				return m.focus == focusList && (m.view == viewPeople || m.view == viewDue || m.view == viewDates)
 			}
 			return m.focus == focusList
 		},
@@ -357,12 +357,14 @@ func personDef() *objDef {
 
 // footer positions of the generated actions
 const (
-	footAdd     = 45
-	footEdit    = 20
-	footDelete  = 46
-	footRestore = 47
-	footLink    = 60
-	footUnlink  = 61
+	footAdd      = 45
+	footEdit     = 20
+	footDelete   = 46
+	footRestore  = 47
+	footLink     = 60
+	footFavorite = 70 // contextual: after every other verb
+	footSnooze   = 40 // contextual: the screen specific hint of a person
+	footUnlink   = 61
 )
 
 // objectActions generates the "<Verb> <object>" actions of every object from the registry.
@@ -455,7 +457,7 @@ func (o *objDef) deleteAction() action {
 	a := action{
 		id: o.actionID(vDelete), title: "Delete " + o.label, group: o.group, hint: "d", keys: o.keysFor(vDelete),
 		desc:  "delete the selected " + o.label + " (asks first, the same soft delete as crm " + cliNoun(o.kind) + " delete). Undoable",
-		write: true, keyFor: o.keyFor(vDelete), foot: footDelete, footIn: inList, footLabel: "delete",
+		write: true, keyFor: o.keyFor(vDelete), foot: footDelete, footIn: inList, footLabel: hwDelete,
 		when: func(m *Model) bool { return o.selected(m) != 0 },
 		run:  func(m *Model) tea.Cmd { return m.verbDelete(o) },
 	}
@@ -472,7 +474,7 @@ func (o *objDef) deleteAction() action {
 	}
 	if o.kind == "person" {
 		a.desc = "delete (archive) the person or all selected (asks first for one, the count typed back for several, restore from the Archived view)"
-		a.footLabel = "archive"
+		a.footLabel = hwDelete
 		a.foot = 35
 		a.footIf = whenMarks
 	}
@@ -491,7 +493,7 @@ func (o *objDef) restoreAction() action {
 		a.when = o.restoreIn
 		a.hint = "r"
 		a.desc = "restore the archived object under the cursor, or every marked person (r on the Archived screen)"
-		a.foot, a.footIn, a.footLabel = 20, inList, "restore"
+		a.foot, a.footIn, a.footLabel = 20, inList, hwRestore
 	}
 	if o.kind == model.NoteKind {
 		a.desc = "bring back the note deleted last in this session (same as crm note restore)"

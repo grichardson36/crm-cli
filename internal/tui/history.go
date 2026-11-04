@@ -235,11 +235,11 @@ func (m *Model) openHistory(redo bool) tea.Cmd {
 		m.pendingCmd = m.stepHistory(redo, int(it.ref))
 	})
 	m.ov.noFilter = true
-	word := "undo"
+	word := hwUndo
 	if redo {
-		word = "redo"
+		word = hwRedo
 	}
-	m.ov.hints = []hintItem{fk("enter", word), fk("esc", "close"), fk("up/down", "select")}
+	m.ov.hints = []hintItem{fk("enter", word), fk("esc", hwClose), fk("up/down", hwSelect)}
 	return nil
 }
 

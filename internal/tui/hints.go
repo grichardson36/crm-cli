@@ -84,22 +84,22 @@ func (m *Model) hintRowsOf(items []hintItem) int { return hintRows(m.renderHintI
 
 // editHints are the hints while a field of a record page is edited in place.
 func (m *Model) editHints() []hintItem {
-	items := []hintItem{fk("enter", "save"), fk("esc", "cancel")}
+	items := []hintItem{fk("enter", hwSave), fk("esc", hwCancel)}
 	e := m.edit
 	switch {
 	case e != nil && e.typed != nil && e.typed.vocab != nil:
-		items = append(items, fk("up/down", "pick"), ak("prompt-tab", "complete"))
+		items = append(items, fk("up/down", hwPick), ak("prompt-tab", hwComplete))
 	case e != nil && e.typed != nil && e.typed.spec.Type == model.FieldChoice:
-		items = append(items, fk("up/down", "pick"), fk("tab", "save"))
+		items = append(items, fk("up/down", hwPick), fk("tab", hwSave))
 	case e != nil && e.typed != nil && e.typed.spec.Type == model.FieldLongText:
-		items = append(items, fk("alt+enter", "new line"), fk("tab", "save"))
+		items = append(items, fk("alt+enter", hwNewLine), fk("tab", hwSave))
 	case e != nil && e.typed != nil:
-		items = append(items, fk("tab", "save"))
+		items = append(items, fk("tab", hwSave))
 	case e != nil && e.ta != nil:
-		items = []hintItem{fk("enter", "pick"), fk("esc", "cancel"), fk("up/down", "move"), ak("prompt-tab", "complete")}
+		items = []hintItem{fk("enter", hwPick), fk("esc", hwCancel), fk("up/down", hwMove), ak("prompt-tab", hwComplete)}
 	}
 	if e != nil && e.kind == rkHandle {
-		items = append(items, fk("tab", "change kind"))
+		items = append(items, fk("tab", hwChangeKind))
 	}
 	return items
 }
@@ -107,12 +107,12 @@ func (m *Model) editHints() []hintItem {
 // promptHints are the hints while the footer input is open.
 func (m *Model) promptHints() []hintItem {
 	if s := m.pipeRefresh(); s != nil && s.ac.Open() {
-		return []hintItem{fk("enter", "confirm"), fk("esc", "close list"), fk("up/down", "choose"), ak("prompt-tab", "accept")}
+		return []hintItem{fk("enter", hwSave), fk("esc", hwClose), fk("up/down", hwChoose), ak("prompt-tab", hwAccept)}
 	}
 	if m.promptKind == "note" || m.promptKind == "note-object" || m.promptKind == "note-free" {
-		return []hintItem{fk("enter", "save"), fk("esc", "cancel"), ak("prompt-tab", "type")}
+		return []hintItem{fk("enter", hwSave), fk("esc", hwCancel), ak("prompt-tab", hwType)}
 	}
-	return []hintItem{fk("enter", "confirm"), fk("esc", "cancel")}
+	return []hintItem{fk("enter", hwSave), fk("esc", hwCancel)}
 }
 
 // overlayHints are the hints of a picker, the palette or the command bar.
@@ -122,9 +122,9 @@ func (m *Model) overlayHints() []hintItem {
 	case o == nil:
 		return nil
 	case o.cmd != nil && o.cmd.confirming:
-		return []hintItem{fk("enter", "apply"), fk("esc", "back")}
+		return []hintItem{fk("enter", hwApply), fk("esc", hwBack)}
 	case o.cmd != nil:
-		return []hintItem{fk("enter", "run"), fk("esc", "close"), ak("prompt-tab", "complete")}
+		return []hintItem{fk("enter", hwRun), fk("esc", hwCancel), ak("prompt-tab", hwComplete)}
 	case o.hintsFor != nil:
 		return o.hintsFor(m)
 	case o.hints != nil:
@@ -133,28 +133,32 @@ func (m *Model) overlayHints() []hintItem {
 	// The keys that work on the highlighted row, one word each.
 	it, ok := o.highlighted()
 	var h []hintItem
+	esc := hwClose // a popup with nothing to choose is read only
 	switch {
 	case ok && it.selector:
-		h = append(h, fk("left/right", "change"))
+		h = append(h, fk("left/right", hwChange))
+		esc = hwCancel
 	case ok && it.disabled == "" && !it.divider && o.palette:
-		h = append(h, fk("enter", "run"))
+		h = append(h, fk("enter", hwRun))
+		esc = hwCancel
 	case ok && it.disabled == "" && !it.divider:
-		h = append(h, fk("enter", "pick"))
+		h = append(h, fk("enter", hwPick))
+		esc = hwCancel
 	}
-	h = append(h, fk("esc", "close"))
+	h = append(h, fk("esc", esc))
 	if len(o.shown) > 1 {
-		h = append(h, fk("up/down", "select"))
+		h = append(h, fk("up/down", hwSelect))
 	}
 	if o.palette {
-		h = append(h, fk("tab", "verbs"))
+		h = append(h, fk("tab", hwVerbs))
 	}
 	return h
 }
 
 // namesHints are the hints of the panel that settles the names of a line.
 func (m *Model) namesHints() []hintItem {
-	return []hintItem{fk("enter", "save"), fk("esc", "back"), fk("up/down", "move"), fk("1-9", "pick a person"),
-		fk("c", "create a contact"), fk("x", "keep as text"), fk("A", "same answer for the name")}
+	return []hintItem{fk("enter", hwSave), fk("esc", hwBack), fk("up/down", hwMove), fk("1-9", hwPickPerson),
+		fk("c", hwCreate), fk("x", hwKeepText), fk("A", hwSameAnswer)}
 }
 
 // sveHints are the hints of the saved view editor.
@@ -163,26 +167,26 @@ func (m *Model) sveHints() []hintItem {
 	if e != nil && e.ed != nil {
 		switch e.ed.mode {
 		case "text":
-			return []hintItem{fk("enter", "save the cell"), fk("esc", "cancel")}
+			return []hintItem{fk("enter", hwSave), fk("esc", hwCancel)}
 		case "choice":
-			return []hintItem{fk("enter", "save"), fk("esc", "cancel"), fk("up/down", "pick")}
+			return []hintItem{fk("enter", hwSave), fk("esc", hwCancel), fk("up/down", hwPick)}
 		case "multi":
-			return []hintItem{fk("enter", "save"), fk("esc", "cancel"), fk("up/down", "move"), fk("space", "add or remove")}
+			return []hintItem{fk("enter", hwSave), fk("esc", hwCancel), fk("up/down", hwMove), fk("space", hwSelect)}
 		}
-		return []hintItem{fk("enter", "pick"), fk("esc", "save"), fk("up/down", "move"), fk("tab", "complete")}
+		return []hintItem{fk("enter", hwPick), fk("esc", hwBack), fk("up/down", hwMove), fk("tab", hwComplete)}
 	}
-	return []hintItem{fk("enter", "edit"), fk("a", "add condition"), fk("d", "remove"), fk("ctrl+s", "save"), fk("esc", "close"),
-		fk("up/down", "row"), fk("left/right", "cell")}
+	return []hintItem{fk("enter", hwEdit), fk("a", hwAdd), fk("d", hwDelete), fk("ctrl+s", hwSave), fk("esc", hwCancel),
+		fk("up/down", hwRow), fk("left/right", hwCell)}
 }
 
 // textHints are the hints of a text page (a help topic, doctor, where).
 func (m *Model) textHints() []hintItem {
-	return []hintItem{fk("esc", "back"), fk("up/down", "scroll"), fk("home/end", "top or bottom"), ak("palette", "every action")}
+	return []hintItem{fk("esc", hwBack), fk("up/down", hwScroll), fk("home/end", hwTopBottom), ak("palette", hwEveryThing)}
 }
 
 // helpHints are the hints of the keys page.
 func (m *Model) helpHints() []hintItem {
-	return []hintItem{fk("any key", "close"), fk("up/down", "scroll"), ak("palette", "every action")}
+	return []hintItem{fk("any key", hwClose), fk("up/down", hwScroll), ak("palette", hwEveryThing)}
 }
 
 // modalHintsLine is the footer line of a mode that takes over the screen, "" for the main screen.
@@ -197,9 +201,9 @@ func (m *Model) modalHintsLine() (string, bool) {
 	case modeEdit:
 		return m.renderHintItems(m.editHints()), true
 	case modeConfirm:
-		return m.renderHintItems([]hintItem{fk("y", "yes"), fk("n", "no"), fk("esc", "cancel")}), true
+		return m.renderHintItems([]hintItem{fk("y", hwYes), fk("n", hwNo), fk("esc", hwCancel)}), true
 	case modeCapture:
-		return m.renderHintItems([]hintItem{fk("any key", "bind it"), fk("esc", "cancel")}), true
+		return m.renderHintItems([]hintItem{fk("any key", hwBindIt), fk("esc", hwCancel)}), true
 	case modePrompt:
 		return m.renderHintItems(m.promptHints()), true
 	}

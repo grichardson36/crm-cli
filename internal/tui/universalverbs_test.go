@@ -261,10 +261,10 @@ func TestViewsInheritTheDefaultNavigation(t *testing.T) {
 		assert.Equal(t, unitPage, nav.unit, viewNames[v])
 		assert.Nil(t, nav.home, viewNames[v])
 	}
-	assert.Equal(t, unitGroup, navOf(viewBirthdays).unit)
+	assert.Equal(t, unitGroup, navOf(viewDates).unit)
 	assert.Equal(t, unitGroup, navOf(viewMerge).unit, "Merge jumps by confidence level")
 	assert.Nil(t, navOf(viewMerge).home)
-	assert.NotNil(t, navOf(viewBirthdays).home, "Birthdays declares today as its home")
+	assert.NotNil(t, navOf(viewDates).home, "Birthdays declares today as its home")
 	assert.Equal(t, unitLetter, navOf(viewPeople).unit)
 	assert.Equal(t, unitLetter, navOf(viewOrgs).unit)
 	assert.Equal(t, unitLetter, navOf(viewDeals).unit)

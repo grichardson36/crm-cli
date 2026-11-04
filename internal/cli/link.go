@@ -87,6 +87,9 @@ func linkExamples(kind, other string, remove bool) []string {
 			fmt.Sprintf("crm %s link %s 1 1 --role Advisor --from 2023 --new", noun, on))
 	case "person_relation", "org_relation":
 		out = append(out, fmt.Sprintf("crm %s link %s 1 2 --kind parent", noun, on))
+		if rel.Name == "person_relation" {
+			out = append(out, fmt.Sprintf("crm %s link %s 1 2 --kind spouse --anniversary 2014-06-20", noun, on))
+		}
 	case "deal_person":
 		out = append(out, fmt.Sprintf("crm %s link %s 1 1 --role champion", noun, on))
 	case "deal_org":
@@ -149,7 +152,7 @@ func relationCmd(kind, other string, remove bool) *cobra.Command {
 	if remove {
 		verb, short = "unlink", fmt.Sprintf("Remove the link between a %s and a %s", objectNoun[kind], objectNoun[other])
 	}
-	var role, from, to, kindName, notes string
+	var role, from, to, kindName, notes, anniversary string
 	var primary, addNew, createRole bool
 	var linkID int64
 	cmd := &cobra.Command{
@@ -208,6 +211,9 @@ func relationCmd(kind, other string, remove bool) *cobra.Command {
 			if flags.Changed("notes") {
 				attrs.Notes = &notes
 			}
+			if flags.Changed("anniversary") {
+				attrs.Anniversary = &anniversary
+			}
 			link := lr.Link
 			if addNew {
 				link = lr.LinkNew
@@ -264,6 +270,8 @@ func relationCmd(kind, other string, remove bool) *cobra.Command {
 			f.StringVar(&kindName, "kind", "", "link kind, see `crm relation-kind list` (default "+defaultKind(rel)+"). Naming the inverse reverses the ends")
 		case model.AttrNotes:
 			f.StringVar(&notes, "notes", "", "notes on the link")
+		case model.AttrAnniversary:
+			f.StringVar(&anniversary, "anniversary", "", "anniversary of a spouse link: YYYY-MM-DD, or --MM-DD when the year is unknown (empty clears). Only --kind spouse takes one")
 		}
 	}
 	if !rel.Unique {
@@ -295,6 +303,9 @@ func linkLine(li model.LinkedObject) string {
 		parts = append(parts, "since "+*li.StartedOn)
 	case li.EndedOn != nil:
 		parts = append(parts, "until "+*li.EndedOn)
+	}
+	if li.Anniversary != nil && *li.Anniversary != "" {
+		parts = append(parts, "anniversary "+*li.Anniversary)
 	}
 	if li.Primary {
 		parts = append(parts, "primary")

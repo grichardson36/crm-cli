@@ -22,7 +22,7 @@ func svModel(t *testing.T) *Model {
 	m, _ := newTestModel(t)
 	arr := modules.Default()
 	var err error
-	for _, id := range []string{"birthdays", "merge", "tags", "archived", "sync"} {
+	for _, id := range []string{"dates", "merge", "tags", "archived", "sync"} {
 		arr, err = arr.With(id, false)
 		require.NoError(t, err)
 	}

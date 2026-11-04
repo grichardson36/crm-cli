@@ -12,7 +12,7 @@ Every overlay is one popup: a centered box with a border over the dimmed screen.
 │ Add person                   │
 │ Add task                     │
 ├──────────────────────────────┤
-│ enter run | esc close | up/down select │
+│ enter run | esc cancel | up/down select │
 └──────────────────────────────┘
 ```
 
@@ -23,7 +23,7 @@ Call `m.openPicker(title, items, onPick)`, or build an `overlay` with `m.newOver
 1. `title`: the title row. With a filter line it is the placeholder.
 2. `items` (`overlayItem`): `label`, `hint` (a key, drawn at the left), `desc` (drawn dim at the right), `disabled` (reason, drawn instead of desc, enter does nothing), `divider` (heading row), `selector` with `current` (a row whose value left and right change), `isCur` (accent label).
 3. Filter: the line shows when the popup is the palette, has `create`, has more than 7 items, or something is typed. A short picker shows its title until the first letter. Typing filters in every popup except one with `noFilter`.
-4. Hints: default is the keys of the highlighted row (`enter pick`, `left/right change` on a selector, `esc close`, `up/down select`). `hints` sets fixed hints. `hintsFor` builds them from the highlighted row. One word per action.
+4. Hints: default is the keys of the highlighted row (`enter pick`, `left/right change` on a selector, `esc cancel`, or `esc close` when nothing can be picked, `up/down select`). `hints` sets fixed hints. `hintsFor` builds them from the highlighted row. One word per action.
 5. Shortcuts and callbacks: `digits`, `letters`, `onPick`, `onCursor` (preview), `onCancel`, `onKey` (extra keys).
 6. `noDesc` hides the desc column. `minW` keeps a minimum text width when the hints need room.
 

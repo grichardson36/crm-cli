@@ -261,7 +261,7 @@ func selectionActions() []action {
 		setFieldAction(),
 		{id: "mark", title: "Select row", group: "Bulk", hint: "space", keys: []string{" "},
 			desc: "select or unselect the row, then every verb (d, x, f, l, u, r, m, the palette) acts on all selected rows. With nothing selected a verb acts on the highlighted row",
-			foot: 25, footIn: inBoth, footLabel: "select", when: func(m *Model) bool { return whenSelectable(m) || whenFeedEntry(m) }, run: func(m *Model) tea.Cmd { m.toggleMark(); return nil }},
+			foot: 25, footIn: inBoth, footLabel: hwSelect, when: func(m *Model) bool { return whenSelectable(m) || whenFeedEntry(m) }, run: func(m *Model) tea.Cmd { m.toggleMark(); return nil }},
 		{id: "select-all", title: "Select all visible", group: "Bulk", hint: "ctrl+a", keys: []string{"ctrl+a"},
 			desc: "select every visible row, again to clear. The view's sort and filter decide what is visible",
 			when: whenList, run: func(m *Model) tea.Cmd { m.selectAll(); return nil }},

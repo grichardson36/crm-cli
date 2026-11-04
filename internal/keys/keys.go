@@ -18,6 +18,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/BurntSushi/toml"
+	"github.com/jdanielnd/crm-cli/internal/modules"
 )
 
 // ConfigFile is the per-device settings file in the data directory.
@@ -147,6 +148,7 @@ func Display(key string) string {
 // that entry is skipped.
 func Load(dataDir string) (Overrides, []string) {
 	out := Overrides{}
+	_ = modules.MigrateConfig(dataDir) // the Birthdays view became Dates: view-birthdays is rewritten to view-dates
 	data, err := os.ReadFile(ConfigFile(dataDir))
 	if err != nil {
 		return out, nil

@@ -30,7 +30,7 @@ func birthdayModel(t *testing.T) *Model {
 	add("Next", "2000-11-02")  // in 2w 6d
 	add("Far", "1975-10-13")   // today, turns 51
 	m.Update(tea.WindowSizeMsg{Width: 80, Height: 12})
-	m.switchView(viewBirthdays)
+	m.switchView(viewDates)
 	return m
 }
 

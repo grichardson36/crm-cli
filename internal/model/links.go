@@ -28,9 +28,9 @@ type RelationKind struct {
 	Phrase  bool `json:"phrase"`
 	Builtin bool `json:"builtin"`
 	// Position is the order inside the object type (migration 019), the list editor reorders it.
-	Position int `json:"position"`
-	CreatedAt   string `json:"created_at"`
-	UpdatedAt   string `json:"updated_at"`
+	Position  int    `json:"position"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
 }
 
 // LinkAttrs are the attributes a link carries. A nil field means "not given": on a new link it is
@@ -43,6 +43,9 @@ type LinkAttrs struct {
 	// Kind is a relation kind name (person and organization relations).
 	Kind  *string `json:"kind,omitempty"`
 	Notes *string `json:"notes,omitempty"`
+	// Anniversary is the day a spouse link began, YYYY-MM-DD or --MM-DD without a year (CRM-022).
+	// Only the built-in spouse kind carries one. An empty string clears it.
+	Anniversary *string `json:"anniversary,omitempty"`
 	// CreateRole lets a deal link take a role that is not on the deal role list: it is added to the
 	// list while the link is saved (--create, create in MCP). It is a switch, not stored.
 	CreateRole bool `json:"-"`
@@ -50,7 +53,7 @@ type LinkAttrs struct {
 
 // Empty reports whether no attribute is set.
 func (a LinkAttrs) Empty() bool {
-	return a.Role == nil && a.StartedOn == nil && a.EndedOn == nil && a.Primary == nil && a.Kind == nil && a.Notes == nil
+	return a.Role == nil && a.StartedOn == nil && a.EndedOn == nil && a.Primary == nil && a.Kind == nil && a.Notes == nil && a.Anniversary == nil
 }
 
 // LinkedObject is one link seen from one end: the object at the other end and the link's attributes.
@@ -70,6 +73,10 @@ type LinkedObject struct {
 	EndedOn   *string `json:"to,omitempty"`
 	Primary   bool    `json:"primary,omitempty"`
 	Notes     *string `json:"notes,omitempty"`
+	// Anniversary is set on a spouse link that has one: YYYY-MM-DD or --MM-DD.
+	Anniversary *string `json:"anniversary,omitempty"`
+	// CanAnniversary is true for a spouse link: it can carry an anniversary even while it has none.
+	CanAnniversary bool `json:"-"`
 	// Current is false for a Person–Organization link that has ended.
 	Current bool `json:"current"`
 	// Incoming is true when the link is stored with the other object as "a" (it points at the viewer).
@@ -97,6 +104,32 @@ func NormalizeLinkDate(s string, now time.Time) (string, error) {
 		return "", fmt.Errorf("invalid date %q: %w", s, ErrValidation)
 	}
 	return s, nil
+}
+
+// SpouseKindUUID is the uuid of the built-in spouse relation kind. It is the only kind that carries an
+// anniversary, and it is matched by uuid, never by name. Turning on device sync replaces the uuid of
+// every relation_kind row with one derived from its name, so repo.IsSpouseKind also accepts that one.
+const SpouseKindUUID = "a0000001-0000-4000-8000-000000000002"
+
+// NormalizeAnniversary checks an anniversary: "" clears it, otherwise YYYY-MM-DD or --MM-DD (the
+// birthday rules, so --02-29 is allowed). It returns the stored text. "MM-DD" is accepted and stored
+// as --MM-DD.
+func NormalizeAnniversary(s string) (string, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return "", nil
+	}
+	month, day, year, err := ParseBirthday(s)
+	if err != nil {
+		return "", fmt.Errorf("invalid anniversary %q (use YYYY-MM-DD or --MM-DD): %w", s, ErrValidation)
+	}
+	if year != nil {
+		if _, err := time.Parse("2006-01-02", fmt.Sprintf("%04d-%02d-%02d", *year, month, day)); err != nil {
+			return "", fmt.Errorf("invalid anniversary %q: day out of range: %w", s, ErrValidation)
+		}
+		return fmt.Sprintf("%04d-%02d-%02d", *year, month, day), nil
+	}
+	return fmt.Sprintf("--%02d-%02d", month, day), nil
 }
 
 // CurrentOn reports whether a link with these dates is current on the day. A link with no end is

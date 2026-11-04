@@ -1,8 +1,8 @@
 package tui
 
 import (
-	"os"
 	"github.com/charmbracelet/x/ansi"
+	"os"
 	"strings"
 	"testing"
 
@@ -60,7 +60,7 @@ func TestViewsScreenShowsShownThenHiddenUnderADivider(t *testing.T) {
 	press(m, "v")
 	require.NotNil(t, m.ov)
 	assert.Equal(t, "Views", m.ov.title)
-	assert.Equal(t, []string{"home", "people", "follow-up", "tasks", "organizations", "deals", "birthdays", "merge", "settings", "|", "tags", "archived", "sync"}, viewsScreen(m))
+	assert.Equal(t, []string{"home", "people", "follow-up", "tasks", "organizations", "deals", "dates", "merge", "settings", "|", "tags", "archived", "sync"}, viewsScreen(m))
 	assert.Equal(t, "home", cursorID(m))
 	// The shown views carry their number key, the hidden ones have none.
 	for _, idx := range m.ov.shown {
@@ -112,22 +112,22 @@ func TestViewsListShiftAcrossTheLineHidesAndShows(t *testing.T) {
 	cursorTo(t, m, "merge")
 	press(m, "shift+down")
 	assert.Equal(t, "merge", cursorID(m))
-	assert.Equal(t, []string{"home", "people", "follow-up", "tasks", "organizations", "deals", "birthdays", "settings", "merge", "|", "tags", "archived", "sync"}, viewsScreen(m), "swapped with Settings")
+	assert.Equal(t, []string{"home", "people", "follow-up", "tasks", "organizations", "deals", "dates", "settings", "merge", "|", "tags", "archived", "sync"}, viewsScreen(m), "swapped with Settings")
 	press(m, "shift+down")
 	assert.Zero(t, m.mods.Position("merge"), "moving past the last shown view crosses the line and hides it")
-	assert.Equal(t, []string{"home", "people", "follow-up", "tasks", "organizations", "deals", "birthdays", "settings", "|", "merge", "tags", "archived", "sync"}, viewsScreen(m), "it lands first under the line")
+	assert.Equal(t, []string{"home", "people", "follow-up", "tasks", "organizations", "deals", "dates", "settings", "|", "merge", "tags", "archived", "sync"}, viewsScreen(m), "it lands first under the line")
 	assert.Equal(t, "merge", cursorID(m), "the cursor follows the view")
 	_, err := os.Stat(modules.ConfigFile(m.env.DataDir))
 	assert.NoError(t, err, "the arrangement is saved")
 
 	press(m, "shift+up")
 	assert.Equal(t, 9, m.mods.Position("merge"), "moving up over the line shows it as the last shown view")
-	assert.Equal(t, []string{"home", "people", "follow-up", "tasks", "organizations", "deals", "birthdays", "settings", "merge", "|", "tags", "archived", "sync"}, viewsScreen(m))
+	assert.Equal(t, []string{"home", "people", "follow-up", "tasks", "organizations", "deals", "dates", "settings", "merge", "|", "tags", "archived", "sync"}, viewsScreen(m))
 
 	// A hidden view moves inside the hidden group, and away from the line at the edge does nothing.
 	cursorTo(t, m, "tags")
 	press(m, "shift+down")
-	assert.Equal(t, []string{"home", "people", "follow-up", "tasks", "organizations", "deals", "birthdays", "settings", "merge", "|", "archived", "tags", "sync"}, viewsScreen(m))
+	assert.Equal(t, []string{"home", "people", "follow-up", "tasks", "organizations", "deals", "dates", "settings", "merge", "|", "archived", "tags", "sync"}, viewsScreen(m))
 	press(m, "shift+up", "shift+up")
 	assert.Equal(t, 10, m.mods.Position("tags"), "the top hidden view crosses up and shows")
 	cursorTo(t, m, "sync")
@@ -141,10 +141,10 @@ func TestViewsListShiftAcrossTheLineHidesAndShows(t *testing.T) {
 func TestViewsListHasNoHideKey(t *testing.T) {
 	m := newDefaultModel(t)
 	press(m, "v")
-	cursorTo(t, m, "birthdays")
+	cursorTo(t, m, "dates")
 	press(m, "x")
 	assert.Equal(t, "x", m.ov.filter.Value(), "x is typed into the filter now")
-	assert.NotZero(t, m.mods.Position("birthdays"))
+	assert.NotZero(t, m.mods.Position("dates"))
 	for _, h := range m.viewsHints(m.ov, false) {
 		assert.NotEqual(t, "x", h.key)
 	}
@@ -197,13 +197,13 @@ func TestViewsListShowsHiddenRowsGrayBelowTheLineAndTheKeysOfTheRow(t *testing.T
 func TestViewsListResetPutsTheDefaultBack(t *testing.T) {
 	m := newDefaultModel(t)
 	m.env.DataDir = t.TempDir()
-	require.NoError(t, m.setModules(mustWith(t, m.mods, "birthdays", false)))
+	require.NoError(t, m.setModules(mustWith(t, m.mods, "dates", false)))
 	press(m, "v")
 	cursorTo(t, m, "home")
 	press(m, "shift+down", "R")
 	assert.True(t, m.mods.IsDefault())
 	assert.Equal(t, "home", cursorID(m))
-	assert.Equal(t, []string{"home", "people", "follow-up", "tasks", "organizations", "deals", "tags", "birthdays", "merge", "settings", "|", "archived", "sync"}, viewsScreen(m), "the shipped order and hidden set")
+	assert.Equal(t, []string{"home", "people", "follow-up", "tasks", "organizations", "deals", "tags", "dates", "merge", "settings", "|", "archived", "sync"}, viewsScreen(m), "the shipped order and hidden set")
 }
 
 func TestSettingsAndTheViewsScreenCanNeverBeHidden(t *testing.T) {
@@ -225,10 +225,10 @@ func TestSettingsAndTheViewsScreenCanNeverBeHidden(t *testing.T) {
 	}
 	// A hand-edited config cannot hide Settings either.
 	m.env.DataDir = t.TempDir()
-	require.NoError(t, os.WriteFile(modules.ConfigFile(m.env.DataDir), []byte("[modules]\nhidden = [\"settings\", \"birthdays\"]\n"), 0o644))
+	require.NoError(t, os.WriteFile(modules.ConfigFile(m.env.DataDir), []byte("[modules]\nhidden = [\"settings\", \"dates\"]\n"), 0o644))
 	m.applyStartupModules()
 	assert.NotZero(t, m.mods.Position("settings"))
-	assert.Zero(t, m.mods.Position("birthdays"))
+	assert.Zero(t, m.mods.Position("dates"))
 	assert.True(t, m.statusIsErr, "the problem is reported")
 }
 
@@ -238,7 +238,7 @@ func TestModulesScreenAndPaletteEntryAreGone(t *testing.T) {
 	assert.NotNil(t, m.actionByID("modules-reset"), "Modules: reset stays")
 	assert.NotContains(t, paletteTitles(m), "Modules")
 	assert.Contains(t, paletteTitles(m), "Modules: reset")
-	require.NoError(t, m.setModules(mustWith(t, m.mods, "birthdays", false)))
+	require.NoError(t, m.setModules(mustWith(t, m.mods, "dates", false)))
 	runID(m, "modules-reset")
 	assert.True(t, m.mods.IsDefault())
 }
@@ -271,7 +271,7 @@ func TestArchivedAndSyncStartHiddenAndExplicitConfigIsRespected(t *testing.T) {
 	// An arrangement the user already wrote keeps Archived and Sync where it put them.
 	m2 := newDefaultModel(t)
 	m2.env.DataDir = t.TempDir()
-	old := "[modules]\norder = [\"home\", \"people\", \"follow-up\", \"tasks\", \"organizations\", \"deals\", \"birthdays\", \"merge\", \"archived\", \"sync\"]\nhidden = []\n"
+	old := "[modules]\norder = [\"home\", \"people\", \"follow-up\", \"tasks\", \"organizations\", \"deals\", \"dates\", \"merge\", \"archived\", \"sync\"]\nhidden = []\n"
 	require.NoError(t, os.WriteFile(modules.ConfigFile(m2.env.DataDir), []byte(old), 0o644))
 	m2.applyStartupModules()
 	assert.Equal(t, 9, m2.viewPosition(viewArchived))
@@ -297,7 +297,7 @@ func TestSettingsViewsPaneKeysAndFooter(t *testing.T) {
 
 	// footer: keys of the highlighted built-in view only
 	h := hintsText(m)
-	for _, want := range []string{"up/down select", "enter open", "shift+up/down move", "shift+r reset", "esc close"} {
+	for _, want := range []string{"up/down select", "enter open", "shift+up/down move", "shift+r reset", "esc back"} {
 		assert.Contains(t, h, want)
 	}
 	for _, bad := range []string{"e edit", "d delete", "r restore", "hide", "x "} {

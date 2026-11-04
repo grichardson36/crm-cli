@@ -47,7 +47,7 @@ func TestOrgsAndDealsAreOnByDefaultAndFollowTheArrangement(t *testing.T) {
 	press(m, "]")
 	assert.Equal(t, viewDeals, m.view)
 	press(m, "]")
-	assert.Equal(t, viewBirthdays, m.view)
+	assert.Equal(t, viewDates, m.view)
 
 	// Turned off, Deals leaves the cycle but a link still opens it. ] goes to the first view and [ to the last.
 	require.NoError(t, m.setModules(mustWith(t, m.mods, "deals", false)))

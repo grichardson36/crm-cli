@@ -44,12 +44,15 @@ func TestMiddleNameIsCapturedAfterTheMigrationOnASyncingDatabase(t *testing.T) {
 	_, err = replicasql.Enable(ctx, d, replicasql.DefaultRegistry())
 	require.NoError(t, err)
 
-	raw, err := os.ReadFile(filepath.Join("..", "..", "db", "migrations", "022_person_middle_name.sql"))
-	require.NoError(t, err)
-	_, down, ok := strings.Cut(strings.ReplaceAll(string(raw), "\r\n", "\n"), "\n-- down\n")
-	require.True(t, ok)
-	_, err = d.Exec(down)
-	require.NoError(t, err, "the down section works on a database with capture triggers")
+	// Migration 023 (a column on person_relation) came after, so it is taken back first.
+	for _, file := range []string{"023_spouse_anniversary.sql", "022_person_middle_name.sql"} {
+		raw, err := os.ReadFile(filepath.Join("..", "..", "db", "migrations", file))
+		require.NoError(t, err)
+		_, down, ok := strings.Cut(strings.ReplaceAll(string(raw), "\r\n", "\n"), "\n-- down\n")
+		require.True(t, ok)
+		_, err = d.Exec(down)
+		require.NoError(t, err, "the down section of %s works on a database with capture triggers", file)
+	}
 	_, err = d.Exec(`PRAGMA user_version = 20`)
 	require.NoError(t, err)
 	_, err = replicasql.Enable(ctx, d, replicasql.DefaultRegistry()) // triggers as an older build made them, without the column

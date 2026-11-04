@@ -450,6 +450,76 @@ func (r *PersonRepo) BirthdaysWindow(ctx context.Context, daysBack, daysAhead in
 	return out, nil
 }
 
+// AnniversariesWindow lists the anniversaries of spouse links from daysBack days before today to
+// daysAhead days after, oldest first, with the same windowing and Feb 29 rule as BirthdaysWindow.
+// Links to an archived person and deleted links are left out.
+func (r *PersonRepo) AnniversariesWindow(ctx context.Context, daysBack, daysAhead int, now time.Time) ([]model.UpcomingAnniversary, error) {
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT l.id, l.a_id, l.anniversary, a.first_name, a.last_name, b.first_name, b.last_name
+		 FROM person_relation l
+		 JOIN relation_kind k ON k.id = l.kind_id
+		 JOIN people a ON a.id = l.a_id
+		 JOIN people b ON b.id = l.b_id
+		 WHERE l.deleted_at IS NULL AND `+spouseKindSQL()+` AND l.anniversary IS NOT NULL AND l.anniversary <> ''
+		   AND a.archived = 0 AND b.archived = 0`)
+	if err != nil {
+		return nil, fmt.Errorf("list anniversaries: %w", err)
+	}
+	defer rows.Close()
+
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	var out []model.UpcomingAnniversary
+	for rows.Next() {
+		var linkID, personID int64
+		var stored, aFirst, bFirst string
+		var aLast, bLast sql.NullString
+		if err := rows.Scan(&linkID, &personID, &stored, &aFirst, &aLast, &bFirst, &bLast); err != nil {
+			return nil, fmt.Errorf("scan anniversary: %w", err)
+		}
+		month, day, year, err := model.ParseBirthday(stored)
+		if err != nil {
+			continue // a bad stored value never hides the other rows
+		}
+		title := anniversaryTitle(aFirst, aLast, bFirst, bLast)
+		add := func(when time.Time) {
+			until := int(when.Sub(today).Hours() / 24)
+			if until > daysAhead || until < -daysBack {
+				return
+			}
+			an := model.UpcomingAnniversary{LinkID: linkID, PersonID: personID, Title: title, Date: when.Format("2006-01-02"),
+				DaysUntil: until, Relative: model.RelativeDate(today, when)}
+			if year != nil {
+				years := when.Year() - *year
+				an.Years = &years
+			}
+			out = append(out, an)
+		}
+		if daysBack > 0 {
+			add(previousOccurrence(today, month, day))
+		}
+		add(nextOccurrence(today, month, day))
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].DaysUntil != out[j].DaysUntil {
+			return out[i].DaysUntil < out[j].DaysUntil
+		}
+		return out[i].LinkID < out[j].LinkID
+	})
+	return out, nil
+}
+
+// anniversaryTitle names a couple in link order: "Joey-Hannah Osgood Anniversary" when both share a
+// last name, else "Joey Osgood-Hannah Smith Anniversary".
+func anniversaryTitle(aFirst string, aLast sql.NullString, bFirst string, bLast sql.NullString) string {
+	if aLast.Valid && aLast.String != "" && aLast.String == bLast.String {
+		return aFirst + "-" + bFirst + " " + aLast.String + " Anniversary"
+	}
+	return displayName(aFirst, aLast) + "-" + displayName(bFirst, bLast) + " Anniversary"
+}
+
 // previousOccurrence is the latest birthday strictly before today.
 func previousOccurrence(today time.Time, month, day int) time.Time {
 	for year := today.Year(); ; year-- {

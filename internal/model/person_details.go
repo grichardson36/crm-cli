@@ -80,6 +80,19 @@ type UpcomingBirthday struct {
 	Turning   *int   `json:"turning"`
 }
 
+// UpcomingAnniversary is the anniversary of a spouse link on a date, shaped like UpcomingBirthday.
+// Title reads "Joey-Hannah Osgood Anniversary". PersonID is the first partner (the link's a side),
+// the person a row opens. Years is the number of years the couple reaches, nil when the year is unknown.
+type UpcomingAnniversary struct {
+	LinkID    int64  `json:"link_id"`
+	PersonID  int64  `json:"person_id"`
+	Title     string `json:"title"`
+	Date      string `json:"date"`
+	DaysUntil int    `json:"days_until"`
+	Relative  string `json:"relative"`
+	Years     *int   `json:"years"`
+}
+
 // ParseBirthday parses "YYYY-MM-DD", "--MM-DD", or "MM-DD". The year is nil when unknown.
 func ParseBirthday(s string) (month, day int, year *int, err error) {
 	s = strings.TrimSpace(s)
@@ -124,5 +137,5 @@ type PersonSummary struct {
 	KeepInTouch string
 	// PriorityTier is 1 (top) to 5 (none), 0 when unset.
 	PriorityTier int
-	UpdatedAt   string
+	UpdatedAt    string
 }

@@ -81,6 +81,9 @@ func (m *Model) linkCells(li model.LinkedObject, kindNames map[string][]model.Fi
 			cells = append(cells, text("notes", "notes", cleanCell(str(li.Notes)), ""))
 		}
 	}
+	if rel.Kinded && li.CanAnniversary {
+		cells = append(cells, text("anniversary", "anniversary", str(li.Anniversary), "2014-06-20, or --06-20 when the year is unknown"))
+	}
 	if rel.Kinded && rel.HasAttr(model.AttrNotes) {
 		cells = append(cells, text("notes", "notes", cleanCell(str(li.Notes)), ""))
 	}
@@ -146,7 +149,7 @@ func whenCellPrev(m *Model) bool { return whenCellRow(m) && m.fcol > 0 }
 func cellActions() []action {
 	return []action{
 		{id: "cell-next", title: "Next cell", group: "Edit pane", hint: "right", keys: []string{"right", "tab"}, desc: "move to the next attribute cell of a linked row or note (role, dates, primary, kind, type, note date). From the last cell it goes back to the list",
-			foot: 16, footIn: inDetail, footLabel: "cell", when: whenCellNext, run: func(m *Model) tea.Cmd { m.fcol++; m.syncDetail(); return nil }},
+			foot: 16, footIn: inDetail, footLabel: hwCell, when: whenCellNext, run: func(m *Model) tea.Cmd { m.fcol++; m.syncDetail(); return nil }},
 		{id: "cell-prev", title: "Previous cell", group: "Edit pane", hint: "left", keys: []string{"left", "shift+tab"}, desc: "move to the previous cell of a linked row or note. From the first cell left goes back to the list",
 			when: whenCellPrev, run: func(m *Model) tea.Cmd { m.fcol--; m.syncDetail(); return nil }},
 	}
@@ -220,6 +223,8 @@ func (m *Model) saveCell(ce *cellEdit, src repo.Ref, v string) error {
 		at.EndedOn = &v
 	case "notes":
 		at.Notes = &v
+	case "anniversary":
+		at.Anniversary = &v
 	case "kind":
 		at.Kind = &v
 	case "primary":
