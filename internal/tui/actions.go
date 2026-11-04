@@ -51,6 +51,9 @@ type action struct {
 	foot   int
 	footIn focusMask
 	footIf func(m *Model) bool
+	// footCtx marks a contextual hint: shown only while the highlighted row supports the verb, and the
+	// first to go (the last one first) when the keys of the view and the app would not fit (footerSegs).
+	footCtx bool
 
 	// when says if the action applies in the current context. nil means always.
 	when func(m *Model) bool
@@ -169,7 +172,7 @@ func buildActions() []action {
 		{id: "cmp-right", title: "Use candidate 2", group: "Compare", hint: "→", keys: []string{"right"}, desc: "compare: keep the right person's value for this field (a list item goes in)",
 			inCompare: true, when: whenCmpEdit, run: func(m *Model) tea.Cmd { m.cmpTake(1); return nil }},
 		{id: "cmp-field", title: "Next field", group: "Compare", hint: "tab", keys: []string{"tab"}, desc: "compare: move to the next field, from the last back to the first (up and down move one row too)",
-			foot: 5, footIn: inBoth, footLabel: "next field", inCompare: true, when: whenCmpEdit, run: func(m *Model) tea.Cmd { m.cmp.cycle(); return nil }},
+			foot: 5, footIn: inBoth, footLabel: hwNextField, inCompare: true, when: whenCmpEdit, run: func(m *Model) tea.Cmd { m.cmp.cycle(); return nil }},
 		{id: "cmp-pick", title: "Toggle value or item", group: "Compare", hint: "space", keys: []string{" "}, desc: "compare: switch a field to the other person's value, or put a list item in or out of the result (left and right pick a side directly)",
 			foot: 7, footIn: inBoth, inCompare: true, when: whenCmpEdit, run: func(m *Model) tea.Cmd { m.cmp.toggle(); m.cmpPreview(); return nil }},
 		{id: "cmp-survivor", title: "Change survivor", group: "Compare", hint: "ctrl+e", keys: []string{"ctrl+e"}, desc: "compare: keep the other person's record and id as the survivor",
@@ -200,7 +203,7 @@ func buildActions() []action {
 				return nil
 			}},
 		{id: "cmp-dismiss", title: "Dismiss group", group: "Compare", hint: "d", keys: []string{"d"}, desc: "compare: mark the group as not duplicates and leave (d is the Delete verb)",
-			write: true, foot: 10, footIn: inBoth, footLabel: "dismiss", inCompare: true, when: whenDismiss, run: func(m *Model) tea.Cmd { m.dismissGroup(); return nil }},
+			write: true, foot: 10, footIn: inBoth, footIf: func(m *Model) bool { return m.cmp != nil }, inCompare: true, when: whenDismiss, run: func(m *Model) tea.Cmd { m.dismissGroup(); return nil }},
 
 		// Contact actions. The verbs of every object (Add, Edit, Delete, Restore, Link, Unlink) are generated
 		// from the registry in objects.go and inserted after them.
@@ -209,12 +212,12 @@ func buildActions() []action {
 		{id: "note-pick", title: "Add note (pick type)", group: "Contact", desc: "pick a note type from a list, then add the note",
 			write: true, when: whenPerson, run: func(m *Model) tea.Cmd { m.pickNoteType(); return nil }},
 		{id: "snooze", title: "Snooze keep-in-touch", group: "Contact", hint: "s", keys: []string{"s"}, desc: "snooze keep-in-touch for N days (a person)",
-			write: true, when: whenPerson, run: func(m *Model) tea.Cmd {
+			write: true, foot: footSnooze, footIn: inBoth, footCtx: true, when: whenPerson, run: func(m *Model) tea.Cmd {
 				m.startPrompt("snooze", "snooze days: ", "7")
 				return m.input.Focus()
 			}},
 		{id: "favorite", title: "Toggle favorite", group: "Contact", hint: "f", keys: []string{"f"}, desc: "toggle favorite (all marked people if any)",
-			write: true, when: whenPerson, run: func(m *Model) tea.Cmd { m.toggleFavorite(); return nil }},
+			write: true, foot: footFavorite, footIn: inBoth, footCtx: true, when: whenPerson, run: func(m *Model) tea.Cmd { m.toggleFavorite(); return nil }},
 		{id: "task-tag", title: "Tag task", group: "Contact", desc: "add a tag to the selected task (prefix with - to remove). In the Tasks view, or on a task row in the detail pane. l links a tag too",
 			write: true, when: whenTaskTarget, run: func(m *Model) tea.Cmd {
 				m.startInput("tasktag", "tag task (-name removes): ", "")
@@ -256,7 +259,7 @@ func buildActions() []action {
 		{id: "compare", title: "Compare group", group: "Merge", desc: "open the side by side compare for the selected group",
 			when: whenMergeRows, run: func(m *Model) tea.Cmd { m.openGroupCompare(); return nil }},
 		{id: "dismiss", title: "Dismiss group", group: "Merge", hint: "d", keys: []string{"d"}, desc: "mark the group as not duplicates (d is the Delete verb). Undo dismiss in the palette brings it back",
-			write: true, foot: 22, footIn: inList, footLabel: "dismiss", when: whenDismiss, run: func(m *Model) tea.Cmd { m.dismissGroup(); return nil }},
+			write: true, foot: 22, footIn: inList, when: whenDismiss, run: func(m *Model) tea.Cmd { m.dismissGroup(); return nil }},
 		{id: "undo-dismiss", title: "Undo dismiss", group: "Merge", desc: "bring back the group dismissed last in this session (palette)",
 			write: true, when: whenMergeList, run: func(m *Model) tea.Cmd { m.undoDismiss(); return nil }},
 		{id: "merge-marked", title: "Merge marked", group: "Merge", desc: "compare and merge the marked people (mark with space, then m)",
@@ -285,12 +288,6 @@ func buildActions() []action {
 			run: func(m *Model) tea.Cmd { m.focus = focusDetail; m.fcol = 0; m.syncDetail(); return nil }},
 		{id: "back", title: "Back to list", group: "Edit pane", hint: "esc", keys: []string{"esc", "tab", "shift+tab", "left"}, desc: "return to the list",
 			foot: 15, footIn: inDetail, when: func(m *Model) bool { return m.focus == focusDetail },
-			footDyn: func(m *Model) string {
-				if m.appearanceOpen() && !m.themeEditing {
-					return "close"
-				}
-				return "back"
-			},
 			run: func(m *Model) tea.Cmd {
 				if m.appearanceOpen() && m.themeEditing {
 					m.themeBack()

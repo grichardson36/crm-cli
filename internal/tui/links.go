@@ -80,11 +80,11 @@ func linkActions() []action {
 	out := []action{
 		{id: "link", title: "Link", group: "Link", hint: "l", keys: []string{"l"},
 			desc:  "link the selected person, organization, deal or task to another object (or a tag). Pick or create in one step, from either side. Undoable",
-			write: true, foot: footLink, footIn: inBoth, footLabel: "link", when: whenAnyObject,
+			write: true, foot: footLink, footIn: inBoth, footLabel: hwLink, when: whenAnyObject,
 			run: func(m *Model) tea.Cmd { return m.startLinkVerb(false) }},
 		{id: "unlink", title: "Unlink", group: "Link", hint: "u", keys: []string{"u"},
 			desc:  "remove a link of the selected object (or a tag). Undoable",
-			write: true, when: whenAnyObject,
+			write: true, foot: footUnlink, footIn: inDetail, footCtx: true, footIf: whenLinkedRow, when: whenAnyObject,
 			run: func(m *Model) tea.Cmd {
 				if m.focus == focusDetail && whenLinkedRow(m) { // u on a linked row removes that chip
 					m.askUnlinkRow(m.form[m.fcur])

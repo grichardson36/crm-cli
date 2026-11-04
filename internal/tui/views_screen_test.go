@@ -297,7 +297,7 @@ func TestSettingsViewsPaneKeysAndFooter(t *testing.T) {
 
 	// footer: keys of the highlighted built-in view only
 	h := hintsText(m)
-	for _, want := range []string{"up/down select", "enter open", "shift+up/down move", "shift+r reset", "esc close"} {
+	for _, want := range []string{"up/down select", "enter open", "shift+up/down move", "shift+r reset", "esc back"} {
 		assert.Contains(t, h, want)
 	}
 	for _, bad := range []string{"e edit", "d delete", "r restore", "hide", "x "} {

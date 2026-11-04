@@ -153,7 +153,7 @@ func TestListPane_FooterShowsOnlyKeysThatWorkOnTheRow(t *testing.T) {
 		le := openLE(t, m, "relation-kinds")
 		leTo(t, m, le, "friend")
 		f := hintsText(m)
-		for _, want := range []string{"up/down select", "a add", "shift+up/down move", "shift+r reset", "esc close"} {
+		for _, want := range []string{"up/down select", "a add", "shift+up/down move", "shift+r reset", "esc back"} {
 			assert.True(t, has(f, want), "%q in %q", want, f)
 		}
 		for _, no := range []string{"e rename", "d delete", "tab"} {
@@ -217,7 +217,7 @@ func TestListPane_FooterShowsOnlyKeysThatWorkOnTheRow(t *testing.T) {
 		for _, no := range []string{"a add", "e rename", "d delete", "tab", "shift+r"} {
 			assert.False(t, has(f, no), "%q in %q", no, f)
 		}
-		assert.True(t, has(f, "esc close"), f)
+		assert.True(t, has(f, "esc back"), f)
 	})
 	t.Run("the footer is one word per key, no sentences", func(t *testing.T) {
 		m, _ := newTestModel(t)

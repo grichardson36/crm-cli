@@ -270,22 +270,22 @@ func themeSwatch(m *Model, hex string) string {
 
 func (p *colorsPane) hints(m *Model) []hintItem {
 	if p.editing {
-		return []hintItem{fk("enter", "save"), fk("esc", "cancel")}
+		return []hintItem{fk("enter", hwSave), fk("esc", hwCancel)}
 	}
 	var h []hintItem
 	ks := m.paneColorKinds()
 	if len(ks) > 1 {
-		h = append(h, fk("up/down", "select"))
+		h = append(h, fk("up/down", hwSelect))
 	}
 	if !m.readOnly {
-		h = append(h, fk("e", "edit"))
+		h = append(h, fk("e", hwEdit))
 		if ck, ok := p.cur(m); ok {
 			if _, custom := m.kindColors[ck.kind]; custom {
-				h = append(h, fk("shift+r", "reset"))
+				h = append(h, fk("shift+r", hwReset))
 			}
 		}
 	}
-	return append(h, fk("esc", "close"))
+	return append(h, fk("esc", hwBack))
 }
 
 func (p *colorsPane) startEdit(m *Model) {

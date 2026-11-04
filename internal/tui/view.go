@@ -391,16 +391,16 @@ type footSeg struct {
 }
 
 var footShort = map[string]string{
-	"down": "move", "focus-detail": "edit", "mark": "mark", "contacted": "contacted",
-	"tag": "tag", "cadence": "cadence", "note": "note", "new": "new", "task": "task",
-	"help": "help", "palette": "find", "edit": "edit", "add": "add", "delete": "delete", "copy": "copy",
-	"open": "open", "back": "back", "compare": "compare", "dupe-level": "level", "dismiss": "dismiss",
-	"undo-dismiss": "undo", "merge-marked": "merge", "archive": "archive", "restore": "restore", "purge": "purge",
-	"home-open": "open", "sync-now": "sync", "sync-dry": "dry-run", "inbox-accept": "accept", "inbox-attach": "attach",
-	"inbox-ignore": "ignore", "goto-view": "views",
-	"org-add": "add", "org-edit": "edit", "org-delete": "delete",
-	"deal-add": "add", "deal-edit": "edit", "deal-delete": "delete",
-	"cmp-left": "pick", "cmp-pick": "toggle", "cmp-survivor": "survivor", "cmp-pair": "pair", "cmp-view": "pane", "cmp-confirm": "merge", "cmp-back": "back",
+	"down": hwMove, "focus-detail": hwDetails, "mark": hwMark, "contacted": hwContacted,
+	"tag": hwTag, "cadence": hwCadence, "note": hwNote, "new": hwNew, "task": hwTask,
+	"help": hwHelp, "palette": hwFind, "edit": hwEdit, "add": hwAdd, "delete": hwDelete, "copy": hwCopy,
+	"open": hwOpen, "back": hwBack, "compare": hwCompare, "dupe-level": hwLevel, "dismiss": hwDelete,
+	"undo-dismiss": hwUndo, "merge-marked": hwMerge, "archive": hwDelete, "restore": hwRestore, "purge": hwPurge,
+	"home-open": hwOpen, "sync-now": hwSync, "sync-dry": hwDryRun, "inbox-accept": hwAccept, "inbox-attach": hwAttach,
+	"inbox-ignore": hwDelete, "goto-view": hwViews, "unlink": hwUnlink, "favorite": hwFavorite, "snooze": hwSnooze,
+	"org-add": hwAdd, "org-edit": hwEdit, "org-delete": hwDelete,
+	"deal-add": hwAdd, "deal-edit": hwEdit, "deal-delete": hwDelete,
+	"cmp-left": hwPick, "cmp-pick": hwToggle, "cmp-survivor": hwSurvivor, "cmp-pair": hwPair, "cmp-view": hwPane, "cmp-confirm": hwMerge, "cmp-back": hwBack, "cmp-dismiss": hwDelete,
 }
 
 // footerSegs lists the hints for the focused pane, in order, limited to what fits the width.
@@ -432,24 +432,40 @@ func (m *Model) footerSegs() []footSeg {
 	}
 	var segs []footSeg
 	var widths []int
-	for _, a := range acts {
-		hint, label := a.hint, footShort[a.id]
-		if a.footLabel != "" {
-			label = a.footLabel
+	var places []hintPlace
+	for {
+		segs, widths = segs[:0], widths[:0]
+		for _, a := range acts {
+			hint, label := a.hint, footShort[a.id]
+			if a.footLabel != "" {
+				label = a.footLabel
+			}
+			if a.footDyn != nil {
+				label = a.footDyn(m)
+			}
+			if a.id == "down" {
+				hint = "↑/↓"
+			}
+			widths = append(widths, ansi.StringWidth(hint)+1+ansi.StringWidth(label))
+			segs = append(segs, footSeg{hint: hint, label: label, id: a.id})
 		}
-		if a.footDyn != nil {
-			label = a.footDyn(m)
+		places = placeHints(widths, lead, m.width, m.footerMax())
+		if len(places) == len(segs) {
+			break
 		}
-		if a.id == "down" {
-			hint = "↑/↓"
+		// Something is cut, and the keys of the view and the app come last. Contextual hints give way first.
+		drop := -1
+		for i := len(acts) - 1; i >= 0; i-- {
+			if acts[i].footCtx {
+				drop = i
+				break
+			}
 		}
-		if a.id == "focus-detail" && m.readOnly {
-			label = "detail"
+		if drop < 0 {
+			break
 		}
-		widths = append(widths, ansi.StringWidth(hint)+1+ansi.StringWidth(label))
-		segs = append(segs, footSeg{hint: hint, label: label, id: a.id})
+		acts = append(acts[:drop], acts[drop+1:]...)
 	}
-	places := placeHints(widths, lead, m.width, m.footerMax())
 	segs = segs[:len(places)]
 	for i, p := range places {
 		segs[i].row, segs[i].x0, segs[i].x1 = p.row, p.x0, p.x1

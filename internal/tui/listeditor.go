@@ -1068,21 +1068,21 @@ func (le *listEditor) movable(it listItem) bool {
 func (le *listEditor) hints(m *Model) []hintItem {
 	switch le.phase {
 	case lpAdd, lpRename, lpCell:
-		return []hintItem{fk("enter", "save"), fk("esc", "cancel")}
+		return []hintItem{fk("enter", hwSave), fk("esc", hwCancel)}
 	case lpPick:
-		return []hintItem{fk("enter", "ok"), fk("esc", "cancel"), fk("up/down", "choose")}
+		return []hintItem{fk("enter", hwPick), fk("esc", hwCancel), fk("up/down", hwChoose)}
 	case lpConfirm:
-		return []hintItem{fk("y", "yes"), fk("n", "no")}
+		return []hintItem{fk("y", hwYes), fk("n", hwNo)}
 	}
 	var h []hintItem
 	if len(le.items) > 1 {
-		h = append(h, fk("up/down", "select"))
+		h = append(h, fk("up/down", hwSelect))
 	}
 	it, onItem := le.cur()
 	if !m.readOnly {
-		h = append(h, fk("a", "add"))
+		h = append(h, fk("a", hwAdd))
 		if onItem && le.canEdit(it) {
-			label := "rename"
+			label := hwRename
 			if le.col > 0 {
 				label = le.d.cells[le.col-1].label
 			}
@@ -1092,20 +1092,20 @@ func (le *listEditor) hints(m *Model) []hintItem {
 			if ci := le.d.cycleCell(); ci >= 0 {
 				h = append(h, fk("tab", le.d.cells[ci].label))
 			} else if le.d.editCols() && it.locked == "" {
-				h = append(h, fk("tab", "column"))
+				h = append(h, fk("tab", hwColumn))
 			}
 			if it.locked == "" {
-				h = append(h, fk("d", "delete"))
+				h = append(h, fk("d", hwDelete))
 			}
 			if le.movable(it) {
-				h = append(h, fk("shift+up/down", "move"))
+				h = append(h, fk("shift+up/down", hwMove))
 			}
 		}
 		if le.d.defaults != nil {
-			h = append(h, fk("shift+r", "reset"))
+			h = append(h, fk("shift+r", hwReset))
 		}
 	}
-	return append(h, fk("esc", "close"))
+	return append(h, fk("esc", hwBack))
 }
 
 // promptLines is the confirm question, wrapped to the pane.

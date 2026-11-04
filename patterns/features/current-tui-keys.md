@@ -17,6 +17,8 @@ BRANCH feat/keymap-b (owner decisions 2026-10-28, keymap part B2, built on main 
 - **Purge** is a verb of every archivable type: repo `PurgeObject`/`PurgeArchived`, `crm purge --archived [--type T] [--ids ...] [--apply]`, MCP `crm_purge_archived`, `d` and the palette bulk purge in the Archived view. Notes are listed in Archived.
 - **Add picker**: tags are objects (`a g`, name prompt, the chip puts the tag on the highlighted object, `u` takes it off). Each kind declares its letter (`objDef.shortcut`), `TestAddShortcutsAreUniqueAndShownInThePicker` keeps them unique.
 
+- **Footer words (CRM-023, 2026-11-03)**: no key changed, only the labels. `d` reads delete on every screen (person with marks, Merge, Sync inbox, the saved view editor), purge only in Archived. `enter` reads open in every object list (Tasks, Organizations and Deals were edit), compare in Merge, accept in the Sync inbox. `tab` on a list reads details. `esc` reads cancel, back or close by what it leaves. The footer also shows `f favorite` and `s snooze` on a person row and `u unlink` on a linked row of the detail pane while there is room. The table is in [[key-hints-in-one-place]].
+
 **Old key to new key (B2)**
 
 | Old | New |
