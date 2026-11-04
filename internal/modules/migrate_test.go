@@ -97,6 +97,12 @@ func TestMigrateConfigKeepsAnExistingDatesBindingAndIsQuietWhenNothingMoves(t *t
 	require.NoError(t, modules.MigrateConfig(writeConfig(t, "not = [valid")), "a broken file is left alone")
 }
 
+func TestMigrateConfigMovesTheOldNameWhateverItsCase(t *testing.T) {
+	dir := writeConfig(t, "[modules]\norder = [\"home\", \"Birthdays\", \"Birthday\"]\n")
+	require.NoError(t, modules.MigrateConfig(dir))
+	assert.Equal(t, []any{"home", "dates"}, readConfig(t, dir)["modules"].(map[string]any)["order"])
+}
+
 func TestMigrateConfigDropsDuplicateAfterTheMove(t *testing.T) {
 	dir := writeConfig(t, "[modules]\norder = [\"home\", \"dates\", \"birthdays\"]\n")
 	require.NoError(t, modules.MigrateConfig(dir))

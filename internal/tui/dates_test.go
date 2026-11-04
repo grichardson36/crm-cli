@@ -228,6 +228,13 @@ func TestLinkFlowS5SpouseAsksForTheAnniversary(t *testing.T) {
 		press(m, "esc")
 		assert.Empty(t, zedBobLinks(t, m))
 	})
+	t.Run("a link of several selected people asks no anniversary", func(t *testing.T) {
+		m, _ := newTestModel(t)
+		m.linkAlso = []repo.Ref{{Kind: "person", ID: 3}}
+		linkPersonAs(t, m, "spouse")
+		assert.Equal(t, modeNormal, m.mode)
+		assert.NotEqual(t, "link-anniversary", m.promptKind)
+	})
 	t.Run("parent asks nothing", func(t *testing.T) {
 		m, _ := newTestModel(t)
 		linkPersonAs(t, m, "parent")
@@ -275,6 +282,7 @@ func TestLinkFlowS6EditTheDateOnTheLinkRowAndUndoIt(t *testing.T) {
 	require.NotNil(t, items[0].Anniversary)
 	assert.Equal(t, "2014-06-20", *items[0].Anniversary)
 	assert.Contains(t, linkSummary(items[0]), "anniversary 2014-06-20")
+	assert.Contains(t, m.linkSuffix(items[0]), "anniversary 2014-06-20")
 
 	m.switchView(viewDates)
 	assert.Contains(t, dateRowsSummary(m), "Zed Adams-Bob Baker Anniversary|12 yrs", "the Dates view follows the edit (the partners have different last names)")

@@ -99,6 +99,9 @@ func TestAnniversariesWindow_LookBackAndWindowEdges(t *testing.T) {
 	got, err = pr.AnniversariesWindow(ctx, 10, 100, day(2026, 7, 1))
 	require.NoError(t, err)
 	assert.Empty(t, got, "11 days back is outside a 10 day look-back")
+	got, err = pr.AnniversariesWindow(ctx, 11, 100, day(2026, 7, 1))
+	require.NoError(t, err)
+	assert.Len(t, got, 1, "11 days back is inside an 11 day look-back")
 
 	got, err = pr.AnniversariesWindow(ctx, 0, 3, day(2026, 6, 17))
 	require.NoError(t, err)
@@ -249,8 +252,20 @@ func TestLinkAnniversary_OnlySpouseKind(t *testing.T) {
 		_, err := links.Link(ctx, repo.Ref{Kind: "organization", ID: o1.ID}, repo.Ref{Kind: "organization", ID: o2.ID}, model.LinkAttrs{Anniversary: sp("2000-03-04")})
 		assert.ErrorIs(t, err, model.ErrValidation)
 	})
+	t.Run("a person-organization link refuses it", func(t *testing.T) {
+		o, err := repo.NewOrgRepo(links.DB()).Create(ctx, model.CreateOrgInput{Name: "Acme"})
+		require.NoError(t, err)
+		_, err = links.Link(ctx, annivRef(a), repo.Ref{Kind: "organization", ID: o.ID}, model.LinkAttrs{Anniversary: sp("2000-03-04")})
+		assert.ErrorIs(t, err, model.ErrValidation)
+		assert.Contains(t, err.Error(), "anniversary")
+	})
+	t.Run("clearing is allowed on any kind", func(t *testing.T) {
+		x, y := annivPerson(t, pr, "Xi", "Kay"), annivPerson(t, pr, "Yo", "Kay")
+		_, err := links.Link(ctx, annivRef(x), annivRef(y), model.LinkAttrs{Kind: sp("friend"), Anniversary: sp("")})
+		require.NoError(t, err)
+	})
 	t.Run("a bad date is refused", func(t *testing.T) {
-		for _, bad := range []string{"soon", "2014-13-01", "2014-02-30", "06-31", "--02-30", "2014", "2014-06"} {
+		for _, bad := range []string{"soon", "2014-13-01", "2014-02-30", "06-31", "--02-30", "2014", "2014-06", "2015-02-29"} {
 			_, err := links.Link(ctx, annivRef(a), annivRef(b), model.LinkAttrs{Kind: sp("spouse"), Anniversary: sp(bad)})
 			assert.ErrorIs(t, err, model.ErrValidation, bad)
 		}
