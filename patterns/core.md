@@ -123,7 +123,7 @@ The first missing badge identifies the next gate. A failed gate retains its prev
 **WORKFLOW:**
 
 1. Verify every approved scenario maps to passing tests across applicable interfaces.
-2. Run relevant integration, contract, regression and invariant checks.
+2. Run relevant integration, contract, regression and invariant checks. During the work run only the affected packages and tests (`go test ./internal/tui -run <regex>`). The full `go vet ./...` and `go test ./...` run once per deploy, inside `deploy/deploy.ps1`, so do not repeat it by hand before a deploy.
 3. Perform a mutation sweep. Investigate surviving meaningful mutations and strengthen inadequate tests.
 4. Prune redundant tests without losing scenario coverage or demonstrated defect detection.
 5. Rerun affected tests and regression checks.
@@ -205,7 +205,6 @@ Items below here are not built.
 		- [ ] Same verbs for similar actions
 	- [ ] Sorting/Filtering/Grouping improvements
 		- [ ] Add full functionality to all views - make this a modular component
-		- [ ] "Save current view" keeps the Order direction (today it stores only the sort field, so a list on Order descending is saved in the default direction)
 		- [ ] Be able to sort and group by other variables - maybe the user can pick from all our tracked variables
 	- [ ] Like Dex, track changes to LinkedIn title/subscript and aggregate them to a list. Look and function very similar to Dex. This can go in Home screen just like Dex.
 	- [ ] Home screen
