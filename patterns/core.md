@@ -210,6 +210,16 @@ Items below here are not built.
 	- [ ] Speed up the TUI test suite: 637 tests average 0.46s each with no slow outliers, so look at the per-test setup in `newTestModel` (a seeded database copied per test instead of migrated per test).
 	- [ ] Show an `N marked` count in the status line for Orgs, Deals, Tasks and Tags lists (today only People show it; `esc unmark` is the only cue there).
 	- [ ] Route the Settings list editor (`listeditor.go`) through the key registry so a rebound `d`, `a` or `e` reaches it (today it has its own key handling).
+	- [ ] Tag management gaps against Obsidian Bulk Tag Manager (README: https://github.com/ducktapekiller/obsidian-bulk-tag-manager). Nest, unnest, subtree rename, merge with children, delete subtree, tree view, case duplicates and undo already match ([[features-tags-module]] TM06 to TM09). Gaps, to be sorted into separate items by the owner:
+		- [ ] Batch rename: a table of old and new pairs, import from CSV, and a regex rename.
+		- [ ] Standardise rules with a preview: case strategy, separator style, special characters, accents, applied to all tags after a list of the affected objects (the CLI has `--dry-run`, the TUI has no preview).
+		- [ ] Orphan threshold: find tags used fewer than N times (today only tags used zero times).
+		- [ ] Tree sort by name, count or depth (today the tree shows names in order, count sort is for the flat list only).
+		- [ ] Aliases (alias to canonical tag, corrected automatically) and protected tags that bulk operations skip, with wildcards. Aliases overlap the nicknames item above.
+		- [ ] Drag a tag in the tree to restructure it (today the nest and unnest verbs only).
+		- [ ] Tag health statistics: flat versus nested, tags over a length, special characters, separator consistency.
+		- [ ] The People list `#tag` filter is a plain text match on the tag list (`#uf` matches any tag containing "uf" and a name with spaces cannot be typed), while a saved view tag condition matches children properly. Make the list filter use the same tag rule.
+		- [ ] The quick-add `#tag` syntax accepts only letters, digits, `_` and `-`, so a nested tag such as `University of Florida (UF)/Rinker School of Construction Management` cannot be typed there.
 - ## Someday / maybe
 	- [ ] Node graph view of object nodes and their link edges like [[obsidian]]
 	- [ ] Deep enrichment capabilities - sync to LinkedIn, Facebook, email servers (Gmail, etc), Beeper/messaging apps, phone call history
