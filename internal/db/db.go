@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io/fs"
 	"strings"
+	"time"
 
 	"github.com/jdanielnd/crm-cli/internal/replica/replicasql"
 	_ "modernc.org/sqlite"
@@ -50,20 +51,35 @@ func Open(dbPath string) (*sql.DB, error) {
 }
 
 func setPragmas(db *sql.DB) error {
+	// busy_timeout comes first so that the pragmas after it wait for another process instead of failing.
 	pragmas := []string{
-		"PRAGMA journal_mode = WAL",
 		"PRAGMA busy_timeout = 5000",
+		"PRAGMA journal_mode = WAL",
 		"PRAGMA synchronous = NORMAL",
 		"PRAGMA foreign_keys = ON",
 		"PRAGMA cache_size = -64000",
 		"PRAGMA temp_store = MEMORY",
 	}
 	for _, p := range pragmas {
-		if _, err := db.Exec(p); err != nil {
+		if err := execPragma(db, p); err != nil {
 			return fmt.Errorf("%s: %w", p, err)
 		}
 	}
 	return nil
+}
+
+// execPragma runs a pragma. Switching to WAL while another process opens the same file can answer
+// "database is locked" without waiting for the busy timeout, so that pragma is tried again for a few
+// seconds.
+func execPragma(db *sql.DB, p string) error {
+	deadline := time.Now().Add(pragmaRetryFor)
+	for {
+		_, err := db.Exec(p)
+		if err == nil || !strings.Contains(err.Error(), "database is locked") || time.Now().After(deadline) {
+			return err
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
 }
 
 // runMigrations applies the embedded migrations above the database's user_version. A limit above

@@ -207,7 +207,6 @@ Items below here are not built.
 	- [ ] Home screen
 		- [ ] Customizable - user can see what modules they'd like
 	- [ ] Locations as a view w/ standard sort/filter/group - research Dex implementation
-	- [ ] Fix the flaky `TestConcurrentOpenMigratesOnce` in `internal/db` on Windows (fails about 6 of 20 runs with "Access is denied" on the migrate lock and "database is locked"), so the deploy test step stops failing at random.
 	- [ ] Speed up the TUI test suite: 637 tests average 0.46s each with no slow outliers, so look at the per-test setup in `newTestModel` (a seeded database copied per test instead of migrated per test).
 - ## Someday / maybe
 	- [ ] Node graph view of object nodes and their link edges like [[obsidian]]

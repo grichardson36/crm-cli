@@ -25,6 +25,10 @@ var (
 	now          = time.Now
 	lockWait     = 60 * time.Second
 	lockStaleAge = 2 * time.Minute
+	// lockDeniedWait is how long a denied create of the lock file is tried again (see acquireLock).
+	lockDeniedWait = 2 * time.Second
+	// pragmaRetryFor is how long a pragma that answers "database is locked" is tried again.
+	pragmaRetryFor = 5 * time.Second
 )
 
 // NewerSchemaError reports a database whose schema is newer than this build supports.
@@ -160,9 +164,12 @@ func pruneBackups(dir, base string) {
 }
 
 // acquireLock creates the lock file exclusively, waiting for another holder. A lock older than
-// lockStaleAge belongs to a crashed process and is removed.
+// lockStaleAge belongs to a crashed process and is removed. On Windows, creating the file while the
+// holder is deleting it answers "Access is denied" instead of "exists", so a denied create is tried
+// again for lockDeniedWait before it is reported.
 func acquireLock(lock string) (func(), error) {
 	deadline := time.Now().Add(lockWait)
+	deniedUntil := time.Now().Add(lockDeniedWait)
 	for {
 		f, err := os.OpenFile(lock, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 		if err == nil {
@@ -170,7 +177,8 @@ func acquireLock(lock string) (func(), error) {
 			f.Close()
 			return func() { _ = os.Remove(lock) }, nil
 		}
-		if !errors.Is(err, os.ErrExist) {
+		denied := errors.Is(err, os.ErrPermission) && time.Now().Before(deniedUntil)
+		if !errors.Is(err, os.ErrExist) && !denied {
 			return nil, fmt.Errorf("migration lock %s: %w", lock, err)
 		}
 		if st, serr := os.Stat(lock); serr == nil && time.Since(st.ModTime()) > lockStaleAge {
