@@ -54,6 +54,9 @@ type action struct {
 	// footCtx marks a contextual hint: shown only while the highlighted row supports the verb, and the
 	// first to go (the last one first) when the keys of the view and the app would not fit (footerSegs).
 	footCtx bool
+	// footKeep ranks a contextual hint: the lowest rank goes first when the footer is short, the last of
+	// equal rank first. A hint with footKeep set outlasts the others.
+	footKeep int
 
 	// when says if the action applies in the current context. nil means always.
 	when func(m *Model) bool

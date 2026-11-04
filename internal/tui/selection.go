@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"fmt"
+
 	tea "charm.land/bubbletea/v2"
 	"github.com/jdanielnd/crm-cli/internal/db/repo"
 	"github.com/jdanielnd/crm-cli/internal/model"
@@ -203,6 +205,91 @@ func (m *Model) toggleMark() {
 	m.move(1)
 }
 
+// whenUnmark: the list has selected rows and no other action wants esc here (a search to clear, the
+// tag page to leave). Esc peels the layers in that order, and the marks are the last one.
+func whenUnmark(m *Model) bool {
+	if m.focus != focusList || m.cmp != nil || len(m.markedRefs()) == 0 {
+		return false
+	}
+	chain := m.scopeChain()
+	for i := range m.actions {
+		a := &m.actions[i]
+		if a.id == "unmark" || a.mode != keyNormal || !a.hasKey("esc") || !a.enabled(m) || (a.keyIf != nil && !a.keyIf(m)) {
+			continue
+		}
+		for _, sc := range chain {
+			if a.scopeOf() == sc {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// markScope says which list the marks belong to: the view, the saved view and the tag page.
+type markScope struct {
+	view    viewKind
+	saved   string
+	tagPage string
+}
+
+func (m *Model) markScope() (markScope, string) {
+	s := markScope{view: m.view, tagPage: m.tagPage}
+	name := viewNames[m.view]
+	if m.sv != nil {
+		s.saved, name = m.sv.v.UUID, m.sv.v.Name
+	}
+	if m.tagPage != "" {
+		name = "tag " + m.tagPage
+	}
+	return s, name
+}
+
+// unmarkAll is esc on a list with selected rows: clear every mark of the view. The cursor stays. It is
+// one undo step, like a data change: ctrl+z puts back the same marks while that list is open, ctrl+y
+// clears them again. Undo is refused (the entry stays on the stack) when another list is open.
+func (m *Model) unmarkAll() tea.Cmd {
+	saved := map[int64]bool{}
+	for _, ref := range m.markedRefs() {
+		saved[m.selKey(ref)] = true
+	}
+	n := len(saved)
+	scope, name := m.markScope()
+	here := func() error {
+		if now, _ := m.markScope(); now != scope {
+			return staleError{"the marks belong to " + name + ", open it first"}
+		}
+		return nil
+	}
+	m.marked = map[int64]bool{}
+	m.extend = nil
+	m.record(fmt.Sprintf("unmark %d", n),
+		func() error {
+			if err := here(); err != nil {
+				return err
+			}
+			m.marked = map[int64]bool{}
+			for _, r := range m.rows { // an id that left the list is skipped
+				if ref, ok := m.rowRef(r); ok && saved[m.selKey(ref)] {
+					m.marked[m.selKey(ref)] = true
+				}
+			}
+			return nil
+		},
+		func() error {
+			if err := here(); err != nil {
+				return err
+			}
+			m.marked = map[int64]bool{}
+			return nil
+		})
+	undoKey := "ctrl+z"
+	if a := m.actionByID("undo"); a != nil && len(a.keys) > 0 {
+		undoKey = showKey(a.keys[0])
+	}
+	return m.showToast(fmt.Sprintf("unmarked %d (%s undoes)", n, undoKey), false)
+}
+
 // selectAll is ctrl+a: select every visible row, or clear the selection when every visible row is selected.
 func (m *Model) selectAll() {
 	all := map[int64]bool{}
@@ -262,6 +349,10 @@ func selectionActions() []action {
 		{id: "mark", title: "Select row", group: "Bulk", hint: "space", keys: []string{" "},
 			desc: "select or unselect the row, then every verb (d, x, f, l, u, r, m, the palette) acts on all selected rows. With nothing selected a verb acts on the highlighted row",
 			foot: 25, footIn: inBoth, footLabel: hwSelect, when: func(m *Model) bool { return whenSelectable(m) || whenFeedEntry(m) }, run: func(m *Model) tea.Cmd { m.toggleMark(); return nil }},
+		{id: "unmark", title: "Unmark all rows", group: "Bulk", hint: "esc", keys: []string{"esc"},
+			desc: "clear every selected row of this view. Esc does this last: a search, the tag page, the detail pane and every popup or mode take esc first. One undo step: the undo key puts the marks back",
+			foot: footUnmark, footIn: inList, footLabel: hwUnmark, footCtx: true, footKeep: 1,
+			when: whenUnmark, run: func(m *Model) tea.Cmd { return m.unmarkAll() }},
 		{id: "select-all", title: "Select all visible", group: "Bulk", hint: "ctrl+a", keys: []string{"ctrl+a"},
 			desc: "select every visible row, again to clear. The view's sort and filter decide what is visible",
 			when: whenList, run: func(m *Model) tea.Cmd { m.selectAll(); return nil }},

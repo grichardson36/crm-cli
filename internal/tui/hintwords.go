@@ -22,6 +22,7 @@ package tui
 //	space  select (marks rows), toggle (flips a value in place, the Compare screen)
 //	esc    cancel (editors, prompts, pickers, confirms), back (leaves a screen, pane, detail or tag
 //	       page), close (a read-only popup, help, history)
+//	       In a list with marked rows esc reads unmark: the last layer, after a search or a tag page.
 const (
 	// Verbs.
 	hwDelete    = "delete"
@@ -45,6 +46,7 @@ const (
 	hwRename    = "rename"
 	hwLoad      = "load"
 	hwSelect    = "select"
+	hwUnmark    = "unmark"
 	hwToggle    = "toggle"
 	hwCancel    = "cancel"
 	hwBack      = "back"
@@ -113,7 +115,7 @@ var hintCanon = map[string][]string{
 	"f":     {hwFavorite},
 	"s":     {hwSnooze},
 	"m":     {hwMerge},
-	"esc":   {hwCancel, hwBack, hwClose},
+	"esc":   {hwCancel, hwBack, hwClose, hwUnmark},
 	"space": {hwSelect, hwToggle},
 	"y":     {hwYes},
 	"n":     {hwNo},

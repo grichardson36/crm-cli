@@ -228,7 +228,7 @@ var frameworkIDs = map[string]bool{
 	"archive": true, "org-delete": true, "deal-delete": true, "task-delete": true, "delete": true, "dismiss": true,
 	"purge": true, "copy": true, "inbox-ignore": true, "tags-delete": true, "tag-back": true, "cmp-dismiss": true, "tag-merge": true, "cmp-apply": true,
 	"restore": true, "link": true, "unlink": true, "tag-link": true, "tag-unlink": true,
-	"mark": true, "select-all": true, "extend-down": true, "extend-up": true,
+	"mark": true, "unmark": true, "select-all": true, "extend-down": true, "extend-up": true,
 	"undo": true, "redo": true, "undo-history": true, "redo-history": true, "reload": true,
 	// navigation
 	"down": true, "up": true, "half-down": true, "half-up": true, "page-down": true, "page-up": true,

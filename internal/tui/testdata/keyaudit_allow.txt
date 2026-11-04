@@ -3,3 +3,4 @@
 shadow ctrl+c copy quit    # owner decision 2026-10-28: ctrl+c copies the focused field in the detail pane and keeps quitting everywhere else
 verbs ctrl+c copy_/_quit    # the same decision: copy when a field is focused, quit or cancel otherwise, documented in help
 shadow tab cell-next back    # owner decision 2026-10-28: tab moves across the cells of a linked row, and from the last cell it goes back to the list as before
+static esc app unmark clear-search    # CRM-026: esc unmarks the list last. unmark has a when that yields to every other esc action in the scope chain (a search, the tag page, the detail pane), so the two never both apply

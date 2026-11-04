@@ -603,7 +603,7 @@ func TestContextualHintsNeverPushTheChromeOffTheFooter(t *testing.T) {
 		// base is the same screen without any contextual hint.
 		for i := range base.actions {
 			switch base.actions[i].id {
-			case "favorite", "snooze", "unlink":
+			case "favorite", "snooze", "unlink", "unmark":
 				base.actions[i].foot = 0
 			}
 		}

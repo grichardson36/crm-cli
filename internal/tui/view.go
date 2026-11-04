@@ -457,9 +457,8 @@ func (m *Model) footerSegs() []footSeg {
 		// Something is cut, and the keys of the view and the app come last. Contextual hints give way first.
 		drop := -1
 		for i := len(acts) - 1; i >= 0; i-- {
-			if acts[i].footCtx {
+			if acts[i].footCtx && (drop < 0 || acts[i].footKeep < acts[drop].footKeep) {
 				drop = i
-				break
 			}
 		}
 		if drop < 0 {

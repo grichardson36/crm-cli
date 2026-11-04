@@ -365,6 +365,7 @@ const (
 	footFavorite = 70 // contextual: after every other verb
 	footSnooze   = 40 // contextual: the screen specific hint of a person
 	footUnlink   = 61
+	footUnmark   = 71 // contextual: while rows are marked, dropped last of the contextual hints
 )
 
 // objectActions generates the "<Verb> <object>" actions of every object from the registry.
