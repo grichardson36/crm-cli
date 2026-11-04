@@ -44,7 +44,7 @@ func TestThePickerPreselectsTheViewsOwnKind(t *testing.T) {
 	cases := []struct {
 		view viewKind
 		want string
-	}{{viewPeople, "Person"}, {viewHome, "Person"}, {viewBirthdays, "Person"}, {viewTasks, "Task"}, {viewOrgs, "Organization"}, {viewDeals, "Deal"}}
+	}{{viewPeople, "Person"}, {viewHome, "Person"}, {viewDates, "Person"}, {viewTasks, "Task"}, {viewOrgs, "Organization"}, {viewDeals, "Deal"}}
 	for _, tc := range cases {
 		m, _ := newTestModel(t)
 		m.switchView(tc.view)
@@ -133,7 +133,7 @@ func TestANoteOfferedAnOrganizationLinksItOnTab(t *testing.T) {
 
 func TestGlobalAddTaskDealPersonAndNote(t *testing.T) {
 	m, pr := newTestModel(t)
-	m.switchView(viewBirthdays)
+	m.switchView(viewDates)
 
 	press(m, "a", "t") // task: a standalone task even though a person is highlighted, until tab
 	require.Equal(t, modePrompt, m.mode)
@@ -142,14 +142,14 @@ func TestGlobalAddTaskDealPersonAndNote(t *testing.T) {
 	require.Len(t, tasks, 1)
 	assert.Equal(t, "Order flowers", tasks[0].Title)
 	assert.Empty(t, tasks[0].PersonIDs)
-	assert.Equal(t, viewBirthdays, m.view)
+	assert.Equal(t, viewDates, m.view)
 
 	press(m, "a", "d") // deal
 	require.Equal(t, modePrompt, m.mode)
 	submit(m, "Big rollout | 5000 | lead")
 	deals, _ := m.dlr.FindAll(m.ctx, model.DealFilters{})
 	require.Len(t, deals, 1)
-	assert.Equal(t, viewBirthdays, m.view)
+	assert.Equal(t, viewDates, m.view)
 
 	press(m, "a", "p") // person: the footer line opens, a name saves it
 	require.Equal(t, modePrompt, m.mode, "the person line takes the footer")

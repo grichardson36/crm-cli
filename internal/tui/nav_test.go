@@ -68,8 +68,8 @@ func TestViewSwitcherReachableByMouseOnMore(t *testing.T) {
 	require.Equal(t, modeOverlay, m.mode)
 	// Click the Birthdays line (view 5 is the fifth item under the two header lines).
 	box := m.overlayBox(m.ov)
-	click(m, box.x+3, box.listY+m.viewPosition(viewBirthdays)-1)
-	assert.Equal(t, viewBirthdays, m.view)
+	click(m, box.x+3, box.listY+m.viewPosition(viewDates)-1)
+	assert.Equal(t, viewDates, m.view)
 	assert.Contains(t, strings.Split(m.screen(), "\n")[0], "7 Birthdays")
 }
 

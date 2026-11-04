@@ -73,7 +73,7 @@ func TestKeysMovedToThePaletteHaveNoKeyAndStayInThePalette(t *testing.T) {
 	press(m, "esc")
 	// modules reset is a palette action that puts the default arrangement back.
 	m.env.DataDir = t.TempDir()
-	require.NoError(t, m.setModules(modules.Arrangement{Order: []string{"people", "home", "follow-up", "tasks", "birthdays", "merge", "archived", "sync", "organizations", "deals"}}))
+	require.NoError(t, m.setModules(modules.Arrangement{Order: []string{"people", "home", "follow-up", "tasks", "dates", "merge", "archived", "sync", "organizations", "deals"}}))
 	require.False(t, m.mods.IsDefault())
 	runID(m, "modules-reset")
 	assert.True(t, m.mods.IsDefault())
@@ -186,7 +186,7 @@ func TestGroupedListHelperInsertsADividerWhenTheGroupChanges(t *testing.T) {
 	}
 	assert.Equal(t, 1, heads, "the outer heading is drawn once")
 
-	assert.Equal(t, "day", groupField(viewBirthdays))
+	assert.Equal(t, "day", groupField(viewDates))
 	assert.Equal(t, "confidence level", groupField(viewMerge))
 	assert.Equal(t, "", groupField(viewPeople))
 }
@@ -202,7 +202,7 @@ func TestOneViewOptionsOverlayServesEveryListView(t *testing.T) {
 			assert.False(t, a.hasKey(k), "%s is not a key any more (%s)", k, a.id)
 		}
 	}
-	for _, v := range []viewKind{viewHome, viewPeople, viewDue, viewTasks, viewBirthdays, viewMerge, viewArchived, viewSync, viewOrgs, viewDeals} {
+	for _, v := range []viewKind{viewHome, viewPeople, viewDue, viewTasks, viewDates, viewMerge, viewArchived, viewSync, viewOrgs, viewDeals} {
 		m.switchView(v)
 		press(m, "ctrl+o")
 		require.Equal(t, modeOverlay, m.mode, viewNames[v])
@@ -228,6 +228,7 @@ func TestOneViewOptionsOverlayServesEveryListView(t *testing.T) {
 	assert.Equal(t, []string{"sort", "order"}, ids(viewOrgs))
 	assert.Equal(t, []string{"level"}, ids(viewMerge))
 	assert.Equal(t, []string{"type"}, ids(viewArchived))
+	assert.Equal(t, []string{"show"}, ids(viewDates))
 }
 
 func TestViewOptionsSortOrganizationsAndFilterArchivedByType(t *testing.T) {

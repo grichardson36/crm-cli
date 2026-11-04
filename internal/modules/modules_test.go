@@ -12,7 +12,7 @@ import (
 
 func TestDefaultArrangement(t *testing.T) {
 	a := modules.Default()
-	assert.Equal(t, []string{"home", "people", "follow-up", "tasks", "organizations", "deals", "tags", "birthdays", "merge", "settings"}, a.Visible(), "Archived and Sync start hidden, Settings is last")
+	assert.Equal(t, []string{"home", "people", "follow-up", "tasks", "organizations", "deals", "tags", "dates", "merge", "settings"}, a.Visible(), "Archived and Sync start hidden, Settings is last")
 	assert.Equal(t, 5, a.Position("organizations"))
 	assert.Equal(t, 6, a.Position("deals"))
 	assert.Equal(t, 7, a.Position("tags"), "Tags comes after Deals")
@@ -40,9 +40,9 @@ func TestLookupNames(t *testing.T) {
 func TestOnOffMoveAndGuards(t *testing.T) {
 	a := modules.Default()
 	var err error
-	a, err = a.With("birthdays", false)
+	a, err = a.With("dates", false)
 	require.NoError(t, err)
-	assert.Equal(t, 0, a.Position("birthdays"))
+	assert.Equal(t, 0, a.Position("dates"))
 	assert.Equal(t, 8, a.Position("merge"), "the next module takes its place")
 	a, err = a.With("deals", false)
 	require.NoError(t, err)
@@ -65,7 +65,7 @@ func TestOnOffMoveAndGuards(t *testing.T) {
 	_, err = b.With("people", false)
 	assert.ErrorContains(t, err, "Home or People")
 	var c modules.Arrangement = modules.Default()
-	for _, id := range []string{"home", "follow-up", "tasks", "organizations", "deals", "tags", "birthdays", "merge", "archived", "sync", "people"} {
+	for _, id := range []string{"home", "follow-up", "tasks", "organizations", "deals", "tags", "dates", "merge", "archived", "sync", "people"} {
 		c, err = c.With(id, false)
 		if err != nil {
 			break
@@ -116,12 +116,12 @@ func TestLoadNeverFails(t *testing.T) {
 	assert.NotEmpty(t, problems)
 	assert.True(t, got.IsDefault())
 
-	write("[modules]\norder = [\"tasks\", \"nope\", \"home\"]\nhidden = [\"birthdays\", \"alsonope\"]\n")
+	write("[modules]\norder = [\"tasks\", \"nope\", \"home\"]\nhidden = [\"dates\", \"alsonope\"]\n")
 	got, problems = modules.Load(dir)
 	assert.Len(t, problems, 2, "each unknown name is reported")
 	assert.Equal(t, []string{"tasks", "home"}, got.Visible()[:2])
-	assert.Equal(t, 0, got.Position("birthdays"))
-	assert.Equal(t, 6, got.Position("deals"), "a module missing from order is appended in default order, and hidden names only birthdays")
+	assert.Equal(t, 0, got.Position("dates"))
+	assert.Equal(t, 6, got.Position("deals"), "a module missing from order is appended in default order, and hidden names only dates")
 	assert.NotZero(t, got.Position("archived"), "an explicit table is respected: Archived is on because it does not list it")
 	assert.NotZero(t, got.Position("settings"))
 
@@ -146,12 +146,12 @@ func TestSettingsAndViewsCannotBeHidden(t *testing.T) {
 	assert.Error(t, err, "an alias is refused too")
 
 	dir := t.TempDir()
-	require.NoError(t, os.WriteFile(modules.ConfigFile(dir), []byte("[modules]\nhidden = [\"settings\", \"birthdays\"]\n"), 0o644))
+	require.NoError(t, os.WriteFile(modules.ConfigFile(dir), []byte("[modules]\nhidden = [\"settings\", \"dates\"]\n"), 0o644))
 	got, problems := modules.Load(dir)
 	require.Len(t, problems, 1)
 	assert.Contains(t, problems[0], "cannot be hidden")
 	assert.NotZero(t, got.Position("settings"), "a hand-edited config cannot hide it")
-	assert.Zero(t, got.Position("birthdays"))
+	assert.Zero(t, got.Position("dates"))
 	assert.False(t, got.Normalize().IsHidden("settings"))
 }
 
@@ -177,7 +177,7 @@ func TestArchivedAndSyncHiddenByDefaultButExplicitConfigIsRespected(t *testing.T
 	assert.True(t, got.IsHidden("archived"), "a new setup has them hidden")
 
 	// An existing arrangement written before the change lists every module on.
-	old := "[modules]\norder = [\"home\", \"people\", \"follow-up\", \"tasks\", \"organizations\", \"deals\", \"birthdays\", \"merge\", \"archived\", \"sync\"]\nhidden = []\n"
+	old := "[modules]\norder = [\"home\", \"people\", \"follow-up\", \"tasks\", \"organizations\", \"deals\", \"dates\", \"merge\", \"archived\", \"sync\"]\nhidden = []\n"
 	require.NoError(t, os.WriteFile(modules.ConfigFile(dir), []byte(old), 0o644))
 	got, problems = modules.Load(dir)
 	assert.Empty(t, problems)

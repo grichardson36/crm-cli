@@ -175,6 +175,7 @@ func registerObjectTools(s *server.MCPServer, db *sql.DB) {
 					gomcp.WithString("to", gomcp.Description("End date, same forms. Empty means current")),
 					gomcp.WithBoolean("primary", gomcp.Description("Make this the primary organization of the person or deal")),
 					gomcp.WithString("notes", gomcp.Description("Notes on the link")),
+					gomcp.WithString("anniversary", gomcp.Description("Person-person links of kind spouse only: the anniversary as YYYY-MM-DD, or --MM-DD when the year is unknown. Empty clears it. Shown in the Dates view as \"Joey-Hannah Osgood Anniversary\"")),
 					gomcp.WithBoolean("new", gomcp.Description("Add another link even when the pair is already linked (Person–Organization links only)")),
 				)
 			} else {
@@ -250,7 +251,7 @@ func attrHelp(kind string) string {
 func LinkAttrsFromRequest(req gomcp.CallToolRequest) model.LinkAttrs {
 	a := model.LinkAttrs{
 		Role: optString(req, "role"), StartedOn: optString(req, "from"), EndedOn: optString(req, "to"),
-		Kind: optString(req, "kind"), Notes: optString(req, "notes"),
+		Kind: optString(req, "kind"), Notes: optString(req, "notes"), Anniversary: optString(req, "anniversary"),
 		CreateRole: req.GetBool("create", false),
 	}
 	if _, ok := req.GetArguments()["primary"]; ok {

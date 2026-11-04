@@ -36,13 +36,13 @@ func TestModulesCommands(t *testing.T) {
 	require.Equal(t, 0, code, stderr)
 	_, stderr, code = run("on", "deals")
 	require.Equal(t, 0, code, stderr)
-	_, stderr, code = run("off", "Birthdays", "merge")
+	_, stderr, code = run("off", "Dates", "merge")
 	require.Equal(t, 0, code, stderr)
 	stdout, _, _ = run("move", "deals", "1", "-f", "json")
 	rows = keyRows(t, stdout)
 	assert.EqualValues(t, 1, rows["deals"]["position"])
 	assert.EqualValues(t, 2, rows["home"]["position"])
-	assert.Equal(t, false, rows["birthdays"]["on"])
+	assert.Equal(t, false, rows["dates"]["on"])
 	data, err := os.ReadFile(filepath.Join(home, ".crm", "config.toml"))
 	if err != nil { // the test helper may point the data directory elsewhere
 		data, err = os.ReadFile(filepath.Join(home, "config.toml"))
@@ -76,6 +76,6 @@ func TestModulesCommands(t *testing.T) {
 	require.Equal(t, 0, code)
 	rows = keyRows(t, stdout)
 	assert.Equal(t, true, rows["deals"]["on"])
-	assert.Equal(t, true, rows["birthdays"]["on"])
+	assert.Equal(t, true, rows["dates"]["on"])
 	assert.EqualValues(t, 1, rows["home"]["position"])
 }

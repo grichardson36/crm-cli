@@ -1,13 +1,13 @@
 // Package modules holds the arrangement of the program's views: which are on and in what order.
-// Every view is a module (Home, People, Follow-up, Tasks, Organizations, Birthdays, Merge,
+// Every view is a module (Home, People, Follow-up, Tasks, Organizations, Dates, Merge,
 // Archived, Sync, Deals, Settings). Turning one off hides it from the tabs, the number keys, [ and ],
 // the Views screen's shown group and the palette. Settings can never be turned off, and the Views
 // screen itself (the v key) is not a module, so the user can always get back to both. Its data, its links and every other way to reach it stay. The
 // arrangement is per device, in the [modules] table of ~/.crm/config.toml next to [keys]:
 //
 //	[modules]
-//	order  = ["home", "people", "follow-up", "tasks", "organizations", "deals", "birthdays", "merge", "archived", "sync", "settings"]
-//	hidden = ["birthdays"]
+//	order  = ["home", "people", "follow-up", "tasks", "organizations", "deals", "dates", "merge", "archived", "sync", "settings"]
+//	hidden = ["dates"]
 //
 // The rest of config.toml is kept when the table is written.
 package modules
@@ -39,7 +39,7 @@ var All = []Module{
 	{"organizations", "Organizations", "companies and groups", false},
 	{"deals", "Deals", "deals with stage and value", false},
 	{"tags", "Tags", "labels on anything, rename, merge, clean up", false},
-	{"birthdays", "Birthdays", "upcoming birthdays", false},
+	{"dates", "Dates", "upcoming birthdays and anniversaries", false},
 	{"merge", "Merge", "probable duplicates", false},
 	{"archived", "Archived", "archived records, restore or purge", false},
 	{"sync", "Sync", "sources and the inbox", false},
@@ -65,7 +65,7 @@ func Key(pos int) string {
 
 var aliases = map[string]string{
 	"due": "follow-up", "followup": "follow-up", "follow": "follow-up", "orgs": "organizations", "org": "organizations",
-	"organisations": "organizations", "birthday": "birthdays", "task": "tasks", "person": "people", "contacts": "people",
+	"organisations": "organizations", "task": "tasks", "person": "people", "contacts": "people",
 	"deal": "deals", "archive": "archived", "duplicates": "merge", "dupes": "merge", "setting": "settings", "preferences": "settings",
 }
 
@@ -264,6 +264,7 @@ func ConfigFile(dataDir string) string { return filepath.Join(dataDir, "config.t
 // problem (bad TOML, wrong types, unknown module names, an arrangement with nothing to start from)
 // is returned as a message and falls back to the default for that part.
 func Load(dataDir string) (Arrangement, []string) {
+	_ = MigrateConfig(dataDir) // best effort: a file that cannot be written keeps the old key, which is then reported as unknown
 	data, err := os.ReadFile(ConfigFile(dataDir))
 	if err != nil {
 		return Default(), nil

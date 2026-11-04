@@ -24,10 +24,10 @@ func paletteTitles(m *Model) []string {
 
 func TestModuleOffHidesTabsKeysBracketsAndPalette(t *testing.T) {
 	m, _ := newTestModel(t)
-	require.NoError(t, m.setModules(mustWith(t, m.mods, "birthdays", false)))
+	require.NoError(t, m.setModules(mustWith(t, m.mods, "dates", false)))
 
-	assert.NotContains(t, tabBar(m), "Birthdays")
-	assert.Equal(t, 0, m.viewPosition(viewBirthdays))
+	assert.NotContains(t, tabBar(m), "Dates")
+	assert.Equal(t, 0, m.viewPosition(viewDates))
 	assert.Equal(t, 7, m.viewPosition(viewMerge), "Merge moves up one place")
 	press(m, "7")
 	assert.Equal(t, viewMerge, m.view, "the number key follows the arrangement")
@@ -45,20 +45,20 @@ func TestModuleOffHidesTabsKeysBracketsAndPalette(t *testing.T) {
 		if id == "|" {
 			div = i
 		}
-		if id == "birthdays" {
+		if id == "dates" {
 			bday = i
 		}
 	}
 	assert.Greater(t, bday, div, "it sits under the Hidden divider")
 	assert.GreaterOrEqual(t, div, 0)
 	press(m, "esc")
-	assert.NotContains(t, paletteTitles(m), "Birthdays view")
+	assert.NotContains(t, paletteTitles(m), "Dates view")
 	assert.Contains(t, paletteTitles(m), "Merge view")
 
 	// The data stays: the view still works when something opens it.
-	m.switchView(viewBirthdays)
-	assert.Equal(t, viewBirthdays, m.view)
-	assert.Contains(t, tabBar(m), "v Birthdays")
+	m.switchView(viewDates)
+	assert.Equal(t, viewDates, m.view)
+	assert.Contains(t, tabBar(m), "v Dates")
 	assert.NotEmpty(t, m.rows)
 }
 

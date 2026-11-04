@@ -53,6 +53,8 @@ type LinkRecord struct {
 	KindID    *int64  `json:"kind_id,omitempty"`
 	Notes     *string `json:"notes,omitempty"`
 	Deleted   bool    `json:"deleted,omitempty"`
+	// Anniversary is the spouse link's anniversary (YYYY-MM-DD or --MM-DD).
+	Anniversary *string `json:"anniversary,omitempty"`
 }
 
 // LinkRepo is the one place that makes, lists, edits and removes links between objects
@@ -96,7 +98,7 @@ func storeOf(rel model.Relation) store {
 		return store{table: "person_organization_link", aCol: "person_id", bCol: "org_id", cols: map[string]string{
 			model.AttrRole: "role", model.AttrFrom: "started_on", model.AttrTo: "ended_on", model.AttrPrimary: "is_primary", model.AttrNotes: "notes"}}
 	case "person_relation":
-		return store{table: "person_relation", aCol: "a_id", bCol: "b_id", cols: map[string]string{model.AttrKind: "kind_id", model.AttrNotes: "notes"}}
+		return store{table: "person_relation", aCol: "a_id", bCol: "b_id", cols: map[string]string{model.AttrKind: "kind_id", model.AttrNotes: "notes", model.AttrAnniversary: "anniversary"}}
 	case "org_relation":
 		return store{table: "org_relation", aCol: "a_id", bCol: "b_id", cols: map[string]string{model.AttrKind: "kind_id", model.AttrNotes: "notes"}}
 	case "deal_person":
@@ -127,9 +129,9 @@ func (s store) selectList(prefix string) string {
 	if primary == "NULL" {
 		primary = "0"
 	}
-	return fmt.Sprintf("%sid, %s%s, %s%s, %s, %s, %s, %s, %s, %s, %sdeleted_at IS NOT NULL",
+	return fmt.Sprintf("%sid, %s%s, %s%s, %s, %s, %s, %s, %s, %s, %sdeleted_at IS NOT NULL, %s",
 		prefix, prefix, s.aCol, prefix, s.bCol, p(s.col(model.AttrRole)), p(s.col(model.AttrFrom)), p(s.col(model.AttrTo)),
-		primary, p(s.col(model.AttrKind)), p(s.col(model.AttrNotes)), prefix)
+		primary, p(s.col(model.AttrKind)), p(s.col(model.AttrNotes)), prefix, p(s.col(model.AttrAnniversary)))
 }
 
 // fixedWhere returns " AND col = 'value'" for the activity kind columns.
@@ -149,7 +151,7 @@ func (s store) fixedWhere(prefix string) string {
 func scanRecord(rel model.Relation, row interface{ Scan(...any) error }) (*LinkRecord, error) {
 	var rec LinkRecord
 	var primary int
-	err := row.Scan(&rec.ID, &rec.A, &rec.B, &rec.Role, &rec.StartedOn, &rec.EndedOn, &primary, &rec.KindID, &rec.Notes, &rec.Deleted)
+	err := row.Scan(&rec.ID, &rec.A, &rec.B, &rec.Role, &rec.StartedOn, &rec.EndedOn, &primary, &rec.KindID, &rec.Notes, &rec.Deleted, &rec.Anniversary)
 	if err != nil {
 		return nil, err
 	}
@@ -201,6 +203,7 @@ func (r *LinkRepo) validateAttrs(ctx context.Context, rel model.Relation, at mod
 	has := map[string]bool{
 		model.AttrRole: at.Role != nil, model.AttrFrom: at.StartedOn != nil, model.AttrTo: at.EndedOn != nil,
 		model.AttrPrimary: at.Primary != nil, model.AttrKind: at.Kind != nil, model.AttrNotes: at.Notes != nil,
+		model.AttrAnniversary: at.Anniversary != nil,
 	}
 	for key, given := range has {
 		if given && !rel.HasAttr(key) {
@@ -216,6 +219,13 @@ func (r *LinkRepo) validateAttrs(ctx context.Context, rel model.Relation, at mod
 			}
 			*p = &d
 		}
+	}
+	if at.Anniversary != nil {
+		d, err := model.NormalizeAnniversary(*at.Anniversary)
+		if err != nil {
+			return at, err
+		}
+		at.Anniversary = &d
 	}
 	if at.Role != nil {
 		v := strings.TrimSpace(*at.Role)
@@ -293,6 +303,9 @@ func (r *LinkRepo) link(ctx context.Context, a, b Ref, attrs model.LinkAttrs, fo
 		}
 		if swapped {
 			ra, rb = rb, ra
+		}
+		if err := checkAnniversaryKind(attrs, kind); err != nil {
+			return LinkResult{}, err
 		}
 		if kind.Symmetric && ra.ID > rb.ID {
 			ra, rb = rb, ra
@@ -387,6 +400,15 @@ func (r *LinkRepo) link(ctx context.Context, a, b Ref, attrs model.LinkAttrs, fo
 	return res, nil
 }
 
+// checkAnniversaryKind refuses an anniversary on any kind but the built-in spouse kind (matched by
+// uuid, so renaming the kind changes nothing). Clearing one is always allowed.
+func checkAnniversaryKind(at model.LinkAttrs, kind *model.RelationKind) error {
+	if at.Anniversary == nil || *at.Anniversary == "" || kind == nil || IsSpouseKind(kind) {
+		return nil
+	}
+	return fmt.Errorf("only a spouse link has an anniversary, not %q: %w", kind.Name, model.ErrValidation)
+}
+
 // deadRow returns the newest unlinked row of the pair (and kind), nil when there is none.
 func (r *LinkRepo) deadRow(ctx context.Context, rel model.Relation, aID, bID int64, kind *model.RelationKind) (*LinkRecord, error) {
 	st := storeOf(rel)
@@ -460,6 +482,7 @@ func applyAttrs(cur LinkRecord, at model.LinkAttrs, kind *model.RelationKind) (L
 	set(&cur.StartedOn, at.StartedOn)
 	set(&cur.EndedOn, at.EndedOn)
 	set(&cur.Notes, at.Notes)
+	set(&cur.Anniversary, at.Anniversary)
 	if at.Primary != nil && *at.Primary != cur.Primary {
 		cur.Primary, changed = *at.Primary, true
 	}
@@ -506,6 +529,7 @@ func (r *LinkRepo) insert(ctx context.Context, tx *sql.Tx, rel model.Relation, s
 	add(model.AttrFrom, nilIfEmptyPtr(at.StartedOn))
 	add(model.AttrTo, nilIfEmptyPtr(at.EndedOn))
 	add(model.AttrNotes, nilIfEmptyPtr(at.Notes))
+	add(model.AttrAnniversary, nilIfEmptyPtr(at.Anniversary))
 	if kind != nil {
 		add(model.AttrKind, kind.ID)
 	}
@@ -598,6 +622,7 @@ func (r *LinkRepo) write(ctx context.Context, tx *sql.Tx, rel model.Relation, st
 	add(model.AttrFrom, rec.StartedOn)
 	add(model.AttrTo, rec.EndedOn)
 	add(model.AttrNotes, rec.Notes)
+	add(model.AttrAnniversary, rec.Anniversary)
 	add(model.AttrPrimary, rec.Primary)
 	if rel.Kinded && rec.KindID != nil {
 		add(model.AttrKind, *rec.KindID)
@@ -664,6 +689,22 @@ func (r *LinkRepo) Update(ctx context.Context, relation string, id int64, attrs 
 		kind = k
 		kindChanged = cur.KindID == nil || *cur.KindID != k.ID
 		next.KindID = &k.ID
+	}
+	if rel.Kinded {
+		eff := kind
+		if eff == nil && cur.KindID != nil {
+			if eff, err = r.kinds.FindByID(ctx, *cur.KindID); err != nil {
+				return LinkResult{}, err
+			}
+		}
+		if err := checkAnniversaryKind(attrs, eff); err != nil {
+			return LinkResult{}, err
+		}
+		// A link that stops being a spouse link loses its anniversary.
+		if eff != nil && !IsSpouseKind(eff) && attrs.Anniversary == nil && next.Anniversary != nil {
+			empty := ""
+			attrs.Anniversary = &empty
+		}
 	}
 	next, changed := applyAttrs(next, attrs, kind)
 	changed = changed || kindChanged
@@ -897,8 +938,12 @@ func (r *LinkRepo) linkedVia(ctx context.Context, rel model.Relation, a Ref) ([]
 		}
 		label := "''"
 		join := ""
+		spouse := "0" // 1 for a link of the spouse kind, the only one that carries an anniversary
 		if rel.Kinded {
 			join = " JOIN relation_kind k ON k.id = l.kind_id"
+			if rel.Name == "person_relation" {
+				spouse = spouseKindSQL()
+			}
 			// A phrase kind (referred-by) reads from the viewing side, so its labels are swapped.
 			if anchorIsA {
 				label = "CASE k.phrase WHEN 1 THEN k.name ELSE k.inverse_name END"
@@ -906,7 +951,7 @@ func (r *LinkRepo) linkedVia(ctx context.Context, rel model.Relation, a Ref) ([]
 				label = "CASE k.phrase WHEN 1 THEN k.inverse_name ELSE k.name END"
 			}
 		}
-		q := fmt.Sprintf(`SELECT l.id, l.%[1]s, %[2]s, %[3]s, %[4]s, %[5]s, %[6]s, %[7]s, %[8]s
+		q := fmt.Sprintf(`SELECT l.id, l.%[1]s, %[2]s, %[3]s, %[4]s, %[5]s, %[6]s, %[7]s, %[8]s, %[16]s, %[17]s
 			FROM %[9]s l JOIN %[10]s o ON o.id = l.%[1]s%[11]s
 			WHERE l.%[12]s = ? AND l.deleted_at IS NULL AND o.archived = 0%[13]s
 			ORDER BY %[14]s COALESCE(l.%[15]s, '9999') DESC, 3`,
@@ -914,7 +959,7 @@ func (r *LinkRepo) linkedVia(ctx context.Context, rel model.Relation, a Ref) ([]
 			lcol(st, model.AttrRole), lcol(st, model.AttrFrom), lcol(st, model.AttrTo),
 			primaryExpr(st), lcol(st, model.AttrNotes),
 			st.table, tableOf[otherKind], join, anchorCol, st.fixedWhere("l."),
-			orderPrimary(st), orderDate(st))
+			orderPrimary(st), orderDate(st), lcol(st, model.AttrAnniversary), spouse)
 		rows, err := r.db.QueryContext(ctx, q, a.ID)
 		if err != nil {
 			return nil, fmt.Errorf("list %s links of %s: %w", rel.Name, a, err)
@@ -922,7 +967,7 @@ func (r *LinkRepo) linkedVia(ctx context.Context, rel model.Relation, a Ref) ([]
 		for rows.Next() {
 			var li model.LinkedObject
 			var primary int
-			if err := rows.Scan(&li.LinkID, &li.ID, &li.Name, &li.Label, &li.Role, &li.StartedOn, &li.EndedOn, &primary, &li.Notes); err != nil {
+			if err := rows.Scan(&li.LinkID, &li.ID, &li.Name, &li.Label, &li.Role, &li.StartedOn, &li.EndedOn, &primary, &li.Notes, &li.Anniversary, &li.CanAnniversary); err != nil {
 				rows.Close()
 				return nil, fmt.Errorf("scan link: %w", err)
 			}

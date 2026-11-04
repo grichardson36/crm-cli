@@ -186,6 +186,11 @@ func (m *merger) movePersonRelations(d int64) error {
 			return err
 		}
 		if n > 0 {
+			// The link that stays keeps its own anniversary and takes the dropped link's when it has none.
+			if _, err := m.exec(`UPDATE person_relation SET anniversary = (SELECT anniversary FROM person_relation WHERE id = ?), updated_at = datetime('now')
+				WHERE a_id = ? AND b_id = ? AND kind_id = ? AND deleted_at IS NULL AND id <> ? AND anniversary IS NULL`, r.id, a, b, r.kind, r.id); err != nil {
+				return fmt.Errorf("keep anniversary: %w", err)
+			}
 			if err := m.softDelete("person_relation", r.id); err != nil {
 				return err
 			}

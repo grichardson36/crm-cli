@@ -81,6 +81,9 @@ func (m *Model) linkCells(li model.LinkedObject, kindNames map[string][]model.Fi
 			cells = append(cells, text("notes", "notes", cleanCell(str(li.Notes)), ""))
 		}
 	}
+	if rel.Kinded && li.CanAnniversary {
+		cells = append(cells, text("anniversary", "anniversary", str(li.Anniversary), "2014-06-20, or --06-20 when the year is unknown"))
+	}
 	if rel.Kinded && rel.HasAttr(model.AttrNotes) {
 		cells = append(cells, text("notes", "notes", cleanCell(str(li.Notes)), ""))
 	}
@@ -220,6 +223,8 @@ func (m *Model) saveCell(ce *cellEdit, src repo.Ref, v string) error {
 		at.EndedOn = &v
 	case "notes":
 		at.Notes = &v
+	case "anniversary":
+		at.Anniversary = &v
 	case "kind":
 		at.Kind = &v
 	case "primary":

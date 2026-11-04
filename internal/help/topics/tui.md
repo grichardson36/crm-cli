@@ -21,7 +21,7 @@ Every view is a module you can turn on or off and reorder (see modules). Jump wi
 | 4 | Tasks | open tasks |
 | 5 | Organizations | companies and groups |
 | 6 | Deals | deals with stage and value |
-| 7 | Birthdays | upcoming birthdays |
+| 7 | Dates | upcoming birthdays and anniversaries |
 | 8 | Merge | groups of probable duplicates |
 | 9 | Settings | every setting, with where it is stored (device, synced or session) |
 | hidden | Archived, Sync | archived records, sync sources and the inbox (Settings: "Open Archived", "Open Sync") |

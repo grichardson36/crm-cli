@@ -280,10 +280,10 @@ var commandMeta = map[string]cmdMeta{
 	"keys list":     {fields: keysListFields, examples: []string{`crm keys list -f json`, `crm keys list --custom`, `crm keys list --group Contact`}},
 	"keys set":      {mutates: true, noDryRun: true, fields: "id,title,default,keys,saved,dry_run,config", examples: []string{`crm keys set undo ctrl+z`, `crm keys set favorite f "*" --dry-run`}},
 	"keys reset":    {mutates: true, noDryRun: true, fields: "id,title,default,keys,saved,dry_run,config", examples: []string{`crm keys reset undo`, `crm keys reset --all --dry-run`}},
-	"modules":       {examples: []string{`crm modules list -f json`, `crm modules off birthdays`}},
+	"modules":       {examples: []string{`crm modules list -f json`, `crm modules off dates`}},
 	"modules list":  {fields: modulesFields, examples: []string{`crm modules list -f json`}},
 	"modules on":    {mutates: true, noDryRun: true, fields: modulesFields, examples: []string{`crm modules on deals`}},
-	"modules off":   {mutates: true, noDryRun: true, fields: modulesFields, examples: []string{`crm modules off birthdays merge`}},
+	"modules off":   {mutates: true, noDryRun: true, fields: modulesFields, examples: []string{`crm modules off dates merge`}},
 	"modules move":  {mutates: true, noDryRun: true, fields: modulesFields, examples: []string{`crm modules move organizations 3`}},
 	"modules reset": {mutates: true, noDryRun: true, fields: modulesFields, examples: []string{`crm modules reset`}},
 

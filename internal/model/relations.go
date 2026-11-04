@@ -18,6 +18,8 @@ const (
 	AttrPrimary = "primary"
 	AttrKind    = "kind"
 	AttrNotes   = "notes"
+	// AttrAnniversary is the day a spouse link began (CRM-022). Only the spouse kind takes it.
+	AttrAnniversary = "anniversary"
 )
 
 // AttrSpec describes one link attribute for forms, flags and help.
@@ -32,12 +34,13 @@ type AttrSpec struct {
 
 // AttrSpecs lists every attribute a link can carry.
 var AttrSpecs = map[string]AttrSpec{
-	AttrRole:    {Key: AttrRole, Label: "Role", Type: "text", Suggest: true},
-	AttrFrom:    {Key: AttrFrom, Label: "From", Type: "date"},
-	AttrTo:      {Key: AttrTo, Label: "To", Type: "date"},
-	AttrPrimary: {Key: AttrPrimary, Label: "Primary", Type: "bool"},
-	AttrKind:    {Key: AttrKind, Label: "Kind", Type: "kind"},
-	AttrNotes:   {Key: AttrNotes, Label: "Notes", Type: "text"},
+	AttrRole:        {Key: AttrRole, Label: "Role", Type: "text", Suggest: true},
+	AttrFrom:        {Key: AttrFrom, Label: "From", Type: "date"},
+	AttrTo:          {Key: AttrTo, Label: "To", Type: "date"},
+	AttrPrimary:     {Key: AttrPrimary, Label: "Primary", Type: "bool"},
+	AttrKind:        {Key: AttrKind, Label: "Kind", Type: "kind"},
+	AttrNotes:       {Key: AttrNotes, Label: "Notes", Type: "text"},
+	AttrAnniversary: {Key: AttrAnniversary, Label: "Anniversary", Type: "date"},
 }
 
 // Relation is one stored kind of link between two kinds of object, kept in one table. Every link
@@ -66,7 +69,7 @@ type Relation struct {
 var Relations = []Relation{
 	{Name: "person_organization_link", A: "person", B: "organization", Attrs: []string{AttrRole, AttrFrom, AttrTo, AttrPrimary, AttrNotes},
 		PrimaryPerA: true, LabelA: "Organizations", LabelB: "Members"},
-	{Name: "person_relation", A: "person", B: "person", Attrs: []string{AttrKind, AttrNotes}, Kinded: true, Unique: true,
+	{Name: "person_relation", A: "person", B: "person", Attrs: []string{AttrKind, AttrAnniversary, AttrNotes}, Kinded: true, Unique: true,
 		LabelA: "Related people", LabelB: "Related people"},
 	{Name: "org_relation", A: "organization", B: "organization", Attrs: []string{AttrKind, AttrNotes}, Kinded: true, Unique: true,
 		LabelA: "Related organizations", LabelB: "Related organizations"},

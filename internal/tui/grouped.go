@@ -13,8 +13,8 @@ package tui
 
 // viewGroupFields is the field each grouped view groups its rows by.
 var viewGroupFields = map[viewKind]string{
-	viewBirthdays: "day",
-	viewMerge:     "confidence level",
+	viewDates: "day",
+	viewMerge: "confidence level",
 }
 
 // groupField is the field the view groups by, "" when the view is not grouped.

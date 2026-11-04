@@ -166,7 +166,7 @@ func (m *Model) headingKind() string {
 		return "task"
 	case viewTags:
 		return "tag"
-	case viewSettings, viewMerge, viewArchived, viewSync, viewBirthdays:
+	case viewSettings, viewMerge, viewArchived, viewSync, viewDates:
 		return ""
 	}
 	return "person"
@@ -181,4 +181,3 @@ func (m *Model) headingStyle() lipgloss.Style {
 	}
 	return m.st.Name
 }
-

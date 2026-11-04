@@ -34,7 +34,7 @@ func relateDeprecated(old, use string) {
 }
 
 func personRelateCmd() *cobra.Command {
-	var relType, notes string
+	var relType, notes, anniversary string
 
 	cmd := &cobra.Command{
 		Use:   "relate <person_id> <related_person_id>",
@@ -57,6 +57,9 @@ func personRelateCmd() *cobra.Command {
 			defer db.Close()
 
 			attrs := model.LinkAttrs{Kind: &relType, Notes: nilIfEmpty(notes)}
+			if cmd.Flags().Changed("anniversary") {
+				attrs.Anniversary = &anniversary
+			}
 			res, err := repo.NewLinkRepo(db).Link(cmd.Context(), repo.Ref{Kind: "person", ID: personID}, repo.Ref{Kind: "person", ID: relatedID}, attrs)
 			if err != nil {
 				return err
@@ -68,6 +71,7 @@ func personRelateCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&relType, "type", model.DefaultPersonKind, "relationship kind, see `crm relation-kind list`")
 	cmd.Flags().StringVar(&notes, "notes", "", "notes about the relationship")
+	cmd.Flags().StringVar(&anniversary, "anniversary", "", "anniversary of a spouse relationship: YYYY-MM-DD, or --MM-DD when the year is unknown")
 
 	return cmd
 }

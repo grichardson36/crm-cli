@@ -36,7 +36,7 @@ const (
 	viewPeople
 	viewDue
 	viewTasks
-	viewBirthdays
+	viewDates
 	viewMerge
 	viewArchived
 	viewSync
@@ -55,7 +55,7 @@ const (
 	numAllViews
 )
 
-var viewNames = [numAllViews]string{"Home", "People", "Follow-up", "Tasks", "Birthdays", "Merge", "Archived", "Sync", "Organizations", "Deals", "Tags", "Settings", "Notes"}
+var viewNames = [numAllViews]string{"Home", "People", "Follow-up", "Tasks", "Dates", "Merge", "Archived", "Sync", "Organizations", "Deals", "Tags", "Settings", "Notes"}
 
 type mode int
 
@@ -180,7 +180,7 @@ type Model struct {
 	sortChoice map[viewKind]string
 	// orderChoice says per view whether the sort runs ascending or descending, once the user set it.
 	orderChoice map[viewKind]string
-	marked     map[int64]bool
+	marked      map[int64]bool
 	// extend is the selection extension in progress (shift+up, shift+down), nil otherwise.
 	extend *extendState
 	// orgCreateAnyway lets the next organization create skip the duplicate check (the user chose Create anyway).
@@ -203,7 +203,7 @@ type Model struct {
 	// setField is the bulk set-field waiting for its typed value (setfield.go).
 	setField *setFieldState
 	// setFieldDeal and setFieldCreate carry a bulk deal role: the deal it is set on and a role to add to the list first.
-	setFieldDeal repo.Ref
+	setFieldDeal   repo.Ref
 	setFieldCreate string
 	detail         viewport.Model
 	detailKey      string
@@ -215,15 +215,15 @@ type Model struct {
 	hintRowsFn     func() int // footerHintRows, set in New. A field so bodyHeight does not reach the hints at init
 
 	// Detail form.
-	form       []formRow
-	formTitle  string
+	form      []formRow
+	formTitle string
 
 	// Per-kind colors (kindcolors.go): the saved overrides.
 	kindColors map[string]string
 	formPerson int64
 	fcur       int
 	feed       feedState // expanded and selected entries of the activity feed (feed.go)
-	fcol       int // the cell under the cursor in a row with cells (cells.go), 0 is the row itself
+	fcol       int       // the cell under the cursor in a row with cells (cells.go), 0 is the row itself
 
 	lineRow  []int // screen line in the detail content -> form row index, -1 for none
 	rowStart []int
@@ -253,19 +253,23 @@ type Model struct {
 	archItems map[string]repo.ArchivedItem
 	archKind  string
 
+	// datesShow is the Show option of the Dates view: "" or "all" lists birthdays and anniversaries,
+	// "birthdays" and "anniversaries" list one kind (ctrl+o).
+	datesShow string
+
 	// noteType is the type used by the next note prompt (remembered between notes).
 	noteType string
 
 	// st holds every style of the active theme. Views draw only with it. See theme.go.
-	st        theme.Styles
-	themeName   string      // name of the chosen theme (theme.go says what else holds theme state)
-	appearance  theme.Mode  // auto, light or dark (per device setting)
-	previewName string      // theme previewed in the Theme pane, "" when none
-	darkBG      bool        // the terminal reports a dark background
-	themeSel     string        // the theme under the cursor of the Theme pane, "" when none
-	themeEditing bool          // the cursor of the Theme pane is in the name and color rows
-	themeCat     theme.Catalog // the themes the Theme pane lists
-	profile   colorprofile.Profile // what colors the terminal can show (NO_COLOR gives Ascii)
+	st           theme.Styles
+	themeName    string               // name of the chosen theme (theme.go says what else holds theme state)
+	appearance   theme.Mode           // auto, light or dark (per device setting)
+	previewName  string               // theme previewed in the Theme pane, "" when none
+	darkBG       bool                 // the terminal reports a dark background
+	themeSel     string               // the theme under the cursor of the Theme pane, "" when none
+	themeEditing bool                 // the cursor of the Theme pane is in the name and color rows
+	themeCat     theme.Catalog        // the themes the Theme pane lists
+	profile      colorprofile.Profile // what colors the terminal can show (NO_COLOR gives Ascii)
 	// Command bar: caches for the quick package, the person the palette opened on, the changes of
 	// command lines run this session (newest last) for Undo, and the short syntax switch.
 	qix       *quick.Index
@@ -483,7 +487,7 @@ func (m *Model) rebuild(keep bool) error {
 			for _, d := range due {
 				rows = append(rows, row{personID: d.PersonID, title: cleanCell(d.Name), sub: d.KeepInTouch, meta: fmt.Sprintf("%dd overdue", d.DaysOverdue)})
 			}
-		case viewBirthdays:
+		case viewDates:
 			br, err := m.birthdayRows()
 			if err != nil {
 				return err
@@ -553,7 +557,7 @@ func (m *Model) rebuild(keep bool) error {
 		m.offset = 0
 	}
 	m.settle()
-	if m.view == viewBirthdays && !keep {
+	if m.view == viewDates && !keep {
 		m.snapBirthdays()
 	}
 	m.clamp()
@@ -1003,7 +1007,7 @@ func (m *Model) handlePromptKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.input.Blur()
 		m.addSugg, m.pipe = nil, nil
 		m.pendingCmd = nil
-		if value != "" || kind == "link-attrs" {
+		if value != "" || kind == "link-attrs" || kind == "link-anniversary" {
 			m.runPrompt(kind, value)
 		}
 		cmd := m.pendingCmd
@@ -1132,6 +1136,9 @@ func (m *Model) runPrompt(kind, value string) {
 		return
 	case "link-attrs":
 		m.runLinkAttrs(value)
+		return
+	case "link-anniversary":
+		m.runLinkAnniversary(value)
 		return
 	case "note-object":
 		m.saveObjectNote(value)

@@ -58,7 +58,7 @@ func TestTabBarHandlesTheDefaultViews(t *testing.T) {
 	for _, name := range []string{"Home", "People", "Follow-up", "Tasks"} {
 		assert.Contains(t, line, name)
 	}
-	assert.NotContains(t, line, "Birthdays")
+	assert.NotContains(t, line, "Dates")
 }
 
 // A narrow terminal drops tabs from the end into a "v +N" entry that opens the view list.

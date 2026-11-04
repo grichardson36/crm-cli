@@ -38,14 +38,14 @@ type viewNav struct {
 
 // viewNavs holds the declarations. A view that is not listed uses a page and has no home.
 var viewNavs = map[viewKind]viewNav{
-	viewBirthdays: {unit: unitGroup, home: func(m *Model) { m.snapBirthdays() }},
-	viewMerge:     {unit: unitGroup},
-	viewSettings:  {unit: unitGroup},
-	viewPeople:    {unit: unitLetter},
-	viewOrgs:      {unit: unitLetter},
-	viewDeals:     {unit: unitLetter},
-	viewTasks:     {unit: unitLetter},
-	viewTags:      {unit: unitSibling},
+	viewDates:    {unit: unitGroup, home: func(m *Model) { m.snapBirthdays() }},
+	viewMerge:    {unit: unitGroup},
+	viewSettings: {unit: unitGroup},
+	viewPeople:   {unit: unitLetter},
+	viewOrgs:     {unit: unitLetter},
+	viewDeals:    {unit: unitLetter},
+	viewTasks:    {unit: unitLetter},
+	viewTags:     {unit: unitSibling},
 }
 
 func navOf(v viewKind) viewNav { return viewNavs[v] }

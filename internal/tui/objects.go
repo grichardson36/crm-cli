@@ -338,7 +338,7 @@ func personDef() *objDef {
 			case vAdd:
 				// the detail form's own a adds a row, so a person is added from a people list only.
 				switch m.view {
-				case viewHome, viewPeople, viewDue, viewBirthdays:
+				case viewHome, viewPeople, viewDue, viewDates:
 					return m.focus == focusList
 				}
 				return false
@@ -346,7 +346,7 @@ func personDef() *objDef {
 				// d only in the list (in the detail form it deletes a row).
 				return m.focus == focusList
 			case vEdit:
-				return m.focus == focusList && (m.view == viewPeople || m.view == viewDue || m.view == viewBirthdays)
+				return m.focus == focusList && (m.view == viewPeople || m.view == viewDue || m.view == viewDates)
 			}
 			return m.focus == focusList
 		},

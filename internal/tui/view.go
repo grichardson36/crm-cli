@@ -285,8 +285,8 @@ func (m *Model) listView(w, h int) string {
 			return m.st.Dim.Render("No matches.")
 		case m.view == viewDue:
 			return m.st.Dim.Render("Nobody is due. Set a cadence with: crm person edit <id> --keep-in-touch \"3 mons\"")
-		case m.view == viewBirthdays:
-			return m.st.Dim.Render("No birthdays in the next 90 days.")
+		case m.view == viewDates:
+			return m.st.Dim.Render("No birthdays or anniversaries in the next 90 days.")
 		case m.view == viewTasks:
 			return m.st.Dim.Render("No open tasks.")
 		case m.view == viewMerge:

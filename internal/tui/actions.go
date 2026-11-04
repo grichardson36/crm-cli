@@ -320,17 +320,17 @@ func buildActions() []action {
 			run: func(m *Model) tea.Cmd { m.step(max(1, m.bodyHeight()-1)); return nil }},
 		{id: "page-up", inCompare: true, title: "Page up", group: "Move", hint: "pgup", keys: []string{"pgup"}, desc: "a full page up",
 			run: func(m *Model) tea.Cmd { m.step(-max(1, m.bodyHeight()-1)); return nil }},
-		{id: "jump-down", inCompare: true, title: "Jump down", group: "Move", hint: "ctrl+down", keys: []string{"ctrl+down"}, desc: "jump by the unit the view declares: a day in Birthdays, the next first letter in People, Organizations, Deals and Tasks, a page elsewhere",
+		{id: "jump-down", inCompare: true, title: "Jump down", group: "Move", hint: "ctrl+down", keys: []string{"ctrl+down"}, desc: "jump by the unit the view declares: a day in Dates, the next first letter in People, Organizations, Deals and Tasks, a page elsewhere",
 			run: func(m *Model) tea.Cmd { m.jump(1); return nil }},
-		{id: "jump-up", inCompare: true, title: "Jump up", group: "Move", hint: "ctrl+up", keys: []string{"ctrl+up"}, desc: "jump back by the unit the view declares: a day in Birthdays, the previous first letter in People, Organizations, Deals and Tasks, a page elsewhere",
+		{id: "jump-up", inCompare: true, title: "Jump up", group: "Move", hint: "ctrl+up", keys: []string{"ctrl+up"}, desc: "jump back by the unit the view declares: a day in Dates, the previous first letter in People, Organizations, Deals and Tasks, a page elsewhere",
 			run: func(m *Model) tea.Cmd { m.jump(-1); return nil }},
 		{id: "top", inCompare: true, title: "Go to top", group: "Move", hint: "home", keys: []string{"home"}, desc: "first row",
 			run: func(m *Model) tea.Cmd { m.step(-1 << 20); return nil }},
 		{id: "bottom", inCompare: true, title: "Go to bottom", group: "Move", hint: "end", keys: []string{"end"}, desc: "last row",
 			run: func(m *Model) tea.Cmd { m.step(1 << 20); return nil }},
-		{id: "home-top", inCompare: true, title: "Go to home or top", group: "Move", hint: "ctrl+shift+up", keys: []string{"ctrl+shift+up"}, desc: "the view's home destination (today in Birthdays), else the first row",
+		{id: "home-top", inCompare: true, title: "Go to home or top", group: "Move", hint: "ctrl+shift+up", keys: []string{"ctrl+shift+up"}, desc: "the view's home destination (today in Dates), else the first row",
 			run: func(m *Model) tea.Cmd { m.goHome(-1); return nil }},
-		{id: "home-bottom", inCompare: true, title: "Go to home or bottom", group: "Move", hint: "ctrl+shift+down", keys: []string{"ctrl+shift+down"}, desc: "the view's home destination (today in Birthdays), else the last row",
+		{id: "home-bottom", inCompare: true, title: "Go to home or bottom", group: "Move", hint: "ctrl+shift+down", keys: []string{"ctrl+shift+down"}, desc: "the view's home destination (today in Dates), else the last row",
 			run: func(m *Model) tea.Cmd { m.goHome(1); return nil }},
 		{id: "scroll-down", title: "Scroll detail down", group: "Move", desc: "scroll the detail pane down (palette)",
 			run: func(m *Model) tea.Cmd { m.detail.ScrollDown(3); return nil }},
@@ -338,7 +338,7 @@ func buildActions() []action {
 			run: func(m *Model) tea.Cmd { m.detail.ScrollUp(3); return nil }},
 
 		// Views and search.
-		viewAction(viewHome), viewAction(viewPeople), viewAction(viewDue), viewAction(viewTasks), viewAction(viewOrgs), viewAction(viewBirthdays), viewAction(viewMerge), viewAction(viewArchived), viewAction(viewSync), viewAction(viewDeals), viewAction(viewSettings), viewAction(viewTags),
+		viewAction(viewHome), viewAction(viewPeople), viewAction(viewDue), viewAction(viewTasks), viewAction(viewOrgs), viewAction(viewDates), viewAction(viewMerge), viewAction(viewArchived), viewAction(viewSync), viewAction(viewDeals), viewAction(viewSettings), viewAction(viewTags),
 		{id: "goto-view", title: "Go to view", group: "Views", hint: "v", keys: []string{"v"}, desc: "the Views screen: shown views, a line, hidden views in gray. Type to filter, open a view, move a view with shift+up and shift+down (across the line hides or shows it). Per device",
 			foot: 85, footIn: inList, run: func(m *Model) tea.Cmd { return m.openViews() }},
 		{id: "next-view", title: "Next view", group: "Views", hint: "]", keys: []string{"]", "ctrl+right"}, desc: "next view",
@@ -417,7 +417,7 @@ func buildActions() []action {
 			break
 		}
 	}
-	out := append(append(append(append(append(append(append(appearanceActions(), cellActions()...),tagViewActions()...), todayActions()...), globalAddActions()...), verbActions()...), orgAutoActions()...), acts[:at]...)
+	out := append(append(append(append(append(append(append(appearanceActions(), cellActions()...), tagViewActions()...), todayActions()...), globalAddActions()...), verbActions()...), orgAutoActions()...), acts[:at]...)
 	out = append(out, tagTreeActions()...)
 	out = append(out, objectActions()...)
 	out = append(out, selectionActions()...)
