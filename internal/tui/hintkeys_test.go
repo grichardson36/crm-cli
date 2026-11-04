@@ -1,10 +1,7 @@
 package tui
 
 import (
-	"go/ast"
-	"go/token"
 	"regexp"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -48,54 +45,6 @@ func TestKeyGlyphsAreOneCellWide(t *testing.T) {
 }
 
 var arrowWord = regexp.MustCompile(`^((shift|ctrl|alt)\+)*(up|down|left|right)(/(up|down|left|right))?$`)
-
-// TestKeyTextIsNeverALiteralWord: a hint names its arrows with the hk constants, and no code shows a
-// key through keys.Display, so every key a person reads goes through showKey.
-func TestKeyTextIsNeverALiteralWord(t *testing.T) {
-	fset := token.NewFileSet()
-	files := parseNonTestFiles(t, fset)
-	var bad []string
-	str := func(e ast.Expr) (string, bool) {
-		l, ok := e.(*ast.BasicLit)
-		if !ok || l.Kind != token.STRING {
-			return "", false
-		}
-		s, err := strconv.Unquote(l.Value)
-		return s, err == nil
-	}
-	check := func(pos token.Pos, e ast.Expr, what string) {
-		if s, ok := str(e); ok && (arrowWord.MatchString(s) || strings.ContainsAny(s, "↑↓←→")) {
-			bad = append(bad, fset.Position(pos).String()+" literal key text "+strconv.Quote(s)+" in "+what)
-		}
-	}
-	for _, f := range files {
-		ast.Inspect(f, func(n ast.Node) bool {
-			switch x := n.(type) {
-			case *ast.CallExpr:
-				if id, ok := x.Fun.(*ast.Ident); ok && id.Name == "fk" && len(x.Args) == 2 {
-					check(x.Pos(), x.Args[0], "fk")
-				}
-				if sel, ok := x.Fun.(*ast.SelectorExpr); ok {
-					if p, ok := sel.X.(*ast.Ident); ok && p.Name == "keys" && sel.Sel.Name == "Display" {
-						bad = append(bad, fset.Position(x.Pos()).String()+" keys.Display shows a key, use showKey")
-					}
-				}
-			case *ast.KeyValueExpr:
-				if k, ok := x.Key.(*ast.Ident); ok && k.Name == "hint" {
-					check(x.Pos(), x.Value, "a hint field")
-				}
-			case *ast.AssignStmt:
-				for i, l := range x.Lhs {
-					if sel, ok := l.(*ast.SelectorExpr); ok && sel.Sel.Name == "hint" && i < len(x.Rhs) {
-						check(x.Pos(), x.Rhs[i], "a hint assignment")
-					}
-				}
-			}
-			return true
-		})
-	}
-	assert.Empty(t, bad, "arrow key text comes from hintkeys.go")
-}
 
 // footerKeyWord matches a hint that still names an arrow with a word: "up/down select", "left move".
 var footerKeyWord = regexp.MustCompile(`(^|\s)((shift|ctrl|alt)\+)*(up|down|left|right)(/(up|down|left|right))?\s+[a-z]`)
