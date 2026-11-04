@@ -10,6 +10,6 @@ research: bookmarked
 **Research state.** bookmarked, not researched in detail. See [[inspirations]].
 
 **What we take.**
-- UID matching on import; round-trip tests for tasks. [[idempotent-by-uid]]
+- UID matching on import; round-trip tests for tasks. [[standards/integration]]
 
 **Sources.** bugzilla.mozilla.org bug 330547 (old, may be stale), support.mozilla.org exporting-and-sharing-a-calendar [search].

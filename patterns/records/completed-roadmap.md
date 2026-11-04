@@ -15,17 +15,17 @@ Badges show only the gates that have evidence. All items below passed `go build`
   - Decisions: no legacy aliases or old file formats. Colors section stays a separate set of kind overrides. `default` keeps its name until the app is named.
   - Exceptions: interactive color picker is on the roadmap. The forced light mode on a dark terminal and the swatches are unverified in a real terminal.
 - [ ] 🧭 🔨 CRM-002: Navigation standard (X47) (`d23ca75`)
-  - Outcome: [[navigation-standard]] with tests for every overlay and two-pane screen. `esc` always leaves.
+  - Outcome: [[standards/interface]] with tests for every overlay and two-pane screen. `esc` always leaves.
 - [ ] 🧭 🔨 CRM-003: Tags pane lists the tagged objects (X48) (`b157f74`)
   - Outcome: `enter` opens an object, `d` or `u` takes the tag off.
   - Exceptions: `space` and bulk verbs inside the pane are not built. The tag page has them.
 - [ ] 🧭 🔨 CRM-004: Add standard (X49) (`355d29d`)
-  - Outcome: [[add-standard]]. A person adds from the footer line like every kind, the form is the palette action "Person: add with the form", and every add lands on the new object.
+  - Outcome: [[standards/interface]]. A person adds from the footer line like every kind, the form is the palette action "Person: add with the form", and every add lands on the new object.
 - [ ] 🧭 🔨 CRM-005: Undo and redo history popups (`292ab9c`)
   - Outcome: `ctrl+shift+z` lists the session's changes, newest first, and undoes back to the chosen one. Redo history is a palette action.
   - Exceptions: `ctrl+shift+z` on Windows Terminal is unverified.
 - [ ] 🧭 🔨 CRM-006: Reusable popup component (`1adc92a`, `b9cde4b`)
-  - Outcome: [[popup-component]]. A centered box with a filter line or a title, hints in the bottom row, used by every overlay. Inline syntax helpers stay while typing. Views popup has a filter line, the hidden-line model and `shift+up/down` to hide or show.
+  - Outcome: [[standards/interface]]. A centered box with a filter line or a title, hints in the bottom row, used by every overlay. Inline syntax helpers stay while typing. Views popup has a filter line, the hidden-line model and `shift+up/down` to hide or show.
   - Exceptions: popup dimming, light themes, short terminals and mouse clicks are unverified.
 - [ ] 🧭 🔨 CRM-007: Types lists live in the Settings pane (`01a88e6`)
   - Outcome: Deal stages, Deal roles, Notes, Links and Ignored company texts open only in the right pane, with a used-by count, `tab` cycles and `shift+r` reset. "Counts as contact" is now "mark contacted". No standalone popup, key or palette action.

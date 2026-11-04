@@ -3,7 +3,7 @@ type: research
 ---
 # HubSpot export: how real data uses the relation schema
 
-Source: owner's HubSpot export dated 2025-09-24 (Capstone Aero, Sales Ops). Read 2026-10-16 by headers, counts and aggregate statistics only. No names, emails or company data are recorded here. Feeds [[link-registry]], [[object-registry]] and the schema ER review. Companion: `research-relationship-models.md`.
+Source: owner's HubSpot export dated 2025-09-24 (Capstone Aero, Sales Ops). Read 2026-10-16 by headers, counts and aggregate statistics only. No names, emails or company data are recorded here. Feeds [[standards/product-model]], [[standards/product-model]] and the schema ER review. Companion: `research-relationship-models.md`.
 
 ## Sizes
 3,082 contacts, 3,735 companies, 16 deals, 746 emails, 151 notes, 163 calls.
@@ -17,7 +17,7 @@ Source: owner's HubSpot export dated 2025-09-24 (Capstone Aero, Sales Ops). Read
 - H5. **Company hierarchy is single-parent, shallow and sparse.** 11 of 3,735 companies have a parent (single id each), 6 have children (max 4), 4 are both child and parent so two levels exist. Parent and child links are exactly reciprocal. Our decision allows several parents (owner decision 2026-10-16), which HubSpot does not.
 - H6. **Other company links exist:** sibling (4 companies), generic company-to-company (29), partners (2).
 - H7. **Activities attach to several object types at once.** Notes: 115 of 151 company-only, 14 contact plus company, 10 contact only. Calls: 108 contact plus company, 24 contact plus company plus deal. Emails: 631 contact plus company, 73 plus deal. Activities link to the company far more often than to the person.
-- H8. **Links are stored on both sides, exactly reciprocal.** One link, two views, as in [[link-registry]]. All ids resolve.
+- H8. **Links are stored on both sides, exactly reciprocal.** One link, two views, as in [[standards/product-model]]. All ids resolve.
 - H9. **Merges leave alias ids.** 1,007 contacts and 194 companies carry merged-in old ids. A merge needs an alias record so old references still resolve.
 - H10. **Person-to-person links are almost unused** (2 of 3,082 contacts), with no label. Dex Related is similarly untyped.
 
@@ -25,7 +25,7 @@ Source: owner's HubSpot export dated 2025-09-24 (Capstone Aero, Sales Ops). Read
 
 1. Person–Organization links (person to many orgs) with a primary flag are required: 28% of real contacts need them.
 2. Notes and interactions must attach to organizations and deals as first-class targets, not only to people.
-3. Role labels on deal-person links are sales roles. First read as free text with suggestions, changed 2026-10-29 to a user-managed list seeded from this export (champion, economic buyer, signer, billing contact and the usual buying committee), see [[deal-vocabulary]]. Person–Organization link roles stay free text.
+3. Role labels on deal-person links are sales roles. First read as free text with suggestions, changed 2026-10-29 to a user-managed list seeded from this export (champion, economic buyer, signer, billing contact and the usual buying committee), see [[standards/product-model]]. Person–Organization link roles stay free text.
 4. Org hierarchy needs reciprocal parent and child views and at least two levels. Cycle checks cost nothing at this size.
 5. Merge must keep aliases of merged ids, in addition to `merged_into`.
 6. Import from HubSpot is a future adapter. Join tables are built by splitting the `* IDs` columns on `;` and using ids, never names.

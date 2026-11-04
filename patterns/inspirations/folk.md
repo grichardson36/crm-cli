@@ -10,7 +10,7 @@ research: partial
 **Research state.** partly researched. See [[inspirations]].
 
 **What we take.**
-- Groups as workflow databases: per-group fields and pipeline views serve many uses from one contact store. [[object-registry]]
+- Groups as workflow databases: per-group fields and pipeline views serve many uses from one contact store. [[standards/product-model]]
 - Provenance such as last enriched is cheap and useful. [[core]]
 - Quiet-contact nudges and an import logged in the timeline. [[core]]
 

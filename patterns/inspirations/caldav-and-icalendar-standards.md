@@ -11,6 +11,6 @@ research: mined
 
 **What we take.**
 - Sync state per calendar: href, etag, sync token. Fall back to full listing on an invalid token. [[core]] [[core]]
-- Import matches by UID. [[idempotent-by-uid]]
+- Import matches by UID. [[standards/integration]]
 
 **Sources.** rfc-editor.org/rfc/rfc6578, rfc5545, icalendar.org CalDAV Scheduling RFC 6638.

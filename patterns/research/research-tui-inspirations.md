@@ -24,7 +24,7 @@ Date 2026-10-26. Trigger: owner asked for study of TUI-first apps beyond Gmail, 
 - Discoverability: `?` shows active mnemonics. User hotkeys (`hotkeys.yaml`) appear in `?` too. The header showing hotkeys was not confirmed (gap).
 - Filter: `/regex`, `/!` inverse, `/-l` label selector, `/-f` fuzzy. The filter is part of the same input that takes commands.
 - Relations: `:xray` shows a resource with its dependents as a tree. How to jump between related resources was not described (gap).
-- Lesson: a command line whose first word is an object kind, followed by scoping words, is our bar with objects first ([[object-registry]]). Modifier keys guard irreversible verbs. Ours are reversible, so bare `d` stays.
+- Lesson: a command line whose first word is an object kind, followed by scoping words, is our bar with objects first ([[standards/product-model]]). Modifier keys guard irreversible verbs. Ours are reversible, so bare `d` stays.
 
 ### T3. yazi (doc)
 - Layout: file manager with parent, current and preview columns (stated from general knowledge, the quick-start page did not describe it, gap). Tabs.

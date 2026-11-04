@@ -3,7 +3,7 @@ type: guide
 ---
 # Core design gates
 
-This pattern language and the program are enforced by these core gates. Violation of these gates across the repository must be flagged with the user and removed. Supporting patterns supply reusable, owner-decided answers when a gate is not specific enough.
+This pattern language and the program are enforced by these core gates. Violation of these gates across the repository must be flagged with the user and removed. Area standards supply reusable, owner-decided answers when a gate is not specific enough.
 
 1. **Requirement:** Does the requirement have a traceable decision and purpose? Can it be deleted? Simplify what survives, shorten its feedback loop, and automate only when stable.
 2. **Relationship loop:** Does it help the user find a person, understand the relationship, capture what changed or complete the next follow-up? If not, get an owner decision.
@@ -14,18 +14,17 @@ This pattern language and the program are enforced by these core gates. Violatio
 7. **Safety and boundaries:** Is the change validated, reversible, archive-safe and sync-safe? Do external inputs and outputs map into the canonical CRM model rather than define it?
 8. **Evidence and escalation:** If a gate does not answer the question, use relevant standards, project research and inspirations. If still unresolved, record the gap and recommendation for the owner. Do not invent a local exception.
 
-## Add a supporting pattern
+## Maintain an area standard
 
-A supporting pattern is a reusable, owner-decided answer to one core gate. Add one only when all are true:
+Use the standard selected by [[domains]] when a core gate needs a reusable, owner-decided answer. A standard owns one software area. It holds only current reusable rules, a small current-shape summary and observable checks.
 
-1. A core gate leaves a stable decision unanswered.
-2. It will guide at least three future features or doors.
-3. It has a default and meaningful exception.
-4. It has an observable check.
+Do not put roadmap rows, branch history, research, command lists, schema dumps or one-screen decisions in a standard. Put feature-specific work in its area worklist; put external evidence in research or inspirations; put owner-blocked questions in [[open-discrepancies]].
 
-Otherwise use a feature record, reference, research note or discrepancy. A supporting pattern links directly to one core gate and cannot create child patterns.
+## Maintain feature work
 
-A supporting pattern contains one current decision. A replacement uses `status: superseded` and a `replaced-by` link to its current note; it contains no history. Commands, schema, migrations, UI keys, test paths and research belong in references or evidence.
+Each area worklist contains only active or partly verified work. An item has one globally unique ID, state, checked-out evidence (`not built` when applicable), governing standard, one bounded next step and priority. Do not restate the standard, research or implementation history. A completed item moves as a concise outcome to [[completed-roadmap]].
+
+If an old ID is duplicated, do not silently reuse or rename it. Record the owner decision in [[open-discrepancies]] before assigning a canonical replacement.
 
 ## Add a core gate
 
@@ -37,7 +36,7 @@ Only an owner decision adds or changes a core gate. Add one only when all are tr
 4. No existing core gate can answer it without becoming unclear.
 5. It can be stated as one short question with a clear pass or fail.
 
-Otherwise use a supporting pattern, feature record, reference, research note or discrepancy.
+Otherwise update an area standard, feature record, reference, research note or discrepancy.
 
 ## Workflow & instructions
 
@@ -64,9 +63,10 @@ Use one checklist under `# Roadmap`, with `next` or `someday` priority. Preserve
 The first missing badge identifies the next gate. A failed gate retains its previous badges. Skip work only when its gate is already satisfied with evidence. Never invent a passing result.
 
 **Improve the process:** When a gate exposes unclear, conflicting, or workaround-dependent guidance, fix the guidance at the lowest sufficient layer before continuing. Record only an owner-blocked question in [[open-discrepancies]].
+
 ### 1. Plan 🧭
 
-**INPUTS:** `core.md`, `index.md`, request or conversation, relevant code, existing patterns and ADRs.
+**INPUTS:** `core.md`, `index.md`, the applicable area standards, request or conversation, relevant code and evidence.
 
 **INSTRUCTIONS:**
 
@@ -77,7 +77,7 @@ The first missing badge identifies the next gate. A failed gate retains its prev
 **WORKFLOW:**
 
 1. Select or capture a roadmap request. Preserve its intent and assign a stable ID.
-2. Inspect relevant code, tests, domain vocabulary, patterns and architectural decisions.
+2. Inspect relevant code, tests, domain vocabulary, area standards and architectural decisions.
 3. Identify applicable rules, boundaries, assumptions and existing test seams. Prefer the highest reliable observable seam.
 4. Load `/grilling` and `/ascii-wireframe` skills.
 5. Challenge ambiguity, contradictions, missing behavior, edge cases and failure conditions through `/grilling`, ATDD/BDD discovery, and wireframing.
@@ -135,7 +135,7 @@ The first missing badge identifies the next gate. A failed gate retains its prev
 
 ### 4. Review 🔍
 
-**INPUTS:** `core.md`, approved scenarios, code diff, tests, evidence and relevant patterns.
+**INPUTS:** `core.md`, approved scenarios, code diff, tests, evidence and applicable area standards.
 
 **INSTRUCTIONS:**
 
@@ -147,7 +147,7 @@ The first missing badge identifies the next gate. A failed gate retains its prev
 
 1. Compare implementation against the original request and approved scenarios.
 2. Check architecture, naming, canonical data, applicable doors, safety, reversibility and sync behavior.
-3. Verify test integrity, evidence and compliance with existing patterns.
+3. Verify test integrity, evidence and compliance with applicable area standards.
 4. Resolve findings. Return failed work to the appropriate earlier gate and invalidate affected badges.
 5. Obtain owner decisions for unresolved deviations or changes to requirements and core gates.
 
@@ -169,10 +169,10 @@ The first missing badge identifies the next gate. A failed gate retains its prev
 1. Update only documentation affected by the implementation.
 2. Confirm the integrated changes pass required checks.
 3. Merge and push to main. Verify the resulting commit.
-4. Deploy a code change to the running program with `deploy/deploy.ps1` ([[references/app/operations|app operations]]). Never build, test, copy or swap `bin/crm.exe` by hand.
+4. Deploy a code change to the running program with `deploy/deploy.ps1` ([[standards/operations|operations]]). Never build, test, copy or swap `bin/crm.exe` by hand.
 5. Add 📚 and mark the task `[x] ✅` only after the implemented result is verified.
 6. Move a concise completion record to [[completed-roadmap]], preserving its ID, outcome, important decisions, exceptions and commit reference.
-7. Make de minimis updates to [[domain-model]], [[architecture]], [[runtime]], [[operations]] or none, as appropriate.
+7. Make de minimis updates to the applicable area standard or none, as appropriate.
 8. Remove the completed task and its working notes from the active roadmap.
 
 **REPORT:** Final implementation reference and archived completion record.
@@ -185,16 +185,16 @@ The first missing badge identifies the next gate. A failed gate retains its prev
 
 ## This app
 
-Current app facts live outside the core gates: [[references/app/domain-model|app domain model]], [[references/app/architecture|app architecture]], [[references/app/runtime|app runtime]] and [[references/app/operations|app operations]].
+Current app facts and reusable decisions live in [[standards/product-model|product model]], [[standards/interface|interface]], [[standards/data|data]], [[standards/integration|integration]], [[standards/system|system]] and [[standards/operations|operations]].
 
 # Roadmap
 
 Items below here are not built.
 
 - ## Next
-	- [ ] Interactive color picker for the Theme pane (today a hex field with a swatch): pick a color on a grid or sliders, keep the hex field as the typed path ([[custom-themes]]).
-	- [ ] Custom themes ([[custom-themes]]): snippets in `~/.crm/themes/snippets`, theme checks in `internal/validate` with contrast warnings (`crm theme check`), a file watcher for live reload, `crm theme export` and `import`, a picker detail pane with a rendered sample.
-	- [ ] Theme generator in the style of the theme-factory skill: `crm theme generate` takes a name, a mood or a few seed colors (accent, background) and writes both variants with roles derived from the seeds, checks contrast (4.5:1 text, 3:1 kinds) and the 16-color mapping, then shows the sample in the picker before saving ([[custom-themes]]).
+	- [ ] Interactive color picker for the Theme pane (today a hex field with a swatch): pick a color on a grid or sliders, keep the hex field as the typed path ([[standards/interface]]).
+	- [ ] Custom themes ([[standards/interface]]): snippets in `~/.crm/themes/snippets`, theme checks in `internal/validate` with contrast warnings (`crm theme check`), a file watcher for live reload, `crm theme export` and `import`, a picker detail pane with a rendered sample.
+	- [ ] Theme generator in the style of the theme-factory skill: `crm theme generate` takes a name, a mood or a few seed colors (accent, background) and writes both variants with roles derived from the seeds, checks contrast (4.5:1 text, 3:1 kinds) and the 16-color mapping, then shows the sample in the picker before saving ([[standards/interface]]).
 	- [ ] Phone number normalization to the E.164 standard. Today `PhoneKey` (`internal/dedupe/normalize.go`) only reduces a number to its last 10 digits for matching, and the stored value stays as typed. Plan: parse with a phone number library using a default region, store the original and the E.164 form, display in national format, match on E.164, and keep the original text for the vCard round trip (see [[research-sync-standard]]).
 	- [ ] Smart linking suggestions (kind of how we want to suggest via enrichment) but these link suggestions come from 1. links you've made (Joey and Hannah Osgood are spouses, Jude Osgood is child of Joey Osgood, so Hannah Osgood may also be parent of Jude Osgood, so Hannah Osgood's link section in her note grayscale-suggests Jude Osgood as a child link) 2. Corroborated from link evidence found via social media networks (Joey lists Hannah as his wife on his profile). Never automatically make a link - suggest it in grayscale and let the user accept or reject the suggestion. We should collect the link suggestions in a place the user can go through them (kind of like Merge view) and further deepen their node graph of relationships. Related connections (orgs, tags, mutual friends, previous related school or work) can help strengthen the suggestion algorithm but should really be left to really strong links typically within family of origin and super close friends. If A is sibling with B and B sibling with C then A is probably sibling with C. We need to think through relationships like that to build a strong semantic model we can convert into code.
 	- [ ] Merge candidates for other object types (Orgs, Tags) to keep the data clean (&=and for instance) all put in the Merge list screen and ctrl+o sortable/filterable/groupable. Base merge screen shows all objects grouped by confidence with object type the user's object type colors. Need to think through merge behavior for these.

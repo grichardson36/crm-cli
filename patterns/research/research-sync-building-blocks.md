@@ -3,7 +3,7 @@ type: research
 ---
 # Sync building blocks: libraries and implementations to adopt or study for the Go + SQLite sync contract
 
-Checked 2026-10-27 with the GitHub API (`gh`), the GitLab API for modernc.org/sqlite, proxy.golang.org, and file reads of repo sources. Feeds [[sync-contract]]. Full engines were already rejected in [[research-sync-engines]]. Wire-format precedents are in [[research-sync-standardization]]. This note covers only parts: clocks, op-log code, SQLite change capture, transport.
+Checked 2026-10-27 with the GitHub API (`gh`), the GitLab API for modernc.org/sqlite, proxy.golang.org, and file reads of repo sources. Feeds [[standards/integration]]. Full engines were already rejected in [[research-sync-engines]]. Wire-format precedents are in [[research-sync-standardization]]. This note covers only parts: clocks, op-log code, SQLite change capture, transport.
 
 Contract recap: field-change records, HLC, per-field LWW, tombstones, version-vector cursor, pull/push over HTTP, relay as a role, Tailscale trust, SQLite adapter first, Go, modernc.org/sqlite, no CGO.
 
@@ -17,7 +17,7 @@ Contract recap: field-change records, HLC, per-field LWW, tombstones, version-ve
   - `glycerine/hlc`: license file says "BSD-style" (GitHub reports NOASSERTION), 1 star, last push 2026-01-24. Packs 48-bit physical plus 16-bit counter into `int64`. https://github.com/glycerine/hlc
   - Others found by search (`alinz/hlc`, `avatar29A/hlc`, `nikosl/go-hlclock`, `shafreeck/hlc`) have no push since 2020 to 2021.
   - `cockroachdb/cockroach` `pkg/util/hlc`: the file header says it is governed by the "CockroachDB Software License" in `/LICENSE`. That is not an OSI license. Skip.
-  - Gap: none of these is a string form that sorts lexicographically, which [[sync-contract]] rule 3 requires. The HLC algorithm is about 40 lines (see `lafikl/hlc` `Now` and `Update`). Writing it ourselves costs less than auditing a one-star dependency.
+  - Gap: none of these is a string form that sorts lexicographically, which [[standards/integration]] rule 3 requires. The HLC algorithm is about 40 lines (see `lafikl/hlc` `Now` and `Update`). Writing it ourselves costs less than auditing a one-star dependency.
 
 ### Actual Budget
 
@@ -35,7 +35,7 @@ Contract recap: field-change records, HLC, per-field LWW, tombstones, version-ve
 - P3. **any-sync is a full protocol stack and not separable.** Go, MIT (LICENSE.md, Copyright 2023 Any Association), 1,748 stars, last commit 2026-10-13, latest tag v0.13.8. https://github.com/anyproto/any-sync
   - Packages: `commonspace` (spaces, `headsync`, `object/tree`, `acl`, `sync`), `net` (peer, pool, `secureservice`, `quicdemotion`, `streampool`), `nodeconf`, `consensus`, `coordinator`, `paymentservice`, `nameservice`, `identityrepo`, `accountservice`.
   - Data model: signed, end-to-end encrypted DAGs per object, with an ACL chain. Its go.mod pulls in `go-libp2p` v0.50.0, `quic-go`, `webtransport-go`, `storj.io/drpc`, and a `modernc.org/sqlite` indirect dependency.
-  - Conflict model is DAG-tree change merging (document-oriented), not per-field LWW. Out-of-scope features in [[sync-contract]] ("Not in v1": encryption, signed authorship, untrusted relays, multi-user) are what it is built around.
+  - Conflict model is DAG-tree change merging (document-oriented), not per-field LWW. Out-of-scope features in [[standards/integration]] ("Not in v1": encryption, signed authorship, untrusted relays, multi-user) are what it is built around.
   - `commonspace/headsync` (`remotediff.go`, `diffsyncer.go`) is the part worth reading: it compares sets of object heads between peers to decide what to pull. Related: `anyproto/any-store`, MIT, 98 stars, pure-Go embedded document DB, last push 2026-10-21 (not read in depth).
   - Verdict: study `headsync` only. Skip as a dependency.
 
@@ -113,7 +113,7 @@ Contract recap: field-change records, HLC, per-field LWW, tombstones, version-ve
 
 **Write ourselves (small, and nothing safe to import)**
 3. HLC: about 40 lines plus a fixed-width string form. Copy Actual's encoding (ISO millis, 4-hex counter, node id) and its algorithm shape, set drift in config, reject far-future timestamps on receive (P1, P2).
-4. `changes` table, trigger set, apply with per-field clock guard, tombstone and review queue, version-vector cursor, snapshot, adapter interface and the shuffled-and-duplicated conformance test ([[sync-contract]] rules 2, 4, 8, 9, 11, 13, 14).
+4. `changes` table, trigger set, apply with per-field clock guard, tombstone and review queue, version-vector cursor, snapshot, adapter interface and the shuffled-and-duplicated conformance test ([[standards/integration]] rules 2, 4, 8, 9, 11, 13, 14).
 
 **Study before coding (read, do not import)**
 5. Actual `packages/crdt` (`timestamp.ts`, `sync.proto`) for HLC string and message shape.
@@ -139,8 +139,8 @@ Net: there is nothing in Go to adopt for the core. The contract's novelty is sma
 
 ## Open questions
 
-- Q1. Which maximum drift: Actual's source says 5 minutes, [[research-sync-standardization]] says 1 minute. Pick one for [[sync-contract]] rule 3.
+- Q1. Which maximum drift: Actual's source says 5 minutes, [[research-sync-standardization]] says 1 minute. Pick one for [[standards/integration]] rule 3.
 - Q2. Capture by triggers (pure SQL, adapter-portable) or by the pre-update hook (Go, less SQL to maintain, driver-specific)? Triggers are recommended here.
-- Q3. Should delete/restore use cr-sqlite's causal length instead of tombstone plus `restore` op? It removes the "delete wins or edit wins" ambiguity for repeated delete/restore cycles but is a different record shape from [[sync-contract]] rule 2.
+- Q3. Should delete/restore use cr-sqlite's causal length instead of tombstone plus `restore` op? It removes the "delete wins or edit wins" ambiguity for repeated delete/restore cycles but is a different record shape from [[standards/integration]] rule 2.
 - Q4. Per-device token or Tailscale identity via `tsnet` for relay auth?
 - Q5. Is fuzzynote's per-device WAL file model (carried by Syncthing or S3) worth keeping as a no-server transport alongside HTTP? See [[research-sync-engines]] E12.

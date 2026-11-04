@@ -3,7 +3,7 @@ type: research
 ---
 # Sync standard: structured-to-flat mapping and round-trip fidelity
 
-Read 2026-10-21 from first-party specs and docs. Feeds [[core]] and open discrepancy X23. Related: [[link-map]]. Not verified: Apple iOS/iCloud behavior (no first-party doc found), Monica and Dex conflict handling (nothing found). Treat those as open and test against a real phone ([[core]]).
+Read 2026-10-21 from first-party specs and docs. Feeds [[core]] and open discrepancy X23. Related: [[standards/product-model]]. Not verified: Apple iOS/iCloud behavior (no first-party doc found), Monica and Dex conflict handling (nothing found). Treat those as open and test against a real phone ([[core]]).
 
 ## Findings
 

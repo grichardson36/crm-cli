@@ -10,8 +10,8 @@ research: partial
 **Research state.** partly researched. See [[inspirations]].
 
 **What we take.**
-- Derive interaction facts automatically, expose them as filterable fields and mark them as computed. [[object-registry]] [[core]]
-- Everything is an object with attributes and relations. [[object-registry]] [[link-registry]]
+- Derive interaction facts automatically, expose them as filterable fields and mark them as computed. [[standards/product-model]] [[core]]
+- Everything is an object with attributes and relations. [[standards/product-model]] [[standards/product-model]]
 
 **What we leave.** Workflow builder and sequences until the core loop is proven.
 

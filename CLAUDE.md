@@ -8,9 +8,9 @@
 
 `patterns/` is an Obsidian vault and the source of truth for design decisions and features. Consult `patterns/index.md` before any design or feature change, then the notes it links.
 
-- Feature rows (IDs such as M27) are in `patterns/features/features-*.md`. There is no FEATURES.md. Update the rows you change in the same session.
+- Feature work is grouped in six area worklists in `patterns/features/`. Read the matching area standard before changing an item.
 - Surface discrepancies and missing standards to the owner with a recommendation. Do not decide alone. The live list is `patterns/records/open-discrepancies.md`.
-- Log each new rule as one atomic note in `patterns/`, linked from `patterns/index.md`.
+- Add a reusable rule only to its area standard. Keep feature work, research and implementation evidence out of standards.
 - Commit messages: `docs:` for vault changes, no co-author lines.
 
 ## Quick Reference

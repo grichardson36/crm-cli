@@ -11,7 +11,7 @@ research: partial
 
 **What we take.**
 - Record layout: identity and actions on the left, overview and timeline in the middle, upcoming work first with search, filters and pinning. [[core]] [[core]]
-- Associations dialog for linking records from either record. [[link-registry]] [[core]]
+- Associations dialog for linking records from either record. [[standards/product-model]] [[core]]
 - Mention a user by typing @ and picking from a dropdown. [[core]]
 - Limits on custom tabs (five) and fixed Activities tab keep records clean. [[core]]
 - Global search groups results by record type. [[core]]

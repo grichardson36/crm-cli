@@ -1,82 +1,34 @@
 ---
 type: index
 ---
-
 # Pattern language for crm
 
-This vault is a small decision system. [[pattern-audit]] records the reduction. [[open-discrepancies]] lists code that breaks governing guidance.
+This vault is a small decision system. [[core]] supplies the gates. [[domains]] routes a change to the standards that govern it. [[open-discrepancies]] records owner-blocked questions and code that breaks a governing rule.
 
-Start with [[core]]. Use this index only to find the relevant supporting pattern, current-state tracker or evidence.
+## Standards
 
-## Process
+- [[standards/product-model|Product model]]
+- [[standards/interface|Interface]]
+- [[standards/data|Data]]
+- [[standards/integration|Integration]]
+- [[standards/system|System]]
+- [[standards/operations|Operations]]
 
-1. Read [[core]] and identify [[domains]]. Apply the core gates in order.
-2. Read the relevant feature area for current state and next work. [[adding-features]] defines its format and completion rules.
-3. After an owner decision, use the criteria in [[core]] to select a supporting pattern, feature record, reference, research note or [[open-discrepancies]].
-4. Never test on a real database. Use a temporary database or a copy.
+## Worklists
 
-## Supporting patterns
+- [[features/product-model|Product model work]]
+- [[features/interface|Interface work]]
+- [[features/data|Data work]]
+- [[features/integration|Integration work]]
+- [[features/system|System work]]
+- [[features/operations|Operations work]]
 
-- [[local-data-boundary]]
-- [[object-registry]]
-- [[link-registry]]
-- [[organization-links-are-authoritative]]
-- [[reversible-records]]
-- [[edge-adapters]]
-- [[accepted-enrichment]]
-- [[navigation-standard]]
-- [[add-standard]]
+## Evidence and records
 
-## Current references
-
-- [[link-map]]
-- [[handoff-2026-11-02]]
-- [[command-bar]]
-- [[input-grammar]]
-- [[keyboard-and-feedback]]
-- [[key-hints-in-one-place]]
-- [[popup-component]]
-- [[web-search-engines]]
-- [[kind-colors-are-chosen]]
-- [[list-editor-standard]]
-- [[custom-themes]] (themes with a dark and a light palette, the mode, the Theme pane, custom theme files)
-- [[sync-contract]]
-- [[references/app/domain-model|app domain model]]
-- [[references/app/architecture|app architecture]]
-- [[references/app/runtime|app runtime]]
-- [[references/app/operations|app operations]]
-
-## Feature areas
-
-- [[adding-features]]
-- [[features-people-and-contact-details]]
-- [[features-organizations]]
-- [[features-deals]]
-- [[features-tasks-and-notes]]
-- [[features-keep-in-touch-and-birthdays]]
-- [[features-tags-groups-and-views]]
-- [[features-tags-module]]
-- [[features-links-and-relations]]
-- [[features-merge-archive-and-undo]]
-- [[features-import-and-export]]
-- [[features-sync-and-dav]]
-- [[features-insights-and-outreach]]
-- [[features-enrichment]]
-- [[features-tui-keys-and-modules]]
-- [[current-tui-keys]]
-- [[features-tui-input-and-syntax]]
-- [[features-platform-and-themes]]
-- [[features-cli-mcp-and-agents]]
-- [[features-validation-and-field-types]]
-- [[features-domain-model]]
-- [[features-data-safety]]
-- [[features-calendar-archived]]
-
-## Evidence
-
+- Research notes in `research/`
 - [[inspirations]]
-- [[research/research-relationship-models|relationship-model research]]
-- [[research/research-tui-building-blocks|TUI research]]
-- [[research/research-sync-standard|sync research]]
 - [[open-discrepancies]]
 - [[completed-roadmap]]
+- [[pattern-audit]]
+
+Never test on a real database. Use a temporary database or a copy.

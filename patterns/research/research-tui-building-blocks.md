@@ -3,7 +3,7 @@ type: research
 ---
 # Research: a standard for fast, repeatable TUI building blocks
 
-Date 2026-10-26. Trigger: owner asked whether a standard exists (or could be made) for terminal UI/UX abstract enough to build TUIs fast, like web components: building blocks, views driven by queries over a database, one keybind set across programs. Companions: [[research-tui-inspirations]], [[research-keybindings]], [[object-registry]], [[core]]. Evidence tags: doc (first-party page read through a summarizing fetch), search (search summary only), code (our repo, read directly), gap (not verified). Key and field lists passed through a summarizing fetch model, so re-read before quoting in a decision.
+Date 2026-10-26. Trigger: owner asked whether a standard exists (or could be made) for terminal UI/UX abstract enough to build TUIs fast, like web components: building blocks, views driven by queries over a database, one keybind set across programs. Companions: [[research-tui-inspirations]], [[research-keybindings]], [[standards/product-model]], [[core]]. Evidence tags: doc (first-party page read through a summarizing fetch), search (search summary only), code (our repo, read directly), gap (not verified). Key and field lists passed through a summarizing fetch model, so re-read before quoting in a decision.
 
 ## Findings
 

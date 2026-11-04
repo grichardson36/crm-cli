@@ -10,6 +10,6 @@ research: bookmarked
 **Research state.** bookmarked, not researched in detail. See [[inspirations]].
 
 **What we take.**
-- Import asks for a destination calendar and treats the file as a snapshot. [[core]] [[idempotent-by-uid]]
+- Import asks for a destination calendar and treats the file as a snapshot. [[core]] [[standards/integration]]
 
 **Sources.** support.microsoft.com import-or-subscribe-to-a-calendar [search]. Official pages failed to load; re-check before building.

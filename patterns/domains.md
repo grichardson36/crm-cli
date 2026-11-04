@@ -3,20 +3,15 @@ type: guide
 ---
 # Domains
 
-`domains` labels where a pattern applies. It helps find guidance. It does not create a new decision layer.
+Domains label the parts of the program a change affects. They select area standards; they do not create another decision layer.
 
-| Domain | Covers |
+| Domain | Read first |
 |---|---|
-| product | User value, scope and workflow |
-| domain-model | Objects, fields, links and product language |
-| application |
+| product, domain-model, application | [[standards/product-model]] |
+| interface | [[standards/interface]] |
+| data | [[standards/data]] |
+| integration | [[standards/integration]] |
+| architecture, runtime | [[standards/system]] |
+| operations | [[standards/operations]] |
 
-Use cases and shared behavior |
-| interface | CLI, TUI, MCP and agent interaction |
-| data | Persistence, identity, lifecycle and validation |
-| integration | Imports, exports, sync and external protocols |
-| architecture | Modules, seams and composition |
-| runtime | Language, libraries, framework and process model |
-| operations | Build, deployment, backup and service operation |
-
-Before designing a feature, identify its domains, then read the matching patterns in [[index]]. A pattern may list one or more domains.
+Most changes apply to more than one domain. Start with [[core]], identify every applicable domain, then read its standards and worklist.

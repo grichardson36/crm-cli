@@ -11,7 +11,7 @@ research: partial
 
 **What we take.**
 - Cheap high-warmth fields Dex lacks: how we met, gift ideas, promises and debts. [[core]]
-- Relationship kinds between people. [[link-registry]]
+- Relationship kinds between people. [[standards/product-model]]
 - Per-contact choice of visible sections. [[core]]
 
 **What we leave.** Journal and life-event breadth beyond the relationship loop.
