@@ -63,6 +63,7 @@ Use one checklist under `# Roadmap`, with `next` or `someday` priority. Preserve
 
 The first missing badge identifies the next gate. A failed gate retains its previous badges. Skip work only when its gate is already satisfied with evidence. Never invent a passing result.
 
+**Improve the process:** When a gate exposes unclear, conflicting, or workaround-dependent guidance, fix the guidance at the lowest sufficient layer before continuing. Record only an owner-blocked question in [[open-discrepancies]].
 ### 1. Plan 🧭
 
 **INPUTS:** `core.md`, `index.md`, request or conversation, relevant code, existing patterns and ADRs.
@@ -160,7 +161,6 @@ The first missing badge identifies the next gate. A failed gate retains its prev
 
 **INSTRUCTIONS:**
 
-- Make de minimis updates to domain-model, architecture, runtime, operations or none, as appropriate.
 - Do not duplicate information already defined elsewhere.
 - The coordinating agent owns final integration, merge and push to main.
 
@@ -172,7 +172,8 @@ The first missing badge identifies the next gate. A failed gate retains its prev
 4. Deploy a code change to the running program with `deploy/deploy.ps1` ([[references/app/operations|app operations]]). Never build, test, copy or swap `bin/crm.exe` by hand.
 5. Add 📚 and mark the task `[x] ✅` only after the implemented result is verified.
 6. Move a concise completion record to [[completed-roadmap]], preserving its ID, outcome, important decisions, exceptions and commit reference.
-7. Remove the completed task and its working notes from the active roadmap.
+7. Make de minimis updates to [[domain-model]], [[architecture]], [[runtime]], [[operations]] or none, as appropriate.
+8. Remove the completed task and its working notes from the active roadmap.
 
 **REPORT:** Final implementation reference and archived completion record.
 
