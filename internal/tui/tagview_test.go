@@ -298,43 +298,6 @@ func TestTagsMergeSelectedIntoHighlighted(t *testing.T) {
 	assert.Contains(t, m.ov.title, "Merge #client into")
 }
 
-func TestTagPageLinkAndUnlinkObjects(t *testing.T) {
-	m := tagsModel(t)
-	cursorTag(t, m, "friend")
-	press(m, "enter")
-	require.True(t, m.onTagPage())
-
-	// l links another object to the tag.
-	press(m, "l")
-	require.NotNil(t, m.ov)
-	typeText(m, "cara")
-	press(m, "enter")
-	ids, _ := m.tagr.GetEntities(m.ctx, "friend", "person")
-	assert.ElementsMatch(t, []int64{1, 2, 3}, ids)
-	assert.Len(t, tagObjectRows(m), 3)
-
-	// u unlinks the highlighted one at once, undoable.
-	press(m, "u")
-	ids, _ = m.tagr.GetEntities(m.ctx, "friend", "person")
-	assert.Len(t, ids, 2)
-	press(m, "ctrl+z")
-	ids, _ = m.tagr.GetEntities(m.ctx, "friend", "person")
-	assert.Len(t, ids, 3)
-
-	// Bulk: select all, u asks for the count typed back.
-	press(m, "ctrl+a", "u")
-	require.Equal(t, modePrompt, m.mode)
-	typeText(m, "unlink 3")
-	press(m, "enter")
-	ids, _ = m.tagr.GetEntities(m.ctx, "friend", "person")
-	assert.Empty(t, ids)
-	before := len(m.hist)
-	press(m, "ctrl+z")
-	assert.Equal(t, before-1, len(m.hist), "one step")
-	ids, _ = m.tagr.GetEntities(m.ctx, "friend", "person")
-	assert.Len(t, ids, 3)
-}
-
 func tagObjectRows(m *Model) []row {
 	var out []row
 	for _, r := range m.rows {

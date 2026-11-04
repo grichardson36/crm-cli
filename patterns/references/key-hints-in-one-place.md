@@ -19,7 +19,7 @@ status: decided by owner 2026-10-30
 
 | Key | Word | Where |
 |---|---|---|
-| `d` | delete | everywhere (person with marks, Merge, Sync inbox, tags, the saved view editor, a record row). Only the Archived view reads purge |
+| `d` | delete | everywhere (person with marks, Merge, Sync inbox, tags, a tag page where it takes the tag off, the saved view editor, a record row). Only the Archived view reads purge |
 | `a` / `l` / `u` / `r` | add / link / unlink / restore | all screens |
 | `f` / `s` / `m` | favorite / snooze / merge | people, people, objects that can merge |
 | `enter` in a list | open | every list (People, Organizations, Deals, Tasks, Tags, Notes, Home, Follow-up). Compare in Merge, accept in the Sync inbox, rename on a tag in the bar, because enter does that instead of opening |

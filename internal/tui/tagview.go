@@ -32,12 +32,15 @@ import (
 // onTagPage is true while the list pane shows the objects of one tag.
 func (m *Model) onTagPage() bool { return m.view == viewTags && m.tagPage != "" && m.barKind == "" }
 
+// whenTagPageList is true on an open tag page with the list focused.
+func whenTagPageList(m *Model) bool { return m.onTagPage() && m.focus == focusList }
+
 // whenTagList is true on the list of tags with a tag highlighted (not in the bar, not on a page).
 func whenTagList(m *Model) bool {
 	return m.view == viewTags && m.focus == focusList && !m.onTagPage() && m.barKind == "" && m.cursorTagName() != ""
 }
 
-// whenTagVerb is true wherever a tag verb applies: the list, a tag page and a tag row of the bar.
+// whenTagVerb is true wherever a tag verb applies: the list and a tag row of the bar. Not a tag page.
 func whenTagVerb(m *Model) bool {
 	if m.barTag != "" {
 		return true
@@ -49,7 +52,7 @@ func whenTagVerb(m *Model) bool {
 		return false
 	}
 	if m.onTagPage() {
-		return true
+		return false // a tag page uses the standard Link and Unlink (links.go), a adds and d removes
 	}
 	return m.cursorTagName() != ""
 }
@@ -330,7 +333,7 @@ func (m *Model) tagCountText() string {
 func (m *Model) tagEmptyText() string {
 	switch {
 	case m.onTagPage():
-		return "No object carries #" + m.tagPage + ". l gives it to one, esc goes back."
+		return "No object carries #" + m.tagPage + ". a adds one, esc goes back."
 	case m.tagQuery != "":
 		return "No tags match. esc clears the search."
 	case m.tagFilter == "unused":
@@ -357,7 +360,7 @@ func (m *Model) buildTagForm(r row) []formRow {
 		if r.sub != "" {
 			rows = append(rows, infoRow("detail", r.sub))
 		}
-		rows = append(rows, infoRow("open", "enter opens it, u takes the tag off"))
+		rows = append(rows, infoRow("open", "enter opens it, d takes the tag off"))
 		return rows
 	}
 	if r.tagID == 0 {
@@ -523,13 +526,22 @@ func tagViewActions() []action {
 			when: func(m *Model) bool { return m.barTag != "" || whenTagList(m) },
 			run:  func(m *Model) tea.Cmd { return m.deleteTagsVerb() }},
 		{id: "tag-link", title: "Give tag to an object", group: "Tags", hint: "l", keys: []string{"l"}, tagVerb: true, write: true,
-			desc: "pick an object of any kind to give the tag (or every selected tag). On a tag page this links another object to the page's tag. Undoable",
+			desc: "pick an object of any kind to give the tag (or every selected tag). On a tag page l is the standard Link of the marked or highlighted objects. Undoable",
 			foot: 60, footIn: inList, footLabel: hwLink, footIf: func(m *Model) bool { return m.view == viewTags },
 			when: whenTagVerb, run: func(m *Model) tea.Cmd { return m.tagLinkVerb() }},
 		{id: "tag-unlink", title: "Take tag off an object", group: "Tags", hint: "u", keys: []string{"u"}, tagVerb: true, write: true,
-			desc: "on a tag page take the tag off the highlighted or selected objects, elsewhere pick an object that has it. Undoable",
+			desc: "pick an object that has the tag (or every selected tag) and take it off. On a tag page u is the standard Unlink of the marked or highlighted objects. Undoable",
 			foot: 61, footIn: inList, footLabel: hwUnlink, footIf: func(m *Model) bool { return m.view == viewTags },
 			when: whenTagVerb, run: func(m *Model) tea.Cmd { return m.tagUnlinkVerb() }},
+		{id: "tag-page-add", title: "Add to this tag", group: "Tags", hint: "a", keys: []string{"a"}, write: true,
+			desc: "on a tag page pick an existing object of any kind and give it the page's tag. Undoable",
+			foot: footAdd, footIn: inList, footLabel: hwAdd, footIf: func(m *Model) bool { return m.onTagPage() },
+			when: whenTagPageList, run: func(m *Model) tea.Cmd { return m.tagPageAddVerb() }},
+		{id: "tag-page-remove", title: "Remove from this tag", group: "Tags", hint: "d", keys: []string{"d"}, write: true,
+			desc: "on a tag page take the page's tag off the highlighted or selected objects. The objects stay (nothing is deleted or archived). Several ask for the count typed back. One undo step",
+			foot: 46, footIn: inList, footLabel: hwDelete, footIf: func(m *Model) bool { return m.onTagPage() },
+			when: func(m *Model) bool { return whenTagPageList(m) && len(m.bulkRefs()) > 0 },
+			run:  func(m *Model) tea.Cmd { return m.tagPageRemoveVerb() }},
 		{id: "tag-merge-duplicates", title: "Tags: merge case duplicates", group: "Tags", write: true,
 			desc: "merge every group of tags that differ only by case or separators into its most used spelling, for the groups in the list (filter: possible case duplicates). The count is typed back. One undo step. Same as crm tag duplicates --apply",
 			when: func(m *Model) bool { return m.view == viewTags && !m.onTagPage() && m.barKind == "" },
@@ -743,18 +755,26 @@ func (m *Model) objectItems() []overlayItem {
 	return out
 }
 
-// tagLinkVerb is l: pick an object to give the tag (the page's tag, or every selected tag) to.
-func (m *Model) tagLinkVerb() tea.Cmd {
-	tags := m.bulkTagNames()
-	if m.onTagPage() {
-		tags = []string{m.tagPage}
-	}
+// tagLinkVerb is l on the Tags list: pick an object to give the selected tags to.
+func (m *Model) tagLinkVerb() tea.Cmd { return m.pickObjectForTags(m.bulkTagNames(), "Give") }
+
+// tagPageAddVerb is a on a tag page: pick an object of any kind and give it the page's tag.
+func (m *Model) tagPageAddVerb() tea.Cmd {
+	return m.pickObjectForTags([]string{m.tagPage}, "Add to")
+}
+
+// pickObjectForTags opens the object picker and gives the tags to the object picked. verb "Give" reads
+// "Give #x to", "Add to" reads "Add to #x".
+func (m *Model) pickObjectForTags(tags []string, verb string) tea.Cmd {
 	if len(tags) == 0 {
 		return nil
 	}
 	title := "Give #" + tags[0] + " to"
 	if len(tags) > 1 {
 		title = fmt.Sprintf("Give %d tags to", len(tags))
+	}
+	if verb == "Add to" {
+		title = "Add to #" + tags[0]
 	}
 	items := m.objectItems()
 	if len(items) == 0 {
@@ -787,23 +807,11 @@ func prefixAll(p string, in []string) []string {
 	return out
 }
 
-// tagUnlinkVerb is u. On a tag page it takes the page's tag off the highlighted or selected objects. On a
-// list or a bar row it lists the objects that carry the tag(s) and takes the tags off the one picked.
+// tagUnlinkVerb is u on the Tags list or a bar row: list the objects that carry the tag(s) and take the
+// tags off the one picked.
 func (m *Model) tagUnlinkVerb() tea.Cmd {
 	if m.focus == focusDetail && whenLinkedRow(m) {
 		m.askUnlinkRow(m.form[m.fcur])
-		return nil
-	}
-	if m.onTagPage() {
-		refs := m.bulkRefs()
-		switch len(refs) {
-		case 0:
-			return nil
-		case 1:
-			m.unlinkFromPage(refs)
-		default:
-			return m.askTyped(fmt.Sprintf("take #%s off %d objects", m.tagPage, len(refs)), bulkWord("unlink", len(refs)), func() { m.unlinkFromPage(refs) })
-		}
 		return nil
 	}
 	tags := m.bulkTagNames()
@@ -849,8 +857,41 @@ func (m *Model) tagUnlinkVerb() tea.Cmd {
 	return nil
 }
 
-// unlinkFromPage takes the open page's tag off objects as one undo step.
-func (m *Model) unlinkFromPage(refs []repo.Ref) {
+// tagPageRemoveVerb is d on a tag page: take the page's tag off the highlighted or marked objects. The
+// objects are never deleted or archived. With "include children" on, an object that carries the tag only
+// through a child tag is skipped, because the page's tag is not on it.
+func (m *Model) tagPageRemoveVerb() tea.Cmd {
+	var refs []repo.Ref
+	skipped := 0
+	for _, r := range m.bulkRefs() {
+		if m.hasTag(m.ctx, r.Kind, r.ID, m.tagPage) {
+			refs = append(refs, r)
+		} else {
+			skipped++
+		}
+	}
+	switch {
+	case len(refs) == 0 && skipped > 0:
+		m.setStatus(fmt.Sprintf("#%s is not on %s itself, they carry a child tag", m.tagPage, nounsOf(skipped)), true)
+		return nil
+	case len(refs) == 0:
+		return nil
+	case len(refs) == 1:
+		m.removeFromPage(refs, skipped)
+		return nil
+	}
+	return m.askTyped(fmt.Sprintf("remove #%s from %d objects", m.tagPage, len(refs)), bulkWord("remove", len(refs)), func() { m.removeFromPage(refs, skipped) })
+}
+
+func nounsOf(n int) string {
+	if n == 1 {
+		return "1 object"
+	}
+	return fmt.Sprintf("%d objects", n)
+}
+
+// removeFromPage takes the open page's tag off objects as one undo step.
+func (m *Model) removeFromPage(refs []repo.Ref, skipped int) {
 	tag := m.tagPage
 	m.beginGroup()
 	for _, r := range refs {
@@ -861,15 +902,15 @@ func (m *Model) unlinkFromPage(refs []repo.Ref) {
 			return
 		}
 	}
-	label := fmt.Sprintf("take #%s off %d objects", tag, len(refs))
-	if len(refs) == 1 {
-		label = "take #" + tag + " off " + m.refName(refs[0])
-	}
-	m.endGroup(label)
+	m.endGroup(fmt.Sprintf("remove #%s from %d", tag, len(refs)))
 	m.marked = map[int64]bool{}
 	m.afterWrite()
-	m.setStatus(label+" (ctrl+z undoes)", false)
-	m.pendingCmd = m.showToast(label+" · ctrl+z undoes", false)
+	msg := fmt.Sprintf("removed #%s from %d (ctrl+z undoes)", tag, len(refs))
+	if skipped > 0 {
+		msg = fmt.Sprintf("removed #%s from %d, skipped %d that carry it through a child tag (ctrl+z undoes)", tag, len(refs), skipped)
+	}
+	m.setStatus(msg, false)
+	m.pendingCmd = m.showToast(msg, false)
 }
 
 // mergeDuplicatesVerb is the palette action Tags: merge case duplicates. It acts on the groups that have a
