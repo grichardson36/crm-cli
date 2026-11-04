@@ -208,6 +208,8 @@ Items below here are not built.
 		- [ ] Customizable - user can see what modules they'd like
 	- [ ] Locations as a view w/ standard sort/filter/group - research Dex implementation
 	- [ ] Speed up the TUI test suite: 637 tests average 0.46s each with no slow outliers, so look at the per-test setup in `newTestModel` (a seeded database copied per test instead of migrated per test).
+	- [ ] Show an `N marked` count in the status line for Orgs, Deals, Tasks and Tags lists (today only People show it; `esc unmark` is the only cue there).
+	- [ ] Route the Settings list editor (`listeditor.go`) through the key registry so a rebound `d`, `a` or `e` reaches it (today it has its own key handling).
 - ## Someday / maybe
 	- [ ] Node graph view of object nodes and their link edges like [[obsidian]]
 	- [ ] Deep enrichment capabilities - sync to LinkedIn, Facebook, email servers (Gmail, etc), Beeper/messaging apps, phone call history
