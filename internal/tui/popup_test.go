@@ -39,7 +39,7 @@ func TestPopupIsCenteredWithHintsInsideTheBox(t *testing.T) {
 	// The bottom row of the box holds the hints, between the borders.
 	hint := -1
 	for i, l := range lines {
-		if strings.Contains(l, "esc close") {
+		if strings.Contains(l, "esc cancel") {
 			hint = i
 		}
 	}
@@ -100,7 +100,7 @@ func TestPopupFitsSmallTerminals(t *testing.T) {
 		assert.LessOrEqual(t, box.w, size[0]-0)
 		assert.GreaterOrEqual(t, box.x, 0)
 		assert.GreaterOrEqual(t, box.y, 0)
-		assert.Contains(t, out, "esc close", "the hints stay in the box at %v", size)
+		assert.Contains(t, out, "esc cancel", "the hints stay in the box at %v", size)
 	}
 }
 

@@ -76,31 +76,35 @@ func (m *Model) showViews(focusID string) tea.Cmd { return m.showOverlay(m.newVi
 // edits, deletes and restores saved views.
 func (m *Model) viewsHints(o *overlay, pane bool) []hintItem {
 	it, ok := o.highlighted()
+	escWord := hwClose // the Views popup only browses
+	if pane {
+		escWord = hwBack
+	}
 	if !ok {
-		return []hintItem{fk("esc", "close")}
+		return []hintItem{fk("esc", escWord)}
 	}
 	typed := o.filter.Value() != ""
-	h := []hintItem{fk("up/down", "select")}
+	h := []hintItem{fk("up/down", hwSelect)}
 	dead := false
 	if uuid, saved := strings.CutPrefix(it.value, savedPrefix); saved {
 		_, live := m.savedByUUID(uuid)
 		dead = !live
 		switch {
 		case dead && pane && !m.readOnly:
-			h = append(h, fk("r", "restore"))
+			h = append(h, fk("r", hwRestore))
 		case dead:
 		case pane && !m.readOnly:
-			h = append(h, fk("enter", "open"), fk("e", "edit"), fk("d", "delete"))
+			h = append(h, fk("enter", hwOpen), fk("e", hwEdit), fk("d", hwDelete))
 		default:
-			h = append(h, fk("enter", "open"))
+			h = append(h, fk("enter", hwOpen))
 		}
 	} else {
-		h = append(h, fk("enter", "open"))
+		h = append(h, fk("enter", hwOpen))
 	}
 	if !typed && !dead {
-		h = append(h, fk("shift+up/down", "move"))
+		h = append(h, fk("shift+up/down", hwMove))
 	}
-	return append(h, fk("shift+r", "reset"), fk("esc", "close"))
+	return append(h, fk("shift+r", hwReset), fk("esc", escWord))
 }
 
 // newViewsList is the Views popup list as an overlay that is not shown yet.

@@ -90,7 +90,7 @@ func verbActions() []action {
 	return []action{
 		{id: "activate", title: "Activate", group: "Verbs", hint: "enter", keys: []string{"enter", "e"}, verbAll: true,
 			desc:  "open the highlighted thing further, or edit the field under the cursor (rename is just this)",
-			write: false, foot: 10, footIn: inBoth, footLabel: "open",
+			write: false, foot: 10, footIn: inBoth, footLabel: hwOpen,
 			writeFor: func(m *Model) bool {
 				a := m.firstApplying(activateTargets)
 				return a != nil && a.write
@@ -98,33 +98,31 @@ func verbActions() []action {
 			footDyn: func(m *Model) string {
 				switch {
 				case m.barTag != "":
-					return "rename"
+					return hwRename
 				case m.focus == focusDetail:
-					return "edit"
+					return hwEdit
 				case m.view == viewMerge:
-					return "compare"
-				case m.view == viewTasks, m.view == viewOrgs, m.view == viewDeals:
-					return "edit"
+					return hwCompare
 				case m.view == viewSync:
-					return "accept"
+					return hwAccept
 				}
-				return "open"
+				return hwOpen
 			},
 			when: func(m *Model) bool { return m.whenActivate() },
 			run:  func(m *Model) tea.Cmd { return m.runActivate() }},
 		{id: "mark-state", title: "Mark", group: "Verbs", hint: "x", keys: []string{"x"}, verbAll: true,
 			desc:  "mark the highlighted thing with the one meaning its type has: a task is done (again to reopen it), a person is contacted now. Marked rows (space) all get it",
-			write: true, foot: 30, footIn: inBoth, footLabel: "mark",
+			write: true, foot: 30, footIn: inBoth, footLabel: hwMark,
 			footDyn: func(m *Model) string {
 				if m.taskTarget() != 0 {
-					return "done"
+					return hwDone
 				}
-				return "contacted"
+				return hwContacted
 			},
 			when: whenMarkState, run: func(m *Model) tea.Cmd { return m.runMarkState() }},
 		{id: "merge", title: "Merge", group: "Verbs", hint: "m", keys: []string{"m"},
 			desc:  "merge the space-selected rows (people, organizations) or the highlighted duplicate group (opens the compare). m on a tag row moves it into another tag",
-			write: true, foot: 34, footIn: inList, footLabel: "merge",
+			write: true, foot: 34, footIn: inList, footLabel: hwMerge,
 			footIf: func(m *Model) bool {
 				return len(m.markedIDs()) >= 2 || len(m.markedOrgIDs()) >= 2 || whenMergeRows(m) || whenTagList(m)
 			},

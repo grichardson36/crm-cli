@@ -695,18 +695,18 @@ func (m *Model) renderColorRow(r formRow, selected bool, w int) string {
 func appearanceActions() []action {
 	return []action{
 		{id: "theme-load", title: "Load theme", group: "Edit pane", hint: "enter", keys: []string{"enter"}, desc: "in Settings, Theme: choose the theme under the cursor and save it on this device",
-			write: true, foot: 10, footIn: inDetail, footLabel: "load", when: whenThemeBrowse, run: func(m *Model) tea.Cmd { return m.themeLoad() }},
+			write: true, foot: 10, footIn: inDetail, footLabel: hwLoad, when: whenThemeBrowse, run: func(m *Model) tea.Cmd { return m.themeLoad() }},
 		{id: "theme-edit", title: "Edit theme", group: "Edit pane", hint: "e", keys: []string{"e"}, desc: "in Settings, Theme: move into the name and colors of a custom theme",
-			write: true, foot: 11, footIn: inDetail, footLabel: "edit", when: whenThemeCustom, run: func(m *Model) tea.Cmd { return m.themeEdit() }},
+			write: true, foot: 11, footIn: inDetail, footLabel: hwEdit, when: whenThemeCustom, run: func(m *Model) tea.Cmd { return m.themeEdit() }},
 		{id: "theme-add", title: "Add theme", group: "Edit pane", hint: "a", keys: []string{"a"}, desc: "in Settings, Theme: add a theme with the default colors, named New theme",
-			write: true, foot: 12, footIn: inDetail, footLabel: "add", when: whenThemeCustom, run: func(m *Model) tea.Cmd { return m.themeAdd() }},
+			write: true, foot: 12, footIn: inDetail, footLabel: hwAdd, when: whenThemeCustom, run: func(m *Model) tea.Cmd { return m.themeAdd() }},
 		{id: "theme-copy", title: "Copy theme", group: "Edit pane", hint: "c", keys: []string{"c"}, desc: "in Settings, Theme: copy the theme under the cursor as a custom theme",
-			write: true, foot: 13, footIn: inDetail, footLabel: "copy", when: whenThemeBrowse, run: func(m *Model) tea.Cmd { return m.themeCopy() }},
+			write: true, foot: 13, footIn: inDetail, footLabel: hwCopy, when: whenThemeBrowse, run: func(m *Model) tea.Cmd { return m.themeCopy() }},
 		{id: "theme-delete", title: "Delete theme", group: "Edit pane", hint: "d", keys: []string{"d"}, desc: "in Settings, Theme: delete a custom theme (asks first)",
-			write: true, foot: 14, footIn: inDetail, footLabel: "delete", when: whenThemeCustom, run: func(m *Model) tea.Cmd { return m.themeDelete() }},
+			write: true, foot: 14, footIn: inDetail, footLabel: hwDelete, when: whenThemeCustom, run: func(m *Model) tea.Cmd { return m.themeDelete() }},
 		{id: "theme-reset", title: "Reset theme colors", group: "Edit pane", hint: "shift+r", keys: []string{"R"}, desc: "in Settings, Theme: put the colors of a custom theme back to the theme it was copied from (asks first)",
-			write: true, foot: 16, footIn: inDetail, footLabel: "reset", when: whenThemeReset, run: func(m *Model) tea.Cmd { return m.themeReset() }},
+			write: true, foot: 16, footIn: inDetail, footLabel: hwReset, when: whenThemeReset, run: func(m *Model) tea.Cmd { return m.themeReset() }},
 		{id: "theme-mode", title: "Next mode", group: "Edit pane", hint: "tab", keys: []string{"tab"}, desc: "in Settings, Theme: next mode (auto, light, dark), saved on this device",
-			write: true, foot: 17, footIn: inDetail, footLabel: "mode", when: whenThemePane, run: func(m *Model) tea.Cmd { return m.themeNextMode() }},
+			write: true, foot: 17, footIn: inDetail, footLabel: hwMode, when: whenThemePane, run: func(m *Model) tea.Cmd { return m.themeNextMode() }},
 	}
 }
