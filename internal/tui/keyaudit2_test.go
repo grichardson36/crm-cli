@@ -17,11 +17,11 @@ import (
 // "delete" on a person, an organization and a task is one meaning and not three.
 func auditFamily(id string) string {
 	switch id {
-	case "archive", "delete", "org-delete", "deal-delete", "task-delete", "tags-delete", "dismiss", "cmp-dismiss", "purge", "inbox-ignore":
+	case "archive", "delete", "org-delete", "deal-delete", "task-delete", "tags-delete", "tag-page-remove", "dismiss", "cmp-dismiss", "purge", "inbox-ignore":
 		return "delete"
 	case "activate", "edit", "home-open", "compare", "person-edit", "org-edit", "deal-edit", "task-edit", "inbox-accept", "tag-open", "tag-rename", "cmp-confirm":
 		return "activate"
-	case "add-any", "new", "org-add", "deal-add", "task", "note", "note-object", "add":
+	case "add-any", "tag-page-add", "new", "org-add", "deal-add", "task", "note", "note-object", "add":
 		return "add"
 	case "restore", "org-restore", "deal-restore", "task-restore":
 		return "restore"

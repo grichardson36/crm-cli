@@ -227,7 +227,7 @@ var frameworkIDs = map[string]bool{
 	"add-any": true, "add": true, "activate": true, "mark-state": true, "merge": true, "favorite": true,
 	"archive": true, "org-delete": true, "deal-delete": true, "task-delete": true, "delete": true, "dismiss": true,
 	"purge": true, "copy": true, "inbox-ignore": true, "tags-delete": true, "tag-back": true, "cmp-dismiss": true, "tag-merge": true, "cmp-apply": true,
-	"restore": true, "link": true, "unlink": true, "tag-link": true, "tag-unlink": true,
+	"restore": true, "tag-page-add": true, "tag-page-remove": true, "link": true, "unlink": true, "tag-link": true, "tag-unlink": true,
 	"mark": true, "unmark": true, "select-all": true, "extend-down": true, "extend-up": true,
 	"undo": true, "redo": true, "undo-history": true, "redo-history": true, "reload": true,
 	// navigation
@@ -260,7 +260,7 @@ var scopeByID = map[string]string{
 	"sync-now": "type:inbox", "sync-dry": "type:inbox", "inbox-accept": "type:inbox", "inbox-attach": "type:inbox", "inbox-ignore": "type:inbox",
 	// Tags in the bar
 	"tags-delete": "type:tag", "tag-link": "type:tag", "tag-unlink": "type:tag", "tag-rename": "type:tag", "tag-merge": "type:tag",
-	"tag-open": "type:tag", "tag-back": "type:tag", "tag-merge-marked": "type:tag",
+	"tag-page-add": "view:tags", "tag-page-remove": "view:tags", "tag-open": "type:tag", "tag-back": "type:tag", "tag-merge-marked": "type:tag",
 	// The tree layout of the Tags view: right and left win over focus-detail in this view only
 	"tag-tree-expand": "view:tags", "tag-tree-collapse": "view:tags",
 	// The detail form

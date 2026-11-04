@@ -17,9 +17,9 @@ MCP: `crm_tag_unused`, `crm_tag_duplicates` (`apply`).
 
 The module is after Deals (key `7` with every module on, or the palette entry Tags view). It has no tag-specific key, the universal verbs act on the selected tags.
 
-- `enter` opens the tag page: the objects that carry the tag, grouped by kind. `enter` on one opens it, `esc` goes back.
+- `enter` opens the tag page: the objects that carry the tag, grouped by kind. `enter` on one opens it, `esc` goes back. On a page `a` adds an existing object to the tag, `d` takes the tag off the highlighted or selected objects (the objects stay, several ask for the count typed back), and `l` and `u` are the standard link and unlink of those objects (pick Tag to give or take another tag). With children included, `d` skips an object that carries only a child tag.
 - `tab`, then `enter` or `e` on the name renames it everywhere. A name another tag has asks once to merge into it.
-- `d` deletes, `m` merges the selected tags into the highlighted one, `l` gives the tag to an object, `u` takes it off. Several at once ask for the count typed back, and one `ctrl+z` undoes the whole step.
+- `d` deletes, `m` merges the selected tags into the highlighted one, `l` gives the selected tags to an object, `u` takes them off an object. Several at once ask for the count typed back, and one `ctrl+z` undoes the whole step.
 - `ctrl+o` sorts (name, number of objects) and filters (tags in use, unused, possible case duplicates). `/` finds a tag.
 - Palette: Tags: merge case duplicates, Tags: delete unused tags, Tags: nest under..., Tags: unnest.
 - `ctrl+o` Layout switches to a tree, remembered on this device. `right` opens a node or goes to its first child, `left` closes it or goes to the parent, `ctrl+up` and `ctrl+down` jump between siblings. Each node shows its objects and, in brackets, those with its children.

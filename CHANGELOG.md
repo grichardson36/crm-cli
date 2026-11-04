@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Tag page uses the standard verbs (CRM-027, owner decision 2026-11-04). On a tag page `l` and `u` link and unlink the marked or highlighted objects like in every list (the relation picker, Tag included), `a` adds an existing object to the tag and `d` takes the tag off the objects without deleting them. The Tags list keeps `l` and `u` for giving and taking tags.
 - The list editors live only in the right pane of their Settings rows (owner request 2026-11-03). Deal stages, Deal roles, Notes (note types), Links (relation kinds) and Ignored company texts open in the pane (`enter` on the row enters it, `esc` leaves it). The palette entries Edit deal stages, Edit deal roles, Edit note types, Edit relation kinds and Ignored company texts are gone, and so is the full screen editor. Columns: name, the cell (outcome, mark contacted, inverse) and used by (a count queried from the records). `tab` cycles the outcome of a stage or toggles mark contacted of a note type (the word replaces counts as contact). Links shows People and Organizations, a name equal to its inverse is mutual. `shift+r` resets to the built-in items after a confirm that lists the changes, one undo step, nothing is removed. The footer shows a key only when it works on the highlighted row.
 
 ### Added

@@ -35,6 +35,12 @@ func relationLabel(kind string) string {
 // cursorObject is the object Link and Unlink act on: a task row in the detail form or the Tasks
 // view, an organization or deal in their views, otherwise the person under the cursor.
 func (m *Model) cursorObject() (repo.Ref, bool) {
+	if m.onTagPage() && m.barTag == "" { // a tag page lists objects of every kind: the row carries kind and id
+		if r, ok := m.selected(); ok {
+			return m.tagRowRef(r)
+		}
+		return repo.Ref{}, false
+	}
 	for _, o := range objectDefs() {
 		if o.kind == "person" || o.kind == model.SavedViewKind {
 			continue
@@ -72,6 +78,14 @@ func whenLinkable(other string) func(m *Model) bool {
 	}
 }
 
+// whenUnlinkHint shows the unlink hint on a linked row of the detail pane and on a tag page.
+func whenUnlinkHint(m *Model) bool {
+	if m.focus == focusList {
+		return m.onTagPage() && m.barTag == ""
+	}
+	return whenLinkedRow(m)
+}
+
 func whenAnyObject(m *Model) bool { _, ok := m.cursorObject(); return ok }
 
 // linkActions generates Link and Unlink, and "Link <other>" and "Unlink <other>" for every kind
@@ -84,7 +98,7 @@ func linkActions() []action {
 			run: func(m *Model) tea.Cmd { return m.startLinkVerb(false) }},
 		{id: "unlink", title: "Unlink", group: "Link", hint: "u", keys: []string{"u"},
 			desc:  "remove a link of the selected object (or a tag). Undoable",
-			write: true, foot: footUnlink, footIn: inDetail, footCtx: true, footIf: whenLinkedRow, when: whenAnyObject,
+			write: true, foot: footUnlink, footIn: inBoth, footCtx: true, footIf: whenUnlinkHint, when: whenAnyObject,
 			run: func(m *Model) tea.Cmd {
 				if m.focus == focusDetail && whenLinkedRow(m) { // u on a linked row removes that chip
 					m.askUnlinkRow(m.form[m.fcur])

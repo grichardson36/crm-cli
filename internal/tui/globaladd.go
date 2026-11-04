@@ -44,7 +44,7 @@ func globalAddActions() []action {
 	return []action{
 		{id: "add-any", title: "Add", group: "Verbs", hint: "a", keys: []string{"a"}, write: true,
 			desc: "add an object: a picker of kinds with this view's own kind preselected or type a letter to jump to a kind. A highlighted object is the first suggestion of the matching link segment of the pipe line",
-			foot: footAdd, footIn: inList, footLabel: hwAdd,
+			foot: footAdd, footIn: inList, footLabel: hwAdd, footIf: func(m *Model) bool { return !m.onTagPage() },
 			keyIf: func(m *Model) bool { return m.focus != focusDetail }, // in the detail pane a adds a row (the form's own add)
 			run:   func(m *Model) tea.Cmd { return m.openGlobalAdd(nil) }},
 	}
