@@ -441,13 +441,12 @@ func (m *Model) captureView() (kind string, q query.Query, ok bool) {
 	if !ok || m.view == viewNotes {
 		return "", q, false
 	}
-	switch m.view {
-	case viewPeople, viewOrgs:
-		if m.sortOf(m.view) == "recent" {
-			q.Sort = []query.Sort{{Field: "updated", Dir: "desc"}}
-		} else {
-			q.Sort = []query.Sort{{Field: "name"}}
+	if field := svSortField(m.view, m.sortOf(m.view)); field != "" {
+		s := query.Sort{Field: field}
+		if m.orderOf(m.view) == "desc" {
+			s.Dir = "desc"
 		}
+		q.Sort = []query.Sort{s}
 	}
 	if m.view == viewPeople {
 		q.Filter, q.Search = m.searchToQuery(m.query)
@@ -455,6 +454,33 @@ func (m *Model) captureView() (kind string, q query.Query, ok bool) {
 		q.Search = strings.TrimSpace(m.query)
 	}
 	return kind, q, true
+}
+
+// svSortField is the query field that a list's sort (viewOptionsFor) stands for, "" when there is none.
+func svSortField(v viewKind, sort string) string {
+	switch v {
+	case viewPeople, viewOrgs:
+		if sort == "recent" {
+			return "updated"
+		}
+		return "name"
+	case viewDeals:
+		if sort == "recent" {
+			return "created"
+		}
+		return "title"
+	case viewTasks:
+		if sort == "due" {
+			return "due"
+		}
+		return "title"
+	case viewTags:
+		if sort == "count" {
+			return "used"
+		}
+		return "name"
+	}
+	return ""
 }
 
 // searchToQuery turns what was typed in the People search into conditions and words: #tag is a tag
