@@ -8,7 +8,6 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/jdanielnd/crm-cli/internal/keys"
 	sg "github.com/jdanielnd/crm-cli/internal/suggest"
 )
 
@@ -487,7 +486,7 @@ func (o *overlay) popupWidth() int {
 func (o *overlay) hintWidth() int {
 	w := 0
 	for _, it := range o.items {
-		w = max(w, ansi.StringWidth(it.hint))
+		w = max(w, ansi.StringWidth(showKey(it.hint)))
 	}
 	if w == 0 {
 		return 0
@@ -593,7 +592,7 @@ func (m *Model) popupListRows(o *overlay, textW, n int) []string {
 			labelW = max(4, min(labelMax+2, textW-hintW-rightW-1))
 		}
 		rightW := max(0, textW-hintW-labelW)
-		keyCol, labelCol := fit(it.hint, hintW), fit(it.label, labelW)
+		keyCol, labelCol := fit(showKey(it.hint), hintW), fit(it.label, labelW)
 		rightCol := fit(right, rightW)
 		if it.selector {
 			rightCol = padLeft(ansi.Truncate(right, rightW, "…"), rightW)
@@ -676,7 +675,7 @@ func (m *Model) helpText() string {
 				var live []string
 				for _, k := range a.keys {
 					if (a.keyIf == nil || a.keyIf(m)) && (a.keyFor == nil || a.keyFor(m, k)) && (m.cmp == nil || a.inCompare) {
-						live = append(live, keys.Display(k))
+						live = append(live, showKey(k))
 					}
 				}
 				if len(live) == 0 {
@@ -721,7 +720,7 @@ func (m *Model) barListView(o *overlay, end, width int) []string {
 	const groupW = 8
 	keyW := 0
 	for _, it := range o.items {
-		keyW = max(keyW, ansi.StringWidth(it.hint))
+		keyW = max(keyW, ansi.StringWidth(showKey(it.hint)))
 	}
 	keyW = min(keyW, 15)
 	if keyW > 0 {
@@ -750,14 +749,14 @@ func (m *Model) barListView(o *overlay, end, width int) []string {
 		}
 		titleW := min(34, max(12, width/2))
 		room := max(0, width-groupW-titleW-keyW)
-		plainLine := fit(tag, groupW) + fit(it.label, titleW) + fit(desc, room) + padLeft(it.hint, keyW)
+		plainLine := fit(tag, groupW) + fit(it.label, titleW) + fit(desc, room) + padLeft(showKey(it.hint), keyW)
 		switch {
 		case i == o.cursor:
 			out = append(out, m.st.Sel.Render(fit(plainLine, width)))
 		case it.disabled != "":
 			out = append(out, m.st.Dim.Render(fit(plainLine, width)))
 		default:
-			out = append(out, m.st.Head.Render(fit(tag, groupW))+m.st.Name.Render(fit(it.label, titleW))+m.st.Dim.Render(fit(desc, room))+m.st.Dim.Render(padLeft(it.hint, keyW)))
+			out = append(out, m.st.Head.Render(fit(tag, groupW))+m.st.Name.Render(fit(it.label, titleW))+m.st.Dim.Render(fit(desc, room))+m.st.Dim.Render(padLeft(showKey(it.hint), keyW)))
 		}
 	}
 	return out

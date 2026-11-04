@@ -252,7 +252,7 @@ func (m *Model) openViewOptions() tea.Cmd {
 // viewOptionsAction is the one ctrl+o action. It is a framework action: every list view has it.
 func viewOptionsAction() action {
 	return action{id: "options", title: "View options", group: "Views", hint: "ctrl+o", keys: []string{"ctrl+o"},
-		desc: "sort, filter and group settings of this view: Sort in People and Organizations, Minimum level in Merge, Type in Archived, Show in Dates. One overlay for every list view, left and right change a value",
+		desc: "sort, filter and group settings of this view: Sort in People and Organizations, Minimum level in Merge, Type in Archived, Show in Dates. One overlay for every list view, " + showKey("left/right") + " change a value",
 		foot: 50, footIn: inList, footLabel: hwOptions, footIf: func(m *Model) bool { return len(m.optionsForView()) > 0 }, when: whenList,
 		run: func(m *Model) tea.Cmd { return m.openViewOptions() }}
 }

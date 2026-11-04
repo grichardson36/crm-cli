@@ -153,7 +153,7 @@ func TestListPane_FooterShowsOnlyKeysThatWorkOnTheRow(t *testing.T) {
 		le := openLE(t, m, "relation-kinds")
 		leTo(t, m, le, "friend")
 		f := hintsText(m)
-		for _, want := range []string{"up/down select", "a add", "shift+up/down move", "shift+r reset", "esc back"} {
+		for _, want := range []string{"↑/↓ select", "a add", "shift+↑/↓ move", "shift+r reset", "esc back"} {
 			assert.True(t, has(f, want), "%q in %q", want, f)
 		}
 		for _, no := range []string{"e rename", "d delete", "tab"} {
@@ -203,7 +203,7 @@ func TestListPane_FooterShowsOnlyKeysThatWorkOnTheRow(t *testing.T) {
 		le := openLE(t, m, "company-ignore")
 		leTo(t, m, le, "retired")
 		f := hintsText(m)
-		assert.False(t, has(f, "shift+up/down") || has(f, "shift+r"), f)
+		assert.False(t, has(f, "shift+↑/↓") || has(f, "shift+r"), f)
 		assert.False(t, has(f, "e rename"), "a built-in text keeps its name: %s", f)
 		assert.True(t, has(f, "d delete"), f)
 		press(m, "d")

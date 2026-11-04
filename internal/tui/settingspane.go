@@ -275,7 +275,7 @@ func (p *colorsPane) hints(m *Model) []hintItem {
 	var h []hintItem
 	ks := m.paneColorKinds()
 	if len(ks) > 1 {
-		h = append(h, fk("up/down", hwSelect))
+		h = append(h, fk(hkUpDown, hwSelect))
 	}
 	if !m.readOnly {
 		h = append(h, fk("e", hwEdit))

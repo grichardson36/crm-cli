@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/jdanielnd/crm-cli/internal/keys"
 	"github.com/jdanielnd/crm-cli/internal/modules"
 )
 
@@ -30,7 +29,7 @@ func (m *Model) viewItems() []overlayItem {
 		if pos := arr.Position(id); pos > 0 {
 			it.hint = modules.Key(pos)
 			if a := m.actionByID(viewActionID(v)); a != nil && len(a.keys) > 0 {
-				it.hint = keys.Display(a.keys[0])
+				it.hint = showKey(a.keys[0])
 			}
 			shown = append(shown, it)
 		} else {
@@ -84,7 +83,7 @@ func (m *Model) viewsHints(o *overlay, pane bool) []hintItem {
 		return []hintItem{fk("esc", escWord)}
 	}
 	typed := o.filter.Value() != ""
-	h := []hintItem{fk("up/down", hwSelect)}
+	h := []hintItem{fk(hkUpDown, hwSelect)}
 	dead := false
 	if uuid, saved := strings.CutPrefix(it.value, savedPrefix); saved {
 		_, live := m.savedByUUID(uuid)
@@ -102,7 +101,7 @@ func (m *Model) viewsHints(o *overlay, pane bool) []hintItem {
 		h = append(h, fk("enter", hwOpen))
 	}
 	if !typed && !dead {
-		h = append(h, fk("shift+up/down", hwMove))
+		h = append(h, fk(hkShiftUpDown, hwMove))
 	}
 	return append(h, fk("shift+r", hwReset), fk("esc", escWord))
 }

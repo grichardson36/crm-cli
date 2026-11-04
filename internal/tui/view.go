@@ -444,8 +444,9 @@ func (m *Model) footerSegs() []footSeg {
 				label = a.footDyn(m)
 			}
 			if a.id == "down" {
-				hint = "↑/↓"
+				hint = hkUpDown
 			}
+			hint = showKey(hint)
 			widths = append(widths, ansi.StringWidth(hint)+1+ansi.StringWidth(label))
 			segs = append(segs, footSeg{hint: hint, label: label, id: a.id})
 		}

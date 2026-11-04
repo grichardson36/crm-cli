@@ -13,7 +13,7 @@ import (
 
 // A key hint is a key name followed by what it does ("enter save", "esc cancel", "ctrl+z undoes").
 // patterns/key-hints-in-one-place: such text may only be on the footer of a screen.
-var keyHintText = regexp.MustCompile(`(^|[^A-Za-z+/])(enter|esc|tab|shift\+tab|ctrl\+[a-z]|alt\+enter|up/down|left/right|home/end|y/n|any key)\s+[a-z]{3,}`)
+var keyHintText = regexp.MustCompile(`(^|[^A-Za-z+/])(enter|esc|tab|shift\+tab|ctrl\+[a-z]|alt\+enter|up/down|left/right|↑/↓|←/→|home/end|y/n|any key)\s+[a-z]{3,}`)
 
 // footerOnly renders the screen and returns the lines above the footer, and the footer.
 func footerOnly(m *Model, footerLines int) (body []string, footer []string) {

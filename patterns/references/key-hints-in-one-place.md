@@ -36,12 +36,26 @@ status: decided by owner 2026-10-30
 
 `esc` never reads save, close list or confirm. Prompts and editors never read confirm or ok. Words that are not verbs (move, find, help, views, options, cell, outside and the screen specifics) are in the same file.
 
+**Key text (CRM-025, owner decision 2026-11-04).** Rule: all key text comes from the key text table. `internal/tui/hintkeys.go` holds the table (`keyTexts`) and the one function every renderer calls, `showKey(name)`. It turns a key name or a key group into the text a person reads. Matching code (`case "up":`, `keys: []string{"left"}`) keeps the plain names. Only drawing changes. A modifier keeps its name and the key after it follows the table, a key outside the table reads as typed, so a rebound key shows what it is rebound to.
+
+| Key name | Text | Note |
+|---|---|---|
+| `up` `down` `left` `right` | `↑` `↓` `←` `→` | the main footer already showed arrows |
+| `up/down` `left/right` | `↑/↓` `←/→` | groups, constants `hkUpDown` and `hkLeftRight` |
+| `shift+up` `ctrl+left` and the like | `shift+↑` `ctrl+←` | `hkShiftUpDown` reads `shift+↑/↓` |
+| `enter` `esc` `tab` `shift+tab` | same | chrome keys keep their names |
+| `" "` | `space` | |
+| `home` `end` `home/end` `pgup` `pgdown` | same | |
+| `ctrl+x` forms and letters | same | |
+
+Hints name arrows with the `hk*` constants (`fk(hkUpDown, hwSelect)`), registry `hint:` fields too (`hint: hkLeft`). The registry `hint` stays a key name, the renderer converts it: footer (`footerSegs`), modes and popups (`keyText` in `hints.go`), the picker key column and the palette (`overlay.go`), the keys page and the Settings Keys pane (`joinKeys`), the command bar verbs, the Views popup, rebind messages, and the key names inside action descriptions. The CLI (`crm keys`, `SwallowedChordWarning`) still prints the config file names. The glyphs are one cell wide, so footer wrapping and mouse hit boxes use the shown text.
+
 **Contextual hints.** `unlink` (a linked row of the detail pane), `favorite` and `snooze` (a person row) show in the footer only while the highlighted row supports them (`footCtx` in the registry, with the same `when` and `footIf` as the key). They come after the existing verbs of their class. The footer is two rows, so when the keys of the view and the app (find, help, views, options) would be cut, `footerSegs` drops contextual hints first, the last one first. `restore` already shows only on the Archived view with rows, where `r` works.
 
-**Check.** `TestHintLabelsAreNeverLiterals` fails when a label is typed into the code instead of using the word table. `TestHintLabelsStayInTheWordTable` checks the footer and the mode tables on many screens against the table and the word each verb key may carry. The scenario tests in `internal/tui/hintwords_test.go` (`TestDReadsDeleteEverywhereExceptArchived`, `TestEnterReadsOpenInEveryObjectList`, `TestEscReadsCancelBackOrClose`, `TestContextualHintsNeverPushTheChromeOffTheFooter` and the rest) cover each key. `TestKeyHintsAreOnlyInTheFooter` renders every screen and mode and fails when a line above the footer reads like a hint (a key name followed by a verb). `TestFooterHintsFollowTheKeymap` rebinds a key and expects the footer to follow. `TestFooterOrderIsVerbsThenNavigationThenSpecifics` checks the order.
+**Check.** `TestKeyTextIsNeverALiteralWord` fails when a hint types an arrow as a word or glyph, or code shows a key through `keys.Display`. `TestKeyTextTable`, `TestNoFooterNamesAnArrowWithAWord`, `TestMainFooterAndModesShowArrowGlyphs`, `TestListEditorSettingsPaneAndHistoryShowArrowGlyphs` and `TestFooterWrapAndHitBoxesCountGlyphWidth` (`internal/tui/hintkeys_test.go`) cover the table, the screens and the hit boxes. `TestHintLabelsAreNeverLiterals` fails when a label is typed into the code instead of using the word table. `TestHintLabelsStayInTheWordTable` checks the footer and the mode tables on many screens against the table and the word each verb key may carry. The scenario tests in `internal/tui/hintwords_test.go` (`TestDReadsDeleteEverywhereExceptArchived`, `TestEnterReadsOpenInEveryObjectList`, `TestEscReadsCancelBackOrClose`, `TestContextualHintsNeverPushTheChromeOffTheFooter` and the rest) cover each key. `TestKeyHintsAreOnlyInTheFooter` renders every screen and mode and fails when a line above the footer reads like a hint (a key name followed by a verb). `TestFooterHintsFollowTheKeymap` rebinds a key and expects the footer to follow. `TestFooterOrderIsVerbsThenNavigationThenSpecifics` checks the order.
 
 **Because.** Owner request 2026-10-30.
 
 **Related.** [[keyboard-and-feedback]], [[keyboard-and-feedback]], [[current-tui-keys]]
 
-**Sources.** `internal/tui/hintwords.go`, `internal/tui/hints.go`, `internal/tui/hints_test.go`, `internal/tui/hintwords_test.go`, `internal/tui/view.go`
+**Sources.** `internal/tui/hintwords.go`, `internal/tui/hintkeys.go`, `internal/tui/hints.go`, `internal/tui/hints_test.go`, `internal/tui/hintwords_test.go`, `internal/tui/view.go`

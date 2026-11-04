@@ -189,10 +189,10 @@ func treeActions(prefix, collection string, when func(m *Model) bool) []action {
 		return when(m) && ok && ((r.kids > 0 && r.open) || m.treeParentExists(r))
 	}
 	return []action{
-		{id: prefix + "-expand", title: "Tree: expand or go to first child", group: "Move", hint: "right", keys: []string{"right"},
+		{id: prefix + "-expand", title: "Tree: expand or go to first child", group: "Move", hint: hkRight, keys: []string{"right"},
 			desc: "in a tree view: open the highlighted node, or when it is open move to its first child. A node without children does nothing here and right moves into the detail pane as in a list",
 			when: hasKids, run: func(m *Model) tea.Cmd { m.treeExpand(collection); return nil }},
-		{id: prefix + "-collapse", title: "Tree: collapse or go to parent", group: "Move", hint: "left", keys: []string{"left"},
+		{id: prefix + "-collapse", title: "Tree: collapse or go to parent", group: "Move", hint: hkLeft, keys: []string{"left"},
 			desc: "in a tree view: close the highlighted node, or when it is closed (or has no children) move to its parent",
 			when: canLeft, run: func(m *Model) tea.Cmd { m.treeCollapse(collection); return nil }},
 		{id: prefix + "-expand-all", title: "Tree: expand all", group: "Views",

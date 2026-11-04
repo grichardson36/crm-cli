@@ -239,7 +239,7 @@ func (m *Model) openHistory(redo bool) tea.Cmd {
 	if redo {
 		word = hwRedo
 	}
-	m.ov.hints = []hintItem{fk("enter", word), fk("esc", hwClose), fk("up/down", hwSelect)}
+	m.ov.hints = []hintItem{fk("enter", word), fk("esc", hwClose), fk(hkUpDown, hwSelect)}
 	return nil
 }
 

@@ -7,7 +7,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/jdanielnd/crm-cli/internal/keys"
 )
 
 // Results act like views (pattern bar-results-act-like-views). In the bar, Tab moves focus from the
@@ -211,7 +210,7 @@ func (m *Model) barVerbs(t barTarget) []barVerb {
 			if label == "" {
 				label = strings.ToLower(a.title)
 			}
-			out = append(out, barVerb{id: a.id, key: keys.Display(k), label: label, write: a.writes(m)})
+			out = append(out, barVerb{id: a.id, key: showKey(k), label: label, write: a.writes(m)})
 			break
 		}
 	}
@@ -298,7 +297,7 @@ func (m *Model) runBarVerb(msg tea.KeyPressMsg) tea.Cmd {
 	if act == nil {
 		m.leaveBarContext(saved)
 		o.ensureCursor(it.id)
-		return m.showToast(fmt.Sprintf("%s has no verb on %s", barTargetName(t, it), keys.Display(key)), true)
+		return m.showToast(fmt.Sprintf("%s has no verb on %s", barTargetName(t, it), showKey(key)), true)
 	}
 	target := barTargetName(t, it)
 	title := act.title

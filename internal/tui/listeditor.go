@@ -1070,13 +1070,13 @@ func (le *listEditor) hints(m *Model) []hintItem {
 	case lpAdd, lpRename, lpCell:
 		return []hintItem{fk("enter", hwSave), fk("esc", hwCancel)}
 	case lpPick:
-		return []hintItem{fk("enter", hwPick), fk("esc", hwCancel), fk("up/down", hwChoose)}
+		return []hintItem{fk("enter", hwPick), fk("esc", hwCancel), fk(hkUpDown, hwChoose)}
 	case lpConfirm:
 		return []hintItem{fk("y", hwYes), fk("n", hwNo)}
 	}
 	var h []hintItem
 	if len(le.items) > 1 {
-		h = append(h, fk("up/down", hwSelect))
+		h = append(h, fk(hkUpDown, hwSelect))
 	}
 	it, onItem := le.cur()
 	if !m.readOnly {
@@ -1098,7 +1098,7 @@ func (le *listEditor) hints(m *Model) []hintItem {
 				h = append(h, fk("d", hwDelete))
 			}
 			if le.movable(it) {
-				h = append(h, fk("shift+up/down", hwMove))
+				h = append(h, fk(hkShiftUpDown, hwMove))
 			}
 		}
 		if le.d.defaults != nil {

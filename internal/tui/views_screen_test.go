@@ -185,13 +185,13 @@ func TestViewsListShowsHiddenRowsGrayBelowTheLineAndTheKeysOfTheRow(t *testing.T
 		}
 	}
 	assert.Equal(t, 3, hidden)
-	for _, want := range []string{"up/down select", "enter open", "shift+up/down move", "shift+r reset", "esc close"} {
+	for _, want := range []string{"↑/↓ select", "enter open", "shift+↑/↓ move", "shift+r reset", "esc close"} {
 		assert.Contains(t, out, want)
 	}
 	assert.NotContains(t, out, "hide")
 	assert.NotContains(t, out, "x show")
 	typeText(m, "t")
-	assert.NotContains(t, ansi.Strip(m.screen()), "shift+up/down move", "a move needs the whole list")
+	assert.NotContains(t, ansi.Strip(m.screen()), "shift+↑/↓ move", "a move needs the whole list")
 }
 
 func TestViewsListResetPutsTheDefaultBack(t *testing.T) {
@@ -297,7 +297,7 @@ func TestSettingsViewsPaneKeysAndFooter(t *testing.T) {
 
 	// footer: keys of the highlighted built-in view only
 	h := hintsText(m)
-	for _, want := range []string{"up/down select", "enter open", "shift+up/down move", "shift+r reset", "esc back"} {
+	for _, want := range []string{"↑/↓ select", "enter open", "shift+↑/↓ move", "shift+r reset", "esc back"} {
 		assert.Contains(t, h, want)
 	}
 	for _, bad := range []string{"e edit", "d delete", "r restore", "hide", "x "} {

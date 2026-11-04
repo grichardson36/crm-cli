@@ -49,7 +49,7 @@ Entered with `enter` on the Theme row. Layout: the mode line (`auto | light | da
 | `shift+r` | custom theme with `copied_from` | reset both palettes to that theme after a question |
 | `esc` | pane | from the color rows back to the list, from the list close the pane and restore the chosen theme |
 
-The footer shows only what the highlighted item can do: a built-in shows `enter`, `c`, `esc` (and `tab`, `up/down`). Built-in colors are listed dim and cannot be edited.
+The footer shows only what the highlighted item can do: a built-in shows `enter`, `c`, `esc` (and `tab`, `↑/↓`). Built-in colors are listed dim and cannot be edited.
 
 ## CLI
 

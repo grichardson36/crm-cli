@@ -265,11 +265,11 @@ func selectionActions() []action {
 		{id: "select-all", title: "Select all visible", group: "Bulk", hint: "ctrl+a", keys: []string{"ctrl+a"},
 			desc: "select every visible row, again to clear. The view's sort and filter decide what is visible",
 			when: whenList, run: func(m *Model) tea.Cmd { m.selectAll(); return nil }},
-		{id: "extend-down", title: "Extend selection down", group: "Bulk", hint: "shift+down", keys: []string{"shift+down"},
-			desc: "select the highlighted row and the one below, again to extend by one more row (shift+up takes rows back out)",
+		{id: "extend-down", title: "Extend selection down", group: "Bulk", hint: hkShiftDown, keys: []string{"shift+down"},
+			desc: "select the highlighted row and the one below, again to extend by one more row (" + showKey("shift+up") + " takes rows back out)",
 			when: whenSelectable, run: func(m *Model) tea.Cmd { m.extendSelection(1); return nil }},
-		{id: "extend-up", title: "Extend selection up", group: "Bulk", hint: "shift+up", keys: []string{"shift+up"},
-			desc: "select the highlighted row and the one above, again to extend by one more row (shift+down takes rows back out)",
+		{id: "extend-up", title: "Extend selection up", group: "Bulk", hint: hkShiftUp, keys: []string{"shift+up"},
+			desc: "select the highlighted row and the one above, again to extend by one more row (" + showKey("shift+down") + " takes rows back out)",
 			when: whenSelectable, run: func(m *Model) tea.Cmd { m.extendSelection(-1); return nil }},
 	}
 }

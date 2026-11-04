@@ -558,7 +558,7 @@ func TestSettingsViewsPaneEditDeleteRestoreKeys(t *testing.T) {
 	h := hintsText(m)
 	assert.Contains(t, h, "r restore")
 	assert.NotContains(t, h, "e edit", "a deleted view cannot be edited")
-	assert.NotContains(t, h, "shift+up/down move")
+	assert.NotContains(t, h, "shift+↑/↓ move")
 	press(m, "enter")
 	assert.True(t, m.statusIsErr, "a deleted view does not open")
 	assert.Nil(t, m.sv)

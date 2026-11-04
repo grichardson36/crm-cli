@@ -124,7 +124,7 @@ func TestDealRoleCellShowsTheOffer(t *testing.T) {
 	assert.Equal(t, []string{"Create role kingmaker"}, itemLabels(m))
 	view := plain(m.detail.View())
 	assert.Contains(t, view, "Create role kingmaker")
-	assert.Contains(t, plain(m.hintsLine()), "up/down pick")
+	assert.Contains(t, plain(m.hintsLine()), "↑/↓ pick")
 	typeText(m, "")
 	press(m, "ctrl+u")
 	typeText(m, "buyer")

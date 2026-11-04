@@ -128,7 +128,7 @@ func TestHelpPageHintsWrapUnderTheBody(t *testing.T) {
 	lines := screenLines(m)
 	require.Len(t, lines, m.height, "the page keeps the terminal height")
 	assert.Contains(t, lines[len(lines)-2], "any key close")
-	assert.Contains(t, lines[len(lines)-1], "up/down scroll")
+	assert.Contains(t, lines[len(lines)-1], "↑/↓ scroll")
 }
 
 func TestDetailPaneFollowsTheWrappedFooter(t *testing.T) {

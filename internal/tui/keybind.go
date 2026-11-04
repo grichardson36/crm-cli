@@ -99,7 +99,7 @@ func applyKeyOverrides(actions []action, o keys.Overrides) []string {
 				if b.id == id || !b.hasKey(k) || !sameContext(a, b) {
 					continue
 				}
-				clash = fmt.Sprintf("keys.%s: %s is already used by %q (%s). Choose another key or rebind that action first", id, keys.Display(k), b.title, b.id)
+				clash = fmt.Sprintf("keys.%s: %s is already used by %q (%s). Choose another key or rebind that action first", id, showKey(k), b.title, b.id)
 				break
 			}
 			if clash != "" {
@@ -114,7 +114,7 @@ func applyKeyOverrides(actions []action, o keys.Overrides) []string {
 		a.keys = append([]string{}, o[id]...)
 		overridden[id] = true
 		if len(a.keys) > 0 {
-			a.hint = keys.Display(a.keys[0])
+			a.hint = showKey(a.keys[0])
 		}
 	}
 	return problems
@@ -196,7 +196,7 @@ func (m *Model) saveKeys() error {
 func joinKeys(ks []string) string {
 	parts := make([]string, len(ks))
 	for i, k := range ks {
-		parts[i] = keys.Display(k)
+		parts[i] = showKey(k)
 	}
 	return strings.Join(parts, ", ")
 }
@@ -267,7 +267,7 @@ func (m *Model) handleCaptureKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		warn = " warning: " + why + "."
 	}
 	m.confirm = &confirmState{
-		prompt: fmt.Sprintf("bind %s to %s (now %s)?%s", title, keys.Display(norm), old, warn),
+		prompt: fmt.Sprintf("bind %s to %s (now %s)?%s", title, showKey(norm), old, warn),
 		yes: func() {
 			o := keys.Overrides{}
 			for k, v := range m.keyOverrides {
@@ -275,7 +275,7 @@ func (m *Model) handleCaptureKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			}
 			o[id] = []string{norm}
 			m.applyKeys(o)
-			msg := fmt.Sprintf("%s is now %s", title, keys.Display(norm))
+			msg := fmt.Sprintf("%s is now %s", title, showKey(norm))
 			if err := m.saveKeys(); err != nil {
 				m.pendingCmd = m.showToast("Keys: "+msg+", but "+err.Error(), true)
 				return

@@ -68,7 +68,7 @@ func TestPopupFilterAndTitleVariants(t *testing.T) {
 	top, _, _, lines = boxOf(t, m)
 	assert.Contains(t, lines[top+1], "View options")
 	assert.NotContains(t, lines[top+1], ">")
-	assert.Contains(t, strings.Join(lines, "\n"), "left/right change")
+	assert.Contains(t, strings.Join(lines, "\n"), "←/→ change")
 }
 
 func TestPopupHintsFollowTheHighlightedRow(t *testing.T) {
@@ -80,7 +80,7 @@ func TestPopupHintsFollowTheHighlightedRow(t *testing.T) {
 		saved = saved || strings.HasPrefix(it.value, savedPrefix)
 	}
 	hints := m.renderPopupHints(m.overlayHints(), 200)
-	assert.Contains(t, ansi.Strip(hints), "shift+up/down move")
+	assert.Contains(t, ansi.Strip(hints), "shift+↑/↓ move")
 	assert.NotContains(t, ansi.Strip(hints), "delete", "a built-in view cannot be deleted")
 	_ = saved
 }

@@ -18,6 +18,7 @@ BRANCH feat/keymap-b (owner decisions 2026-10-28, keymap part B2, built on main 
 - **Add picker**: tags are objects (`a g`, name prompt, the chip puts the tag on the highlighted object, `u` takes it off). Each kind declares its letter (`objDef.shortcut`), `TestAddShortcutsAreUniqueAndShownInThePicker` keeps them unique.
 
 - **Footer words (CRM-023, 2026-11-03)**: no key changed, only the labels. `d` reads delete on every screen (person with marks, Merge, Sync inbox, the saved view editor), purge only in Archived. `enter` reads open in every object list (Tasks, Organizations and Deals were edit), compare in Merge, accept in the Sync inbox. `tab` on a list reads details. `esc` reads cancel, back or close by what it leaves. The footer also shows `f favorite` and `s snooze` on a person row and `u unlink` on a linked row of the detail pane while there is room. The table is in [[key-hints-in-one-place]].
+- **Key text (CRM-025, 2026-11-04)**: no key changed, only how keys are drawn. The arrows read `↑` `↓` `←` `→` (and `↑/↓`, `←/→`, `shift+↑/↓`) in the footer, popups, modes, the keys page, the palette key column and the Settings Keys pane. Other keys keep their names. One table, `internal/tui/hintkeys.go` (`showKey`), see [[key-hints-in-one-place]]. In this note `up` and `down` name the keys for matching.
 
 **Old key to new key (B2)**
 

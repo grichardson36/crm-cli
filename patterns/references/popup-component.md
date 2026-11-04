@@ -12,7 +12,7 @@ Every overlay is one popup: a centered box with a border over the dimmed screen.
 │ Add person                   │
 │ Add task                     │
 ├──────────────────────────────┤
-│ enter run | esc cancel | up/down select │
+│ enter run | esc cancel | ↑/↓ select │
 └──────────────────────────────┘
 ```
 
@@ -23,7 +23,7 @@ Call `m.openPicker(title, items, onPick)`, or build an `overlay` with `m.newOver
 1. `title`: the title row. With a filter line it is the placeholder.
 2. `items` (`overlayItem`): `label`, `hint` (a key, drawn at the left), `desc` (drawn dim at the right), `disabled` (reason, drawn instead of desc, enter does nothing), `divider` (heading row), `selector` with `current` (a row whose value left and right change), `isCur` (accent label).
 3. Filter: the line shows when the popup is the palette, has `create`, has more than 7 items, or something is typed. A short picker shows its title until the first letter. Typing filters in every popup except one with `noFilter`.
-4. Hints: default is the keys of the highlighted row (`enter pick`, `left/right change` on a selector, `esc cancel`, or `esc close` when nothing can be picked, `up/down select`). `hints` sets fixed hints. `hintsFor` builds them from the highlighted row. One word per action.
+4. Hints: default is the keys of the highlighted row (`enter pick`, `←/→ change` on a selector, `esc cancel`, or `esc close` when nothing can be picked, `↑/↓ select`). `hints` sets fixed hints. `hintsFor` builds them from the highlighted row. One word per action.
 5. Shortcuts and callbacks: `digits`, `letters`, `onPick`, `onCursor` (preview), `onCancel`, `onKey` (extra keys).
 6. `noDesc` hides the desc column. `minW` keeps a minimum text width when the hints need room.
 
@@ -44,7 +44,7 @@ A popup shows no explanatory sentences or action descriptions, but the helpers t
 
 `m.newViewsList(focus)` returns the Views list as an overlay that is not shown. The Views popup shows it. A pane that embeds the list draws its rows with `m.popupListRows(o, width, rows)` and keeps the same `onKey`, `onPick` and `hintsFor`.
 
-The list is the shown views numbered 1 to 0, a divider with no label (drawn as a line), then the hidden views as `dim` rows (gray, no number). `shift+up` and `shift+down` move the highlighted view inside its group. At the edge of its group a move toward the line crosses it: a shown view is hidden and lands first below the line, a hidden view is shown and lands last above it. A move away from the line at the edge does nothing. Settings refuses to cross because it cannot be hidden. The data is the `[modules]` table (order and hidden) and the saved views' `ShowInTabs`, a view's number follows its place among the shown ones. The filter matches names only (`nameOnly`), digits pick a view only while the filter is empty, `enter` opens the highlighted row. `shift+r` restores `modules.Default()`. Hints show only keys of the highlighted row: `up/down select`, `enter open`, `shift+up/down move` (not while a filter is typed), `shift+r reset`, `esc close`. The popup has no edit, delete or restore key: plain letters are typed into the filter. Saved views are managed in the Settings Views pane, which embeds the same list (`m.newViewsListFor(focus, true)` and `popupListRows`, `settingspane.go`) with no filter line, so `e` edit, `d` delete and `r` restore work there and the footer shows them only for the highlighted row.
+The list is the shown views numbered 1 to 0, a divider with no label (drawn as a line), then the hidden views as `dim` rows (gray, no number). `shift+up` and `shift+down` move the highlighted view inside its group. At the edge of its group a move toward the line crosses it: a shown view is hidden and lands first below the line, a hidden view is shown and lands last above it. A move away from the line at the edge does nothing. Settings refuses to cross because it cannot be hidden. The data is the `[modules]` table (order and hidden) and the saved views' `ShowInTabs`, a view's number follows its place among the shown ones. The filter matches names only (`nameOnly`), digits pick a view only while the filter is empty, `enter` opens the highlighted row. `shift+r` restores `modules.Default()`. Hints show only keys of the highlighted row: `↑/↓ select`, `enter open`, `shift+↑/↓ move` (not while a filter is typed), `shift+r reset`, `esc close`. The popup has no edit, delete or restore key: plain letters are typed into the filter. Saved views are managed in the Settings Views pane, which embeds the same list (`m.newViewsListFor(focus, true)` and `popupListRows`, `settingspane.go`) with no filter line, so `e` edit, `d` delete and `r` restore work there and the footer shows them only for the highlighted row.
 
 ## Not a popup
 
