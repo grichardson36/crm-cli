@@ -7,57 +7,57 @@ Inspirations are evidence, not policy. Read a source when its stated question is
 
 ## CRM products
 
-| Source | Use for | Research |
-|---|---|---|
-| [[dex]] | Relationship workflow, cadence, merge | mined |
-| [[clay-me-sh]] | Enrichment and relationship research | partial |
-| [[hubspot]] | Objects, links, merge and import | partial |
-| [[monica]] | Personal relationships and life events | partial |
-| [[folk]] | Flexible records, groups and views | partial |
-| [[attio]] | Object metadata and derived facts | partial |
-| [[pipedrive]] | Deals and pipeline | partial |
-| [[salesforce]] | Organizations, deals and imports | partial |
-| [[jdanielnd-crm-cli]] | CLI CRM baseline | mined |
-| [[dzhng-crm-cli]] | CLI CRM baseline | partial |
+| Source | Use for | Read with | Research |
+|---|---|---|---|
+| [[dex]] | Relationship workflow, cadence, merge | [[standards/product-model]], [[standards/interface]] | mined |
+| [[clay-me-sh]] | Enrichment and relationship research | [[standards/integration]] | partial |
+| [[hubspot]] | Objects, links, merge and import | [[standards/product-model]], [[standards/integration]] | partial |
+| [[monica]] | Personal relationships and life events | [[standards/product-model]] | partial |
+| [[folk]] | Flexible records, groups and views | [[standards/product-model]], [[standards/interface]] | partial |
+| [[attio]] | Object metadata and derived facts | [[standards/product-model]] | partial |
+| [[pipedrive]] | Deals and pipeline | [[standards/product-model]] | partial |
+| [[salesforce]] | Organizations, deals and imports | [[standards/product-model]], [[standards/integration]] | partial |
+| [[jdanielnd-crm-cli]] | CLI CRM baseline | [[standards/interface]], [[standards/system]] | mined |
+| [[dzhng-crm-cli]] | CLI CRM baseline | [[standards/interface]] | partial |
 
 ## Interface and workflow products
 
-| Source | Use for | Research |
-|---|---|---|
-| [[obsidian]] | Local linking, navigation and vault shape | mined |
-| [[pi]] | Agent skills and user-permission boundaries | partial |
-| [[vscode]] | Commands, navigation and editing | partial |
-| [[superhuman]] | Fast triage and command-bar interaction | partial |
-| [[raycast]] | Command palette and discovery | partial |
-| [[linear]] | Keyboard behavior and focused workflows | partial |
-| [[slack]] | Search and messaging interaction | partial |
-| [[github]] | Review and merge workflow | partial |
-| [[notion]] | Objects, properties and views | partial |
-| [[microsoft-office]] | Familiar edit and undo behavior | partial |
-| [[vim-and-lazygit]] | Keyboard-first interaction | partial |
+| Source | Use for | Read with | Research |
+|---|---|---|---|
+| [[obsidian]] | Local linking, navigation and vault shape | [[standards/interface]], [[standards/system]] | mined |
+| [[pi]] | Agent skills and user-permission boundaries | [[standards/system]] | partial |
+| [[vscode]] | Commands, navigation and editing | [[standards/interface]] | partial |
+| [[superhuman]] | Fast triage and command-bar interaction | [[standards/interface]] | partial |
+| [[raycast]] | Command palette and discovery | [[standards/interface]] | partial |
+| [[linear]] | Keyboard behavior and focused workflows | [[standards/interface]] | partial |
+| [[slack]] | Search and messaging interaction | [[standards/interface]] | partial |
+| [[github]] | Review and merge workflow | [[standards/interface]], [[standards/operations]] | partial |
+| [[notion]] | Objects, properties and views | [[standards/product-model]], [[standards/interface]] | partial |
+| [[microsoft-office]] | Familiar edit and undo behavior | [[standards/interface]] | partial |
+| [[vim-and-lazygit]] | Keyboard-first interaction | [[standards/interface]] | partial |
 
 ## Tasks and scheduling
 
-| Source | Use for | Research |
-|---|---|---|
-| [[todoist]] | Quick add, reminders and task behavior | partial |
-| [[ticktick]] | Task workflow and input syntax | partial |
-| [[things]] | Personal task workflow | partial |
-| [[super-productivity]] | Task fields and shortcuts | partial |
-| [[fantastical]] | Date input and scheduling | partial |
-| [[motion]] | Scheduling and time-block ideas | mined |
-| [[calendly]] | Scheduling boundaries | partial |
+| Source | Use for | Read with | Research |
+|---|---|---|---|
+| [[todoist]] | Quick add, reminders and task behavior | [[standards/product-model]], [[standards/interface]] | partial |
+| [[ticktick]] | Task workflow and input syntax | [[standards/product-model]], [[standards/interface]] | partial |
+| [[things]] | Personal task workflow | [[standards/product-model]] | partial |
+| [[super-productivity]] | Task fields and shortcuts | [[standards/product-model]], [[standards/interface]] | partial |
+| [[fantastical]] | Date input and scheduling | [[standards/product-model]], [[standards/interface]] | partial |
+| [[motion]] | Scheduling and time-block ideas | [[standards/product-model]] | mined |
+| [[calendly]] | Scheduling boundaries | [[standards/product-model]] | partial |
 
 ## Protocols and local operation
 
-| Source | Use for | Research |
-|---|---|---|
-| [[outlook]] | Contact and calendar interoperability | bookmarked |
-| [[thunderbird]] | Contact and calendar interoperability | bookmarked |
-| [[caldav-and-icalendar-standards]] | Calendar and UID rules | mined |
-| [[obsidian-sync-and-publish]] | Local-first publishing and sync | bookmarked |
-| [[simplefin-and-exe-dev]] | Local executable operation | bookmarked |
-| [[us]] | Owner product direction | ongoing |
+| Source | Use for | Read with | Research |
+|---|---|---|---|
+| [[outlook]] | Contact and calendar interoperability | [[standards/integration]] | bookmarked |
+| [[thunderbird]] | Contact and calendar interoperability | [[standards/integration]] | bookmarked |
+| [[caldav-and-icalendar-standards]] | Calendar and UID rules | [[standards/integration]] | mined |
+| [[obsidian-sync-and-publish]] | Local-first publishing and sync | [[standards/integration]], [[standards/system]] | bookmarked |
+| [[simplefin-and-exe-dev]] | Local executable operation | [[standards/operations]] | bookmarked |
+| [[us]] | Owner product direction | [[core]] | ongoing |
 
 ## Research queue
 

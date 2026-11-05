@@ -5,7 +5,7 @@ type: guide
 
 This vault is a small decision system. Load [[core]], which supplies the gates. This file routes a change to the standards that govern it. [[open-discrepancies]] records owner-blocked questions and code that breaks a governing rule.
 
-## Standards Domains
+## Domains and standards
 
 Domains label the parts of the program a change affects. They select area standards; they do not create another decision layer.
 
@@ -26,6 +26,5 @@ Most changes apply to more than one domain. Start with [[core]], identify every 
 - [[inspirations]]
 - [[open-discrepancies]]
 - [[completed-roadmap]]
-- [[pattern-audit]]
 
 Never test on a real database. Use a temporary database or a copy.

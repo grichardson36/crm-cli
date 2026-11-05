@@ -30,7 +30,7 @@ Only an owner decision adds or changes a core gate. Add one only when all are tr
 4. No existing core gate can answer it without becoming unclear.
 5. It can be stated as one short question with a clear pass or fail.
 
-Otherwise update an area standard, roadmap task, reference, research note or discrepancy.
+Otherwise update an area standard, roadmap task, research note or discrepancy.
 
 ## Working with the owner
 
@@ -62,11 +62,11 @@ Use one checklist under `# Roadmap`, with `next` or `someday` priority. Preserve
 
 The first missing badge identifies the next gate. A failed gate retains its previous badges. Skip work only when its gate is already satisfied with evidence. Never invent a passing result.
 
-**Improve the process:** When a gate exposes unclear, conflicting, or workaround-dependent guidance, fix the guidance at the lowest sufficient layer before continuing. Record only an owner-blocked question in [[open-discrepancies]].
+**Improve the process:** When a gate exposes unclear, conflicting, or workaround-dependent guidance, stop and fix the guidance at the lowest sufficient layer with the owner before continuing. Record only an owner-blocked question in [[open-discrepancies]].
 
 ### 1. Plan 🧭
 
-**INPUTS:** `core.md`, `index.md`, the applicable area standards, request or conversation, relevant code and evidence.
+**INPUTS:** `core.md`, `AGENTS.md`, the applicable area standards, request or conversation, relevant code and evidence.
 
 **INSTRUCTIONS:**
 
@@ -98,6 +98,7 @@ The first missing badge identifies the next gate. A failed gate retains its prev
 - Tests derive from approved scenarios, never from implementation behavior.
 - Implementation agents may not weaken tests or alter approved scenarios to obtain a pass.
 - Keep changes small and within approved scope.
+- If implementation exposes a behavior or scope decision, return it to Plan with numbered options and a recommendation. Do not choose it locally.
 
 **WORKFLOW:**
 
@@ -107,7 +108,7 @@ The first missing badge identifies the next gate. A failed gate retains its prev
 4. **Refactor:** Improve the code without changing behavior. Keep tests green.
 5. Repeat steps 1–4 until all approved scenarios are implemented.
 
-**REPORT:** Record scenario-to-test references, implementation changes and red/green evidence in the task.
+**REPORT:** Record only scenario-to-test references, implementation changes, red/green evidence and blocking decisions in the task.
 
 **GATE:** Every approved scenario has a passing test and implementation, with no unauthorized changes to requirements or tests. Add 🔨.
 
@@ -150,7 +151,7 @@ The first missing badge identifies the next gate. A failed gate retains its prev
 2. Check architecture, naming, canonical data, applicable doors, safety, reversibility and sync behavior.
 3. Verify test integrity, evidence and compliance with applicable area standards.
 4. Resolve findings. Return failed work to the appropriate earlier gate and invalidate affected badges.
-5. Obtain owner decisions for unresolved deviations or changes to requirements and core gates.
+5. Present each unresolved deviation or requirement change as numbered options with a recommendation. Wait for the owner decision.
 
 **REPORT:** Record findings, resolutions and any remaining approved exceptions.
 
@@ -158,7 +159,7 @@ The first missing badge identifies the next gate. A failed gate retains its prev
 
 ### 5. Document 📚
 
-**INPUTS:** Reviewed changes, `core.md`, `index.md` and relevant project documentation.
+**INPUTS:** Reviewed changes, `core.md`, `AGENTS.md` and relevant project documentation.
 
 **INSTRUCTIONS:**
 
@@ -177,7 +178,7 @@ The first missing badge identifies the next gate. A failed gate retains its prev
 8. Make de minimis updates to the applicable area standard or none, as appropriate.
 9. Remove the completed task and its working notes from the active roadmap.
 
-**REPORT:** Final implementation reference and archived completion record.
+**REPORT:** Final implementation reference, verified checks and archived completion record.
 
 **GATE:** Code is integrated, required checks pass, documentation is current and the completion record exists. The task no longer appears in the active roadmap.
 
