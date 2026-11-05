@@ -10,8 +10,8 @@ research: partial
 **Research state.** partly researched. See [[inspirations]].
 
 **What we take.**
-- The value is the feed and the review loop, not data entry. [[core]] [[core]]
-- Reconnect prompts and daily Review suggestions. [[core]]
+- The value is the feed and the review loop, not data entry. [[standards/integration]] [[standards/integration]]
+- Reconnect prompts and daily Review suggestions. [[standards/integration]]
 
 **What we leave.** Passive auto-capture and enrichment, which a local-first tool cannot do without adapters.
 

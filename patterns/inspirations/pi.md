@@ -10,6 +10,6 @@ research: partial
 **Research state.** partly researched. See [[inspirations]].
 
 **What we take.**
-- Data and instructions before code that runs with user permissions. [[core]]
+- Data and instructions before code that runs with user permissions. [[standards/system]]
 
 **Sources.** pi.dev/docs/latest/skills and /extensions (CRM-UX-RESEARCH.md).

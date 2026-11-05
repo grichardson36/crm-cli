@@ -10,11 +10,11 @@ research: mined
 **Research state.** mined. See [[inspirations]].
 
 **What we take.**
-- Keep-in-touch cadence per person with an enum (7 days, 14 days, 1 month, 42 days, 3 months, 6 months, 1 year, never) and priority tiers (Top, High, Medium, Low, None). [[core]] [[core]]
-- Merge-and-fix duplicates with a compare screen. [[core]]
-- User-defined note types, timeline items that carry meeting type and calendar event id. [[core]] [[core]]
-- CSV import with column mapping that creates custom fields from unknown columns. [[core]]
-- Dex already exposes API, MCP, CLI and Zapier, which validates the agent-surface direction. [[core]]
+- Keep-in-touch cadence per person with an enum (7 days, 14 days, 1 month, 42 days, 3 months, 6 months, 1 year, never) and priority tiers (Top, High, Medium, Low, None). [[standards/product-model]] [[standards/product-model]]
+- Merge-and-fix duplicates with a compare screen. [[standards/product-model]]
+- User-defined note types, timeline items that carry meeting type and calendar event id. [[standards/product-model]] [[standards/product-model]]
+- CSV import with column mapping that creates custom fields from unknown columns. [[standards/product-model]]
+- Dex already exposes API, MCP, CLI and Zapier, which validates the agent-surface direction. [[standards/product-model]]
 
 **What we leave.** AI copilot and nightly summaries, SMS and WhatsApp reminders, team workspaces, paid-only API access. Dex has no documented command palette.
 
@@ -22,4 +22,4 @@ research: mined
 
 **Gaps to research.** Confirm field shapes through the Dex REST API (needs the Professional plan, not held). LinkedIn feed_items are not imported.
 
-**Sources.** DEX-GAP.md (REA capture 2026-10-13 plus public JS, field names observed, types inferred). The feature-area notes ([[index]]) hold the 94 mined rows. Dex CSV exports 2026-10-13 are imported (4445 contacts, 93 notes). github.com/getdex/agent-skills for the CLI and MCP docs.
+**Sources.** DEX-GAP.md (REA capture 2026-10-13 plus public JS, field names observed, types inferred). The old feature catalog was retired; current work lives in the [[core#Roadmap|roadmap]]. Dex CSV exports 2026-10-13 are imported (4445 contacts, 93 notes). github.com/getdex/agent-skills for the CLI and MCP docs.

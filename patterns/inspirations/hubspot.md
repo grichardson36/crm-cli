@@ -10,11 +10,11 @@ research: partial
 **Research state.** partly researched. See [[inspirations]].
 
 **What we take.**
-- Record layout: identity and actions on the left, overview and timeline in the middle, upcoming work first with search, filters and pinning. [[core]] [[core]]
-- Associations dialog for linking records from either record. [[standards/product-model]] [[core]]
-- Mention a user by typing @ and picking from a dropdown. [[core]]
-- Limits on custom tabs (five) and fixed Activities tab keep records clean. [[core]]
-- Global search groups results by record type. [[core]]
+- Record layout: identity and actions on the left, overview and timeline in the middle, upcoming work first with search, filters and pinning. [[standards/product-model]] [[standards/product-model]]
+- Associations dialog for linking records from either record. [[standards/product-model]] [[standards/product-model]]
+- Mention a user by typing @ and picking from a dropdown. [[standards/product-model]]
+- Limits on custom tabs (five) and fixed Activities tab keep records clean. [[standards/product-model]]
+- Global search groups results by record type. [[standards/product-model]]
 
 **What we leave.** Ticketing, shared inbox, live chat, quotes, sequences. They serve teams, not one user.
 

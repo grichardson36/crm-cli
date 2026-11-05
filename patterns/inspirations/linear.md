@@ -10,6 +10,6 @@ research: partial
 **Research state.** partly researched. See [[inspirations]].
 
 **What we take.**
-- Flat bar with recents on empty. [[core]] [[core]]
+- Flat bar with recents on empty. [[standards/interface]] [[standards/interface]]
 
 **Sources.** linear.app/enablement/guide/navigating-linear and fastshortcuts.com (search).

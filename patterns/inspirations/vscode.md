@@ -10,6 +10,6 @@ research: partial
 **Research state.** partly researched. See [[inspirations]].
 
 **What we take.**
-- Prefix scopes in one bar. [[core]] [[core]]
+- Prefix scopes in one bar. [[standards/interface]] [[standards/interface]]
 
 **Sources.** code.visualstudio.com/docs/getstarted/userinterface. Only the palette, Quick Open and ? are confirmed on the official page.

@@ -10,7 +10,7 @@ research: partial
 **Research state.** partly researched. See [[inspirations]].
 
 **What we take.**
-- Hooks and a skills file as agent surface. [[core]] [[core]]
+- Hooks and a skills file as agent surface. [[standards/interface]] [[standards/interface]]
 
 **What we leave.** Stores emails, phones and companies as JSON text columns and creates schema inline, which fights Dex-style features. Rejected as the base.
 

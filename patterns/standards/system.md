@@ -50,4 +50,4 @@ MCP ─┘              │
 
 ## Evidence
 
-Feature work is in [[features/system]].
+Current work is in the [[core#Roadmap|roadmap]].

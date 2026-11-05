@@ -10,7 +10,7 @@ research: bookmarked
 **Research state.** bookmarked, not researched in detail. See [[inspirations]].
 
 **What we take.**
-- Sync maps to optional hosted end-to-end encrypted sync. Publish maps to hosted booking links and a hosted CardDAV address. [[core]]
+- Sync maps to optional hosted end-to-end encrypted sync. Publish maps to hosted booking links and a hosted CardDAV address. [[standards/integration]]
 
 **What we leave.** Anything that makes hosting a requirement.
 

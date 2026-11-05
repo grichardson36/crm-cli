@@ -10,7 +10,7 @@ research: partial
 **Research state.** partly researched. See [[inspirations]].
 
 **What we take.**
-- @ means a person. [[core]]
-- Resolve unresolved names after send in one batch. [[core]]
+- @ means a person. [[standards/interface]]
+- Resolve unresolved names after send in one batch. [[standards/interface]]
 
 **Sources.** slack.com/help/articles/205240127 [doc].

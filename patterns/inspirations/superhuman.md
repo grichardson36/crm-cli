@@ -10,8 +10,8 @@ research: partial
 **Research state.** partly researched. See [[inspirations]].
 
 **What we take.**
-- Shortcut and alias beside every action. [[core]]
-- Rank: fuzzy match, then score, then recency and context boost. [[core]]
-- Toast with undo. [[core]]
+- Shortcut and alias beside every action. [[standards/interface]]
+- Rank: fuzzy match, then score, then recency and context boost. [[standards/interface]]
+- Toast with undo. [[standards/interface]]
 
 **Sources.** blog.superhuman.com/how-to-build-a-remarkable-command-palette [doc]. The toast detail is general knowledge.

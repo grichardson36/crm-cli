@@ -11,8 +11,8 @@ research: partial
 
 **What we take.**
 - Groups as workflow databases: per-group fields and pipeline views serve many uses from one contact store. [[standards/product-model]]
-- Provenance such as last enriched is cheap and useful. [[core]]
-- Quiet-contact nudges and an import logged in the timeline. [[core]]
+- Provenance such as last enriched is cheap and useful. [[standards/product-model]]
+- Quiet-contact nudges and an import logged in the timeline. [[standards/product-model]]
 
 **What we leave.** Sequences with waits and branching, Chrome capture extension.
 

@@ -10,8 +10,8 @@ research: partial
 **Research state.** partly researched. See [[inspirations]].
 
 **What we take.**
-- at for location. [[core]]
-- Quoted text is a no-parse zone. [[core]]
-- ! repetition for priority. [[core]]
+- at for location. [[standards/product-model]]
+- Quoted text is a no-parse zone. [[standards/product-model]]
+- ! repetition for priority. [[standards/product-model]]
 
 **Sources.** The Sweet Setup guide (2019). Fantastical's own page 404'd, so syntax may have changed.

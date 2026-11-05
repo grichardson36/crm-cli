@@ -10,6 +10,6 @@ research: bookmarked
 **Research state.** bookmarked, not researched in detail. See [[inspirations]].
 
 **What we take.**
-- Install by prompt, flat fee, optional small yearly hosted fee. [[core]]
+- Install by prompt, flat fee, optional small yearly hosted fee. [[standards/operations]]
 
 **Sources.** BUSINESS.md.

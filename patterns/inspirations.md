@@ -3,104 +3,82 @@ type: index
 ---
 # Inspirations
 
-Every pattern here comes from an inspiration or from our own ideas ([[us]]). Each note below says what we take, what we leave, where the evidence came from and what is still unresearched. A pattern links to its inspirations with an **Inspired by** line, and each inspiration links to the patterns it informed.
+Inspirations are evidence, not policy. Read a source when its stated question is relevant. [[core]] and the area standards own decisions.
 
-Part of the [[index]]. Design gates and pattern guidance are in [[core]].
+## CRM products
 
-## CRMs
-
-| Inspiration           | Research | Patterns informed                                                                                                                  |
-| --------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| [[dex]]               | mined    | [[core]], [[core]], [[core]], [[core]] +3 |
-| [[clay-me-sh]]        | partial  | [[core]], [[core]]                                                                           |
-| [[hubspot]]           | partial  | [[core]], [[core]], [[standards/product-model]], [[core]] +9                            |
-| [[monica]]            | partial  | [[standards/product-model]], [[core]], [[core]], [[standards/product-model]]                |
-| [[folk]]              | partial  | [[core]], [[standards/product-model]], [[core]]                                                                 |
-| [[attio]]             | partial  | [[standards/product-model]], [[standards/product-model]], [[core]]                                                                |
-| [[pipedrive]]         | partial  | [[core]], [[core]], [[core]], [[core]] +1                     |
-| [[salesforce]]        | partial  | [[core]], [[core]], [[core]], [[core]], [[standards/product-model]] |
-| [[jdanielnd-crm-cli]] | mined    | [[core]]                                                                                                           |
-| [[dzhng-crm-cli]]     | partial  | [[core]], [[core]]                                                                                 |
-
-## Notes, command bars, messaging and editors
-
-| Inspiration | Research | Patterns informed |
+| Source | Use for | Research |
 |---|---|---|
-| [[obsidian]] | mined | [[core]], [[core]], [[core]], [[standards/product-model]] +3 |
-| [[pi]] | partial | [[core]] |
-| [[vscode]] | partial | [[core]], [[core]] |
-| [[superhuman]] | partial | [[core]], [[core]], [[core]] |
-| [[raycast]] | partial | [[core]] |
-| [[linear]] | partial | [[core]], [[core]] |
-| [[slack]] | partial | [[core]], [[core]] |
-| [[github]] | partial | [[core]], [[core]], [[core]] |
-| [[notion]] | partial | [[standards/product-model]], [[core]], [[core]], [[core]] |
-| [[microsoft-office]] | partial | [[core]], [[core]] |
-| [[vim-and-lazygit]] | partial | [[core]], [[core]] |
+| [[dex]] | Relationship workflow, cadence, merge | mined |
+| [[clay-me-sh]] | Enrichment and relationship research | partial |
+| [[hubspot]] | Objects, links, merge and import | partial |
+| [[monica]] | Personal relationships and life events | partial |
+| [[folk]] | Flexible records, groups and views | partial |
+| [[attio]] | Object metadata and derived facts | partial |
+| [[pipedrive]] | Deals and pipeline | partial |
+| [[salesforce]] | Organizations, deals and imports | partial |
+| [[jdanielnd-crm-cli]] | CLI CRM baseline | mined |
+| [[dzhng-crm-cli]] | CLI CRM baseline | partial |
 
-## Task apps and quick add
+## Interface and workflow products
 
-| Inspiration | Research | Patterns informed |
+| Source | Use for | Research |
 |---|---|---|
-| [[todoist]] | partial | [[core]], [[core]], [[core]], [[core]] +1 |
-| [[ticktick]] | partial | [[core]], [[core]], [[core]] |
-| [[things]] | partial | [[core]] |
-| [[super-productivity]] | partial | [[core]], [[core]] |
+| [[obsidian]] | Local linking, navigation and vault shape | mined |
+| [[pi]] | Agent skills and user-permission boundaries | partial |
+| [[vscode]] | Commands, navigation and editing | partial |
+| [[superhuman]] | Fast triage and command-bar interaction | partial |
+| [[raycast]] | Command palette and discovery | partial |
+| [[linear]] | Keyboard behavior and focused workflows | partial |
+| [[slack]] | Search and messaging interaction | partial |
+| [[github]] | Review and merge workflow | partial |
+| [[notion]] | Objects, properties and views | partial |
+| [[microsoft-office]] | Familiar edit and undo behavior | partial |
+| [[vim-and-lazygit]] | Keyboard-first interaction | partial |
 
-## Calendars and scheduling
+## Tasks and scheduling
 
-| Inspiration | Research | Patterns informed |
+| Source | Use for | Research |
 |---|---|---|
-| [[fantastical]] | partial | [[core]], [[core]], [[core]] |
-| [[motion]] | mined | [[core]], [[core]] |
-| [[calendly]] | partial | [[core]] |
-| [[outlook]] | bookmarked | [[standards/integration]], [[core]] |
-| [[thunderbird]] | bookmarked | [[standards/integration]] |
+| [[todoist]] | Quick add, reminders and task behavior | partial |
+| [[ticktick]] | Task workflow and input syntax | partial |
+| [[things]] | Personal task workflow | partial |
+| [[super-productivity]] | Task fields and shortcuts | partial |
+| [[fantastical]] | Date input and scheduling | partial |
+| [[motion]] | Scheduling and time-block ideas | mined |
+| [[calendly]] | Scheduling boundaries | partial |
 
-## Standards
+## Protocols and local operation
 
-| Inspiration | Research | Patterns informed |
+| Source | Use for | Research |
 |---|---|---|
-| [[caldav-and-icalendar-standards]] | mined | [[core]], [[standards/integration]], [[core]] |
+| [[outlook]] | Contact and calendar interoperability | bookmarked |
+| [[thunderbird]] | Contact and calendar interoperability | bookmarked |
+| [[caldav-and-icalendar-standards]] | Calendar and UID rules | mined |
+| [[obsidian-sync-and-publish]] | Local-first publishing and sync | bookmarked |
+| [[simplefin-and-exe-dev]] | Local executable operation | bookmarked |
+| [[us]] | Owner product direction | ongoing |
 
-## Business and style
+## Research queue
 
-| Inspiration | Research | Patterns informed |
-|---|---|---|
-| [[obsidian-sync-and-publish]] | bookmarked | [[core]] |
-| [[simplefin-and-exe-dev]] | bookmarked | [[core]] |
-
-## Our own
-
-| Inspiration | Research | Patterns informed |
-|---|---|---|
-| [[us]] | ongoing | [[core]], [[core]], [[core]], [[core]] +1 |
-
-## Research status key
-
-- mined: read in depth, rows built into the feature-area notes (see [[index]]) or a plan file.
-- partial: some first-party pages read, some claims from search summaries. Each note marks which.
-- bookmarked: named as an inspiration, not researched in detail.
-
-## Research queue (gaps surfaced to the owner)
-
-1. Clay/me.sh cadence, groups and search: third-party only. Needs first-party docs or a trial.
+1. Clay/me.sh cadence, groups and search: obtain first-party evidence or a trial.
 2. Dex REST shapes: blocked on the Professional plan.
-3. TickTick and Fantastical syntax: old third-party sources. Fetch official pages.
-4. Outlook and Thunderbird calendar behaviour: official pages failed. Re-check before building.
+3. TickTick and Fantastical syntax: replace old third-party material with official sources.
+4. Outlook and Thunderbird calendar behavior: re-check first-party sources before building.
 5. Monica gifts, debts and life events: marketing copy only.
-6. Link verbs: how HubSpot, Attio, Folk, Notion and Monica add a link from the other side (needed for [[standards/product-model]] verification). Not yet researched in first-party docs.
-7. Restore and trash conventions: HubSpot, Notion and Gmail restore flows (for [[core]]).
-8. Object registries and generic verbs: how Attio, Notion and Folk expose one verb set across object types (for [[standards/product-model]]).
-9. Local-first community sync standard: Ink & Switch, Automerge, cr-sqlite, Replicache, Linear, ElectricSQL, Actual Budget. Field-level merge, structured-to-flat mappings, deletes, conflict display (for [[core]]).
-10. Terminal UI platform and images: which terminals draw images (Sixel, Kitty, iTerm2 protocols; Windows Terminal), whether Bubble Tea can host them, or whether another TUI stack or a native/web front end is needed for logos and photos. Owner open decision 2026-10-19 ([[features/product-model]] M16). First pass done 2026-10-20: [[research-terminal-images]]. Spikes pending.
-11. Enrichment providers: Clay, Anymailfinder and similar APIs: fields, pricing, rate limits, terms (for [[core]], [[features/integration]]).
-12. Module customization: how Notion, Obsidian, Raycast, HubSpot and Attio let users turn parts of the UI on or off and reorder them (for [[core]]).
-13. Keybindings: first pass [[research-keybindings]] (herdr, Obsidian, Primer/GitLab). Still to read: Obsidian default table, Superhuman, Linear, Gmail, helix, Zellij, tmux, Things, Todoist.
+6. Link verbs: how CRM products add a link from either end.
+7. Restore and trash conventions.
+8. Generic object registries and verbs.
+9. Local-first field-level sync and conflict display.
+10. Terminal image support and its value over text fallbacks.
+11. Enrichment-provider fields, pricing, terms and consent.
+12. User-customized modules and ordering.
+13. Keybinding conventions across keyboard-first applications.
 
 ## Adding an inspiration
 
-1. Research with the `research` skill (or REA for shipped apps). Prefer first-party pages and tag each claim doc, search or general.
-2. Add one note in `inspirations/` using the layout of [[dex]]: What it is, Research state, What we take (each item links to a pattern), What we leave, Where we beat it, Gaps, Sources.
-3. If it changes a design decision, apply [[core]], then amend the applicable area standard when its criteria are met and add the **Inspired by** line.
-4. Add the note to the table above.
+1. Research with the `research` skill or REA. Prefer first-party sources and label each claim by evidence quality.
+2. Add a source note with: what it is, research state, what we take, what we leave, gaps and sources.
+3. Link each relevant takeaway to its area standard. Do not treat the source as a decision.
+4. If evidence changes a decision, apply [[core]] and amend the applicable standard only when its admission rules pass.
+5. Add the source to the index above.

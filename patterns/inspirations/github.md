@@ -10,6 +10,6 @@ research: partial
 **Research state.** partly researched. See [[inspirations]].
 
 **What we take.**
-- @ for people, # for references, free text stays text. [[core]] [[core]] [[core]]
+- @ for people, # for references, free text stays text. [[standards/interface]] [[standards/interface]] [[standards/interface]]
 
 **Sources.** docs.github.com basic-writing-and-formatting-syntax [doc].

@@ -25,4 +25,4 @@ Import, export, sync, enrichment, CardDAV, replica transport and external protoc
 
 ## Evidence
 
-[[research-sync-standard]] and [[research-relationship-models]] are evidence. Feature work is in [[features/integration]].
+[[research-sync-standard]] and [[research-relationship-models]] are evidence. Current work is in the [[core#Roadmap|roadmap]].
