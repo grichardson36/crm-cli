@@ -12,13 +12,13 @@ This pattern language and the program are enforced by these core gates. Violatio
 5. **Source of truth:** Is every representation canonical, a derived projection or an approved boundary translation? Anything else is a duplicate. Delete it or record a discrepancy before extending the concept.
 6. **Behavior:** Can every applicable CLI, TUI, MCP and agent door use one behavior with the same validation and effects? State any omitted door in the roadmap task.
 7. **Safety and boundaries:** Is the change validated, reversible, archive-safe and sync-safe? Do external inputs and outputs map into the canonical CRM model rather than define it?
-8. **Evidence and escalation:** If a gate does not answer the question, use relevant standards, project research and inspirations. If still unresolved, record the gap and recommendation for the owner. Do not invent a local exception.
+8. **Evidence and escalation:** If a gate does not answer the question, use relevant standards and [[evidence]]. If still unresolved, record the gap and recommendation for the owner. Do not invent a local exception.
 
 ## Maintain an area standard
 
 Use the standard selected by [[AGENTS]] when a core gate needs a reusable, owner-decided answer. A standard owns one software area. It holds only current reusable rules, a small current-shape summary and observable checks.
 
-Do not put roadmap rows, branch history, research, command lists, schema dumps or one-screen decisions in a standard. Put feature-specific work in the roadmap; put external evidence in research or inspirations; put owner-blocked questions in [[open-discrepancies]].
+Do not put roadmap rows, branch history, evidence, command lists, schema dumps or one-screen decisions in a standard. Put feature-specific work in the roadmap; put external evidence in [[evidence]]; put owner-blocked questions in [[open-discrepancies]].
 
 ## Add a core gate
 

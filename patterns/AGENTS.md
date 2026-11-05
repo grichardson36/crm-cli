@@ -22,8 +22,7 @@ Most changes apply to more than one domain. Start with [[core]], identify every 
 
 ## Evidence and records
 
-- Research notes in `research/`
-- [[inspirations]]
+- [[evidence]]
 - [[open-discrepancies]]
 - [[completed-roadmap]]
 
