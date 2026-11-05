@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 
 	"charm.land/bubbles/v2/spinner"
 	"charm.land/bubbles/v2/textinput"
@@ -652,7 +653,7 @@ func (m *Model) peopleRows() []row {
 		}
 		people = sorted
 	}
-	terms := strings.Fields(strings.ToLower(m.query))
+	terms := filterTerms(m.query)
 	var rows []row
 	for _, p := range people {
 		if !matchesAlias(p, terms, m.aliasTable()) {
@@ -676,6 +677,42 @@ func personRowOf(p model.PersonSummary) row {
 	return row{personID: p.ID, title: name, sub: sub, meta: p.KeepInTouch}
 }
 
+// filterTerms splits a list filter into words. A #tag may be quoted to hold spaces, #"University of Florida (UF)",
+// and comes back as the term #university of florida (uf).
+func filterTerms(q string) []string {
+	q = strings.ToLower(q)
+	var out []string
+	for q = strings.TrimSpace(q); q != ""; q = strings.TrimSpace(q) {
+		if strings.HasPrefix(q, `#"`) {
+			if end := strings.Index(q[2:], `"`); end >= 0 {
+				out = append(out, "#"+strings.TrimSpace(q[2:2+end]))
+				q = q[3+end:]
+				continue
+			}
+		}
+		i := strings.IndexFunc(q, unicode.IsSpace)
+		if i < 0 {
+			i = len(q)
+		}
+		out = append(out, q[:i])
+		q = q[i:]
+	}
+	return out
+}
+
+// hasTagTerm is the tag rule of a saved view: the tag list (comma separated) holds the name or one of its
+// children, ignoring case. #work holds for work/clients and not for network.
+func hasTagTerm(tags, name string) bool {
+	name = strings.ToLower(strings.TrimSpace(name))
+	for _, t := range strings.Split(tags, ",") {
+		t = strings.ToLower(strings.TrimSpace(t))
+		if t == name || strings.HasPrefix(t, name+"/") {
+			return true
+		}
+	}
+	return false
+}
+
 func matches(p model.PersonSummary, terms []string) bool { return matchesAlias(p, terms, nil) }
 
 // matchesAlias is matches with each plain word expanded through the name aliases (Rick finds Richard).
@@ -688,7 +725,7 @@ func matchesAlias(p model.PersonSummary, terms []string, tbl *alias.Table) bool 
 	for i := 0; i < len(terms); i++ {
 		t := terms[i]
 		if strings.HasPrefix(t, "#") {
-			if len(t) > 1 && !strings.Contains(tags, t[1:]) {
+			if len(t) > 1 && !hasTagTerm(p.Tags, t[1:]) {
 				return false
 			}
 			continue

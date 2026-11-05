@@ -327,7 +327,7 @@ func (m *Model) savedRowsIfActive() ([]row, bool, error) {
 			byID[r.taskID] = r
 		}
 	}
-	terms := strings.Fields(strings.ToLower(m.query))
+	terms := filterTerms(m.query)
 	var kept []query.Row
 	rowOf := map[int64]row{}
 	counts := map[string]int{}
@@ -488,7 +488,7 @@ func svSortField(v viewKind, sort string) string {
 func (m *Model) searchToQuery(text string) ([]query.Condition, string) {
 	var conds []query.Condition
 	var words []string
-	for _, t := range strings.Fields(text) {
+	for _, t := range filterTerms(text) {
 		switch {
 		case strings.HasPrefix(t, "#") && len(t) > 1:
 			conds = append(conds, query.Condition{Field: "tag", Op: query.OpHas, Values: []string{t[1:]}})

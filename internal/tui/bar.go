@@ -236,7 +236,7 @@ func (m *Model) barSearch(scope byte, q string) []overlayItem {
 			}
 		}
 	}
-	terms := strings.Fields(strings.ToLower(q))
+	terms := filterTerms(q)
 	people := 0
 	var tagged []overlayItem // people who match only through a tag come after the ones whose own text matches
 	for _, p := range m.people {
@@ -456,7 +456,7 @@ func taggedBy(tags string, terms []string) string {
 		t = strings.TrimSpace(t)
 		low := strings.ToLower(t)
 		for _, term := range terms {
-			if strings.Contains(low, strings.TrimPrefix(term, "#")) {
+			if strings.HasPrefix(term, "#") && hasTagTerm(t, term[1:]) || !strings.HasPrefix(term, "#") && strings.Contains(low, term) {
 				hit = append(hit, "#"+t)
 				break
 			}
