@@ -30,4 +30,4 @@ The application uses one local SQLite database per CRM domain. Repositories own 
 
 ## Evidence
 
-[[open-discrepancies]] records data-model violations. Feature work is in [[features/data]].
+[[open-discrepancies]] records data-model violations. Current work is in the [[core#Roadmap|roadmap]].

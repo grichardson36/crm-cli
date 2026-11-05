@@ -10,21 +10,15 @@ This pattern language and the program are enforced by these core gates. Violatio
 3. **Local boundary:** Does it work without an account or network, with data owned locally?
 4. **Concept and name:** Can an existing object, field, link or activity express the fact? What is its canonical term and class naming convention? Use it in the model, storage and every CRM door.
 5. **Source of truth:** Is every representation canonical, a derived projection or an approved boundary translation? Anything else is a duplicate. Delete it or record a discrepancy before extending the concept.
-6. **Behavior:** Can every applicable CLI, TUI, MCP and agent door use one behavior with the same validation and effects? State any omitted door in the feature record.
+6. **Behavior:** Can every applicable CLI, TUI, MCP and agent door use one behavior with the same validation and effects? State any omitted door in the roadmap task.
 7. **Safety and boundaries:** Is the change validated, reversible, archive-safe and sync-safe? Do external inputs and outputs map into the canonical CRM model rather than define it?
-8. **Evidence and escalation:** If a gate does not answer the question, use relevant standards, project research and inspirations. If still unresolved, record the gap and recommendation for the owner. Do not invent a local exception.
+8. **Evidence and escalation:** If a gate does not answer the question, use relevant standards and [[evidence]]. If still unresolved, record the gap and recommendation for the owner. Do not invent a local exception.
 
 ## Maintain an area standard
 
-Use the standard selected by [[domains]] when a core gate needs a reusable, owner-decided answer. A standard owns one software area. It holds only current reusable rules, a small current-shape summary and observable checks.
+Use the standard selected by [[AGENTS]] when a core gate needs a reusable, owner-decided answer. A standard owns one software area. It holds only current reusable rules, a small current-shape summary and observable checks.
 
-Do not put roadmap rows, branch history, research, command lists, schema dumps or one-screen decisions in a standard. Put feature-specific work in its area worklist; put external evidence in research or inspirations; put owner-blocked questions in [[open-discrepancies]].
-
-## Maintain feature work
-
-Each area worklist contains only active or partly verified work. An item has one globally unique ID, state, checked-out evidence (`not built` when applicable), governing standard, one bounded next step and priority. Do not restate the standard, research or implementation history. A completed item moves as a concise outcome to [[completed-roadmap]].
-
-If an old ID is duplicated, do not silently reuse or rename it. Record the owner decision in [[open-discrepancies]] before assigning a canonical replacement.
+Do not put roadmap rows, branch history, evidence, command lists, schema dumps or one-screen decisions in a standard. Put feature-specific work in the roadmap; put external evidence in [[evidence]]; put owner-blocked questions in [[open-discrepancies]].
 
 ## Add a core gate
 
@@ -36,7 +30,13 @@ Only an owner decision adds or changes a core gate. Add one only when all are tr
 4. No existing core gate can answer it without becoming unclear.
 5. It can be stated as one short question with a clear pass or fail.
 
-Otherwise update an area standard, feature record, reference, research note or discrepancy.
+Otherwise update an area standard, roadmap task, research note or discrepancy.
+
+## Working with the owner
+
+- Use concise, plain, factual language. Lead with the result.
+- When an owner decision changes behavior or scope, present numbered options with a recommendation and its reason. Wait for the answer before proceeding.
+- At each gate, report only the relevant evidence, blocker and next owner decision.
 
 ## Workflow & instructions
 
@@ -62,11 +62,11 @@ Use one checklist under `# Roadmap`, with `next` or `someday` priority. Preserve
 
 The first missing badge identifies the next gate. A failed gate retains its previous badges. Skip work only when its gate is already satisfied with evidence. Never invent a passing result.
 
-**Improve the process:** When a gate exposes unclear, conflicting, or workaround-dependent guidance, fix the guidance at the lowest sufficient layer before continuing. Record only an owner-blocked question in [[open-discrepancies]].
+**Improve the process:** When a gate exposes unclear, conflicting, or workaround-dependent guidance, stop and fix the guidance at the lowest sufficient layer with the owner before continuing. Record only an owner-blocked question in [[open-discrepancies]].
 
 ### 1. Plan 🧭
 
-**INPUTS:** `core.md`, `index.md`, the applicable area standards, request or conversation, relevant code and evidence.
+**INPUTS:** `core.md`, `AGENTS.md`, the applicable area standards, request or conversation, relevant code and evidence.
 
 **INSTRUCTIONS:**
 
@@ -82,7 +82,7 @@ The first missing badge identifies the next gate. A failed gate retains its prev
 4. Load `/grilling` and `/ascii-wireframe` skills.
 5. Challenge ambiguity, contradictions, missing behavior, edge cases and failure conditions through `/grilling`, ATDD/BDD discovery, and wireframing.
 6. Formulate agreed behavior as concise, testable Given/When/Then scenarios. Record implementation decisions, exclusions and applicable doors.
-7. Resolve blocking questions with the owner. Do not silently turn assumptions into requirements.
+7. Present each blocking owner decision as numbered options with a recommendation and its reason. Wait for an answer. Do not silently turn assumptions into requirements.
 
 **REPORT:** Update the roadmap item with intent, decisions, scenarios, test seam and unresolved exceptions.
 
@@ -94,20 +94,21 @@ The first missing badge identifies the next gate. A failed gate retains its prev
 
 **INSTRUCTIONS:**
 
-- Use git worktrees for parallel execution, one sub-agent per branch. The coordinating agent owns integration, final merge and push.
+- Work happens in git worktrees: `git -C crm-cli worktree add .claude/worktrees/<name> -b <branch> main`, one sub-agent per branch, branches fast-forwarded into `main` and pushed. Agents run in the background and report back to you. If an agent stops on a rate limit, resume it with a message instead of doing its work yourself.
 - Tests derive from approved scenarios, never from implementation behavior.
 - Implementation agents may not weaken tests or alter approved scenarios to obtain a pass.
 - Keep changes small and within approved scope.
+- If implementation exposes a behavior or scope decision, return it to Plan with numbered options and a recommendation. Do not choose it locally.
 
 **WORKFLOW:**
 
-1. Select one unimplemented scenario.
+1. Select one unimplemented scenario that has 🧭.
 2. **Red:** Write its test and prove it fails for the intended behavioral reason. If existing code already satisfies the scenario, record the passing evidence instead.
 3. **Green:** Write the minimum code necessary to pass the test. Run relevant regression tests.
 4. **Refactor:** Improve the code without changing behavior. Keep tests green.
 5. Repeat steps 1–4 until all approved scenarios are implemented.
 
-**REPORT:** Record scenario-to-test references, implementation changes and red/green evidence in the task.
+**REPORT:** Record only scenario-to-test references, implementation changes, red/green evidence and blocking decisions in the task.
 
 **GATE:** Every approved scenario has a passing test and implementation, with no unauthorized changes to requirements or tests. Add 🔨.
 
@@ -125,9 +126,10 @@ The first missing badge identifies the next gate. A failed gate retains its prev
 
 1. Verify every approved scenario maps to passing tests across applicable interfaces.
 2. Run relevant integration, contract, regression and invariant checks. During the work run only the affected packages and tests (`go test ./internal/tui -run <regex>`). The full `go vet ./...` and `go test ./...` run once per deploy, inside `deploy/deploy.ps1`, so do not repeat it by hand before a deploy.
-3. Perform a mutation sweep. Investigate surviving meaningful mutations and strengthen inadequate tests.
-4. Prune redundant tests without losing scenario coverage or demonstrated defect detection.
-5. Rerun affected tests and regression checks.
+3. Manually verify behavior that automated tests cannot observe: terminal rendering, modified keys, real-device behavior or sync. Record the result.
+4. Perform a mutation sweep. Investigate surviving meaningful mutations and strengthen inadequate tests.
+5. Prune redundant tests without losing scenario coverage or demonstrated defect detection.
+6. Rerun affected tests and regression checks.
 
 **REPORT:** Record coverage, test results, meaningful mutation survivors and exceptions.
 
@@ -149,7 +151,7 @@ The first missing badge identifies the next gate. A failed gate retains its prev
 2. Check architecture, naming, canonical data, applicable doors, safety, reversibility and sync behavior.
 3. Verify test integrity, evidence and compliance with applicable area standards.
 4. Resolve findings. Return failed work to the appropriate earlier gate and invalidate affected badges.
-5. Obtain owner decisions for unresolved deviations or changes to requirements and core gates.
+5. Present each unresolved deviation or requirement change as numbered options with a recommendation. Wait for the owner decision.
 
 **REPORT:** Record findings, resolutions and any remaining approved exceptions.
 
@@ -157,7 +159,7 @@ The first missing badge identifies the next gate. A failed gate retains its prev
 
 ### 5. Document 📚
 
-**INPUTS:** Reviewed changes, `core.md`, `index.md` and relevant project documentation.
+**INPUTS:** Reviewed changes, `core.md`, `AGENTS.md` and relevant project documentation.
 
 **INSTRUCTIONS:**
 
@@ -167,15 +169,16 @@ The first missing badge identifies the next gate. A failed gate retains its prev
 **WORKFLOW:**
 
 1. Update only documentation affected by the implementation.
-2. Confirm the integrated changes pass required checks.
-3. Merge and push to main. Verify the resulting commit.
-4. Deploy a code change to the running program with `deploy/deploy.ps1` ([[standards/operations|operations]]). Never build, test, copy or swap `bin/crm.exe` by hand.
-5. Add 📚 and mark the task `[x] ✅` only after the implemented result is verified.
-6. Move a concise completion record to [[completed-roadmap]], preserving its ID, outcome, important decisions, exceptions and commit reference.
-7. Make de minimis updates to the applicable area standard or none, as appropriate.
-8. Remove the completed task and its working notes from the active roadmap.
+2. Merge current `main` into the worktree before final verification. Resolve conflicts while preserving both intents.
+3. Confirm the integrated changes pass required checks.
+4. Merge and push to main. Verify the resulting commit.
+5. Deploy a code change to the running program with `deploy/deploy.ps1` ([[standards/operations|operations]]). Never build, test, copy or swap `bin/crm.exe` by hand.
+6. Add 📚 and mark the task `[x] ✅` only after the implemented result is verified.
+7. Move a concise completion record to [[completed-roadmap]], preserving its ID, outcome, important decisions, exceptions and commit reference.
+8. Make de minimis updates to the applicable area standard or none, as appropriate.
+9. Remove the completed task and its working notes from the active roadmap.
 
-**REPORT:** Final implementation reference and archived completion record.
+**REPORT:** Final implementation reference, verified checks and archived completion record.
 
 **GATE:** Code is integrated, required checks pass, documentation is current and the completion record exists. The task no longer appears in the active roadmap.
 
@@ -198,7 +201,7 @@ Items below here are not built.
 	- [ ] Phone number normalization to the E.164 standard. Today `PhoneKey` (`internal/dedupe/normalize.go`) only reduces a number to its last 10 digits for matching, and the stored value stays as typed. Plan: parse with a phone number library using a default region, store the original and the E.164 form, display in national format, match on E.164, and keep the original text for the vCard round trip (see [[research-sync-standard]]).
 	- [ ] Smart linking suggestions (kind of how we want to suggest via enrichment) but these link suggestions come from 1. links you've made (Joey and Hannah Osgood are spouses, Jude Osgood is child of Joey Osgood, so Hannah Osgood may also be parent of Jude Osgood, so Hannah Osgood's link section in her note grayscale-suggests Jude Osgood as a child link) 2. Corroborated from link evidence found via social media networks (Joey lists Hannah as his wife on his profile). Never automatically make a link - suggest it in grayscale and let the user accept or reject the suggestion. We should collect the link suggestions in a place the user can go through them (kind of like Merge view) and further deepen their node graph of relationships. Related connections (orgs, tags, mutual friends, previous related school or work) can help strengthen the suggestion algorithm but should really be left to really strong links typically within family of origin and super close friends. If A is sibling with B and B sibling with C then A is probably sibling with C. We need to think through relationships like that to build a strong semantic model we can convert into code.
 	- [ ] Merge candidates for other object types (Orgs, Tags) to keep the data clean (&=and for instance) all put in the Merge list screen and ctrl+o sortable/filterable/groupable. Base merge screen shows all objects grouped by confidence with object type the user's object type colors. Need to think through merge behavior for these.
-	- [ ] nicknames/aliases variable for People ("Bob" would also show in a search, their official name on social is Robert Borer but I call them Bob Borer), organizations, and tags
+	- [ ] nicknames/aliases variable for People ("Bob" would also show in a search, their official name on social is Robert Borer but I call them Bob Borer), organizations, and tags.
 		- [ ] Incorporate maiden names
 	- [ ] Sorting/Filtering/Grouping improvements
 		- [ ] Add full functionality to all views - make this a modular component
@@ -210,7 +213,7 @@ Items below here are not built.
 	- [ ] Speed up the TUI test suite: 637 tests average 0.46s each with no slow outliers, so look at the per-test setup in `newTestModel` (a seeded database copied per test instead of migrated per test).
 	- [ ] Show an `N marked` count in the status line for Orgs, Deals, Tasks and Tags lists (today only People show it; `esc unmark` is the only cue there).
 	- [ ] Route the Settings list editor (`listeditor.go`) through the key registry so a rebound `d`, `a` or `e` reaches it (today it has its own key handling).
-	- [ ] Tag management gaps against Obsidian Bulk Tag Manager (README: https://github.com/ducktapekiller/obsidian-bulk-tag-manager). Nest, unnest, subtree rename, merge with children, delete subtree, tree view, case duplicates and undo already match. Current tag work is in [[features/product-model]]. Gaps, to be sorted into separate items by the owner:
+	- [ ] Tag management gaps against Obsidian Bulk Tag Manager (README: https://github.com/ducktapekiller/obsidian-bulk-tag-manager). Nest, unnest, subtree rename, merge with children, delete subtree, tree view, case duplicates and undo already match. Gaps, to be sorted into separate items by the owner:
 		- [ ] Batch rename: a table of old and new pairs, import from CSV, and a regex rename.
 		- [ ] Standardise rules with a preview: case strategy, separator style, special characters, accents, applied to all tags after a list of the affected objects (the CLI has `--dry-run`, the TUI has no preview).
 		- [ ] Orphan threshold: find tags used fewer than N times (today only tags used zero times).

@@ -31,4 +31,4 @@ CLI, TUI and MCP are adapters over the same CRM behavior. The TUI exposes views,
 
 ## Evidence
 
-[[research-tui-building-blocks]] and the Stitch design guidance are evidence, not CRM policy. Feature work is in [[features/interface]].
+[[research-tui-building-blocks]] and the Stitch design guidance are evidence, not CRM policy. Current work is in the [[core#Roadmap|roadmap]].

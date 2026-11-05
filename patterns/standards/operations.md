@@ -29,4 +29,4 @@ The primary deployment is one local binary with one local SQLite database. Migra
 
 ## Evidence
 
-Feature work is in [[features/operations]].
+Current work is in the [[core#Roadmap|roadmap]].

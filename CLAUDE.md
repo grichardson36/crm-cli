@@ -8,7 +8,7 @@
 
 `patterns/` is an Obsidian vault and the source of truth for design decisions and features. Consult `patterns/index.md` before any design or feature change, then the notes it links.
 
-- Feature work is grouped in six area worklists in `patterns/features/`. Read the matching area standard before changing an item.
+- The roadmap in `patterns/core.md` is the only active backlog. Read the matching area standard before changing an item.
 - Surface discrepancies and missing standards to the owner with a recommendation. Do not decide alone. The live list is `patterns/records/open-discrepancies.md`.
 - Add a reusable rule only to its area standard. Keep feature work, research and implementation evidence out of standards.
 - Commit messages: `docs:` for vault changes, no co-author lines.

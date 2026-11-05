@@ -42,4 +42,4 @@ Tag <-> any object       taggings
 
 ## Evidence
 
-[[open-discrepancies]] records model violations. Feature work is in [[features/product-model]].
+[[open-discrepancies]] records model violations. Current work is in the [[core#Roadmap|roadmap]].
