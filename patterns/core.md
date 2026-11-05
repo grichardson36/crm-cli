@@ -221,8 +221,34 @@ Items below here are not built.
 		- [ ] Aliases (alias to canonical tag, corrected automatically) and protected tags that bulk operations skip, with wildcards. Aliases overlap the nicknames item above.
 		- [ ] Drag a tag in the tree to restructure it (today the nest and unnest verbs only).
 		- [ ] Tag health statistics: flat versus nested, tags over a length, special characters, separator consistency.
-		- [ ] The People list `#tag` filter is a plain text match on the tag list (`#uf` matches any tag containing "uf" and a name with spaces cannot be typed), while a saved view tag condition matches children properly. Make the list filter use the same tag rule.
+		- [ ] The People list `#tag` filter is a plain text match on the tag list (`#uf` matches any tag containing "uf" and a name with spaces cannot be typed), while a saved view tag condition matches children properly. Make the list filter use the same tag rule. Folded into CRM-028.
 		- [ ] The quick-add `#tag` syntax accepts only letters, digits, `_` and `-`, so a nested tag such as `University of Florida (UF)/Rinker School of Construction Management` cannot be typed there.
+	- [ ] CRM-028: One tag rule and built-in tags computed from the data (next)
+		- Intent: typing `#tag` finds the right people fast. One rule for the TUI filter, saved views and the CLI. Tags have no spaces (Obsidian rule). The program computes some tags from facts so the user does not maintain them. Raised 2026-11-05 from the open roadmap line "People list `#tag` filter" and the owner's reading of [[research-add-and-link-flow]].
+		- Decisions (owner, 2026-11-05):
+			- A tag matches itself and its children, never its siblings. `#work` finds `work` and `work/client`, not `work/partner`. The saved-view rule is the one rule (`tagCond` in `internal/query/compile.go`). The CLI `--tag` follows it too.
+			- Typed text only filters a picker. A pick commits an existing tag. Quick-add will use the same picker (separate item).
+			- Tag names forbid spaces, like Obsidian: letters, digits, `_`, `-`, `/`.
+			- Computed tags are stored nowhere. They show grayed in the picker, cannot be edited, can be hidden, and can get aliases so the user chooses how to type them. They work in every `#` filter and nest like any tag.
+			- Computed tags replace the stored `LinkedIn Connections` (1,310 people) and `Facebook Friends` (1,219) tags. A person with a LinkedIn link is 1,323, with a Facebook link 1,220, from the personal database.
+			- Connection state is a different fact from having a link: `#has/socials/linkedin/connected`, `/following`, `#has/socials/facebook/friends`. Record it in the relationship with the person.
+			- One add-and-link flow for every object type is wanted. Research done, design still open.
+		- Scenarios:
+			- Given Ann is tagged `work/client`, when the filter is `#work` or `#work/client`, then Ann shows. When it is `#work/partner`, `#work/employee` or `#client`, then Ann does not.
+			- Given a tag `buffalo`, when the filter is `#uf`, then no one tagged `buffalo` shows.
+			- Given Ann is tagged `work/client`, when `crm person list --tag work` runs, then Ann is listed.
+			- Given Ann has an email and a LinkedIn link, when the filter is `#boy-scouts-t369 #has/email`, then Ann shows if she also carries `boy-scouts-t369`.
+			- Given a person has no email, then `#has/email` does not show them, and `has/email` does not appear in the stored tag list or as something to rename or delete.
+		- Test seam: `matches` and `filterTerms` in `internal/tui`, `tagCond` in `internal/query`, `PersonRepo` tag listing in `internal/db/repo/person.go`.
+		- Evidence: first slice built on branch `worktree-tag-filter-rule` (TUI filter, 4 unit tests pass, full TUI suite exceeds the 10 minute default). Not gated.
+		- Exceptions (owner decisions open):
+			- Name with spaces typed as a new tag: reject, or convert to a slug. The 219 of 261 personal tags with spaces or special characters, 168 equal to an organization name, need a migration and a review first.
+			- Stored company-name tags: 594 of 618 tagged people already have the link. VIATechnik has 156 tagged and 48 linked. Show the tagged-but-not-linked people before deleting.
+			- Tag handle, label and aliases (slug with free display name), and whether `#` also matches organization names and aliases.
+			- `/connected`, `/following`, `/friends` need data we do not store (`person_handles` holds only kind and value). Start with `#has/...`.
+			- The `#"quoted name"` filter syntax on the branch is the builder's addition. Remove it if tags forbid spaces.
+			- Doors: CLI and MCP behavior for computed tags.
+	- [ ] Location tags such as `#location/us/fl/greater-orlando/space-coast/merritt-island`, so a filter narrows at every level. Needs a public place hierarchy (research a public schema first) and a map from the free-text `location` field onto it. Dex tracks locations, see [[dex]]. Builds on CRM-028 computed tags.
 - ## Someday / maybe
 	- [ ] Node graph view of object nodes and their link edges like [[obsidian]]
 	- [ ] Deep enrichment capabilities - sync to LinkedIn, Facebook, email servers (Gmail, etc), Beeper/messaging apps, phone call history
